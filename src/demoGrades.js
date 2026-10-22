@@ -57,6 +57,8 @@ const DEMO_GRADES_CONFIG = Object.freeze({
   message_rapport_absences: "Les causes de l’absence doivent être notifiées par écrit à l'aide d'un justificatif dans les 48 heures à compter du début de l’absence au secrétariat du département.",
   liste_dep_affichage_appreciations: 'MMI',
   autoriser_justificatifs: false,
+  // Fictive: lets the "Justifier" button show in the demo.
+  absence_secretariat: 'secretariat@exemple.fr',
 })
 
 const EVALUATION_NORMAL = 0

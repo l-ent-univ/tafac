@@ -5,6 +5,9 @@ import { dayText, durationText, formatTime, relativeDayText } from '../planningD
 import { nextOccurrences } from '../planningEvents'
 import { accentStyle } from '../eventAccents'
 import { FULL_BLOCK_HEIGHT } from '../eventBlockLayout'
+import { navigateTo } from '../appRoute'
+import { formatClock } from '../transitClock'
+import { useEventBuses } from '../useDayBuses'
 import PlanningEventBlock from './PlanningEventBlock'
 
 // A row of the sheet's cards (the iOS GroupCard's rows, in the look of
@@ -32,13 +35,46 @@ function SheetRow({ icon, title, detail, onClick }) {
 
 const CARD_CLASSES = 'widget-card widget-card-visible m-0 list-none overflow-hidden border bg-widget-bg px-0 py-1 rounded-[22px] max-md:rounded-[20px]'
 
+// The bus there (the day's first class) and home (its last), from the
+// student's stop (« Bus »); a row to pick that stop when there is none.
+function EventBusRows({ event, events, establishment }) {
+  const buses = useEventBuses(event, events, establishment)
+  if (buses.status === 'off' || buses.status === 'error') return null
+  const openBus = () => navigateTo('bus', { source: 'planning' })
+  if (buses.status === 'no-home') {
+    return <ul className={CARD_CLASSES}><SheetRow icon="carbon:bus" title="Y aller en bus" detail="Choisis ton arrêt pour voir le bus à prendre" onClick={openBus} /></ul>
+  }
+  const describe = (journey) => journey.legs.map((leg) => `${leg.line} à ${formatClock(leg.departAt)}`).join(' puis ')
+  return (
+    <ul className={CARD_CLASSES}>
+      {buses.status === 'loading' ? <SheetRow icon="carbon:bus" title="Recherche du bus…" /> : null}
+      {buses.wantTo ? (
+        <SheetRow
+          icon="carbon:bus"
+          title={buses.to ? `Pars à ${formatClock(buses.to.leaveAt)} · bus ${describe(buses.to)}` : 'Pas de bus pour arriver à temps'}
+          detail={buses.to ? `Sur place à ${formatClock(buses.to.arriveAt)}${buses.to.legs[0].realtime ? ' · temps réel' : ''}` : 'Depuis ton arrêt'}
+          onClick={openBus}
+        />
+      ) : null}
+      {buses.wantFrom ? (
+        <SheetRow
+          icon="carbon:home"
+          title={buses.from ? `Retour : bus ${describe(buses.from)}` : 'Pas de bus retour après ce cours'}
+          detail={buses.from ? `Chez toi vers ${formatClock(buses.from.arriveAt)}` : 'Le dernier bus est déjà parti à cette heure-là'}
+          onClick={openBus}
+        />
+      ) : null}
+    </ul>
+  )
+}
+
 // A class's sheet, laid out as the iOS app's (EventDetailViewController)
 // and drawn as a grade's (GradeDetailModal): the course's colour washing
 // its top, the class's block, a card with its hours, its day and length and
 // its group, then the same course's next classes over 30 days (each one
 // takes the planning to its day). `searching`: those weeks are still on
 // their way.
-function PlanningEventSheet({ event, accent, events, todayKey, searching, onClose, onPickDay }) {
+function PlanningEventSheet({ event, accent, events, todayKey, searching, onClose, onPickDay, establishment = null }) {
   const dialogRef = useRef(null)
   const scrollRef = useRef(null)
   // Content under the header: its blur shows.
@@ -123,10 +159,12 @@ function PlanningEventSheet({ event, accent, events, todayKey, searching, onClos
                   <PlanningEventBlock event={event} accent={accent} variant="regular" width={contentWidth} height={FULL_BLOCK_HEIGHT} style={{ position: 'relative' }} />
                 ) : <div style={{ height: FULL_BLOCK_HEIGHT }} />}
                 <ul className={CARD_CLASSES}>
+                  {event.notice ? <SheetRow icon="carbon:warning-filled" title={event.notice.label} detail={`D’après le mail « ${event.notice.signal.subject} »`} /> : null}
                   <SheetRow icon="carbon:time" title={`De ${formatTime(event.start)} à ${formatTime(event.end)}`} />
                   <SheetRow icon="carbon:calendar" title={`${dayText(event.day)} · ${durationText(event.start, event.end)}`} />
                   {event.group ? <SheetRow icon="carbon:events" title={event.group} /> : null}
                 </ul>
+                <EventBusRows event={event} events={events} establishment={establishment} />
               </div>
               {/* Titled like the sections of Mes notes. */}
               <section className="gd-rise grid gap-3" style={{ '--d': '80ms' }} aria-labelledby="planning-occurrences-title">

@@ -33,3 +33,4 @@ API_GUIDE.md
 
 # Server data (automatic app icons, see docs/SELF_HOSTING.md)
 data/
+bun.lock

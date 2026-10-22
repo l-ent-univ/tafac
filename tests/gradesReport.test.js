@@ -4,6 +4,7 @@ import { buildDemoGradesPayload, buildDemoSemesterGradesPayload } from '../src/d
 import {
   buildAbsenceReport,
   buildGradesReport,
+  buildJustificationMail,
   canDownloadReportPdf,
   computeAverageHistory,
   computeGeneralAverage,
@@ -13,13 +14,16 @@ import {
   describeUeValidation,
   evaluationTypeLabel,
   findNewGrades,
+  formatDuration,
   formatGrade,
   formatHour,
   hasJuryDecision,
+  hoursToJustify,
   htmlToPlainText,
   listGradeSignatures,
   listGradesSemesters,
   projectAverages,
+  summarizeAbsencesBySubject,
   summarizeAverage,
 } from '../src/gradesReport.js'
 
@@ -397,3 +401,43 @@ test('formatHour and htmlToPlainText', () => {
     'Jurys le 28 janvier.\nMerci !',
   )
 })
+
+test('summarizeAbsencesBySubject adds up missed hours per subject', () => {
+  const payload = buildDemoGradesPayload()
+  const report = buildAbsenceReport(payload, payload['relevé'], payload.config)
+  assert.deepEqual(report.entries.map((entry) => entry.hours), [2, 0, 2, 2])
+
+  assert.deepEqual(summarizeAbsencesBySubject(report.entries), [
+    { subject: 'R5.11 – Développement Front', hours: 4, unjustifiedHours: 2, count: 2 },
+    { subject: 'SAÉ 5.01 – Prototype interactif', hours: 2, unjustifiedHours: 0, count: 1 },
+  ])
+  assert.equal(formatDuration(1.5), '1h30')
+  assert.equal(formatDuration(4), '4h')
+})
+
+test('hoursToJustify counts 48 hours from the start of the absence', () => {
+  const entry = { date: '2026-09-25', startHours: 8.25 }
+  // Deadline: Sunday 27 Sept 08:15.
+  assert.equal(hoursToJustify(entry, new Date(2026, 8, 25, 20, 15)), 36)
+  assert.equal(hoursToJustify(entry, new Date(2026, 8, 27, 10, 15)), -2)
+  assert.equal(hoursToJustify({ date: 'n/a' }), null)
+})
+
+test('buildJustificationMail writes a mailto: link for the secretariat', () => {
+  const payload = buildDemoGradesPayload()
+  const report = buildAbsenceReport(payload, payload['relevé'], payload.config)
+  const entry = report.entries.find((candidate) => candidate.status === 'unjustified')
+  const mail = buildJustificationMail({
+    to: 'secretariat@exemple.fr',
+    student: { firstName: 'Camille', lastName: 'MARTIN' },
+    entries: entry,
+    semesterLabel: 'S5 2026/2027',
+    formatDate: (date) => date.split('-').reverse().join('/'),
+  })
+
+  assert.equal(mail.subject, "Justificatif d'absence du 25/09/2026 - Camille MARTIN")
+  assert.match(mail.body, /- 25\/09\/2026, 8h15 – 10h15 · R5\.11 – Développement Front \(Thomas Lemoine\)/)
+  assert.ok(mail.href.startsWith('mailto:secretariat@exemple.fr?subject='))
+  assert.equal(decodeURIComponent(mail.href.split('&body=')[1]), mail.body)
+})
+

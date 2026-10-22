@@ -199,7 +199,8 @@ function GradeHistogram({ state, studentBucket = null, isPending = false, onRetr
         </div>
       ) : null}
       <p id={`${id}-summary`} className="sr-only">{spokenSummary}</p>
-      <table className="sr-only">
+      {/* sr-only on the table itself leaves its caption visible: captions sit outside the table's clip. */}
+      <div className="sr-only"><table>
         <caption>Nombre d’étudiants par tranche de notes</caption>
         <thead>
           <tr><th scope="col">Notes</th><th scope="col">Étudiants</th></tr>
@@ -212,7 +213,7 @@ function GradeHistogram({ state, studentBucket = null, isPending = false, onRetr
             </tr>
           ))}
         </tbody>
-      </table>
+      </table></div>
     </div>
   )
 }

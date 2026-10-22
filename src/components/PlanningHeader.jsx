@@ -231,7 +231,7 @@ function PhoneViewMenu({ view, onChangeView }) {
 // switch is "Jour" / "Semaine" / "Liste", and every view has the week's
 // days' headers in place of the strip (the same ones, so switching moves
 // nothing up there), swiped by weeks too.
-function PlanningHeader({ titleId, selectedDay, todayKey, view, isWide, columnsFor, selection, onSelectDay, onOpenDay, onToday, onStep, onChangeView }) {
+function PlanningHeader({ titleId, selectedDay, todayKey, view, isWide, columnsFor, selection, onSelectDay, onOpenDay, onToday, onStep, onChangeView, tools = null }) {
   const [isPickerOpen, setIsPickerOpen] = useState(false)
   const monday = startOfWeek(selectedDay)
   const dayCount = view === 'twoDays' ? 2 : 1
@@ -326,6 +326,8 @@ function PlanningHeader({ titleId, selectedDay, todayKey, view, isWide, columnsF
           {/* Wide: "Jour" / "Semaine" / "Liste". Otherwise a menu of the
               phone's views. */}
           {isWide ? <WideViewSwitch view={view} onChangeView={onChangeView} /> : <PhoneViewMenu view={view} onChangeView={onChangeView} />}
+          {/* The extras (`tools`: free rooms, a teacher's week), before the export. */}
+          {tools}
           {/* At the row's end, apart from the views: the .ics export. On a
               phone it gives its room to "Aujourd’hui" (the row would cut
               the day short): it exports the weeks ahead, offered from

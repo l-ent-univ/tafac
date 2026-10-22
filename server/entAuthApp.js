@@ -8,6 +8,7 @@
 // All university-specific values come from the config object
 // (universities/<id>/server.js) passed to createEntAuthApp().
 // ============================================================================
+import './patchNodeWarnings.js'
 import express from 'express'
 import cookieParser from 'cookie-parser'
 import { createProxyMiddleware } from 'http-proxy-middleware'
@@ -41,21 +42,35 @@ import {
 import { createPlanningPortalApiClient } from '../planningPortalApi.js'
 import { SchoolCertificateUnavailableError, buildDemoCertificatePdf, openCertificateDownload } from './schoolCertificate.js'
 import { createPlanningRpcClient } from '../planningRpc.js'
+import { createCrousFeed } from './crousFeed.js'
+import { createTransitFeed } from './transitFeed.js'
+import { findDepartures, planJourneys, stopsNear } from './transitPlanner.js'
+import { createTransitPushStore, readReminders, readSubscription } from './transitPush.js'
+import { createLinkPreviewer } from './linkPreview.js'
 import {
   DEMO_ACCOUNT,
   DEMO_GRADES_DEPARTMENT_MESSAGE,
   DEMO_SESSION_MODE,
+  DEMO_ROOMS,
+  DEMO_TEACHERS,
   applyDemoLayoutMutation,
   buildDemoAdeTreePayload,
   buildDemoAlertsPayload,
   buildDemoCalendarPayload,
+  buildDemoRoomEvents,
   buildDemoEvaluationDistribution,
   buildDemoGradesPayload,
   buildDemoLayoutData,
   buildDemoLayoutDocData,
   buildDemoMailPayload,
+  buildDemoMailMessagePayload,
   buildDemoMarketplaceEntries,
   buildDemoMoodleDeadlinesPayload,
+  buildDemoMoodleCoursesPayload,
+  buildDemoMoodleCourseContentsPayload,
+  getDemoAssignmentDetails,
+  submitDemoAssignment,
+  removeDemoAssignmentFile,
   buildDemoPlanningPayload,
   buildDemoPortletFragment,
   buildDemoSemesterGradesPayload,
@@ -231,6 +246,8 @@ const RUNTIME_SESSION_IDLE_TTL_MS = 24 * 60 * 60 * 1000
 const GRADES_CACHE_TTL_MS = 10 * 60 * 1000
 const MAIL_CACHE_TTL_MS = 2 * 60 * 1000
 const MOODLE_DEADLINES_CACHE_TTL_MS = 5 * 60 * 1000
+const MOODLE_COURSES_CACHE_TTL_MS = 5 * 60 * 1000
+const MOODLE_CONTENTS_CACHE_TTL_MS = 5 * 60 * 1000
 // Signed-in Moodle contexts are reused for this long (and dropped earlier if
 // Moodle rejects them), so a widget refresh doesn't replay the SAML chain.
 const MOODLE_CONTEXT_TTL_MS = 60 * 60 * 1000
@@ -258,6 +275,10 @@ const runtimeMailCache = new Map()
 const runtimeMailContexts = new Map()
 // sessionId → { cachedAt, data }: short-lived Moodle deadlines snapshot.
 const runtimeMoodleDeadlinesCache = new Map()
+// sessionId → { cachedAt, data }: Moodle enrolled courses.
+const runtimeMoodleCoursesCache = new Map()
+// `${sessionId}:${courseId}` → { cachedAt, data }: Moodle course contents.
+const runtimeMoodleContentsCache = new Map()
 // sessionId → { createdAt, jar, sesskey }: signed-in Moodle context, runtime-only
 // for the same reason as runtimeMailContexts.
 const runtimeMoodleContexts = new Map()
@@ -667,16 +688,20 @@ function pruneRuntimeGradesCache() {
   }
 }
 
-function getCachedGrades(sessionId) {
+function getCachedGradesEntry(sessionId) {
   if (!sessionId) {
     return null
   }
 
   pruneRuntimeGradesCache()
-  return runtimeGradesCache.get(sessionId)?.data ?? null
+  return runtimeGradesCache.get(sessionId) ?? null
 }
 
-function setCachedGrades(sessionId, grades) {
+function getCachedGrades(sessionId) {
+  return getCachedGradesEntry(sessionId)?.data ?? null
+}
+
+function setCachedGrades(sessionId, grades, unavailable = false) {
   if (!sessionId) {
     return
   }
@@ -685,6 +710,7 @@ function setCachedGrades(sessionId, grades) {
   runtimeGradesCache.set(sessionId, {
     cachedAt: Date.now(),
     data: grades,
+    unavailable,
   })
 }
 
@@ -799,12 +825,50 @@ function setCachedMoodleDeadlines(sessionId, deadlines) {
   runtimeMoodleDeadlinesCache.set(sessionId, { cachedAt: Date.now(), data: deadlines })
 }
 
+function getCachedMoodleCourses(sessionId) {
+  if (!sessionId) return null
+  const entry = runtimeMoodleCoursesCache.get(sessionId)
+  if (!entry || Date.now() - entry.cachedAt > MOODLE_COURSES_CACHE_TTL_MS) {
+    runtimeMoodleCoursesCache.delete(sessionId)
+    return null
+  }
+  return entry.data
+}
+
+function setCachedMoodleCourses(sessionId, courses) {
+  if (!sessionId) return
+  runtimeMoodleCoursesCache.set(sessionId, { cachedAt: Date.now(), data: courses })
+}
+
+function getCachedMoodleContents(sessionId, courseId) {
+  if (!sessionId) return null
+  const key = `${sessionId}:${courseId}`
+  const entry = runtimeMoodleContentsCache.get(key)
+  if (!entry || Date.now() - entry.cachedAt > MOODLE_CONTENTS_CACHE_TTL_MS) {
+    runtimeMoodleContentsCache.delete(key)
+    return null
+  }
+  return entry.data
+}
+
+function setCachedMoodleContents(sessionId, courseId, contents) {
+  if (!sessionId) return
+  const key = `${sessionId}:${courseId}`
+  runtimeMoodleContentsCache.set(key, { cachedAt: Date.now(), data: contents })
+}
+
 function clearMoodleCaches(sessionId) {
   if (!sessionId) {
     return
   }
 
   runtimeMoodleDeadlinesCache.delete(sessionId)
+  runtimeMoodleCoursesCache.delete(sessionId)
+  for (const key of runtimeMoodleContentsCache.keys()) {
+    if (key.startsWith(`${sessionId}:`)) {
+      runtimeMoodleContentsCache.delete(key)
+    }
+  }
   runtimeMoodleContexts.delete(sessionId)
 }
 
@@ -1362,6 +1426,17 @@ function isMoodleShibbolethPostTarget(targetUrl) {
     && /\/Shibboleth\.sso\//i.test(new URL(targetUrl).pathname)
 }
 
+// Moodle's own sign-in page: the session is gone (its /login/ path, or its
+// login form).
+function isMoodleLoginPage(html, pageUrl) {
+  try {
+    if (/\/login\/index\.php/i.test(new URL(pageUrl).pathname)) return true
+  } catch {
+    // Not a URL: judge by the page alone.
+  }
+  return /<form[^>]+id=["']login["']/i.test(String(html ?? ''))
+}
+
 function buildMoodleWayfRequest(pageUrl) {
   const actionUrl = extractFormAction(pageUrl.html, pageUrl.url)
   return {
@@ -1854,6 +1929,12 @@ function clearRateLimitEntry(store, key) {
 }
 
 function getActiveLoginRateLimit(req, username) {
+  // Off in development; in production a local address is the reverse proxy,
+  // so it is limited like any other.
+  if (!IS_PRODUCTION) {
+    return null
+  }
+
   const ipKey = getLoginRequesterIp(req)
   const usernameKey = normalizeLoginIdentifier(username)
   const statuses = [
@@ -1871,6 +1952,12 @@ function getActiveLoginRateLimit(req, username) {
 }
 
 function recordLoginFailure(req, username) {
+  // Off in development; in production a local address is the reverse proxy,
+  // so it is limited like any other.
+  if (!IS_PRODUCTION) {
+    return null
+  }
+
   const ipKey = getLoginRequesterIp(req)
   const usernameKey = normalizeLoginIdentifier(username)
   const statuses = [
@@ -2046,6 +2133,8 @@ const {
   fetchPortalEvents = null,
   fetchPortalStatus = null,
   fetchPortalTree = null,
+  listPortalClassrooms = null,
+  listPortalInstructors = null,
   searchPortalTree = null,
 } = portalClient ?? {}
 
@@ -2119,7 +2208,14 @@ app.post('/__ent_auth/analytics', (req, res) => {
   })
 })
 
-app.use('/__ent_auth', express.json()) // Automatically parse incoming JSON requests for auth endpoints
+app.use('/__ent_auth', express.json({ limit: '50mb' })) // Automatically parse incoming JSON requests for auth endpoints
+app.use('/__ent_auth', express.urlencoded({ extended: true, limit: '50mb' }))
+app.use('/__ent_auth', (err, req, res, next) => {
+  if (err instanceof SyntaxError && (err.status === 400 || err.statusCode === 400)) {
+    return res.status(400).json({ error: 'Corps JSON invalide' })
+  }
+  next(err)
+})
 
 app.use((req, res, next) => {
   if (req.path.startsWith('/__ent_auth') || req.path.startsWith('/__ent_proxy')) {
@@ -2286,6 +2382,7 @@ app.post('/__ent_auth/login', async (req, res) => {
       sessionMode: session.mode ?? null,
     })
   } catch (error) {
+    console.error('ENT login error:', error)
     const rateLimit = recordLoginFailure(req, req.body?.username)
     if (rateLimit) {
       res.setHeader('Retry-After', String(rateLimit.retryAfterSeconds))
@@ -2635,13 +2732,14 @@ app.get('/__ent_auth/grades', async (req, res) => {
       })
     }
 
-    const cachedGrades = getCachedGrades(session.id)
-    if (cachedGrades) {
+    const cachedEntry = getCachedGradesEntry(session.id)
+    if (cachedEntry) {
       setSessionCookie(res, session)
       return res.status(200).json({
         authenticated: true,
         sessionMode: session.mode ?? null,
-        grades: cachedGrades,
+        grades: cachedEntry.data,
+        unavailable: cachedEntry.unavailable ?? false,
       })
     }
 
@@ -2655,8 +2753,18 @@ app.get('/__ent_auth/grades', async (req, res) => {
       grades: gradesData,
     })
   } catch (error) {
-    res.status(500).json({
-      error: error instanceof Error ? error.message : String(error),
+    const errorMessage = error instanceof Error ? error.message : String(error)
+    const session = getSessionFromRequest(req)
+    if (session) {
+      setCachedGrades(session.id, null, true)
+      setSessionCookie(res, session)
+    }
+    res.status(200).json({
+      authenticated: Boolean(session),
+      sessionMode: session?.mode ?? null,
+      grades: null,
+      unavailable: true,
+      error: errorMessage,
     })
   }
 })
@@ -2685,9 +2793,10 @@ async function getFirstConnectionGrades(session) {
 // 6b. Relevé of one semester ("Mes notes" page semester picker). Same answer
 // shape as /grades: { relevé, absences, totauxAbsences? }.
 app.get('/__ent_auth/grades/semester/:semesterId', async (req, res) => {
+  let session = null
   try {
     res.setHeader('Cache-Control', 'no-store')
-    const session = getSessionFromRequest(req)
+    session = getSessionFromRequest(req)
 
     if (!session) {
       return res.status(200).json({ authenticated: false, grades: null })
@@ -2723,7 +2832,11 @@ app.get('/__ent_auth/grades/semester/:semesterId', async (req, res) => {
       grades: gradesData,
     })
   } catch (error) {
-    res.status(500).json({
+    res.status(200).json({
+      authenticated: true,
+      sessionMode: session?.mode ?? null,
+      grades: null,
+      unavailable: true,
       error: error instanceof Error ? error.message : String(error),
     })
   }
@@ -2768,103 +2881,11 @@ app.get('/__ent_auth/grades/department-message', async (req, res) => {
   }
 })
 
-// The relevé of `semesterId` ('current': the newest one, from the
-// first-connection answer), from the caches when possible.
-async function getSemesterReleve(session, semesterId) {
-  if (semesterId === 'current') {
-    return (await getFirstConnectionGrades(session))?.['relevé'] ?? null
-  }
-
-  const firstConnection = getCachedGrades(session.id)?.['relevé']
-  if (firstConnection && String(firstConnection.formsemestre_id) === semesterId) {
-    return firstConnection
-  }
-
-  let gradesData = getCachedSemesterGrades(session.id, semesterId)
-  if (!gradesData) {
-    gradesData = await fetchGradesData(
-      session.jar,
-      `${encodeURIComponent('relevéEtudiant')}&semestre=${semesterId}`,
-      isGradesReportPayload,
-    )
-    setCachedSemesterGrades(session.id, semesterId, gradesData)
-  }
-  return gradesData['relevé'] ?? null
-}
-
-// 6d. Promo histogram of one evaluation, what the passerelle shows when a
-// grade is clicked (data.php?q=listeNotes&eval=…, normalized by
-// src/evaluationDistribution.js). Answers { status: 'ok', counts[21], total, bins }
-// or { status: 'unavailable', reason: 'disabled' | 'too-few' | 'hidden' }.
-// listeNotes takes any evaluation id of the ScoDoc instance: only those of
-// the student's own relevé are relayed.
-app.get('/__ent_auth/grades/evaluation-distribution', async (req, res) => {
-  try {
-    res.setHeader('Cache-Control', 'no-store')
-    const session = getSessionFromRequest(req)
-
-    if (!session) {
-      return res.status(200).json({ authenticated: false, status: 'unavailable', reason: 'signed-out' })
-    }
-
-    const semesterId = req.query.semestre === 'current' ? 'current' : parseGradesSemesterId(req.query.semestre)
-    const evaluationId = parseGradesSemesterId(req.query.eval)
-    if (!semesterId || !evaluationId) {
-      return res.status(400).json({ error: 'Invalid semester or evaluation id.' })
-    }
-
-    if (isDemoSession(session)) {
-      const distribution = buildDemoEvaluationDistribution(semesterId, evaluationId)
-      setSessionCookie(res, session)
-      return distribution
-        ? res.status(200).json({ authenticated: true, ...distribution })
-        : res.status(404).json({ error: 'Unknown evaluation.' })
-    }
-
-    const cacheKey = `${semesterId}:${evaluationId}`
-    let distribution = getCachedDistribution(session.id, cacheKey)
-
-    if (!distribution) {
-      const releve = await getSemesterReleve(session, semesterId)
-      if (!findReleveEvaluation(releve, evaluationId)) {
-        return res.status(404).json({ error: 'Unknown evaluation.' })
-      }
-
-      if (getCachedGrades(session.id)?.config?.histogramme === false) {
-        // The passerelle's own switch, sent with the first-connection answer.
-        distribution = { status: 'unavailable', reason: 'disabled' }
-      } else if (!('publie' in releve) || releve.publie === false) {
-        // Unpublished relevé, or a department that hides its grades (the
-        // passerelle then strips the relevé down to its modules).
-        distribution = { status: 'unavailable', reason: 'hidden' }
-      } else {
-        distribution = normalizeDistributionAnswer(await fetchGradesData(
-          session.jar,
-          `listeNotes&eval=${evaluationId}`,
-          (data) => Array.isArray(data) || typeof data?.erreur === 'string',
-        ))
-        if (!distribution) {
-          throw new Error('ScoDoc returned an invalid grade distribution.')
-        }
-      }
-
-      setCachedDistribution(session.id, cacheKey, distribution)
-    }
-
-    setSessionCookie(res, session)
-    res.status(200).json({ authenticated: true, ...distribution })
-  } catch (error) {
-    res.status(500).json({
-      error: error instanceof Error ? error.message : String(error),
-    })
-  }
-})
-
 function isPdfBuffer(buffer) {
   return buffer.length > 4 && buffer.subarray(0, 4).toString('latin1') === '%PDF'
 }
 
-// 6e. Official-looking PDF relevé, generated by the passerelle. The student id
+// 6d. Official-looking PDF relevé, generated by the passerelle. The student id
 // always comes from the signed-in ScoDoc session, never from the request.
 app.get('/__ent_auth/grades/report.pdf', async (req, res) => {
   try {
@@ -2926,6 +2947,98 @@ app.get('/__ent_auth/grades/report.pdf', async (req, res) => {
     res.setHeader('Content-Type', 'application/pdf')
     res.setHeader('Content-Disposition', `inline; filename="releve-${semesterId}.pdf"`)
     res.status(200).send(pdf)
+  } catch (error) {
+    res.status(500).json({
+      error: error instanceof Error ? error.message : String(error),
+    })
+  }
+})
+
+// The relevé of `semesterId` ('current': the newest one, from the
+// first-connection answer), from the caches when possible.
+async function getSemesterReleve(session, semesterId) {
+  if (semesterId === 'current') {
+    return (await getFirstConnectionGrades(session))?.['relevé'] ?? null
+  }
+
+  const firstConnection = getCachedGrades(session.id)?.['relevé']
+  if (firstConnection && String(firstConnection.formsemestre_id) === semesterId) {
+    return firstConnection
+  }
+
+  let gradesData = getCachedSemesterGrades(session.id, semesterId)
+  if (!gradesData) {
+    gradesData = await fetchGradesData(
+      session.jar,
+      `${encodeURIComponent('relevéEtudiant')}&semestre=${semesterId}`,
+      isGradesReportPayload,
+    )
+    setCachedSemesterGrades(session.id, semesterId, gradesData)
+  }
+  return gradesData['relevé'] ?? null
+}
+
+// 6e. Promo histogram of one evaluation, what the passerelle shows when a
+// grade is clicked (data.php?q=listeNotes&eval=…, normalized by
+// src/evaluationDistribution.js). Answers { status: 'ok', counts[21], total, bins }
+// or { status: 'unavailable', reason: 'disabled' | 'too-few' | 'hidden' }.
+// listeNotes takes any evaluation id of the ScoDoc instance: only those of
+// the student's own relevé are relayed.
+app.get('/__ent_auth/grades/evaluation-distribution', async (req, res) => {
+  try {
+    res.setHeader('Cache-Control', 'no-store')
+    const session = getSessionFromRequest(req)
+
+    if (!session) {
+      return res.status(200).json({ authenticated: false, status: 'unavailable', reason: 'signed-out' })
+    }
+
+    const semesterId = req.query.semestre === 'current' ? 'current' : parseGradesSemesterId(req.query.semestre)
+    const evaluationId = parseGradesSemesterId(req.query.eval)
+    if (!semesterId || !evaluationId) {
+      return res.status(400).json({ error: 'Invalid semester or evaluation id.' })
+    }
+
+    if (isDemoSession(session)) {
+      const distribution = buildDemoEvaluationDistribution(semesterId, evaluationId)
+      setSessionCookie(res, session)
+      return distribution
+        ? res.status(200).json({ authenticated: true, ...distribution })
+        : res.status(404).json({ error: 'Unknown evaluation.' })
+    }
+
+    const cacheKey = `${semesterId}:${evaluationId}`
+    let distribution = getCachedDistribution(session.id, cacheKey)
+
+    if (!distribution) {
+      const releve = await getSemesterReleve(session, semesterId)
+      if (!findReleveEvaluation(releve, evaluationId)) {
+        return res.status(404).json({ error: 'Unknown evaluation.' })
+      }
+
+      if (getCachedGrades(session.id)?.config?.histogramme === false) {
+        // The passerelle's own switch, sent with the first-connection answer.
+        distribution = { status: 'unavailable', reason: 'disabled' }
+      } else if (!('publie' in releve) || releve.publie === false) {
+        // Unpublished relevé, or a department that hides its grades (the
+        // passerelle then strips the relevé down to its modules).
+        distribution = { status: 'unavailable', reason: 'hidden' }
+      } else {
+        distribution = normalizeDistributionAnswer(await fetchGradesData(
+          session.jar,
+          `listeNotes&eval=${evaluationId}`,
+          (data) => Array.isArray(data) || typeof data?.erreur === 'string',
+        ))
+        if (!distribution) {
+          throw new Error('ScoDoc returned an invalid grade distribution.')
+        }
+      }
+
+      setCachedDistribution(session.id, cacheKey, distribution)
+    }
+
+    setSessionCookie(res, session)
+    res.status(200).json({ authenticated: true, ...distribution })
   } catch (error) {
     res.status(500).json({
       error: error instanceof Error ? error.message : String(error),
@@ -3004,6 +3117,28 @@ function assertSignInUrl(url, allowedDomains, label) {
 
 function assertMailSignInUrl(url) {
   assertSignInUrl(url, MAIL_SIGN_IN_DOMAINS, 'Webmail')
+}
+
+// A service that answers 403 while signing in (e.g. Moodle closed to
+// requests from outside the university's network): the student can still
+// open it themselves. `serviceHref`: its direct address, not the launch
+// relay, which would hit the same 403.
+class ServiceForbiddenError extends Error {
+  constructor(label, serviceHref) {
+    super(`${label} refuse l’accès depuis Tafac pour le moment (erreur 403). Ouvre-le directement.`)
+    this.serviceHref = serviceHref
+  }
+}
+
+// The mail and Moodle endpoints' errors: 503 with the direct link for a
+// ServiceForbiddenError, 500 otherwise.
+function sendServiceError(res, error) {
+  if (error instanceof ServiceForbiddenError) {
+    return res.status(503).json({ error: error.message, forbidden: true, serviceHref: error.serviceHref })
+  }
+  return res.status(500).json({
+    error: error instanceof Error ? error.message : String(error),
+  })
 }
 
 // Walks webmail → SP → IdP → CAS → IdP → SP (SAML POST) → webmail with a
@@ -3090,6 +3225,9 @@ async function establishZimbraContext(session) {
       continue
     }
 
+    if (response.status === 403) {
+      throw new ServiceForbiddenError('La messagerie', MAIL_WEBMAIL_URL)
+    }
     throw new Error(`Webmail sign-in stopped on an unexpected page (${response.status} at ${getHostnameFromUrl(currentUrl)}).`)
   }
 
@@ -3166,20 +3304,71 @@ function normalizeZimbraMessage(message) {
     snippet: typeof message?.fr === 'string' ? message.fr.replace(/\s+/g, ' ').trim().slice(0, 280) : '',
     receivedAt: Number.isFinite(timestamp) && timestamp > 0 ? new Date(timestamp).toISOString() : null,
     unread: typeof message?.f === 'string' && message.f.includes('u'),
+    flagged: typeof message?.f === 'string' && message.f.includes('f'),
     // Unverified deep link format for the Zimbra Ajax client.
     // Partage can't deep-link through the sign-in handoff: rows open the inbox.
     href: getMailWebmailHref(),
   }
 }
 
-async function queryZimbraInbox(context) {
+function extractZimbraBody(rootMp) {
+  let bodyHtml = ''
+  let bodyText = ''
+  const attachments = []
+  const inlineParts = new Map()
+
+  function walk(part) {
+    if (!part) return
+    if (Array.isArray(part)) {
+      part.forEach(walk)
+      return
+    }
+
+    const ct = String(part.ct || '').toLowerCase()
+    const isAttachment = part.cd === 'attachment' || Boolean(part.filename)
+    const ci = part.ci ? String(part.ci).replace(/^<|>$/g, '').trim() : null
+
+    if (ci && part.part) {
+      inlineParts.set(ci, String(part.part))
+    }
+
+    if (isAttachment) {
+      attachments.push({
+        part: String(part.part || ''),
+        filename: part.filename || 'pièce-jointe',
+        contentType: ct,
+        size: Number(part.s) || null,
+        contentId: ci,
+      })
+      if (!ct.includes('text/html') && !ct.includes('text/plain')) {
+        return
+      }
+    }
+
+    if (ct.includes('text/html') && part.content && !bodyHtml) {
+      bodyHtml = part.content
+    } else if (ct.includes('text/plain') && part.content && !bodyText) {
+      bodyText = part.content
+    }
+
+    if (part.mp) {
+      walk(part.mp)
+    }
+  }
+
+  walk(rootMp)
+  return { bodyHtml, bodyText, attachments, inlineParts }
+}
+
+async function queryZimbraInbox(context, { limit = MAIL_MAX_MESSAGES, query = 'in:inbox', offset = 0 } = {}) {
+  const safeLimit = Math.min(Math.max(Number(limit) || MAIL_MAX_MESSAGES, 1), 50)
   const [searchResult, folderResult] = await Promise.allSettled([
     zimbraSoapRequest(context, 'SearchRequest', {
       types: 'message',
-      query: 'in:inbox',
+      query: query || 'in:inbox',
       sortBy: 'dateDesc',
-      limit: MAIL_MAX_MESSAGES,
-      offset: 0,
+      limit: safeLimit,
+      offset: Number(offset) || 0,
     }),
     // Folder id 2 is the Inbox in every Zimbra mailbox.
     zimbraSoapRequest(context, 'GetFolderRequest', { folder: { l: '2' }, depth: 0 }),
@@ -3205,7 +3394,7 @@ async function queryZimbraInbox(context) {
     .map((message) => normalizeZimbraMessage(message))
     .filter((message) => message.id)
     .sort((left, right) => String(right.receivedAt ?? '').localeCompare(String(left.receivedAt ?? '')))
-    .slice(0, MAIL_MAX_MESSAGES)
+    .slice(0, safeLimit)
 
   return { unreadCount, webmailHref: getMailWebmailHref(), messages }
 }
@@ -3219,7 +3408,7 @@ async function getZimbraContext(session, { fresh = false } = {}) {
   return context
 }
 
-async function fetchZimbraRecentMail(session) {
+async function fetchZimbraRecentMail(session, options = {}) {
   for (let attempt = 0; attempt < 2; attempt += 1) {
     let context = attempt === 0 ? runtimeMailContexts.get(session.id) : null
 
@@ -3229,7 +3418,7 @@ async function fetchZimbraRecentMail(session) {
     }
 
     try {
-      return await queryZimbraInbox(context)
+      return await queryZimbraInbox(context, options)
     } catch (error) {
       runtimeMailContexts.delete(session.id)
       if (!(error instanceof MailAuthError) || attempt > 0) {
@@ -3241,17 +3430,310 @@ async function fetchZimbraRecentMail(session) {
   throw new Error('Unable to load mail.')
 }
 
+async function fetchZimbraMessageDetail(session, messageId) {
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    let context = attempt === 0 ? runtimeMailContexts.get(session.id) : null
+    if (!context) {
+      context = await establishZimbraContext(session)
+      runtimeMailContexts.set(session.id, context)
+    }
+
+    try {
+      const response = await zimbraSoapRequest(context, 'GetMsgRequest', {
+        m: { id: messageId, html: 1, raw: 0, max: 500000, needExp: 1 },
+      })
+      const rawMsg = response?.m
+      const msg = Array.isArray(rawMsg) ? rawMsg[0] : rawMsg
+      if (!msg) {
+        throw new Error('Message not found')
+      }
+
+      const addresses = Array.isArray(msg?.e) ? msg.e : msg?.e ? [msg.e] : []
+      const sender = addresses.find((a) => a?.t === 'f') ?? null
+      const recipients = addresses.filter((a) => a?.t === 't').map((a) => ({ name: a?.p || a?.d || a?.a || '', email: a?.a || '' }))
+      const ccRecipients = addresses.filter((a) => a?.t === 'c').map((a) => ({ name: a?.p || a?.d || a?.a || '', email: a?.a || '' }))
+      const timestamp = Number(msg?.d)
+      let { bodyHtml, bodyText, attachments, inlineParts } = extractZimbraBody(msg?.mp)
+
+      // Fallback: If body is empty, try Zimbra REST API directly
+      if (!bodyHtml && !bodyText && (!attachments || attachments.length === 0)) {
+        try {
+          const restUrl = `${context.origin}/service/home/~/?id=${encodeURIComponent(messageId)}`
+          const restResp = await fetchWithJar(restUrl, context.jar, {
+            headers: { Accept: 'text/html, text/plain, */*', Referer: `${context.origin}/` },
+          })
+          if (restResp.ok) {
+            const rawBody = await restResp.text()
+            if (rawBody) {
+              const ct = restResp.headers.get('content-type') || ''
+              if (ct.includes('text/html') || rawBody.includes('<html') || rawBody.includes('<body') || rawBody.includes('<div')) {
+                bodyHtml = rawBody
+              } else {
+                bodyText = rawBody
+              }
+            }
+          }
+        } catch {
+          // Body preview extraction failed; fallback to text snippet
+        }
+      }
+
+      const resolvedId = String(msg.id || messageId)
+
+      // Attach download URLs
+      const safeAttachments = (attachments || []).map((att) => ({
+        ...att,
+        url: `/__ent_auth/mail/attachment?id=${encodeURIComponent(resolvedId)}&part=${encodeURIComponent(att.part)}`,
+      }))
+
+      // Rewrite inline images and attachments in bodyHtml
+      if (bodyHtml) {
+        if (inlineParts && inlineParts.size > 0) {
+          for (const [cid, partId] of inlineParts.entries()) {
+            const url = `/__ent_auth/mail/attachment?id=${encodeURIComponent(resolvedId)}&part=${encodeURIComponent(partId)}`
+            bodyHtml = bodyHtml.split(`cid:${cid}`).join(url)
+            bodyHtml = bodyHtml.split(`cid:<${cid}>`).join(url)
+          }
+        }
+        for (const att of safeAttachments) {
+          if (att.contentId) {
+            bodyHtml = bodyHtml.split(`cid:${att.contentId}`).join(att.url)
+            bodyHtml = bodyHtml.split(`cid:<${att.contentId}>`).join(att.url)
+          }
+        }
+        // Rewrite relative Zimbra URLs like /service/home/~/?id=...
+        bodyHtml = bodyHtml.replace(
+          /(src|href)=["'](?:\/service\/home\/~?\/?\?id=([^"'\s&]+)(?:&amp;|&)part=([^"'\s&]+))["']/gi,
+          (match, attr, mId, pId) => `${attr}="/__ent_auth/mail/attachment?id=${mId}&part=${pId}"`
+        )
+      }
+
+      return {
+        id: resolvedId,
+        subject: typeof msg.su === 'string' ? msg.su : '',
+        from: {
+          name: sender?.p || sender?.d || sender?.a || '',
+          email: sender?.a || null,
+        },
+        to: recipients,
+        cc: ccRecipients,
+        receivedAt: Number.isFinite(timestamp) && timestamp > 0 ? new Date(timestamp).toISOString() : null,
+        unread: typeof msg.f === 'string' && msg.f.includes('u'),
+        flagged: typeof msg.f === 'string' && msg.f.includes('f'),
+        bodyHtml: bodyHtml || null,
+        bodyText: bodyText || msg.fr || '',
+        snippet: typeof msg.fr === 'string' ? msg.fr.slice(0, 280) : '',
+        attachments: safeAttachments,
+      }
+    } catch (error) {
+      runtimeMailContexts.delete(session.id)
+      if (!(error instanceof MailAuthError) || attempt > 0) {
+        throw error
+      }
+    }
+  }
+
+  throw new Error('Unable to load message details.')
+}
+
+function parseRecipients(input, type = 't') {
+  if (!input) return []
+  const list = Array.isArray(input) ? input : String(input).split(/[,;]+/)
+  const recipients = []
+  for (const item of list) {
+    if (typeof item === 'object' && item !== null) {
+      const email = typeof item.email === 'string' ? item.email.trim() : ''
+      const name = typeof item.name === 'string' ? item.name.trim() : ''
+      if (email && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+        recipients.push({ t: type, a: email, ...(name ? { p: name } : {}) })
+      }
+    } else if (typeof item === 'string') {
+      const trimmed = item.trim()
+      const match = trimmed.match(/^(?:(.*)<)?([^<>\s@]+@[^<>\s@]+\.[^<>\s@]+)>?$/)
+      if (match) {
+        const name = (match[1] || '').replace(/^["']|["']$/g, '').trim()
+        const email = match[2].trim()
+        recipients.push({ t: type, a: email, ...(name ? { p: name } : {}) })
+      }
+    }
+  }
+  return recipients
+}
+
+function convertHtmlToPlainText(html) {
+  if (!html) return ''
+  return html
+    .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '')
+    .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '')
+    .replace(/<br\s*[/]?>/gi, '\n')
+    .replace(/<\/p>/gi, '\n\n')
+    .replace(/<\/div>/gi, '\n')
+    .replace(/<\/h[1-6]>/gi, '\n\n')
+    .replace(/<li>/gi, '• ')
+    .replace(/<\/li>/gi, '\n')
+    .replace(/<blockquote[^>]*>/gi, '> ')
+    .replace(/<\/blockquote>/gi, '\n')
+    .replace(/<[^>]+>/g, '')
+    .replace(/&nbsp;/gi, ' ')
+    .replace(/&amp;/gi, '&')
+    .replace(/&lt;/gi, '<')
+    .replace(/&gt;/gi, '>')
+    .replace(/&quot;/gi, '"')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim()
+}
+
+async function sendZimbraMail(session, { to, cc, bcc, subject, bodyHtml, bodyText, attachments, origId, replyType } = {}) {
+  const toRecipients = parseRecipients(to, 't')
+  if (toRecipients.length === 0) {
+    throw new Error('Au moins une adresse de destinataire valide est requise.')
+  }
+  const ccRecipients = parseRecipients(cc, 'c')
+  const bccRecipients = parseRecipients(bcc, 'b')
+  const allRecipients = [...toRecipients, ...ccRecipients, ...bccRecipients]
+
+  const cleanSubject = typeof subject === 'string' ? subject.trim() : ''
+  const finalSubject = cleanSubject || '(Sans objet)'
+
+  const plain = (bodyText || (bodyHtml ? convertHtmlToPlainText(bodyHtml) : '')).trim()
+  const html = (bodyHtml || (plain ? `<p>${plain.replace(/\n/g, '<br/>')}</p>` : '')).trim()
+
+  const messagePayload = {
+    e: allRecipients,
+    su: finalSubject,
+  }
+
+  if (origId) {
+    messagePayload.origid = String(origId)
+    if (replyType) {
+      messagePayload.rt = replyType
+    }
+  }
+
+  if (html && plain) {
+    messagePayload.mp = {
+      ct: 'multipart/alternative',
+      mp: [
+        { ct: 'text/plain', content: plain },
+        { ct: 'text/html', content: html },
+      ],
+    }
+  } else if (html) {
+    messagePayload.mp = {
+      ct: 'text/html',
+      content: html,
+    }
+  } else {
+    messagePayload.mp = {
+      ct: 'text/plain',
+      content: plain,
+    }
+  }
+
+  if (Array.isArray(attachments) && attachments.length > 0) {
+    const attachmentParts = attachments.map((att) => ({
+      ct: att.type || 'application/octet-stream',
+      filename: att.name,
+      content: att.base64,
+    }))
+    const bodyPart = messagePayload.mp
+    messagePayload.mp = {
+      ct: 'multipart/mixed',
+      mp: [
+        bodyPart,
+        ...attachmentParts,
+      ],
+    }
+  }
+
+  const context = await getZimbraContext(session)
+  const result = await zimbraSoapRequest(context, 'SendMsgRequest', {
+    m: messagePayload,
+  })
+
+  // Invalidate cached mail so newly sent items or inbox counts sync
+  runtimeMailCache.delete(session.id)
+
+  return {
+    ok: true,
+    messageId: result?.m?.id || null,
+  }
+}
+
+const DEMO_DIRECTORY_CONTACTS = [
+  { name: 'Secrétariat Pédagogique BUT MMI', email: 'secretariat-mmi@univ-rennes.fr', type: 'service', department: 'IUT de Lannion' },
+  { name: 'Scolarité Centrale', email: 'scolarite@univ-rennes.fr', type: 'service', department: 'Université de Rennes' },
+  { name: 'Dr. Sophie Bernard (Resp. BUT 3)', email: 'sophie.bernard@univ-rennes.fr', type: 'teacher', department: 'Département Informatique' },
+  { name: 'Marc Dupont (Enseignant R6.C.06)', email: 'marc.dupont@univ-rennes.fr', type: 'teacher', department: 'Département Réseaux & Télécoms' },
+  { name: 'Claire Martin (Enseignante Web & Multimédia)', email: 'claire.martin@univ-rennes.fr', type: 'teacher', department: 'Département MMI' },
+  { name: 'Alexandre Leroux (Professeur Développement)', email: 'alexandre.leroux@univ-rennes.fr', type: 'teacher', department: 'IUT de Lannion' },
+  { name: 'Service des Absences & Justificatifs', email: 'absences-mmi@univ-rennes.fr', type: 'service', department: 'Pôle Pédagogie' },
+  { name: 'Bibliothèque Universitaire (BU Beaulieu)', email: 'bu-contact@univ-rennes.fr', type: 'service', department: 'Documentation' },
+  { name: 'Bureau des Stages & Alternance', email: 'stages-alternance@univ-rennes.fr', type: 'service', department: 'Insertion Professionnelle' },
+  { name: 'Service Santé des Étudiants (SSE)', email: 'sante-etudiants@univ-rennes.fr', type: 'service', department: 'Vie Étudiante' },
+]
+
+async function searchZimbraDirectory(session, query) {
+  if (!query || typeof query !== 'string') return []
+  const clean = query.trim()
+  if (clean.length < 1) return []
+
+  const context = await getZimbraContext(session)
+  try {
+    const result = await zimbraSoapRequest(context, 'AutoCompleteRequest', {
+      name: clean,
+      t: 'all',
+      needExp: 1,
+    })
+    const rawMatches = Array.isArray(result?.match) ? result.match : result?.match ? [result.match] : []
+    return rawMatches.map((m) => ({
+      name: m.display || m.email || '',
+      email: m.email || '',
+      type: m.type === 'gal' ? 'gal' : 'contact',
+      department: m.department || null,
+      title: m.jobTitle || m.title || null,
+    })).filter((c) => c.email)
+  } catch {
+    try {
+      const galResult = await zimbraSoapRequest(context, 'SearchGalRequest', {
+        name: clean,
+        type: 'all',
+        limit: 15,
+      })
+      const entries = Array.isArray(galResult?.cn) ? galResult.cn : galResult?.cn ? [galResult.cn] : []
+      return entries.map((entry) => {
+        const attrs = Array.isArray(entry._attrs) ? entry._attrs : Array.isArray(entry.a) ? entry.a : []
+        const getAttr = (key) => {
+          const item = attrs.find((a) => (a.n || a._n) === key)
+          return item ? item._content || item.content || item._ || '' : ''
+        }
+        const email = getAttr('email') || getAttr('mail')
+        const fullName = getAttr('fullName') || getAttr('displayName') || `${getAttr('givenName')} ${getAttr('sn')}`.trim()
+        return {
+          name: fullName || email,
+          email,
+          type: 'gal',
+          department: getAttr('department') || null,
+          title: getAttr('title') || null,
+        }
+      }).filter((c) => c.email)
+    } catch {
+      return []
+    }
+  }
+}
+
 const MAIL_PROVIDERS = {
   zimbra: fetchZimbraRecentMail,
 }
 
-async function fetchRecentMail(session) {
+async function fetchRecentMail(session, options = {}) {
   const provider = MAIL_PROVIDERS[MAIL_PROVIDER]
   if (!provider) {
     throw new Error('Mail provider not configured')
   }
 
-  return provider(session)
+  return provider(session, options)
 }
 
 // 6c. Open the webmail already signed in. Zimbra's /service/preauth accepts
@@ -3291,7 +3773,7 @@ app.get('/__ent_auth/mail/open', async (req, res) => {
   }
 })
 
-// 6b. Recent mail endpoint
+// 6b. Recent mail endpoint (for widget)
 app.get('/__ent_auth/mail/recent', async (req, res) => {
   try {
     res.setHeader('Cache-Control', 'no-store')
@@ -3331,9 +3813,309 @@ app.get('/__ent_auth/mail/recent', async (req, res) => {
   } catch (error) {
     // Messages above are built from status codes/hostnames only — never from
     // cookies, tokens or upstream bodies.
-    return res.status(500).json({
-      error: error instanceof Error ? error.message : String(error),
+    return sendServiceError(res, error)
+  }
+})
+
+// 6d. Full inbox / search messages endpoint (for in-app MailPage)
+app.get('/__ent_auth/mail/messages', async (req, res) => {
+  try {
+    res.setHeader('Cache-Control', 'no-store')
+    const session = getSessionFromRequest(req)
+
+    if (!session) {
+      return res.status(200).json({ authenticated: false, mail: null })
+    }
+
+    const limit = Math.min(Math.max(Number(req.query.limit) || 30, 1), 50)
+    const userQuery = typeof req.query.q === 'string' ? req.query.q.trim() : ''
+    const filterQuery = userQuery ? `in:inbox ${userQuery}` : 'in:inbox'
+
+    if (isDemoSession(session)) {
+      setSessionCookie(res, session)
+      const demoPayload = buildDemoMailPayload()
+      let messages = demoPayload.messages
+      if (userQuery) {
+        const q = userQuery.toLowerCase()
+        messages = messages.filter(
+          (m) =>
+            m.subject?.toLowerCase().includes(q) ||
+            m.snippet?.toLowerCase().includes(q) ||
+            m.from?.name?.toLowerCase().includes(q) ||
+            m.from?.email?.toLowerCase().includes(q)
+        )
+      }
+      return res.status(200).json({
+        authenticated: true,
+        sessionMode: DEMO_SESSION_MODE,
+        mail: {
+          ...demoPayload,
+          messages: messages.slice(0, limit),
+        },
+      })
+    }
+
+    const mail = await fetchRecentMail(session, { limit, query: filterQuery })
+    setSessionCookie(res, session)
+    return res.status(200).json({
+      authenticated: true,
+      sessionMode: session.mode ?? null,
+      mail,
     })
+  } catch (error) {
+    return sendServiceError(res, error)
+  }
+})
+
+// 6e. Single message detail endpoint (for in-app MailPage reader)
+app.get('/__ent_auth/mail/message/:id', async (req, res) => {
+  try {
+    res.setHeader('Cache-Control', 'no-store')
+    const session = getSessionFromRequest(req)
+
+    if (!session) {
+      return res.status(401).json({ authenticated: false, error: 'Non authentifié' })
+    }
+
+    const messageId = req.params.id
+    if (!messageId) {
+      return res.status(400).json({ error: 'Identifiant de message manquant' })
+    }
+
+    if (isDemoSession(session)) {
+      setSessionCookie(res, session)
+      const message = buildDemoMailMessagePayload(messageId)
+      if (!message) {
+        return res.status(404).json({ error: 'Message introuvable' })
+      }
+      return res.status(200).json({
+        authenticated: true,
+        sessionMode: DEMO_SESSION_MODE,
+        message,
+      })
+    }
+
+    const message = await fetchZimbraMessageDetail(session, messageId)
+    setSessionCookie(res, session)
+    return res.status(200).json({
+      authenticated: true,
+      sessionMode: session.mode ?? null,
+      message,
+    })
+  } catch (error) {
+    return sendServiceError(res, error)
+  }
+})
+
+// 6f. Mark message as read/unread
+app.post('/__ent_auth/mail/read', async (req, res) => {
+  try {
+    res.setHeader('Cache-Control', 'no-store')
+    const session = getSessionFromRequest(req)
+
+    if (!session) {
+      return res.status(401).json({ authenticated: false, error: 'Non authentifié' })
+    }
+
+    const { id, read = true } = req.body || {}
+    if (!id) {
+      return res.status(400).json({ error: 'Identifiant de message manquant' })
+    }
+
+    if (isDemoSession(session)) {
+      setSessionCookie(res, session)
+      return res.status(200).json({ ok: true })
+    }
+
+    const context = await getZimbraContext(session)
+    await zimbraSoapRequest(context, 'MsgActionRequest', {
+      action: { id, op: read ? 'read' : '!read' },
+    })
+    setSessionCookie(res, session)
+    return res.status(200).json({ ok: true })
+  } catch (error) {
+    return sendServiceError(res, error)
+  }
+})
+
+// Flag a message as important (Zimbra's flag), or not.
+app.post('/__ent_auth/mail/flag', async (req, res) => {
+  try {
+    res.setHeader('Cache-Control', 'no-store')
+    const session = getSessionFromRequest(req)
+
+    if (!session) {
+      return res.status(401).json({ authenticated: false, error: 'Non authentifié' })
+    }
+
+    const { id, flagged = true } = req.body || {}
+    if (!id) {
+      return res.status(400).json({ error: 'Identifiant de message manquant' })
+    }
+
+    if (isDemoSession(session)) {
+      setSessionCookie(res, session)
+      return res.status(200).json({ ok: true })
+    }
+
+    const context = await getZimbraContext(session)
+    await zimbraSoapRequest(context, 'MsgActionRequest', {
+      action: { id, op: flagged ? 'flag' : '!flag' },
+    })
+    setSessionCookie(res, session)
+    return res.status(200).json({ ok: true })
+  } catch (error) {
+    return sendServiceError(res, error)
+  }
+})
+
+// A link's preview in a mail (linkPreview.js): signed-in students only.
+const getLinkPreview = createLinkPreviewer()
+app.get('/__ent_auth/link-preview', async (req, res) => {
+  if (!getSessionFromRequest(req)) {
+    return res.status(401).json({ authenticated: false, preview: null })
+  }
+  const preview = await getLinkPreview(req.query.url)
+  res.setHeader('Cache-Control', 'private, max-age=3600')
+  return res.status(200).json({ preview })
+})
+
+// 6g. Move message to trash
+app.post('/__ent_auth/mail/trash', async (req, res) => {
+  try {
+    res.setHeader('Cache-Control', 'no-store')
+    const session = getSessionFromRequest(req)
+
+    if (!session) {
+      return res.status(401).json({ authenticated: false, error: 'Non authentifié' })
+    }
+
+    const { id } = req.body || {}
+    if (!id) {
+      return res.status(400).json({ error: 'Identifiant de message manquant' })
+    }
+
+    if (isDemoSession(session)) {
+      setSessionCookie(res, session)
+      return res.status(200).json({ ok: true })
+    }
+
+    const context = await getZimbraContext(session)
+    await zimbraSoapRequest(context, 'MsgActionRequest', {
+      action: { id, op: 'trash' },
+    })
+    runtimeMailCache.delete(session.id)
+    setSessionCookie(res, session)
+    return res.status(200).json({ ok: true })
+  } catch (error) {
+    return sendServiceError(res, error)
+  }
+})
+
+// 6h. Send mail message (for in-app composer)
+app.post('/__ent_auth/mail/send', async (req, res) => {
+  try {
+    res.setHeader('Cache-Control', 'no-store')
+    const session = getSessionFromRequest(req)
+
+    if (!session) {
+      return res.status(401).json({ authenticated: false, error: 'Non authentifié' })
+    }
+
+    if (isDemoSession(session)) {
+      setSessionCookie(res, session)
+      return res.status(200).json({
+        ok: true,
+        messageId: `demo-${Date.now()}`,
+        demo: true,
+      })
+    }
+
+    const { to, cc, bcc, subject, bodyHtml, bodyText, origId, replyType, attachments } = req.body || {}
+    const result = await sendZimbraMail(session, {
+      to,
+      cc,
+      bcc,
+      subject,
+      bodyHtml,
+      bodyText,
+      attachments,
+      origId,
+      replyType,
+    })
+
+    setSessionCookie(res, session)
+    return res.status(200).json(result)
+  } catch (error) {
+    return sendServiceError(res, error)
+  }
+})
+
+// 6h. Directory / Annuaire search endpoint
+app.get('/__ent_auth/mail/directory', async (req, res) => {
+  try {
+    res.setHeader('Cache-Control', 'no-store')
+    const session = getSessionFromRequest(req)
+
+    if (!session) {
+      return res.status(401).json({ authenticated: false, error: 'Non authentifié' })
+    }
+
+    const query = typeof req.query.q === 'string' ? req.query.q.trim() : ''
+
+    if (isDemoSession(session)) {
+      setSessionCookie(res, session)
+      const q = query.toLowerCase()
+      const matches = q
+        ? DEMO_DIRECTORY_CONTACTS.filter(
+            (c) =>
+              c.name.toLowerCase().includes(q) ||
+              c.email.toLowerCase().includes(q) ||
+              (c.department && c.department.toLowerCase().includes(q))
+          )
+        : DEMO_DIRECTORY_CONTACTS
+      return res.status(200).json({ ok: true, contacts: matches })
+    }
+
+    const contacts = await searchZimbraDirectory(session, query)
+    setSessionCookie(res, session)
+    return res.status(200).json({ ok: true, contacts })
+  } catch (error) {
+    return sendServiceError(res, error)
+  }
+})
+
+// 6i. Attachment / inline image proxy endpoint
+app.get('/__ent_auth/mail/attachment', async (req, res) => {
+  try {
+    const session = getSessionFromRequest(req)
+    if (!session) {
+      return res.status(401).end()
+    }
+
+    const { id, part } = req.query
+    if (!id) {
+      return res.status(400).end()
+    }
+
+    const context = await getZimbraContext(session)
+    const upstreamUrl = `${context.origin}/service/home/~/?id=${encodeURIComponent(id)}${part ? `&part=${encodeURIComponent(part)}` : ''}`
+    const upstream = await fetchWithJar(upstreamUrl, context.jar)
+
+    if (!upstream.ok) {
+      return res.status(upstream.status).end()
+    }
+
+    const ct = upstream.headers.get('content-type') || 'application/octet-stream'
+    const cd = upstream.headers.get('content-disposition')
+    res.setHeader('Content-Type', ct)
+    if (cd) res.setHeader('Content-Disposition', cd)
+    res.setHeader('Cache-Control', 'private, max-age=86400')
+
+    const buffer = await upstream.arrayBuffer()
+    return res.send(Buffer.from(buffer))
+  } catch {
+    return res.status(500).end()
   }
 })
 
@@ -3479,6 +4261,9 @@ async function establishMoodleContext(session) {
       continue
     }
 
+    if (response.status === 403) {
+      throw new ServiceForbiddenError('Moodle', `${MOODLE_ORIGIN}/my/`)
+    }
     throw new Error(`Moodle sign-in stopped on an unexpected page (${response.status} at ${getHostnameFromUrl(currentUrl)}).`)
   }
 
@@ -3535,9 +4320,13 @@ function normalizeMoodleEvent(event, nowMs) {
   const action = event.action && typeof event.action === 'object' ? event.action : null
   const title = [event.activityname, event.name]
     .find((value) => typeof value === 'string' && value.trim())
+  const rawUrl = typeof event.url === 'string' ? event.url : (typeof action?.url === 'string' ? action.url : '')
+  const cmidMatch = rawUrl.match(/[?&]id=(\d+)/)
+  const cmid = cmidMatch ? Number(cmidMatch[1]) : (event.instance ? Number(event.instance) : null)
 
   return {
     id: String(event.id ?? `${event.modulename ?? 'event'}-${event.instance ?? ''}-${timestamp}`),
+    cmid,
     title: title ? decodeHtmlEntities(title.trim()) : '',
     courseName: decodeHtmlEntities(String(event.course?.fullname || event.course?.shortname || '').trim()),
     dueAt: new Date(dueAtMs).toISOString(),
@@ -3632,19 +4421,23 @@ async function queryMoodleDeadlines(context) {
   }
 }
 
+async function getMoodleContext(session) {
+  let context = runtimeMoodleContexts.get(session.id)
+  if (context && Date.now() - context.createdAt > MOODLE_CONTEXT_TTL_MS) {
+    context = null
+  }
+
+  if (!context) {
+    context = await establishMoodleContext(session)
+    runtimeMoodleContexts.set(session.id, context)
+  }
+  return context
+}
+
 async function fetchMoodleDeadlines(session) {
   for (let attempt = 0; attempt < 2; attempt += 1) {
-    let context = attempt === 0 ? runtimeMoodleContexts.get(session.id) : null
-    if (context && Date.now() - context.createdAt > MOODLE_CONTEXT_TTL_MS) {
-      context = null
-    }
-
-    if (!context) {
-      context = await establishMoodleContext(session)
-      runtimeMoodleContexts.set(session.id, context)
-    }
-
     try {
+      const context = await getMoodleContext(session)
       return await queryMoodleDeadlines(context)
     } catch (error) {
       runtimeMoodleContexts.delete(session.id)
@@ -3669,6 +4462,528 @@ function fetchMoodleDeadlinesOnce(session) {
 
   const promise = fetchMoodleDeadlines(session).finally(() => moodleDeadlinesInflight.delete(session.id))
   moodleDeadlinesInflight.set(session.id, promise)
+  return promise
+}
+
+async function queryMoodleCourses(context) {
+  let data
+  try {
+    data = await moodleAjaxCall(context, 'core_course_get_enrolled_courses_by_timeline_classification', {
+      classification: 'all',
+      limit: 0,
+      offset: 0,
+      sort: 'fullname',
+    })
+  } catch {
+    try {
+      data = await moodleAjaxCall(context, 'core_course_get_enrolled_courses_by_timeline_classification', {
+        classification: 'all',
+        limit: 0,
+        offset: 0,
+        sort: 'ul.timeaccess desc',
+      })
+    } catch {
+      data = await moodleAjaxCall(context, 'core_enrol_get_users_courses', {
+        userid: 0,
+      })
+    }
+  }
+
+  const rawCourses = Array.isArray(data?.courses) ? data.courses : (Array.isArray(data) ? data : [])
+  const courses = rawCourses.map((course) => {
+    const viewurl = course.viewurl || (MOODLE_ORIGIN ? `${MOODLE_ORIGIN}/course/view.php?id=${course.id}` : null)
+    return {
+      id: Number(course.id),
+      fullname: decodeHtmlEntities(String(course.fullname || course.fullnamedisplay || '').trim()),
+      shortname: decodeHtmlEntities(String(course.shortname || '').trim()),
+      category: decodeHtmlEntities(String(course.coursecategory || course.categoryname || '').trim()),
+      progress: typeof course.progress === 'number' && Number.isFinite(course.progress) ? Math.round(course.progress) : null,
+      hasprogress: Boolean(course.hasprogress),
+      courseimage: course.courseimage || null,
+      viewurl,
+      moodleHref: buildMoodleLaunchHref(viewurl),
+    }
+  }).sort((a, b) => a.fullname.localeCompare(b.fullname, 'fr'))
+
+  return {
+    moodleHref: buildMoodleLaunchHref(`${MOODLE_ORIGIN}/my/`),
+    courses,
+  }
+}
+
+async function fetchMoodleCourses(session) {
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    try {
+      const context = await getMoodleContext(session)
+      return await queryMoodleCourses(context)
+    } catch (error) {
+      runtimeMoodleContexts.delete(session.id)
+      if (!(error instanceof MoodleAuthError) || attempt > 0) {
+        throw error
+      }
+    }
+  }
+
+  throw new Error('Unable to load Moodle courses.')
+}
+
+const moodleCoursesInflight = new Map()
+
+function fetchMoodleCoursesOnce(session) {
+  const inflight = moodleCoursesInflight.get(session.id)
+  if (inflight) {
+    return inflight
+  }
+
+  const promise = fetchMoodleCourses(session).finally(() => moodleCoursesInflight.delete(session.id))
+  moodleCoursesInflight.set(session.id, promise)
+  return promise
+}
+
+function parseMoodleCoursePageHtml(html, courseId) {
+  if (!html || typeof html !== 'string') {
+    return { courseId: Number(courseId), sections: [] }
+  }
+
+  const sections = []
+
+  // 1. Primary parser: Moodle 4 Course Index drawer (<nav id="courseindex"> / .courseindex-section)
+  // This is generated on 100% of Moodle 4 course pages (University of Rennes / theme_boost_union)
+  if (html.includes('courseindex-section') || html.includes('course-index-section-')) {
+    const courseIndexChunks = html.split(/(?=<div\b[^>]*\bid=["']course-index-section-\d+["']|<div\b[^>]*class=["'][^"']*\bcourseindex-section\b[^"']*["'][^>]*data-for=["']section["'])/i)
+
+    for (const chunk of courseIndexChunks) {
+      const idMatch = chunk.match(/\bid=["']course-index-section-(\d+)["']/i) || chunk.match(/data-id=["'](\d+)["']/i)
+      if (!idMatch) continue
+
+      const sectionId = Number(idMatch[1])
+      const numMatch = chunk.match(/data-number=["'](\d+)["']/i)
+      const sectionNum = numMatch ? Number(numMatch[1]) : sectionId
+
+      let title = ''
+      const titleMatch = chunk.match(/data-for=["']section_title["'][^>]*>([\s\S]*?)<\/a>/i)
+        || chunk.match(/class=["'][^"']*\bcourseindex-section-title\b[^"']*["'][\s\S]*?<a\b[^>]*>([\s\S]*?)<\/a>/i)
+      if (titleMatch) {
+        title = titleMatch[1].replace(/<[^>]+>/g, '').trim()
+      }
+      if (!title) {
+        title = sectionNum === 0 ? 'Généralités' : `Section ${sectionNum}`
+      }
+
+      // Restrict module search to this section's cmlist ul if available
+      const cmlistMatch = chunk.match(/<ul\b[^>]*data-for=["']cmlist["'][^>]*data-id=["']\d+["'][\s\S]*?<\/ul>/i)
+      const contentToSearch = cmlistMatch ? cmlistMatch[0] : chunk
+
+      const modules = []
+      const cmChunks = contentToSearch.split(/(?=<li\b[^>]*class=["'][^"']*\bcourseindex-item\b[^"']*["'][^>]*data-for=["']cm["'])/i)
+
+      for (const cmChunk of cmChunks) {
+        const cmidMatch = cmChunk.match(/data-id=["'](\d+)["']/i) || cmChunk.match(/\bid=["']course-index-cm-(\d+)["']/i)
+        const linkMatch = cmChunk.match(/href=["']([^"']*\/mod\/([a-zA-Z0-9_-]+)\/[^"']*\bid=\d+[^"']*)["']/i)
+        if (!cmidMatch || !linkMatch) continue
+
+        const cmid = Number(cmidMatch[1])
+        const modUrl = linkMatch[1]
+        const modType = linkMatch[2].toLowerCase()
+
+        let modName = ''
+        const nameMatch = cmChunk.match(/data-for=["']cm_name["'][^>]*>([\s\S]*?)<\/a>/i)
+          || cmChunk.match(/<a\b[^>]*class=["'][^"']*\bcourseindex-link\b[^"']*["'][^>]*>([\s\S]*?)<\/a>/i)
+        if (nameMatch) {
+          modName = nameMatch[1].replace(/<[^>]+>/g, '').trim()
+        }
+        if (!modName) {
+          modName = `${modType} ${cmid}`
+        }
+        modName = decodeHtmlEntities(modName)
+
+        const contents = []
+        if (modType === 'resource' && modUrl) {
+          const effectiveUrl = modUrl.includes('redirect=1') ? modUrl : `${modUrl}${modUrl.includes('?') ? '&' : '?'}redirect=1`
+          let detectedFilename = modName
+          if (!detectedFilename.includes('.')) {
+            detectedFilename = `${detectedFilename}.pdf`
+          }
+
+          contents.push({
+            filename: detectedFilename,
+            filesize: 0,
+            fileurl: effectiveUrl,
+            mimetype: 'application/pdf',
+            proxyUrl: `/__ent_auth/moodle/file?url=${encodeURIComponent(effectiveUrl)}&name=${encodeURIComponent(detectedFilename)}`,
+          })
+        }
+
+        const pluralMap = {
+          resource: 'Fichiers',
+          assign: 'Devoirs',
+          quiz: 'Tests',
+          forum: 'Forums',
+          folder: 'Dossiers',
+          url: 'Liens',
+          page: 'Pages',
+        }
+
+        const downloadFolderProxyUrl = modType === 'folder' && MOODLE_ORIGIN
+          ? `/__ent_auth/moodle/file?url=${encodeURIComponent(`${MOODLE_ORIGIN}/mod/folder/download_folder.php?id=${cmid}`)}&name=${encodeURIComponent(`${modName}.zip`)}&download=1`
+          : null
+
+        modules.push({
+          id: cmid,
+          name: modName,
+          modname: modType,
+          modplural: pluralMap[modType] || modType,
+          modicon: null,
+          url: modUrl,
+          launchHref: buildMoodleLaunchHref(modUrl),
+          contents,
+          downloadFolderProxyUrl,
+        })
+      }
+
+      if (modules.length > 0 || (title && title !== 'Généralités')) {
+        sections.push({
+          id: sectionId,
+          name: decodeHtmlEntities(title),
+          summary: '',
+          modules,
+        })
+      }
+    }
+  }
+
+  // 2. Secondary fallback parser: Traditional section/activity DOM (Moodle 3 or course page body)
+  if (sections.length === 0) {
+    const sectionSplits = html.split(/(?=<li\b[^>]*\bid=["']section-\d+["']|<div\b[^>]*\bid=["']section-\d+["']|<div\b[^>]*class=["'][^"']*\bcourse-section\b[^"']*["']|<li\b[^>]*class=["'][^"']*\bsection\b[^"']*["'])/i)
+
+    for (const chunk of sectionSplits) {
+      const idMatch = chunk.match(/\bid=["']section-(\d+)["']/i)
+        || chunk.match(/data-sectionid=["'](\d+)["']/i)
+        || chunk.match(/data-id=["'](\d+)["']/i)
+      if (!idMatch) continue
+
+      const sectionNum = Number(idMatch[1])
+
+      let title = ''
+      const titleMatch = chunk.match(/<(?:h3|h4|div)\b[^>]*class=["'][^"']*(?:sectionname|section-title|section_title)[^"']*["'][^>]*>([\s\S]*?)<\/(?:h3|h4|div)>/i)
+        || chunk.match(/<h3\b[^>]*>([\s\S]*?)<\/h3>/i)
+      if (titleMatch) {
+        title = titleMatch[1]
+          .replace(/<span\b[^>]*class=["'][^"']*accesshide[^"']*["'][^>]*>[\s\S]*?<\/span>/gi, '')
+          .replace(/<[^>]+>/g, '')
+          .trim()
+      }
+      if (!title) {
+        title = sectionNum === 0 ? 'Généralités' : `Section ${sectionNum}`
+      }
+
+      let summary = ''
+      const summaryMatch = chunk.match(/<div\b[^>]*class=["'][^"']*(?:summary|section-summary|description-inner)[^"']*["'][^>]*>([\s\S]*?)<\/div>/i)
+      if (summaryMatch) {
+        summary = summaryMatch[1].trim()
+      }
+
+      const modules = []
+      const moduleChunks = chunk.split(/(?=<li\b[^>]*class=["'][^"']*\bactivity\b|<div\b[^>]*class=["'][^"']*\bactivity-item\b)/i)
+
+      for (const modChunk of moduleChunks) {
+        if (!modChunk.includes('/mod/')) continue
+
+        const linkMatch = modChunk.match(/href=["']([^"']*\/mod\/([a-zA-Z0-9_-]+)\/[^"']*\bid=(\d+)[^"']*)["']/i)
+        if (!linkMatch) continue
+
+        const modUrl = linkMatch[1]
+        const modType = linkMatch[2].toLowerCase()
+        const cmid = Number(linkMatch[3])
+
+        if (modules.some((m) => m.id === cmid)) continue
+
+        let modName = ''
+        const nameMatch = modChunk.match(/<span\b[^>]*class=["'][^"']*(?:instancename|activityname)[^"']*["'][^>]*>([\s\S]*?)<\/span>/i)
+        if (nameMatch) {
+          modName = nameMatch[1]
+            .replace(/<span\b[^>]*class=["'][^"']*accesshide[^"']*["'][^>]*>[\s\S]*?<\/span>/gi, '')
+            .replace(/<[^>]+>/g, '')
+            .trim()
+        } else {
+          const aMatch = modChunk.match(/<a\b[^>]*>([\s\S]*?)<\/a>/i)
+          if (aMatch) {
+            modName = aMatch[1]
+              .replace(/<span\b[^>]*class=["'][^"']*accesshide[^"']*["'][^>]*>[\s\S]*?<\/span>/gi, '')
+              .replace(/<[^>]+>/g, '')
+              .trim()
+          }
+        }
+
+        if (!modName) {
+          modName = `${modType} ${cmid}`
+        }
+
+        modName = decodeHtmlEntities(modName)
+
+        const contents = []
+        if (modType === 'resource' && modUrl) {
+          const effectiveUrl = modUrl.includes('redirect=1') ? modUrl : `${modUrl}${modUrl.includes('?') ? '&' : '?'}redirect=1`
+          let detectedFilename = modName
+          if (!detectedFilename.includes('.')) {
+            detectedFilename = `${detectedFilename}.pdf`
+          }
+
+          contents.push({
+            filename: detectedFilename,
+            filesize: 0,
+            fileurl: effectiveUrl,
+            mimetype: 'application/pdf',
+            proxyUrl: `/__ent_auth/moodle/file?url=${encodeURIComponent(effectiveUrl)}&name=${encodeURIComponent(detectedFilename)}`,
+          })
+        }
+
+        const pluralMap = {
+          resource: 'Fichiers',
+          assign: 'Devoirs',
+          quiz: 'Tests',
+          forum: 'Forums',
+          folder: 'Dossiers',
+          url: 'Liens',
+          page: 'Pages',
+        }
+
+        const downloadFolderProxyUrl = modType === 'folder' && MOODLE_ORIGIN
+          ? `/__ent_auth/moodle/file?url=${encodeURIComponent(`${MOODLE_ORIGIN}/mod/folder/download_folder.php?id=${cmid}`)}&name=${encodeURIComponent(`${modName}.zip`)}&download=1`
+          : null
+
+        modules.push({
+          id: cmid,
+          name: modName,
+          modname: modType,
+          modplural: pluralMap[modType] || modType,
+          modicon: null,
+          url: modUrl,
+          launchHref: buildMoodleLaunchHref(modUrl),
+          contents,
+          downloadFolderProxyUrl,
+        })
+      }
+
+      if (modules.length > 0 || summary) {
+        sections.push({
+          id: sectionNum,
+          name: decodeHtmlEntities(title),
+          summary,
+          modules,
+        })
+      }
+    }
+  }
+
+  return {
+    courseId: Number(courseId),
+    sections,
+  }
+}
+
+function parseMoodleFolderPageHtml(html, cmid, moodleOrigin) {
+  if (!html || typeof html !== 'string') {
+    return { cmid: Number(cmid), name: '', files: [], downloadFolderProxyUrl: null }
+  }
+
+  const h2Match = html.match(/<h2\b[^>]*>([\s\S]*?)<\/h2>/i)
+  const name = h2Match ? decodeHtmlEntities(h2Match[1].replace(/<[^>]+>/g, '').trim()) : ''
+
+  const files = []
+  const fileRegex = /href=["']([^"']*\/pluginfile\.php\/[^"']*)["'][^>]*>([\s\S]*?)<\/a>/gi
+  let match
+  const seenUrls = new Set()
+
+  while ((match = fileRegex.exec(html)) !== null) {
+    let fileurl = match[1].replace(/&amp;/g, '&')
+    if (fileurl.startsWith('/')) {
+      fileurl = `${moodleOrigin}${fileurl}`
+    }
+    if (seenUrls.has(fileurl)) continue
+    seenUrls.add(fileurl)
+
+    if (fileurl.includes('/theme_') || fileurl.includes('/pix/') || fileurl.includes('/favicon')) {
+      continue
+    }
+
+    let filename = match[2].replace(/<[^>]+>/g, '').trim()
+    if (!filename || filename.length > 150) {
+      try {
+        filename = decodeURIComponent(new URL(fileurl).pathname.split('/').pop() || '')
+      } catch {
+        filename = 'document.pdf'
+      }
+    }
+    if (!filename) filename = 'document.pdf'
+
+    files.push({
+      filename,
+      filepath: '/',
+      filesize: 0,
+      fileurl,
+      mimetype: filename.endsWith('.pdf') ? 'application/pdf' : 'application/octet-stream',
+      timemodified: 0,
+      proxyUrl: `/__ent_auth/moodle/file?url=${encodeURIComponent(fileurl)}&name=${encodeURIComponent(filename)}`,
+    })
+  }
+
+  const downloadFolderUrl = `${moodleOrigin}/mod/folder/download_folder.php?id=${cmid}`
+  const downloadFolderProxyUrl = `/__ent_auth/moodle/file?url=${encodeURIComponent(downloadFolderUrl)}&name=${encodeURIComponent(name || 'dossier')}.zip&download=1`
+
+  return {
+    cmid: Number(cmid),
+    name,
+    files,
+    downloadFolderProxyUrl,
+  }
+}
+
+async function queryMoodleCourseContents(context, courseId) {
+  try {
+    const data = await moodleAjaxCall(context, 'core_course_get_contents', {
+      courseid: Number(courseId),
+      options: [],
+    })
+
+    if (Array.isArray(data)) {
+      const sections = data
+        .filter((section) => section.uservisible !== false)
+        .map((section) => {
+          const modules = (Array.isArray(section.modules) ? section.modules : [])
+            .filter((mod) => mod.uservisible !== false && mod.visibleoncoursepage !== 0)
+            .map((mod) => {
+              const modUrl = mod.url || null
+              const modType = String(mod.modname || 'other').toLowerCase()
+
+              let contents = (Array.isArray(mod.contents) ? mod.contents : []).map((file) => {
+                let fileurl = file.fileurl || null
+                if (fileurl && fileurl.includes('/webservice/pluginfile.php/')) {
+                  fileurl = fileurl.replace('/webservice/pluginfile.php/', '/pluginfile.php/')
+                }
+                const filename = file.filename || 'document.pdf'
+                return {
+                  filename,
+                  filepath: file.filepath || '/',
+                  filesize: Number(file.filesize) || 0,
+                  fileurl,
+                  mimetype: file.mimetype || 'application/pdf',
+                  timemodified: Number(file.timemodified) || 0,
+                  proxyUrl: fileurl
+                    ? `/__ent_auth/moodle/file?url=${encodeURIComponent(fileurl)}&name=${encodeURIComponent(filename)}`
+                    : null,
+                }
+              })
+
+              // If contents is empty but this is a resource activity with a URL, create the direct file entry
+              if (contents.length === 0 && (modType === 'resource' || (modUrl && modUrl.includes('/mod/resource/')))) {
+                const effectiveUrl = modUrl.includes('redirect=1') ? modUrl : `${modUrl}${modUrl.includes('?') ? '&' : '?'}redirect=1`
+                let detectedFilename = decodeHtmlEntities(String(mod.name || 'document')).trim()
+                if (!detectedFilename.includes('.')) {
+                  detectedFilename = `${detectedFilename}.pdf`
+                }
+                contents = [{
+                  filename: detectedFilename,
+                  filepath: '/',
+                  filesize: 0,
+                  fileurl: effectiveUrl,
+                  mimetype: 'application/pdf',
+                  proxyUrl: `/__ent_auth/moodle/file?url=${encodeURIComponent(effectiveUrl)}&name=${encodeURIComponent(detectedFilename)}`,
+                }]
+              }
+
+              const isFolder = modType === 'folder'
+              const cmid = Number(mod.id)
+              const downloadFolderProxyUrl = isFolder && MOODLE_ORIGIN
+                ? `/__ent_auth/moodle/file?url=${encodeURIComponent(`${MOODLE_ORIGIN}/mod/folder/download_folder.php?id=${cmid}`)}&name=${encodeURIComponent(`${decodeHtmlEntities(String(mod.name || 'dossier')).trim()}.zip`)}&download=1`
+                : null
+
+              return {
+                id: cmid,
+                name: decodeHtmlEntities(String(mod.name || '').trim()),
+                modname: modType,
+                modplural: decodeHtmlEntities(String(mod.modplural || '').trim()),
+                modicon: mod.modicon || null,
+                url: modUrl,
+                launchHref: buildMoodleLaunchHref(modUrl),
+                contents,
+                downloadFolderProxyUrl,
+              }
+            })
+
+          return {
+            id: Number(section.id),
+            name: decodeHtmlEntities(String(section.name || `Section ${section.section ?? ''}`).trim()),
+            summary: section.summary || '',
+            modules,
+          }
+        })
+
+      return {
+        courseId: Number(courseId),
+        sections,
+      }
+    }
+  } catch (err) {
+    if (err instanceof MoodleAuthError) {
+      throw err
+    }
+  }
+
+  // Fallback: fetch course/view.php?id=... with session jar and parse HTML
+  try {
+    const url = `${MOODLE_ORIGIN}/course/view.php?id=${encodeURIComponent(courseId)}`
+    const resp = await fetchWithJar(url, context.jar, {
+      headers: { Accept: MOODLE_ACCEPT_HTML },
+    })
+
+    if (resp.status === 401 || resp.status === 403) {
+      throw new MoodleAuthError(`Moodle course view rejected the session (${resp.status}).`)
+    }
+
+    if (resp.ok) {
+      const html = await resp.text()
+      return parseMoodleCoursePageHtml(html, courseId)
+    }
+  } catch (err) {
+    if (err instanceof MoodleAuthError) {
+      throw err
+    }
+  }
+
+  return {
+    courseId: Number(courseId),
+    sections: [],
+  }
+}
+
+async function fetchMoodleCourseContents(session, courseId) {
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    try {
+      const context = await getMoodleContext(session)
+      return await queryMoodleCourseContents(context, courseId)
+    } catch (error) {
+      runtimeMoodleContexts.delete(session.id)
+      if (!(error instanceof MoodleAuthError) || attempt > 0) {
+        throw error
+      }
+    }
+  }
+
+  throw new Error('Unable to load course contents.')
+}
+
+const moodleContentsInflight = new Map()
+
+function fetchMoodleCourseContentsOnce(session, courseId) {
+  const key = `${session.id}:${courseId}`
+  const inflight = moodleContentsInflight.get(key)
+  if (inflight) {
+    return inflight
+  }
+
+  const promise = fetchMoodleCourseContents(session, courseId).finally(() => moodleContentsInflight.delete(key))
+  moodleContentsInflight.set(key, promise)
   return promise
 }
 
@@ -3710,13 +5025,840 @@ app.get('/__ent_auth/moodle/deadlines', async (req, res) => {
       deadlines,
     })
   } catch (error) {
-    // Messages are built from status codes, error codes and hostnames only —
-    // never from cookies, the sesskey or upstream bodies.
+    return sendServiceError(res, error)
+  }
+})
+
+// 6e. Moodle enrolled courses endpoint
+app.get('/__ent_auth/moodle/courses', async (req, res) => {
+  try {
+    res.setHeader('Cache-Control', 'no-store')
+    const session = getSessionFromRequest(req)
+
+    if (!session) {
+      return res.status(200).json({ authenticated: false, courses: [] })
+    }
+
+    if (isDemoSession(session)) {
+      setSessionCookie(res, session)
+      return res.status(200).json({
+        authenticated: true,
+        sessionMode: DEMO_SESSION_MODE,
+        ...buildDemoMoodleCoursesPayload(),
+      })
+    }
+
+    const cached = getCachedMoodleCourses(session.id)
+    if (cached) {
+      setSessionCookie(res, session)
+      return res.status(200).json({
+        authenticated: true,
+        sessionMode: session.mode ?? null,
+        ...cached,
+      })
+    }
+
+    const payload = await fetchMoodleCoursesOnce(session)
+    setCachedMoodleCourses(session.id, payload)
+    setSessionCookie(res, session)
+    return res.status(200).json({
+      authenticated: true,
+      sessionMode: session.mode ?? null,
+      ...payload,
+    })
+  } catch (error) {
+    return sendServiceError(res, error)
+  }
+})
+
+// 6f. Moodle course contents & resources endpoint
+app.get('/__ent_auth/moodle/course-contents', async (req, res) => {
+  try {
+    res.setHeader('Cache-Control', 'no-store')
+    const session = getSessionFromRequest(req)
+
+    if (!session) {
+      return res.status(200).json({ authenticated: false, sections: [] })
+    }
+
+    const courseId = Number(req.query.courseId)
+    if (!Number.isFinite(courseId) || courseId <= 0) {
+      return res.status(400).json({ error: 'Valid courseId is required.' })
+    }
+
+    if (isDemoSession(session)) {
+      setSessionCookie(res, session)
+      return res.status(200).json({
+        authenticated: true,
+        sessionMode: DEMO_SESSION_MODE,
+        ...buildDemoMoodleCourseContentsPayload(courseId),
+      })
+    }
+
+    const cached = getCachedMoodleContents(session.id, courseId)
+    if (cached) {
+      setSessionCookie(res, session)
+      return res.status(200).json({
+        authenticated: true,
+        sessionMode: session.mode ?? null,
+        ...cached,
+      })
+    }
+
+    const payload = await fetchMoodleCourseContentsOnce(session, courseId)
+    setCachedMoodleContents(session.id, courseId, payload)
+    setSessionCookie(res, session)
+    return res.status(200).json({
+      authenticated: true,
+      sessionMode: session.mode ?? null,
+      ...payload,
+    })
+  } catch (error) {
+    return sendServiceError(res, error)
+  }
+})
+
+// 6g. Moodle folder contents endpoint
+app.get('/__ent_auth/moodle/folder-contents', async (req, res) => {
+  try {
+    res.setHeader('Cache-Control', 'no-store')
+    const session = getSessionFromRequest(req)
+    if (!session) {
+      return res.status(200).json({ authenticated: false, files: [] })
+    }
+
+    const cmid = Number(req.query.cmid)
+    const courseId = Number(req.query.courseId)
+    if (!Number.isFinite(cmid) || cmid <= 0) {
+      return res.status(400).json({ error: 'Valid cmid is required.' })
+    }
+
+    if (isDemoSession(session)) {
+      setSessionCookie(res, session)
+      const demoContents = buildDemoMoodleCourseContentsPayload(courseId || 101)
+      const allMods = (demoContents.sections || []).flatMap((s) => s.modules || [])
+      const matchedMod = allMods.find((m) => m.id === cmid)
+      return res.status(200).json({
+        authenticated: true,
+        sessionMode: DEMO_SESSION_MODE,
+        cmid,
+        name: matchedMod?.name || 'Dossier',
+        files: (matchedMod?.contents || []).map((file) => ({
+          ...file,
+          proxyUrl: file.proxyUrl || `/__ent_auth/moodle/file?url=${encodeURIComponent(file.fileurl || '')}&name=${encodeURIComponent(file.filename || '')}`,
+        })),
+        downloadFolderProxyUrl: matchedMod?.downloadFolderProxyUrl || `/__ent_auth/moodle/file?download=1&name=${encodeURIComponent(matchedMod?.name || 'dossier')}.zip`,
+      })
+    }
+
+    if (courseId) {
+      const cached = getCachedMoodleContents(session.id, courseId)
+      if (cached?.sections) {
+        const found = cached.sections.flatMap((s) => s.modules || []).find((m) => m.id === cmid)
+        if (found && Array.isArray(found.contents) && found.contents.length > 0) {
+          setSessionCookie(res, session)
+          return res.status(200).json({
+            authenticated: true,
+            sessionMode: session.mode ?? null,
+            cmid,
+            name: found.name,
+            files: found.contents,
+            downloadFolderProxyUrl: found.downloadFolderProxyUrl || null,
+          })
+        }
+      }
+    }
+
+    const context = await getMoodleContext(session)
+    const folderUrl = `${MOODLE_ORIGIN}/mod/folder/view.php?id=${encodeURIComponent(cmid)}`
+    const resp = await fetchWithJar(folderUrl, context.jar, {
+      headers: { Accept: MOODLE_ACCEPT_HTML },
+    })
+
+    if (!resp.ok) {
+      return res.status(resp.status).json({ error: `Moodle folder request failed (${resp.status})` })
+    }
+
+    const html = await resp.text()
+    const parsed = parseMoodleFolderPageHtml(html, cmid, MOODLE_ORIGIN)
+    setSessionCookie(res, session)
+    return res.status(200).json({
+      authenticated: true,
+      sessionMode: session.mode ?? null,
+      ...parsed,
+    })
+  } catch (error) {
+    return sendServiceError(res, error)
+  }
+})
+
+// 6g. Moodle assignment details & submission parsing
+function parseMoodleAssignmentPageHtml(html, cmid, moodleOrigin) {
+  const nameMatch = html.match(/<h2\b[^>]*>([\s\S]*?)<\/h2>/i)
+    || html.match(/<div\b[^>]*class=["'][^"']*\bpage-header-headings\b[^"']*["'][^>]*>([\s\S]*?)<\/h[12]>/i)
+    || html.match(/data-region=["']header["'][^>]*>([\s\S]*?)<\/h[12]>/i)
+  const name = nameMatch ? decodeHtmlEntities(nameMatch[1].replace(/<[^>]+>/g, '').trim()) : `Devoir ${cmid}`
+
+  let introHtml = ''
+  const introMatch = html.match(/<div\b[^>]*class=["'][^"']*\b(intro|generalbox|no-overflow)\b[^"']*["'][^>]*>([\s\S]*?)<\/div>/i)
+    || html.match(/<div\b[^>]*id=["']intro["'][^>]*>([\s\S]*?)<\/div>/i)
+  if (introMatch) {
+    introHtml = introMatch[2].trim().replace(/href=["']([^"']*pluginfile\.php[^"']*)["']/gi, (_m, u) => {
+      let full = u
+      if (full.startsWith('/')) full = `${moodleOrigin}${full}`
+      return `href="/__ent_auth/moodle/file?url=${encodeURIComponent(full)}&name=document"`
+    })
+  }
+
+  let status = 'not_submitted'
+  let statusLabel = 'Aucun devoir remis'
+  let gradingStatus = 'not_graded'
+  let gradingStatusLabel = 'Non noté'
+  let dueDateFormatted = ''
+  let timeRemaining = ''
+  let lastModified = ''
+  const submittedFiles = []
+  let onlineText = ''
+  const acceptedTypes = []
+
+  const rowRegex = /<tr\b[^>]*>([\s\S]*?)<\/tr>/gi
+  let trMatch
+  while ((trMatch = rowRegex.exec(html)) !== null) {
+    const rowContent = trMatch[1]
+    const thMatch = rowContent.match(/<th\b[^>]*>([\s\S]*?)<\/th>/i)
+    const tdMatch = rowContent.match(/<td\b[^>]*>([\s\S]*?)<\/td>/i)
+    if (!thMatch || !tdMatch) continue
+
+    const header = thMatch[1].replace(/<[^>]+>/g, '').trim().toLowerCase()
+    const tdText = decodeHtmlEntities(tdMatch[1].replace(/<[^>]+>/g, '').trim())
+    const tdHtml = tdMatch[1]
+
+    if (header.includes('statut') && (header.includes('remis') || header.includes('travaux') || header.includes('submission'))) {
+      if (/remis pour|submitted for/i.test(tdText)) {
+        status = 'submitted'
+        statusLabel = 'Remis pour évaluation'
+      } else if (/brouillon|draft/i.test(tdText)) {
+        status = 'draft'
+        statusLabel = 'Brouillon (non remis)'
+      } else {
+        status = 'not_submitted'
+        statusLabel = tdText || 'Aucun devoir remis'
+      }
+    } else if (header.includes('évaluation') || header.includes('grading')) {
+      if (/non noté|not graded/i.test(tdText)) {
+        gradingStatus = 'not_graded'
+        gradingStatusLabel = 'Non noté'
+      } else if (/noté|graded|évalué/i.test(tdText)) {
+        gradingStatus = 'graded'
+        gradingStatusLabel = tdText || 'Noté'
+      }
+    } else if (header.includes('date limite') || header.includes('due date')) {
+      dueDateFormatted = tdText
+    } else if (header.includes('temps restant') || header.includes('time remaining')) {
+      timeRemaining = tdText
+    } else if (header.includes('dernière modification') || header.includes('last modified')) {
+      lastModified = tdText
+    } else if (header.includes('fichiers') || header.includes('file submissions')) {
+      const fileRegex = /<a\b[^>]*href=["']([^"']*pluginfile\.php[^"']*)["'][^>]*>([\s\S]*?)<\/a>/gi
+      let fMatch
+      while ((fMatch = fileRegex.exec(tdHtml)) !== null) {
+        let fileurl = fMatch[1].replace(/&amp;/g, '&')
+        if (fileurl.startsWith('/')) fileurl = `${moodleOrigin}${fileurl}`
+        const fname = decodeHtmlEntities(fMatch[2].replace(/<[^>]+>/g, '').trim())
+        if (fname && !submittedFiles.some((f) => f.filename === fname)) {
+          submittedFiles.push({
+            filename: fname,
+            fileurl,
+            proxyUrl: `/__ent_auth/moodle/file?url=${encodeURIComponent(fileurl)}&name=${encodeURIComponent(fname)}&download=1`,
+          })
+        }
+      }
+    } else if (header.includes('texte en ligne') || header.includes('online text')) {
+      onlineText = tdHtml.replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '').trim()
+    } else if (header.includes('types de fichiers') || header.includes('accepted')) {
+      const exts = tdText.match(/\.[a-zA-Z0-9_-]+/g)
+      if (exts) {
+        for (const ext of exts) {
+          if (!acceptedTypes.includes(ext.toLowerCase())) acceptedTypes.push(ext.toLowerCase())
+        }
+      }
+    }
+  }
+
+  const canSubmit = /action=editsubmission/i.test(html) || /ajouter un travail|modifier le devoir/i.test(html)
+  const canFinalize = /action=submit\b/i.test(html) || /envoyer le devoir/i.test(html)
+  const canRemove = /action=removesubmissionconfirm/i.test(html) || /supprimer le devoir/i.test(html)
+
+  return {
+    cmid: Number(cmid),
+    name,
+    introHtml,
+    status,
+    statusLabel,
+    gradingStatus,
+    gradingStatusLabel,
+    dueDateFormatted,
+    timeRemaining,
+    lastModified,
+    submittedFiles,
+    onlineText,
+    acceptedTypes: acceptedTypes.length > 0 ? acceptedTypes : ['.pdf', '.zip', '.tar.gz', '.sql', '.md', '.txt', '.docx'],
+    maxFiles: 5,
+    maxFileSizeFormatted: '50 Mo',
+    canSubmit,
+    canEdit: canSubmit,
+    canFinalize,
+    canRemove,
+    launchHref: buildMoodleLaunchHref(`${moodleOrigin}/mod/assign/view.php?id=${cmid}`),
+  }
+}
+
+function extractMoodleFormHiddenInputs(html) {
+  const fields = {}
+  const inputRegex = /<input\b[^>]*>/gi
+  let match
+  while ((match = inputRegex.exec(html)) !== null) {
+    const tag = match[0]
+    if (!/\btype=["']hidden["']/i.test(tag)) continue
+    const nameMatch = tag.match(/\bname=["']([^"']+)["']/i)
+    const valueMatch = tag.match(/\bvalue=["']([^"']*?)["']/i)
+    if (nameMatch) {
+      fields[decodeHtmlEntities(nameMatch[1])] = valueMatch ? decodeHtmlEntities(valueMatch[1]) : ''
+    }
+  }
+  return fields
+}
+
+async function submitMoodleAssignmentLive(context, cmid, files, onlineText, finalize) {
+  const editUrl = `${MOODLE_ORIGIN}/mod/assign/view.php?id=${encodeURIComponent(cmid)}&action=editsubmission`
+  const { response: editResp, finalUrl: editFinalUrl } = await followRedirectChain(editUrl, context.jar, {
+    headers: {
+      Accept: MOODLE_ACCEPT_HTML,
+      Referer: `${MOODLE_ORIGIN}/mod/assign/view.php?id=${encodeURIComponent(cmid)}`,
+    },
+  })
+  const editHtml = await editResp.text()
+
+  if (isCasLoginForm(editHtml, editFinalUrl) || isMoodleLoginPage(editHtml, editFinalUrl)) {
+    throw new MoodleAuthError('Session Moodle expirée, veuillez vous reconnecter.')
+  }
+
+  const sesskeyMatch = editHtml.match(/name=["']sesskey["'][^>]*value=["']([^"']+)["']/i)
+    || editHtml.match(/value=["']([^"']+)["'][^>]*name=["']sesskey["']/i)
+    || editHtml.match(/["']sesskey["']\s*:\s*["']([^"']+)["']/i)
+  const pageSesskey = sesskeyMatch ? sesskeyMatch[1] : context.sesskey
+
+  const hiddenInputs = extractMoodleFormHiddenInputs(editHtml)
+
+  let draftItemId = hiddenInputs['files_filemanager']
+  if (!draftItemId) {
+    const fmKey = Object.keys(hiddenInputs).find((k) => k.includes('filemanager') || k.includes('files'))
+    if (fmKey) draftItemId = hiddenInputs[fmKey]
+  }
+  if (!draftItemId) {
+    const draftItemMatch = editHtml.match(/name=["']files_filemanager["'][^>]*value=["'](\d+)["']/i)
+      || editHtml.match(/value=["'](\d+)["'][^>]*name=["']files_filemanager["']/i)
+      || editHtml.match(/["']itemid["']\s*:\s*(\d+)/i)
+      || editHtml.match(/draftitemid["']\s*:\s*(\d+)/i)
+    draftItemId = draftItemMatch ? draftItemMatch[1] : null
+  }
+
+  const repoMatch = editHtml.match(/["']type["']\s*:\s*["']upload["'][^}]*?["']id["']\s*:\s*(\d+)/i)
+    || editHtml.match(/["']id["']\s*:\s*(\d+)[^}]*?["']type["']\s*:\s*["']upload["']/i)
+    || editHtml.match(/repo_id["']?\s*[:=]\s*["']?(\d+)/i)
+  const repoId = repoMatch ? repoMatch[1] : '4'
+
+  if (draftItemId && Array.isArray(files) && files.length > 0) {
+    for (const file of files) {
+      const buffer = Buffer.from(file.base64 || '', 'base64')
+      const formData = new FormData()
+      formData.append('repo_id', repoId)
+      formData.append('itemid', draftItemId)
+      formData.append('sesskey', pageSesskey)
+      const filename = file.name || file.filename || 'rendu.md'
+      formData.append('title', filename)
+      formData.append('author', '')
+      formData.append('license', 'allrightsreserved')
+      formData.append('savepath', '/')
+      const blob = new Blob([buffer], { type: file.type || 'application/octet-stream' })
+      formData.append('repo_upload_file', blob, filename)
+
+      const uploadUrl = `${MOODLE_ORIGIN}/repository/repository_ajax.php?action=upload`
+      const uploadResp = await fetchWithJar(uploadUrl, context.jar, {
+        method: 'POST',
+        body: formData,
+        headers: {
+          'X-Requested-With': 'XMLHttpRequest',
+          Origin: MOODLE_ORIGIN,
+          Referer: editFinalUrl || editUrl,
+        },
+      })
+
+      const uploadJson = await uploadResp.json().catch(() => null)
+      if (uploadJson && uploadJson.error) {
+        throw new Error(uploadJson.error || 'Erreur lors du dépôt du fichier dans Moodle.')
+      }
+    }
+  }
+
+  const saveParams = new URLSearchParams()
+  for (const [key, value] of Object.entries(hiddenInputs)) {
+    saveParams.append(key, value)
+  }
+
+  saveParams.set('id', String(cmid))
+  saveParams.set('action', 'savesubmission')
+  saveParams.set('sesskey', pageSesskey)
+  saveParams.set('_qf__mod_assign_submission_form', '1')
+
+  if (draftItemId) {
+    saveParams.set('files_filemanager', String(draftItemId))
+  }
+
+  if (onlineText) {
+    saveParams.set('onlinetext_editor[text]', onlineText)
+    saveParams.set('onlinetext_editor[format]', '1')
+    if (hiddenInputs['onlinetext_editor[itemid]']) {
+      saveParams.set('onlinetext_editor[itemid]', hiddenInputs['onlinetext_editor[itemid]'])
+    }
+  }
+
+  if (/name=["']submissionstatement["']/i.test(editHtml)) {
+    saveParams.set('submissionstatement', '1')
+  }
+
+  const submitBtnMatch = editHtml.match(/name=["']submitbutton["'][^>]*value=["']([^"']*)["']/i)
+    || editHtml.match(/value=["']([^"']*)["'][^>]*name=["']submitbutton["']/i)
+  const submitButtonValue = submitBtnMatch ? decodeHtmlEntities(submitBtnMatch[1]) : 'Enregistrer les modifications'
+  saveParams.set('submitbutton', submitButtonValue)
+
+  const saveUrl = `${MOODLE_ORIGIN}/mod/assign/view.php?id=${encodeURIComponent(cmid)}`
+  const { response: saveResp } = await followRedirectChain(saveUrl, context.jar, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/x-www-form-urlencoded',
+      Origin: MOODLE_ORIGIN,
+      Referer: editFinalUrl || editUrl,
+    },
+    body: saveParams.toString(),
+  })
+
+  const saveHtml = await saveResp.text()
+  const formErrorMatch = saveHtml.match(/class=["'][^"']*\b(form-control-feedback|error|alert-danger)\b[^"']*["'][^>]*>([\s\S]*?)<\/(?:div|span|p)>/i)
+  if (formErrorMatch && !saveResp.headers.get('location') && !/action=editsubmission/i.test(saveResp.url || '')) {
+    const errorText = decodeHtmlEntities(formErrorMatch[2].replace(/<[^>]+>/g, '').trim())
+    if (errorText) {
+      throw new Error(errorText)
+    }
+  }
+
+  if (finalize) {
+    const confirmParams = new URLSearchParams()
+    confirmParams.append('id', String(cmid))
+    confirmParams.append('action', 'submit')
+    confirmParams.append('sesskey', pageSesskey)
+    confirmParams.append('confirm', '1')
+
+    await followRedirectChain(`${MOODLE_ORIGIN}/mod/assign/view.php?id=${encodeURIComponent(cmid)}`, context.jar, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+        Origin: MOODLE_ORIGIN,
+        Referer: saveUrl,
+      },
+      body: confirmParams.toString(),
+    }).catch(() => null)
+  }
+
+  const { response: viewResp } = await followRedirectChain(`${MOODLE_ORIGIN}/mod/assign/view.php?id=${encodeURIComponent(cmid)}`, context.jar, {
+    headers: { Accept: MOODLE_ACCEPT_HTML },
+  })
+  const viewHtml = await viewResp.text()
+  return parseMoodleAssignmentPageHtml(viewHtml, cmid, MOODLE_ORIGIN)
+}
+
+async function removeMoodleAssignmentFileLive(context, cmid, filename) {
+  const editUrl = `${MOODLE_ORIGIN}/mod/assign/view.php?id=${encodeURIComponent(cmid)}&action=editsubmission`
+  const { response: editResp, finalUrl: editFinalUrl } = await followRedirectChain(editUrl, context.jar, {
+    headers: {
+      Accept: MOODLE_ACCEPT_HTML,
+      Referer: `${MOODLE_ORIGIN}/mod/assign/view.php?id=${encodeURIComponent(cmid)}`,
+    },
+  })
+  const editHtml = await editResp.text()
+
+  const sesskeyMatch = editHtml.match(/name=["']sesskey["'][^>]*value=["']([^"']+)["']/i)
+    || editHtml.match(/value=["']([^"']+)["'][^>]*name=["']sesskey["']/i)
+    || editHtml.match(/["']sesskey["']\s*:\s*["']([^"']+)["']/i)
+  const pageSesskey = sesskeyMatch ? sesskeyMatch[1] : context.sesskey
+
+  const hiddenInputs = extractMoodleFormHiddenInputs(editHtml)
+  let draftItemId = hiddenInputs['files_filemanager']
+  if (!draftItemId) {
+    const fmKey = Object.keys(hiddenInputs).find((k) => k.includes('filemanager') || k.includes('files'))
+    if (fmKey) draftItemId = hiddenInputs[fmKey]
+  }
+
+  if (draftItemId) {
+    const deleteParams = new URLSearchParams()
+    deleteParams.append('sesskey', pageSesskey)
+    deleteParams.append('itemid', String(draftItemId))
+    deleteParams.append('filepath', '/')
+    deleteParams.append('filename', filename)
+
+    await fetchWithJar(`${MOODLE_ORIGIN}/repository/draftfiles_ajax.php?action=delete`, context.jar, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+        'X-Requested-With': 'XMLHttpRequest',
+        Origin: MOODLE_ORIGIN,
+        Referer: editFinalUrl || editUrl,
+      },
+      body: deleteParams.toString(),
+    }).catch(() => null)
+  }
+
+  const saveParams = new URLSearchParams()
+  for (const [key, value] of Object.entries(hiddenInputs)) {
+    saveParams.append(key, value)
+  }
+  saveParams.set('id', String(cmid))
+  saveParams.set('action', 'savesubmission')
+  saveParams.set('sesskey', pageSesskey)
+  saveParams.set('_qf__mod_assign_submission_form', '1')
+  if (draftItemId) {
+    saveParams.set('files_filemanager', String(draftItemId))
+  }
+  saveParams.set('submitbutton', 'Enregistrer les modifications')
+
+  const saveUrl = `${MOODLE_ORIGIN}/mod/assign/view.php?id=${encodeURIComponent(cmid)}`
+  await followRedirectChain(saveUrl, context.jar, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/x-www-form-urlencoded',
+      Origin: MOODLE_ORIGIN,
+      Referer: editFinalUrl || editUrl,
+    },
+    body: saveParams.toString(),
+  })
+
+  const { response: viewResp } = await followRedirectChain(`${MOODLE_ORIGIN}/mod/assign/view.php?id=${encodeURIComponent(cmid)}`, context.jar, {
+    headers: { Accept: MOODLE_ACCEPT_HTML },
+  })
+  const viewHtml = await viewResp.text()
+  return parseMoodleAssignmentPageHtml(viewHtml, cmid, MOODLE_ORIGIN)
+}
+
+// 6h. Moodle assignment details endpoint
+app.get('/__ent_auth/moodle/assignment-details', async (req, res) => {
+  try {
+    res.setHeader('Cache-Control', 'no-store')
+    const session = getSessionFromRequest(req)
+    if (!session) {
+      return res.status(200).json({ authenticated: false, assignment: null })
+    }
+
+    const cmid = Number(req.query.cmid)
+    const courseId = req.query.courseId ? Number(req.query.courseId) : null
+    if (!cmid || !Number.isFinite(cmid)) {
+      return res.status(400).json({ error: 'Paramètre cmid requis' })
+    }
+
+    if (isDemoSession(session)) {
+      setSessionCookie(res, session)
+      const assignment = getDemoAssignmentDetails(cmid, courseId)
+      return res.status(200).json({
+        authenticated: true,
+        sessionMode: DEMO_SESSION_MODE,
+        assignment,
+      })
+    }
+
+    const context = await getMoodleContext(session)
+    const viewUrl = `${MOODLE_ORIGIN}/mod/assign/view.php?id=${encodeURIComponent(cmid)}`
+    const { response: resp } = await followRedirectChain(viewUrl, context.jar, {
+      headers: { Accept: MOODLE_ACCEPT_HTML },
+    })
+
+    if (!resp.ok) {
+      return res.status(resp.status).json({ error: `Moodle assign request failed (${resp.status})` })
+    }
+
+    const html = await resp.text()
+    const assignment = parseMoodleAssignmentPageHtml(html, cmid, MOODLE_ORIGIN)
+    setSessionCookie(res, session)
+    return res.status(200).json({
+      authenticated: true,
+      sessionMode: session.mode ?? null,
+      assignment,
+    })
+  } catch (error) {
+    return sendServiceError(res, error)
+  }
+})
+
+// 6i. Moodle assignment submission endpoint
+app.post('/__ent_auth/moodle/submit-assignment', async (req, res) => {
+  try {
+    res.setHeader('Cache-Control', 'no-store')
+    const session = getSessionFromRequest(req)
+    if (!session) {
+      return res.status(401).json({ error: 'Session non authentifiée' })
+    }
+
+    const { cmid, files, onlineText, finalize } = req.body || {}
+    const numericCmid = Number(cmid)
+    if (!numericCmid || !Number.isFinite(numericCmid)) {
+      return res.status(400).json({ error: 'Paramètre cmid requis' })
+    }
+
+    if (isDemoSession(session)) {
+      setSessionCookie(res, session)
+      const assignment = submitDemoAssignment({
+        cmid: numericCmid,
+        files: Array.isArray(files) ? files : [],
+        onlineText: typeof onlineText === 'string' ? onlineText : '',
+        finalize: Boolean(finalize),
+      })
+      return res.status(200).json({
+        ok: true,
+        authenticated: true,
+        sessionMode: DEMO_SESSION_MODE,
+        message: 'Devoir téléversé avec succès',
+        assignment,
+      })
+    }
+
+    const context = await getMoodleContext(session)
+    const assignment = await submitMoodleAssignmentLive(context, numericCmid, files, onlineText, finalize)
+    setSessionCookie(res, session)
+    return res.status(200).json({
+      ok: true,
+      authenticated: true,
+      sessionMode: session.mode ?? null,
+      message: 'Devoir téléversé avec succès sur Moodle',
+      assignment,
+    })
+  } catch (error) {
     return res.status(500).json({
+      ok: false,
       error: error instanceof Error ? error.message : String(error),
     })
   }
 })
+
+// 6j. Moodle remove assignment file endpoint
+app.post('/__ent_auth/moodle/assignment-file/remove', async (req, res) => {
+  try {
+    res.setHeader('Cache-Control', 'no-store')
+    const session = getSessionFromRequest(req)
+    if (!session) {
+      return res.status(401).json({ error: 'Session non authentifiée' })
+    }
+
+    const { cmid, filename } = req.body || {}
+    const numericCmid = Number(cmid)
+    if (!numericCmid || !filename) {
+      return res.status(400).json({ error: 'Paramètres cmid et filename requis' })
+    }
+
+    if (isDemoSession(session)) {
+      setSessionCookie(res, session)
+      const assignment = removeDemoAssignmentFile({ cmid: numericCmid, filename })
+      return res.status(200).json({
+        ok: true,
+        authenticated: true,
+        sessionMode: DEMO_SESSION_MODE,
+        message: 'Fichier retiré',
+        assignment,
+      })
+    }
+
+    const context = await getMoodleContext(session)
+    const assignment = await removeMoodleAssignmentFileLive(context, numericCmid, filename)
+    setSessionCookie(res, session)
+    return res.status(200).json({
+      ok: true,
+      authenticated: true,
+      sessionMode: session.mode ?? null,
+      message: 'Fichier retiré avec succès sur Moodle',
+      assignment,
+    })
+  } catch (error) {
+    return sendServiceError(res, error)
+  }
+})
+
+// Cache for resolved pluginfile URLs so subsequent clicks are instantaneous
+const moodleResolvedFileUrls = new Map()
+
+// 6g. Moodle file download / preview proxy
+app.get('/__ent_auth/moodle/file', async (req, res) => {
+  try {
+    const session = getSessionFromRequest(req)
+    if (!session) {
+      return res.status(401).end()
+    }
+
+    const { url: targetUrl, name, download } = req.query
+    if (!targetUrl || typeof targetUrl !== 'string') {
+      return res.status(400).end()
+    }
+
+    if (isDemoSession(session)) {
+      const fileName = String(name || 'document.pdf')
+      const isZip = fileName.endsWith('.zip')
+      const ct = isZip ? 'application/zip' : 'application/pdf'
+      const disposition = download === '1' ? 'attachment' : 'inline'
+      res.setHeader('Content-Type', ct)
+      res.setHeader('Content-Disposition', `${disposition}; filename="${encodeURIComponent(fileName)}"`)
+      res.setHeader('Cache-Control', 'private, max-age=86400')
+      const samplePdf = Buffer.from('%PDF-1.4\n1 0 obj<</Type/Catalog/Pages 2 0 R>>endobj\n2 0 obj<</Type/Pages/Kids[3 0 R]/Count 1>>endobj\n3 0 obj<</Type/Page/MediaBox[0 0 612 792]/Parent 2 0 R/Resources<<>>>>endobj\nxref\n0 4\n0000000000 65535 f \n0000000009 00000 n \n0000000052 00000 n \n0000000101 00000 n \ntrailer<</Size 4/Root 1 0 R>>\nstartxref\n178\n%%EOF\n')
+      return res.send(samplePdf)
+    }
+
+    let parsed
+    try {
+      parsed = new URL(targetUrl)
+    } catch {
+      return res.status(400).end()
+    }
+
+    const host = parsed.hostname.toLowerCase()
+    const allowedHosts = new Set([
+      MOODLE_HOST,
+      ...(MOODLE_SIGN_IN_DOMAINS ?? []).map((d) => d.toLowerCase()),
+    ].filter(Boolean))
+
+    if (!allowedHosts.has(host) && !host.endsWith(`.${MOODLE_HOST}`)) {
+      return res.status(403).end()
+    }
+
+    const context = await getMoodleContext(session)
+
+    // Check if we already have the resolved pluginfile URL for this resource
+    const cachedResolved = moodleResolvedFileUrls.get(targetUrl)
+    if (cachedResolved) {
+      const redirectUrl = download === '1'
+        ? (cachedResolved.includes('forcedownload=1') ? cachedResolved : `${cachedResolved}${cachedResolved.includes('?') ? '&' : '?'}forcedownload=1`)
+        : cachedResolved
+      return res.redirect(redirectUrl)
+    }
+
+    if (targetUrl.includes('/pluginfile.php/')) {
+      const redirectUrl = download === '1'
+        ? (targetUrl.includes('forcedownload=1') ? targetUrl : `${targetUrl}${targetUrl.includes('?') ? '&' : '?'}forcedownload=1`)
+        : targetUrl
+      return res.redirect(redirectUrl)
+    }
+
+    let fetchUrl = targetUrl
+    if (fetchUrl.includes('/mod/resource/view.php') && !fetchUrl.includes('redirect=1')) {
+      fetchUrl += (fetchUrl.includes('?') ? '&' : '?') + 'redirect=1'
+    }
+
+    let { response: upstream, finalUrl } = await followRedirectChain(fetchUrl, context.jar)
+
+    if (finalUrl && finalUrl.includes('/pluginfile.php/')) {
+      moodleResolvedFileUrls.set(targetUrl, finalUrl)
+      const redirectUrl = download === '1'
+        ? (finalUrl.includes('forcedownload=1') ? finalUrl : `${finalUrl}${finalUrl.includes('?') ? '&' : '?'}forcedownload=1`)
+        : finalUrl
+      return res.redirect(redirectUrl)
+    }
+
+    // If the response is text/html (like Moodle's resource viewer wrapper /mod/resource/view.php?id=...)
+    // we extract the direct file download URL (pluginfile.php) specifically from the resource container,
+    // carefully ignoring any favicons or theme images!
+    let ct = upstream.headers.get('content-type') || ''
+    let discoveredName = ''
+
+    if (upstream.ok && ct.includes('text/html')) {
+      const htmlText = await upstream.text()
+
+      // 1. Highest priority: Moodle's standard download container <div class="resourceworkaround">...<a href="...">...</a></div>
+      const workaroundMatch = htmlText.match(/class=["'][^"']*resourceworkaround[^"']*["'][\s\S]*?<a\b[^>]*href=["']([^"']*\/pluginfile\.php\/[^"']*)["'][^>]*>([\s\S]*?)<\/a>/i)
+
+      // 2. Second priority: Links with /mod_resource/content/ path (the true Moodle resource file location)
+      const modContentMatch = htmlText.match(/(?:href|data|src)=["']([^"']*\/pluginfile\.php\/\d+\/mod_resource\/content\/\d+\/[^"']*)["']/i)
+        || htmlText.match(/https?:\/\/[^"'\s<>]*\/pluginfile\.php\/\d+\/mod_resource\/content\/\d+\/[^"'\s<>]+/i)
+
+      // 3. Embedded object or viewer
+      const embedMatch = htmlText.match(/<(?:object|embed|iframe)\b[^>]*(?:data|src)=["']([^"']*\/pluginfile\.php\/(?!.*(?:theme_|favicon|pix\/))[^"']*)["']/i)
+
+      // 4. Any direct file link with pluginfile.php that points to a document
+      const cleanPluginfile = htmlText.match(/href=["']([^"']*\/pluginfile\.php\/(?!.*(?:theme_|favicon|pix\/))[^"']*(?:\.pdf|\.zip|\.docx?|\.pptx?|\.xlsx?)[^"']*)["']/i)
+
+      let extractedCandidate = null
+      if (workaroundMatch) {
+        extractedCandidate = workaroundMatch[1]
+        discoveredName = workaroundMatch[2].replace(/<[^>]+>/g, '').trim()
+      } else if (modContentMatch) {
+        extractedCandidate = modContentMatch[1] || modContentMatch[0]
+      } else if (embedMatch) {
+        extractedCandidate = embedMatch[1]
+      } else if (cleanPluginfile) {
+        extractedCandidate = cleanPluginfile[1]
+      }
+
+      if (extractedCandidate) {
+        let extractedUrl = extractedCandidate.replace(/&amp;/g, '&')
+        if (extractedUrl.startsWith('/')) {
+          extractedUrl = `${parsed.origin}${extractedUrl}`
+        }
+
+        moodleResolvedFileUrls.set(targetUrl, extractedUrl)
+
+        const redirectUrl = download === '1'
+          ? (extractedUrl.includes('forcedownload=1') ? extractedUrl : `${extractedUrl}${extractedUrl.includes('?') ? '&' : '?'}forcedownload=1`)
+          : extractedUrl
+        return res.redirect(redirectUrl)
+      }
+    }
+
+    if (!upstream.ok) {
+      return res.status(upstream.status).end()
+    }
+
+    // Determine the filename from discoveredName, finalUrl, or original name
+    let fileName = discoveredName || String(name || '').trim()
+    try {
+      const pathname = new URL(finalUrl || fetchUrl).pathname
+      const last = decodeURIComponent(pathname.split('/').pop() || '')
+      if (last && last.includes('.')) {
+        fileName = last
+      }
+    } catch {
+      // Ignore URL parsing fallback
+    }
+
+    if (!fileName) {
+      fileName = 'document.pdf'
+    }
+
+    // Ensure proper content-type for PDF/Zip if Moodle sent a generic octet-stream
+    const ext = fileName.split('.').pop()?.toLowerCase() || ''
+    if (ext === 'pdf' && (!ct || ct.includes('octet-stream') || ct.includes('text/html'))) {
+      ct = 'application/pdf'
+    } else if (ext === 'zip' && (!ct || ct.includes('octet-stream'))) {
+      ct = 'application/zip'
+    } else if (!ct) {
+      ct = 'application/octet-stream'
+    }
+
+    const disposition = download === '1' ? 'attachment' : 'inline'
+    res.setHeader('Content-Type', ct)
+    res.setHeader('Content-Disposition', `${disposition}; filename="${encodeURIComponent(fileName)}"; filename*=UTF-8''${encodeURIComponent(fileName)}"`)
+    res.setHeader('Cache-Control', 'private, max-age=86400')
+
+    const buffer = await upstream.arrayBuffer()
+    return res.send(Buffer.from(buffer))
+  } catch (err) {
+    console.error('Moodle file proxy error:', err)
+    return res.status(500).end()
+  }
+})
+
 
 app.get('/__ent_auth/student-pic', async (req, res) => {
   try {
@@ -3794,6 +5936,201 @@ app.get('/__ent_auth/student-pic', async (req, res) => {
     res.status(500).json({
       error: error instanceof Error ? error.message : String(error),
     })
+  }
+})
+
+// CROUS restaurants and menus (« Menu du RU »), from the CROUS's own public
+// feeds (server/crousFeed.js): no sign-in involved, cached for everyone.
+const getCrousFeed = FEATURES.crous && universityConfig.crous?.region
+  ? createCrousFeed({ region: universityConfig.crous.region })
+  : null
+
+// The region's restaurants, and the coming days of `resto` (an id from that
+// list) when asked: { restaurants, restaurantId, days, fetchedAt }.
+app.get('/__ent_auth/crous', async (req, res) => {
+  try {
+    if (!getCrousFeed) {
+      return res.status(404).json({ error: 'CROUS menus are not enabled.' })
+    }
+
+    const feed = await getCrousFeed()
+    const restaurantId = typeof req.query.resto === 'string' && feed.restaurants.some((resto) => resto.id === req.query.resto)
+      ? req.query.resto
+      : null
+    // Many RUs publish no menu online: `hasMenu` says which have one from
+    // today on (French time), to point the student to them.
+    const today = new Intl.DateTimeFormat('sv-SE', { timeZone: 'Europe/Paris' }).format(new Date())
+    const hasUpcomingMenu = (id) => (feed.menus.get(id) ?? [])
+      .some((day) => day.date >= today && day.meals.some((meal) => meal.sections.length))
+    res.setHeader('Cache-Control', 'private, max-age=600')
+    res.status(200).json({
+      restaurants: feed.restaurants.map((resto) => ({ ...resto, hasMenu: hasUpcomingMenu(resto.id) })),
+      restaurantId,
+      days: restaurantId ? feed.menus.get(restaurantId) ?? [] : [],
+      fetchedAt: new Date(feed.fetchedAt).toISOString(),
+    })
+  } catch (error) {
+    res.status(502).json({ error: error instanceof Error ? error.message : String(error) })
+  }
+})
+
+// « Bus »: the town's bus network (server/transitFeed.js), journeys and
+// departures (server/transitPlanner.js), and the anonymous push reminders
+// (server/transitPush.js). Public data: only the reminders need a session.
+const TRANSIT_CONFIG = FEATURES.transit && universityConfig.transit?.gtfsUrl ? universityConfig.transit : null
+const transitFeed = TRANSIT_CONFIG
+  ? createTransitFeed({ gtfsUrl: TRANSIT_CONFIG.gtfsUrl, realtimeUrl: TRANSIT_CONFIG.realtimeUrl ?? null })
+  : null
+const transitPush = transitFeed
+  ? createTransitPushStore({
+    universityId: universityConfig.id,
+    dataDir: options.appIcons?.dataDir ?? resolveDataDir(),
+    feed: transitFeed,
+    // The contact push services ask for (Apple refuses localhost ones).
+    subject: process.env.VAPID_SUBJECT || 'https://github.com/l-ent-univ/tafac',
+  })
+  : null
+if (transitPush && options.transitPush?.start !== false) transitPush.start()
+app.locals.transitPush = transitPush
+
+const TRANSIT_MAX_QUERIES = 20
+
+// { placeId } | { lat, lon } | { campus } → [{ stopId, walkSeconds }], or
+// null when it names nothing this network knows.
+function resolveTransitPoint(network, point) {
+  if (!point || typeof point !== 'object') return null
+  if (typeof point.placeId === 'string') {
+    const place = network.places.get(point.placeId)
+    return place ? place.stopIds.map((stopId) => ({ stopId, walkSeconds: 0 })) : null
+  }
+  const campus = typeof point.campus === 'string' ? TRANSIT_CONFIG.campuses?.[point.campus] : null
+  const lat = campus ? campus.lat : Number(point.lat)
+  const lon = campus ? campus.lon : Number(point.lon)
+  if (!Number.isFinite(lat) || !Number.isFinite(lon) || Math.abs(lat) > 90 || Math.abs(lon) > 180) return null
+  return stopsNear(network, { lat, lon })
+}
+
+// GET → the network as the client draws it: { name, attribution, timezone,
+//   validUntil, realtime, routes, places, lines, campuses }
+app.get('/__ent_auth/transit/network', async (req, res) => {
+  try {
+    if (!transitFeed) return res.status(404).json({ error: 'Bus network not enabled.' })
+    const network = await transitFeed.getNetwork()
+    res.setHeader('Cache-Control', 'private, max-age=3600')
+    res.status(200).json({
+      name: TRANSIT_CONFIG.name ?? network.agencyName,
+      attribution: TRANSIT_CONFIG.attribution ?? null,
+      timezone: network.timezone,
+      validUntil: network.validUntil,
+      realtime: Boolean(TRANSIT_CONFIG.realtimeUrl),
+      routes: [...network.routes.values()]
+        .filter((route) => network.lines.some((line) => line.routeId === route.id))
+        .sort((left, right) => left.sortOrder - right.sortOrder || left.shortName.localeCompare(right.shortName, 'fr', { numeric: true })),
+      places: [...network.places.values()].map((place) => ({ ...place, routeIds: [...network.routeIdsByPlace.get(place.id)] })),
+      lines: network.lines,
+      campuses: TRANSIT_CONFIG.campuses ?? {},
+      stopPlaces: Object.fromEntries([...network.stops.values()].map((stop) => [stop.id, stop.placeId])),
+    })
+  } catch (error) {
+    res.status(502).json({ error: error instanceof Error ? error.message : String(error) })
+  }
+})
+
+// GET ?place=<placeId>&limit= → { departures, later, realtime }
+//   later: when nothing leaves within 3 h, the next departure within a
+//   day (the first bus of tomorrow), else null.
+app.get('/__ent_auth/transit/departures', async (req, res) => {
+  try {
+    if (!transitFeed) return res.status(404).json({ error: 'Bus network not enabled.' })
+    const [network, realtime] = await Promise.all([transitFeed.getNetwork(), transitFeed.getRealtime()])
+    const place = network.places.get(String(req.query.place ?? ''))
+    if (!place) return res.status(400).json({ error: 'Unknown stop.' })
+    const limit = Math.min(Math.max(Number(req.query.limit) || 6, 1), 20)
+    const fromMs = Date.now()
+    const departures = findDepartures(network, realtime, { stopIds: place.stopIds, fromMs, limit })
+    res.setHeader('Cache-Control', 'no-store')
+    res.status(200).json({
+      departures,
+      later: departures.length ? null : findDepartures(network, realtime, { stopIds: place.stopIds, fromMs, limit: 1, horizonMs: 24 * 60 * 60 * 1000 })[0] ?? null,
+      realtime: Boolean(realtime),
+    })
+  } catch (error) {
+    res.status(502).json({ error: error instanceof Error ? error.message : String(error) })
+  }
+})
+
+// POST { queries: [{ from, to, arriveBy? | departAt? | lastOfDay?, limit? }] }
+//   from/to: { placeId } | { lat, lon } | { campus: <establishment> }
+//   arriveBy/departAt: epoch ms; lastOfDay: 'YYYYMMDD'
+// → { results: [journeys | null], realtime }, in the order asked.
+app.post('/__ent_auth/transit/plan', async (req, res) => {
+  try {
+    if (!transitFeed) return res.status(404).json({ error: 'Bus network not enabled.' })
+    const queries = Array.isArray(req.body?.queries) ? req.body.queries : null
+    if (!queries || queries.length > TRANSIT_MAX_QUERIES) return res.status(400).json({ error: `Up to ${TRANSIT_MAX_QUERIES} queries.` })
+    const [network, realtime] = await Promise.all([transitFeed.getNetwork(), transitFeed.getRealtime()])
+    const results = queries.map((query) => {
+      const origins = resolveTransitPoint(network, query?.from)
+      const destinations = resolveTransitPoint(network, query?.to)
+      if (!origins || !destinations) return null
+      const arriveByMs = Number.isFinite(Number(query.arriveBy)) && query.arriveBy != null ? Number(query.arriveBy) : null
+      const departAtMs = Number.isFinite(Number(query.departAt)) && query.departAt != null ? Number(query.departAt) : null
+      const lastOfDayKey = /^\d{8}$/.test(String(query.lastOfDay ?? '')) ? String(query.lastOfDay) : null
+      if (arriveByMs == null && departAtMs == null && !lastOfDayKey) return null
+      return planJourneys(network, realtime, {
+        origins,
+        destinations,
+        arriveByMs,
+        departAtMs: arriveByMs == null ? departAtMs : null,
+        lastOfDayKey: arriveByMs == null && departAtMs == null ? lastOfDayKey : null,
+        limit: Math.min(Math.max(Number(query.limit) || 3, 1), 5),
+      })
+    })
+    res.setHeader('Cache-Control', 'no-store')
+    res.status(200).json({ results, realtime: Boolean(realtime) })
+  } catch (error) {
+    res.status(502).json({ error: error instanceof Error ? error.message : String(error) })
+  }
+})
+
+// GET → { publicKey }: the VAPID key a push subscription is made with.
+app.get('/__ent_auth/transit/push', async (req, res) => {
+  try {
+    if (!transitPush) return res.status(404).json({ error: 'Bus reminders not enabled.' })
+    res.status(200).json({ publicKey: await transitPush.getPublicKey() })
+  } catch (error) {
+    res.status(500).json({ error: error instanceof Error ? error.message : String(error) })
+  }
+})
+
+// PUT { subscription, reminders } → { ok, count }: replaces the reminders
+// of this subscription (an empty list removes it). Signed-in students only,
+// but nothing about the student is kept.
+app.put('/__ent_auth/transit/push', async (req, res) => {
+  try {
+    res.setHeader('Cache-Control', 'no-store')
+    if (!transitPush) return res.status(404).json({ ok: false, error: 'Bus reminders not enabled.' })
+    if (!getSessionFromRequest(req)) return res.status(401).json({ ok: false, error: 'Not signed in.' })
+    const subscription = readSubscription(req.body?.subscription)
+    const reminders = readReminders(req.body?.reminders, Date.now())
+    if (!subscription || !reminders) return res.status(400).json({ ok: false, error: 'Invalid subscription or reminders.' })
+    if (!await transitPush.setReminders(subscription, reminders)) return res.status(503).json({ ok: false, error: 'Too many subscriptions.' })
+    res.status(200).json({ ok: true, count: reminders.length })
+  } catch (error) {
+    res.status(500).json({ ok: false, error: error instanceof Error ? error.message : String(error) })
+  }
+})
+
+// DELETE { endpoint } → { ok }: forgets a subscription (reminders turned off).
+app.delete('/__ent_auth/transit/push', async (req, res) => {
+  try {
+    res.setHeader('Cache-Control', 'no-store')
+    if (!transitPush) return res.status(404).json({ ok: false, error: 'Bus reminders not enabled.' })
+    if (typeof req.body?.endpoint !== 'string') return res.status(400).json({ ok: false, error: 'Missing endpoint.' })
+    await transitPush.remove(req.body.endpoint)
+    res.status(200).json({ ok: true })
+  } catch (error) {
+    res.status(500).json({ ok: false, error: error instanceof Error ? error.message : String(error) })
   }
 })
 
@@ -4103,6 +6440,35 @@ app.get('/__ent_auth/ade/calendar', async (req, res) => {
   }
 })
 
+// Group names of the student's upcoming courses on the Campus mobile API, as
+// [{ name, count }] sorted by count. With no explicit resource the API answers
+// for the student's own enrolment (customEtabVet). Best effort: [] on failure.
+async function fetchCampusGroupHints(jar, cacheScope) {
+  if (!ADE_ORIGIN || !fetchAdeUpcomingFromApi) {
+    return []
+  }
+
+  try {
+    const result = await fetchAdeUpcomingFromApi(jar, null, {
+      date: new Date().toISOString().slice(0, 10),
+      lookaheadDays: 28,
+      resourceIds: [],
+      cacheScope,
+    })
+    const counts = new Map()
+    for (const event of result.allEvents ?? []) {
+      for (const group of new Set(event.groups ?? [])) {
+        counts.set(group, (counts.get(group) ?? 0) + 1)
+      }
+    }
+    return [...counts.entries()]
+      .map(([name, count]) => ({ name, count }))
+      .sort((left, right) => right.count - left.count)
+  } catch {
+    return []
+  }
+}
+
 // 9. ADE VET Tree
 app.get('/__ent_auth/ade/tree', async (req, res) => {
   try {
@@ -4125,11 +6491,26 @@ app.get('/__ent_auth/ade/tree', async (req, res) => {
     }
 
     if (USE_PLANNING_PORTAL_REST) {
-      const tree = await fetchPortalTree(entSession.jar, {
+      const cacheScope = getPlanningCacheScope(entSession)
+      let tree = await fetchPortalTree(entSession.jar, {
         requestedResourceId: requestedTreeId,
         fallbackResourceId: String(req.query.fallback ?? ''),
-        cacheScope: getPlanningCacheScope(entSession),
+        cacheScope,
       })
+      let campusGroups = null
+
+      // The ADE portal account has no group attached (common outside the
+      // IUTs): the Campus mobile API still lists the student's courses from
+      // their enrolment, with the groups of each course.
+      if (!requestedTreeId && !tree.defaultSelection) {
+        campusGroups = await fetchCampusGroupHints(entSession.jar, cacheScope)
+        if (campusGroups.length > 0) {
+          tree = await fetchPortalTree(entSession.jar, {
+            cacheScope,
+            groupHints: campusGroups,
+          })
+        }
+      }
 
       setSessionCookie(res, entSession)
       return res.status(200).json({
@@ -4151,6 +6532,8 @@ app.get('/__ent_auth/ade/tree', async (req, res) => {
           projectId: tree.projectId,
           cache: tree.cache,
           authCache: tree.authCache,
+          accountSource: tree.accountSource ?? null,
+          campusGroups: campusGroups ? campusGroups.slice(0, 15) : null,
         },
       })
     }
@@ -4238,6 +6621,111 @@ app.get('/__ent_auth/ade/search', async (req, res) => {
         ...authResult,
       },
     })
+  } catch (error) {
+    res.status(500).json({ error: error instanceof Error ? error.message : String(error) })
+  }
+})
+
+// 10b. ADE Teachers
+app.get('/__ent_auth/ade/teachers', async (req, res) => {
+  try {
+    const entSession = getSessionFromRequest(req)
+    if (!entSession) return res.status(200).json({ authenticated: false, teachers: [] })
+
+    const query = String(req.query.q || '').trim()
+
+    if (isDemoSession(entSession)) {
+      setSessionCookie(res, entSession)
+      const q = query.toLowerCase()
+      const filtered = q
+        ? DEMO_TEACHERS.filter((t) => t.name.toLowerCase().includes(q))
+        : DEMO_TEACHERS
+      return res.status(200).json({
+        authenticated: true,
+        sessionMode: DEMO_SESSION_MODE,
+        teachers: filtered,
+        available: true,
+      })
+    }
+
+    if (USE_PLANNING_PORTAL_REST && listPortalInstructors) {
+      const result = await listPortalInstructors(entSession.jar, query, {
+        cacheScope: getPlanningCacheScope(entSession),
+      })
+      setSessionCookie(res, entSession)
+      return res.status(200).json({
+        authenticated: true,
+        sessionMode: entSession.mode ?? null,
+        teachers: result.teachers,
+        available: result.available,
+      })
+    }
+
+    res.status(200).json({ authenticated: true, teachers: [], available: false })
+  } catch (error) {
+    res.status(500).json({ error: error instanceof Error ? error.message : String(error) })
+  }
+})
+
+// 10c. ADE rooms (free-room finder): every room of the "Salles" branch, with
+// the folders above it (site, building) to pick a building by.
+app.get('/__ent_auth/ade/rooms', async (req, res) => {
+  try {
+    res.setHeader('Cache-Control', 'no-store')
+    const entSession = getSessionFromRequest(req)
+    if (!entSession) return res.status(200).json({ authenticated: false, rooms: [] })
+
+    if (isDemoSession(entSession)) {
+      setSessionCookie(res, entSession)
+      return res.status(200).json({ authenticated: true, available: true, rooms: DEMO_ROOMS })
+    }
+
+    if (USE_PLANNING_PORTAL_REST && listPortalClassrooms) {
+      const result = await listPortalClassrooms(entSession.jar, { cacheScope: getPlanningCacheScope(entSession) })
+      setSessionCookie(res, entSession)
+      return res.status(200).json({ authenticated: true, available: result.available, rooms: result.rooms })
+    }
+
+    res.status(200).json({ authenticated: true, available: false, rooms: [] })
+  } catch (error) {
+    res.status(500).json({ error: error instanceof Error ? error.message : String(error) })
+  }
+})
+
+// Rooms asked at once: a building's worth, not the whole university.
+const MAX_ROOMS_PER_REQUEST = 120
+
+// 10d. The courses held on one day in the rooms `ids` (comma-separated), to
+// tell which are free.
+app.get('/__ent_auth/ade/rooms/events', async (req, res) => {
+  try {
+    res.setHeader('Cache-Control', 'no-store')
+    const entSession = getSessionFromRequest(req)
+    if (!entSession) return res.status(200).json({ authenticated: false, events: [] })
+
+    const date = /^\d{4}-\d{2}-\d{2}$/.test(String(req.query.date ?? '')) ? String(req.query.date) : null
+    const ids = [...new Set(String(req.query.ids ?? '').split(',').map((id) => id.trim()).filter(Boolean))]
+    if (!date || !ids.length || ids.length > MAX_ROOMS_PER_REQUEST) {
+      return res.status(400).json({ error: `Expected a date and 1 to ${MAX_ROOMS_PER_REQUEST} room ids.` })
+    }
+
+    if (isDemoSession(entSession)) {
+      setSessionCookie(res, entSession)
+      return res.status(200).json({ authenticated: true, events: buildDemoRoomEvents({ date, roomIds: ids }) })
+    }
+
+    if (!USE_PLANNING_PORTAL_REST || !ids.every((id) => /^-?\d+$/.test(id))) {
+      return res.status(400).json({ error: 'Unknown rooms.' })
+    }
+
+    const result = await fetchPortalEvents(entSession.jar, {
+      date,
+      lookaheadDays: 1,
+      resourceIds: ids,
+      cacheScope: getPlanningCacheScope(entSession),
+    })
+    setSessionCookie(res, entSession)
+    res.status(200).json({ authenticated: true, events: result.events })
   } catch (error) {
     res.status(500).json({ error: error instanceof Error ? error.message : String(error) })
   }

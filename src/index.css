@@ -40,6 +40,16 @@
   --color-context-bg: var(--color-context-bg);
   --color-context-hover: var(--color-context-hover);
 
+  /* The warm accent of « Mes notes » (Simuler): highlighted actions, what
+     needs attention without being an error. */
+  --color-accent-bg: var(--color-accent-bg);
+  --color-accent-hover: var(--color-accent-hover);
+  --color-accent-border: var(--color-accent-border);
+  --color-accent-text: var(--color-accent-text);
+  /* Réglages fills: a muted track or disc, a row under the pointer. */
+  --color-muted-fill: var(--color-muted-fill);
+  --color-row-hover: var(--color-row-hover);
+
   --font-display: 'SN Pro', 'Inter Variable', system-ui, sans-serif;
   --font-body: 'Inter Variable', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
 
@@ -192,6 +202,13 @@ img {
   --color-context-bg: rgba(255, 255, 255, 0.98);
   --color-context-hover: #f4f6f4;
 
+  --color-accent-bg: #ead8bf;
+  --color-accent-hover: #e3cdae;
+  --color-accent-border: #dcc5a6;
+  --color-accent-text: #4a2a12;
+  --color-muted-fill: #f3f1eb;
+  --color-row-hover: #f8f7f3;
+
   color-scheme: light;
   color: var(--color-text);
   background: var(--color-bg);
@@ -232,6 +249,13 @@ img {
 
   --color-context-bg: rgba(26, 26, 26, 0.98);
   --color-context-hover: #262626;
+
+  --color-accent-bg: #4a3825;
+  --color-accent-hover: #56422c;
+  --color-accent-border: #5c4630;
+  --color-accent-text: #f1e2cc;
+  --color-muted-fill: var(--color-bg-muted);
+  --color-row-hover: var(--color-bg-subtle);
 }
 
 /* Sideways overflow cut off, with clip rather than hidden: a hidden overflow

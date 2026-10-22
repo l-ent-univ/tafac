@@ -1,9 +1,10 @@
 import universityConfig from '@university'
 import { GRADES_UNAVAILABLE_MESSAGE } from './gradeFeatureState'
-import { evaluationTypeLabel, listGradesSemesters, summarizeAverage } from './gradesReport'
+import { buildAbsenceReport, evaluationTypeLabel, listGradesSemesters, summarizeAverage } from './gradesReport'
 import { readDistributionCounts } from './evaluationDistribution'
 import { pickAdeGroupForAlias } from './adeGroupMatch'
 import { buildParcoursTpAliases } from './scodocParcoursGroups'
+import { clearOfflineCache } from './offlineStorage'
 
 export const ENT_ORIGIN = universityConfig.origins.ent
 const ENT_HOST = new URL(ENT_ORIGIN).hostname
@@ -171,9 +172,12 @@ export function getRequestErrorKind(error) {
   return 'other'
 }
 
-function createHttpError(message, status) {
+// `serviceHref`: the service's own address when the server says it refused
+// Tafac (403, see sendServiceError): the student can still open it there.
+function createHttpError(message, status, serviceHref = null) {
   const error = new Error(message)
   error.status = status
+  error.serviceHref = serviceHref
   return error
 }
 
@@ -259,6 +263,7 @@ export async function getAuthSession() {
 export async function loginToEnt({ username, password }) {
   clearGradesCache()
   localStorage.removeItem(ADE_TIMETABLE_CACHE_KEY)
+  void clearOfflineCache()
 
   const response = await fetch(`${ENT_AUTH_PREFIX}/login`, {
     method: 'POST',
@@ -284,6 +289,7 @@ export async function loginToEnt({ username, password }) {
 export async function logoutFromEnt() {
   clearGradesCache()
   localStorage.removeItem(ADE_TIMETABLE_CACHE_KEY)
+  void clearOfflineCache()
   clearRecentLoginMarker()
 
   const response = await fetch(`${ENT_AUTH_PREFIX}/logout`, {
@@ -418,7 +424,7 @@ export async function getRecentMail() {
     }
 
     if (!response.ok || !payload) {
-      throw createHttpError(payload?.error || `Mail request failed (${response.status}).`, response.status)
+      throw createHttpError(payload?.error || `Mail request failed (${response.status}).`, response.status, payload?.serviceHref)
     }
 
     if (!payload.authenticated || !payload.mail) {
@@ -439,7 +445,159 @@ export async function getRecentMail() {
       messages: [],
       error: error instanceof Error ? error.message : String(error),
       errorKind: getRequestErrorKind(error),
+      serviceHref: error?.serviceHref ?? null,
     }
+  }
+}
+
+export async function getMailMessages({ limit = 30, query = '' } = {}) {
+  if (!universityConfig.features?.mail) {
+    return { status: 'disabled', unreadCount: null, webmailHref: null, messages: [] }
+  }
+
+  try {
+    const params = new URLSearchParams()
+    if (limit) params.set('limit', String(limit))
+    if (query) params.set('q', query.trim())
+    const queryString = params.toString() ? `?${params.toString()}` : ''
+
+    const response = await fetch(`${ENT_AUTH_PREFIX}/mail/messages${queryString}`, {
+      credentials: 'same-origin',
+    })
+    const payload = await response.json().catch(() => null)
+
+    if (payload?.disabled) {
+      return { status: 'disabled', unreadCount: null, webmailHref: null, messages: [] }
+    }
+
+    if (!response.ok || !payload) {
+      throw createHttpError(payload?.error || `Mail messages request failed (${response.status}).`, response.status, payload?.serviceHref)
+    }
+
+    if (!payload.authenticated || !payload.mail) {
+      return { status: 'unauthenticated', unreadCount: null, webmailHref: null, messages: [] }
+    }
+
+    return {
+      status: 'ok',
+      unreadCount: Number.isFinite(payload.mail.unreadCount) ? payload.mail.unreadCount : null,
+      webmailHref: payload.mail.webmailHref ?? null,
+      messages: Array.isArray(payload.mail.messages) ? payload.mail.messages : [],
+    }
+  } catch (error) {
+    return {
+      status: 'error',
+      unreadCount: null,
+      webmailHref: null,
+      messages: [],
+      error: error instanceof Error ? error.message : String(error),
+      errorKind: getRequestErrorKind(error),
+      serviceHref: error?.serviceHref ?? null,
+    }
+  }
+}
+
+export async function getMailMessage(id) {
+  if (!id) throw new Error('ID de message manquant')
+
+  const response = await fetch(`${ENT_AUTH_PREFIX}/mail/message/${encodeURIComponent(id)}`, {
+    credentials: 'same-origin',
+  })
+  const payload = await response.json().catch(() => null)
+
+  if (!response.ok || !payload) {
+    throw createHttpError(payload?.error || `Impossible de charger le message (${response.status}).`, response.status)
+  }
+
+  return payload.message
+}
+
+export async function markMailAsRead(id, read = true) {
+  if (!id) return false
+
+  const response = await fetch(`${ENT_AUTH_PREFIX}/mail/read`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ id, read }),
+    credentials: 'same-origin',
+  })
+
+  return response.ok
+}
+
+// Flags a message as important in the webmail (or clears it).
+export async function flagMailMessage(id, flagged = true) {
+  if (!id) return false
+
+  const response = await fetch(`${ENT_AUTH_PREFIX}/mail/flag`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ id, flagged }),
+    credentials: 'same-origin',
+  })
+
+  return response.ok
+}
+
+// A link's preview (title, description, image, site; server/linkPreview.js),
+// or null. Asked once per URL for the visit.
+const linkPreviews = new Map()
+export function getLinkPreview(url) {
+  if (!linkPreviews.has(url)) {
+    linkPreviews.set(url, fetch(`${ENT_AUTH_PREFIX}/link-preview?url=${encodeURIComponent(url)}`, { credentials: 'same-origin' })
+      .then((response) => (response.ok ? response.json() : null))
+      .then((payload) => payload?.preview ?? null)
+      .catch(() => null))
+  }
+  return linkPreviews.get(url)
+}
+
+export async function trashMailMessage(id) {
+  if (!id) return false
+
+  const response = await fetch(`${ENT_AUTH_PREFIX}/mail/trash`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ id }),
+    credentials: 'same-origin',
+  })
+
+  return response.ok
+}
+
+export async function sendMailMessage({ to, cc, bcc, subject, bodyHtml, bodyText, origId, replyType, attachments } = {}) {
+  const response = await fetch(`${ENT_AUTH_PREFIX}/mail/send`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ to, cc, bcc, subject, bodyHtml, bodyText, origId, replyType, attachments }),
+    credentials: 'same-origin',
+  })
+
+  const payload = await response.json().catch(() => null)
+  if (!response.ok || !payload?.ok) {
+    throw createHttpError(
+      payload?.error || `Impossible d'envoyer l'e-mail (${response.status}).`,
+      response.status,
+    )
+  }
+
+  return payload
+}
+
+export async function searchMailDirectory(query = '') {
+  try {
+    const params = new URLSearchParams()
+    if (query) params.set('q', query.trim())
+    const response = await fetch(`${ENT_AUTH_PREFIX}/mail/directory?${params.toString()}`, {
+      credentials: 'same-origin',
+    })
+    const payload = await response.json().catch(() => null)
+    if (!response.ok || !payload?.ok) {
+      return []
+    }
+    return Array.isArray(payload.contacts) ? payload.contacts : []
+  } catch {
+    return []
   }
 }
 
@@ -476,7 +634,7 @@ export async function getMoodleDeadlines() {
     }
 
     if (!response.ok || !payload) {
-      throw createHttpError(payload?.error || `Moodle request failed (${response.status}).`, response.status)
+      throw createHttpError(payload?.error || `Moodle request failed (${response.status}).`, response.status, payload?.serviceHref)
     }
 
     if (!payload.authenticated || !payload.deadlines) {
@@ -492,6 +650,248 @@ export async function getMoodleDeadlines() {
     return {
       status: 'error',
       ...empty,
+      error: error instanceof Error ? error.message : String(error),
+      errorKind: getRequestErrorKind(error),
+      serviceHref: error?.serviceHref ?? null,
+    }
+  }
+}
+
+export function getMoodleFileProxyUrl(fileUrl, filename) {
+  if (!fileUrl) return null
+  return `${ENT_AUTH_PREFIX}/moodle/file?url=${encodeURIComponent(fileUrl)}&name=${encodeURIComponent(filename || 'document')}`
+}
+
+export async function getMoodleCourses() {
+  const empty = { moodleHref: null, courses: [] }
+
+  if (!universityConfig.features?.moodle) {
+    return { status: 'disabled', ...empty }
+  }
+
+  try {
+    const response = await fetch(`${ENT_AUTH_PREFIX}/moodle/courses`, {
+      credentials: 'same-origin',
+    })
+    const payload = await response.json().catch(() => null)
+
+    if (payload?.disabled) {
+      return { status: 'disabled', ...empty }
+    }
+
+    if (!response.ok || !payload) {
+      throw createHttpError(payload?.error || `Moodle request failed (${response.status}).`, response.status, payload?.serviceHref)
+    }
+
+    if (!payload.authenticated) {
+      return { status: 'unauthenticated', ...empty }
+    }
+
+    return {
+      status: 'ok',
+      moodleHref: payload.moodleHref ?? null,
+      courses: Array.isArray(payload.courses) ? payload.courses : [],
+    }
+  } catch (error) {
+    return {
+      status: 'error',
+      ...empty,
+      error: error instanceof Error ? error.message : String(error),
+      errorKind: getRequestErrorKind(error),
+      serviceHref: error?.serviceHref ?? null,
+    }
+  }
+}
+
+export async function getMoodleCourseContents(courseId) {
+  const empty = { courseId: Number(courseId), sections: [] }
+
+  if (!universityConfig.features?.moodle) {
+    return { status: 'disabled', ...empty }
+  }
+
+  try {
+    const response = await fetch(`${ENT_AUTH_PREFIX}/moodle/course-contents?courseId=${encodeURIComponent(courseId)}`, {
+      credentials: 'same-origin',
+    })
+    const payload = await response.json().catch(() => null)
+
+    if (payload?.disabled) {
+      return { status: 'disabled', ...empty }
+    }
+
+    if (!response.ok || !payload) {
+      throw createHttpError(payload?.error || `Moodle request failed (${response.status}).`, response.status)
+    }
+
+    if (!payload.authenticated) {
+      return { status: 'unauthenticated', ...empty }
+    }
+
+    return {
+      status: 'ok',
+      courseId: payload.courseId ?? Number(courseId),
+      sections: Array.isArray(payload.sections) ? payload.sections : [],
+    }
+  } catch (error) {
+    return {
+      status: 'error',
+      ...empty,
+      error: error instanceof Error ? error.message : String(error),
+      errorKind: getRequestErrorKind(error),
+    }
+  }
+}
+
+export async function getMoodleFolderContents(cmid, courseId) {
+  const empty = { cmid: Number(cmid), files: [] }
+
+  if (!universityConfig.features?.moodle) {
+    return { status: 'disabled', ...empty }
+  }
+
+  try {
+    const params = new URLSearchParams({ cmid: String(cmid) })
+    if (courseId) params.set('courseId', String(courseId))
+    const response = await fetch(`${ENT_AUTH_PREFIX}/moodle/folder-contents?${params.toString()}`, {
+      credentials: 'same-origin',
+    })
+    const payload = await response.json().catch(() => null)
+
+    if (payload?.disabled) {
+      return { status: 'disabled', ...empty }
+    }
+
+    if (!response.ok || !payload) {
+      throw createHttpError(payload?.error || `Moodle folder request failed (${response.status}).`, response.status)
+    }
+
+    if (!payload.authenticated) {
+      return { status: 'unauthenticated', ...empty }
+    }
+
+    return {
+      status: 'ok',
+      cmid: payload.cmid ?? Number(cmid),
+      name: payload.name || '',
+      files: Array.isArray(payload.files) ? payload.files : [],
+      downloadFolderProxyUrl: payload.downloadFolderProxyUrl || null,
+    }
+  } catch (error) {
+    return {
+      status: 'error',
+      ...empty,
+      error: error instanceof Error ? error.message : String(error),
+      errorKind: getRequestErrorKind(error),
+    }
+  }
+}
+
+export async function getMoodleAssignmentDetails(cmid, courseId) {
+  const empty = { cmid: Number(cmid), assignment: null }
+
+  if (!universityConfig.features?.moodle) {
+    return { status: 'disabled', ...empty }
+  }
+
+  try {
+    const params = new URLSearchParams({ cmid: String(cmid) })
+    if (courseId) params.set('courseId', String(courseId))
+    const response = await fetch(`${ENT_AUTH_PREFIX}/moodle/assignment-details?${params.toString()}`, {
+      credentials: 'same-origin',
+    })
+    const payload = await response.json().catch(() => null)
+
+    if (payload?.disabled) {
+      return { status: 'disabled', ...empty }
+    }
+
+    if (!response.ok || !payload) {
+      throw createHttpError(payload?.error || `Moodle assignment request failed (${response.status}).`, response.status)
+    }
+
+    if (!payload.authenticated) {
+      return { status: 'unauthenticated', ...empty }
+    }
+
+    return {
+      status: 'ok',
+      cmid: Number(cmid),
+      assignment: payload.assignment || null,
+    }
+  } catch (error) {
+    return {
+      status: 'error',
+      ...empty,
+      error: error instanceof Error ? error.message : String(error),
+      errorKind: getRequestErrorKind(error),
+    }
+  }
+}
+
+export async function submitMoodleAssignment({ cmid, files = [], onlineText = '', finalize = false }) {
+  try {
+    const response = await fetch(`${ENT_AUTH_PREFIX}/moodle/submit-assignment`, {
+      method: 'POST',
+      credentials: 'same-origin',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        cmid: Number(cmid),
+        files,
+        onlineText,
+        finalize,
+      }),
+    })
+    const payload = await response.json().catch(() => null)
+
+    if (!response.ok || !payload) {
+      throw createHttpError(payload?.error || `Moodle submit failed (${response.status}).`, response.status)
+    }
+
+    return {
+      status: 'ok',
+      assignment: payload.assignment || null,
+      message: payload.message || 'Devoir téléversé avec succès',
+    }
+  } catch (error) {
+    return {
+      status: 'error',
+      assignment: null,
+      error: error instanceof Error ? error.message : String(error),
+      errorKind: getRequestErrorKind(error),
+    }
+  }
+}
+
+export async function removeMoodleAssignmentFile({ cmid, filename }) {
+  try {
+    const response = await fetch(`${ENT_AUTH_PREFIX}/moodle/assignment-file/remove`, {
+      method: 'POST',
+      credentials: 'same-origin',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        cmid: Number(cmid),
+        filename,
+      }),
+    })
+    const payload = await response.json().catch(() => null)
+
+    if (!response.ok || !payload) {
+      throw createHttpError(payload?.error || `Moodle file remove failed (${response.status}).`, response.status)
+    }
+
+    return {
+      status: 'ok',
+      assignment: payload.assignment || null,
+    }
+  } catch (error) {
+    return {
+      status: 'error',
+      assignment: null,
       error: error instanceof Error ? error.message : String(error),
       errorKind: getRequestErrorKind(error),
     }
@@ -1194,6 +1594,47 @@ export async function getLatestGrade() {
   return latest ?? { error: 'Aucune note trouvée', empty: true }
 }
 
+export async function getAbsencesSummary() {
+  const data = await getGrades()
+  if (!data?.authenticated || !data?.grades || data?.error) {
+    if (data?.disabled) {
+      return { disabled: true }
+    }
+    return { error: data?.error || 'Indisponible', errorKind: data?.errorKind }
+  }
+
+  const grades = data.grades
+  const releve = getCurrentGradesReleve(grades) ?? grades?.['relevé'] ?? grades?.releve ?? null
+  const config = grades.config ?? null
+  const report = buildAbsenceReport(grades, releve, config)
+  if (!report.visible) {
+    return {
+      totals: { justified: '0h', unjustified: '0h', late: '0' },
+      unjustifiedCount: 0,
+      justifiedCount: 0,
+      lateCount: 0,
+      totalCount: 0,
+      notice: null,
+      unpublished: true,
+    }
+  }
+
+  const entries = report.entries || []
+  const unjustified = entries.filter((entry) => entry.status === 'unjustified')
+  const justified = entries.filter((entry) => entry.status === 'justified')
+  const lates = entries.filter((entry) => entry.status === 'late')
+
+  return {
+    totals: report.totals ?? { justified: '0h', unjustified: '0h', late: '0' },
+    unjustifiedCount: unjustified.length,
+    justifiedCount: justified.length,
+    lateCount: lates.length,
+    totalCount: entries.length,
+    notice: report.notice,
+    latestAbsence: entries[0] ?? null,
+  }
+}
+
 // ============================================================================
 // ADE Schedule API
 // ============================================================================
@@ -1234,6 +1675,39 @@ export async function searchAde(query) {
   )
 
   return parseJsonPayload(response)
+}
+
+export async function getAdeTeachers(query = '') {
+  const q = String(query ?? '').trim()
+  const params = q ? `?q=${encodeURIComponent(q)}` : ''
+  const response = await fetch(`${ENT_AUTH_PREFIX}/ade/teachers${params}`, {
+    credentials: 'same-origin',
+  })
+
+  return parseJsonPayload(response)
+}
+
+// ADE's rooms ("Salles"), each with its site and building above it.
+export async function getAdeRooms() {
+  const response = await fetch(`${ENT_AUTH_PREFIX}/ade/rooms`, { credentials: 'same-origin' })
+  return parseJsonPayload(response)
+}
+
+// The courses of `date` (YYYY-MM-DD) held in the rooms `roomIds`, asked by
+// batches the server accepts.
+const ROOMS_PER_REQUEST = 120
+
+export async function getAdeRoomEvents(roomIds, date) {
+  const batches = []
+  for (let index = 0; index < roomIds.length; index += ROOMS_PER_REQUEST) {
+    batches.push(roomIds.slice(index, index + ROOMS_PER_REQUEST))
+  }
+  const answers = await Promise.all(batches.map(async (ids) => {
+    const params = new URLSearchParams({ date, ids: ids.join(',') })
+    const response = await fetch(`${ENT_AUTH_PREFIX}/ade/rooms/events?${params}`, { credentials: 'same-origin' })
+    return parseJsonPayload(response)
+  }))
+  return answers.flatMap((answer) => answer?.events ?? [])
 }
 
 function buildAdeQueryString({ date, ...extra } = {}) {

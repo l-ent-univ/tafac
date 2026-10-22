@@ -6,6 +6,7 @@ import { formatRank, formatScore, formatSignedPoints, listUeGroups } from '../gr
 import { EvaluationRow, NewBadge, ScoreText } from './SubjectsList'
 import CardInfoTip from './CardInfoTip'
 import { readHistoryNav, writeHistoryNav } from '../appHistory'
+import { getRouteFromPath } from '../appRoute'
 import UeBadge from './UeBadge'
 import UeLink from './UeLink'
 import { useUeColor } from '../useUeColor'
@@ -551,8 +552,10 @@ function UeSubjectsList({ report, subjectIcon = () => null, newEvaluationIds = n
   const handlePopStateRef = useRef(null)
   useEffect(() => {
     handlePopStateRef.current = (event) => {
-      const { page, ue } = readHistoryNav(event.state)
-      if (page !== 'grades' || ue === expandedCode) return
+      // The page comes from the URL (appRoute): the /notes entry itself
+      // carries no app state.
+      const { ue } = readHistoryNav(event.state)
+      if (getRouteFromPath(window.location.pathname) !== 'grades' || ue === expandedCode) return
       if (ue && groups.some((group) => group.code === ue)) expand(ue, null, null, { push: false })
       else if (!ue && expandedCode) collapse()
     }

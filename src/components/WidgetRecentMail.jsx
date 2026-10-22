@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Icon } from '@iconify/react'
 import { useWidgetLoadReport } from '../analytics'
+import { navigateTo } from '../appRoute'
 import { publishBriefingSource } from '../briefingSources'
 import { getRecentMail } from '../entApi'
 import WidgetListStatus from './WidgetListStatus'
@@ -8,7 +9,6 @@ import {
   SHIMMER_CLASSES,
   calendarDayDiff,
   formatClockTime,
-  openInNewTab,
   parseDate,
   readStoredHref,
   storeHref,
@@ -103,17 +103,18 @@ function MailRow({ message, fallbackHref, now }) {
 
   return (
     <li className="min-w-0">
-      <a
-        className={`mail-row ${ROW_CLASSES} no-underline text-inherit transition-[background-color] duration-[120ms] ease-in-out hover:bg-brand-subtle focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-text`}
-        href={href}
-        target="_blank"
-        rel="noopener noreferrer"
+      <button
+        type="button"
+        className={`mail-row ${ROW_CLASSES} w-full text-left bg-transparent border-0 cursor-pointer no-underline text-inherit transition-[background-color] duration-[120ms] ease-in-out hover:bg-brand-subtle focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-text`}
+        onClick={(event) => {
+          event.stopPropagation()
+          navigateTo('mail')
+        }}
         aria-label={ariaLabel}
         title={receivedAt ? `${sender} — ${subject}\n${fullDateFormatter.format(receivedAt)}` : `${sender} — ${subject}`}
-        onClick={(event) => event.stopPropagation()}
       >
         {content}
-      </a>
+      </button>
     </li>
   )
 }
@@ -180,24 +181,26 @@ function WidgetRecentMail({ visible = false }) {
   useEffect(() => () => publishBriefingSource('mailCount', null), [])
 
   // Hidden when the mailbox can't be loaded; the background refresh brings
-  // the card back once the webmail answers again.
-  if (state.status === 'disabled' || state.status === 'unauthenticated' || state.status === 'error') {
+  // the card back once the webmail answers again. The webmail refusing Tafac
+  // (403, `serviceHref`) stays, with its direct link.
+  const isForbidden = state.status === 'error' && Boolean(state.serviceHref)
+  if (state.status === 'disabled' || state.status === 'unauthenticated' || (state.status === 'error' && !isForbidden)) {
     return null
   }
 
-  const webmailHref = state.webmailHref || storedWebmailHref
+  const webmailHref = isForbidden ? state.serviceHref : state.webmailHref || storedWebmailHref
   const messages = state.messages.slice(0, MAX_VISIBLE_MESSAGES)
   const unreadCount = state.status === 'ok'
     ? (state.unreadCount ?? state.messages.filter((message) => message.unread).length)
     : 0
-  const openWebmail = () => openInNewTab(webmailHref)
+  const openMail = () => navigateTo('mail')
 
   return (
     <article
-      className={`${CARD_CLASSES} ${webmailHref ? 'cursor-pointer' : ''} ${visible ? 'widget-card-visible' : ''}`}
+      className={`${CARD_CLASSES} cursor-pointer ${visible ? 'widget-card-visible' : ''}`}
       aria-label={unreadCount > 0 ? `Mails récents, ${unreadCount} non lu${unreadCount > 1 ? 's' : ''}` : 'Mails récents'}
       aria-busy={state.status === 'loading' || undefined}
-      onClick={webmailHref ? openWebmail : undefined}
+      onClick={openMail}
     >
       {webmailHref ? (
         <a
@@ -223,6 +226,10 @@ function WidgetRecentMail({ visible = false }) {
             <MailRow key={message.id ?? index} message={message} fallbackHref={webmailHref} now={now} />
           ))}
         </ul>
+      ) : null}
+
+      {isForbidden ? (
+        <WidgetListStatus icon="carbon:locked" title="Messagerie inaccessible depuis Tafac" body="Ouvre-la directement pour lire tes mails" />
       ) : null}
 
       {state.status === 'ok' && messages.length === 0 ? (

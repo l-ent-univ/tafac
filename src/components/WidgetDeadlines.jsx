@@ -278,12 +278,14 @@ function WidgetDeadlines({ visible = false }) {
   }, [loadDeadlines, state.status])
 
   // Hidden when Moodle can't be reached; the background refresh brings the
-  // card back once it answers again.
-  if (state.status === 'disabled' || state.status === 'unauthenticated' || state.status === 'error') {
+  // card back once it answers again. Moodle refusing Tafac (403,
+  // `serviceHref`) stays, with its direct link.
+  const isForbidden = state.status === 'error' && Boolean(state.serviceHref)
+  if (state.status === 'disabled' || state.status === 'unauthenticated' || (state.status === 'error' && !isForbidden)) {
     return null
   }
 
-  const moodleHref = state.moodleHref || storedMoodleHref
+  const moodleHref = isForbidden ? state.serviceHref : state.moodleHref || storedMoodleHref
   const pending = state.status === 'ok' ? prioritizeDeadlines(state.items, now) : []
   const rows = pending.slice(0, MAX_VISIBLE_DEADLINES)
   const urgentItems = pending.filter((item) => isUrgent(item, now))
@@ -322,6 +324,10 @@ function WidgetDeadlines({ visible = false }) {
             <DeadlineRow key={item.id ?? index} item={item} fallbackHref={moodleHref} now={now} />
           ))}
         </ul>
+      ) : null}
+
+      {isForbidden ? (
+        <WidgetListStatus icon="carbon:locked" title="Moodle inaccessible depuis Tafac" body="Ouvre-le directement pour voir tes échéances" />
       ) : null}
 
       {state.status === 'ok' && rows.length === 0 ? (

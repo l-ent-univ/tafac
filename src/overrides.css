@@ -139,10 +139,15 @@
   outline-offset: -2px;
 }
 
-/* Selected tab: a brighter glass lens behind the icon and label. */
+/* Selected tab: a brighter glass lens behind the icon and label. The lens
+   is one element that slides between tabs; the tab itself stays clear. */
 .mobile-tab-bar-item--selected,
 .mobile-tab-bar-item--selected:hover,
 .mobile-tab-bar-item--selected:active {
+  background-color: transparent;
+}
+
+.mobile-tab-bar-lens {
   background-color: rgb(255 255 255 / 0.85);
   box-shadow:
     inset 0 1px 0 rgb(255 255 255 / 0.9),
@@ -209,9 +214,7 @@
   outline-color: rgb(255 255 255 / 0.4);
 }
 
-:where([data-theme="dark"]) .mobile-tab-bar-item--selected,
-:where([data-theme="dark"]) .mobile-tab-bar-item--selected:hover,
-:where([data-theme="dark"]) .mobile-tab-bar-item--selected:active {
+:where([data-theme="dark"]) .mobile-tab-bar-lens {
   background-color: rgb(255 255 255 / 0.16);
   box-shadow:
     inset 0 1px 0 rgb(255 255 255 / 0.12),
@@ -1236,23 +1239,27 @@
 
 /* Mes notes' "Simuler" button: a cream brown, warmer than the page's
    beige, so it reads as the way into something to play with. */
-.simulate-button {
+.simulate-button,
+.accent-button {
   border-color: #dcc5a6;
   background-color: #ead8bf;
   color: #4a2a12;
 }
 
-.simulate-button:hover {
+.simulate-button:hover,
+.accent-button:hover {
   background-color: #e3cdae;
 }
 
-:where([data-theme="dark"]) .simulate-button {
+:where([data-theme="dark"]) .simulate-button,
+:where([data-theme="dark"]) .accent-button {
   border-color: #5c4630;
   background-color: #4a3825;
   color: #f1e2cc;
 }
 
-:where([data-theme="dark"]) .simulate-button:hover {
+:where([data-theme="dark"]) .simulate-button:hover,
+:where([data-theme="dark"]) .accent-button:hover {
   background-color: #56422c;
 }
 
@@ -1428,6 +1435,59 @@
 .subject-panel-inner {
   min-height: 0;
   overflow: hidden;
+}
+
+/* ── "Dans tes mails" threads ──
+   The mails of one announcement unfold as the subjects above (0fr → 1fr,
+   hidden once shut), each one rising in after the one before. */
+
+.mail-thread-panel {
+  display: grid;
+  grid-template-rows: 0fr;
+  visibility: hidden;
+  opacity: 0;
+  transition:
+    grid-template-rows 280ms cubic-bezier(0.16, 1, 0.3, 1),
+    opacity 200ms ease,
+    visibility 0s linear 280ms;
+}
+
+.mail-thread-panel.is-open {
+  grid-template-rows: 1fr;
+  visibility: visible;
+  opacity: 1;
+  transition:
+    grid-template-rows 280ms cubic-bezier(0.16, 1, 0.3, 1),
+    opacity 200ms ease,
+    visibility 0s;
+}
+
+.mail-thread-panel-inner {
+  min-height: 0;
+  overflow: hidden;
+}
+
+.mail-thread-panel.is-open .mail-thread-item {
+  animation: mail-thread-item-in 260ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  animation-delay: calc(60ms + var(--i, 0) * 45ms);
+}
+
+@keyframes mail-thread-item-in {
+  from {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mail-thread-panel,
+  .mail-thread-panel.is-open {
+    transition: visibility 0s;
+  }
+
+  .mail-thread-panel.is-open .mail-thread-item {
+    animation: none;
+  }
 }
 
 /* The icon tile's UE wash: the grade cards' colours, a touch stronger on a
@@ -1693,6 +1753,8 @@
 /* ── Next class widget gradient + transition ── */
 
 .next-class-widget {
+  opacity: 1;
+  transform: none;
   background-color: var(--color-widget-bg);
   --widget-delay: 70ms;
 }
@@ -1704,6 +1766,7 @@
 /* ── Grade widget intro order ── */
 
 .latest-grade-widget,
+.absences-widget,
 .average-grade-widget {
   --widget-delay: 140ms;
 }
@@ -1711,16 +1774,23 @@
 /* ── Grade widget hover state ──
    Only the cards that open something; the average card isn't a link. */
 
-.latest-grade-widget:hover {
+.latest-grade-widget:hover,
+.absences-widget:hover,
+.average-grade-widget:hover {
   background: var(--color-bg-subtle);
 }
 
-:where([data-theme="dark"]) .latest-grade-widget:hover {
+:where([data-theme="dark"]) .latest-grade-widget:hover,
+:where([data-theme="dark"]) .absences-widget:hover,
+:where([data-theme="dark"]) .average-grade-widget:hover {
   background: var(--color-bg-subtle);
 }
 
 .latest-grade-widget:hover .grade-corner-arrow,
-.next-class-widget:hover .grade-corner-arrow {
+.absences-widget:hover .grade-corner-arrow,
+.average-grade-widget:hover .grade-corner-arrow,
+.next-class-widget:hover .grade-corner-arrow,
+.greeting-card-widget:hover .grade-corner-arrow {
   opacity: 0.45;
 }
 
@@ -1801,6 +1871,7 @@
   }
 
   .widget-row:has(.recent-mail-widget):has(.moodle-deadlines-widget) .latest-grade-widget,
+  .widget-row:has(.recent-mail-widget):has(.moodle-deadlines-widget) .absences-widget,
   .widget-row:has(.recent-mail-widget):has(.moodle-deadlines-widget) .recent-mail-widget {
     flex: 1 1 calc(50% - 6px);
     min-width: 0;
@@ -1829,6 +1900,20 @@
   .widget-row:has(.recent-mail-widget):has(.moodle-deadlines-widget) .widget-lists > .widget-card {
     flex: 1 1 0;
     min-width: 0;
+  }
+
+  /* The RU's card, in the strip too: a row of its own under the two. */
+  .widget-row:has(.recent-mail-widget):has(.moodle-deadlines-widget) .widget-lists {
+    flex-wrap: wrap;
+  }
+
+  .widget-row:has(.recent-mail-widget):has(.moodle-deadlines-widget) .widget-lists > :is(.crous-card-widget, .transit-card-widget) {
+    flex: 1 1 100%;
+  }
+
+  /* RU and bus together: two rows of halves, mail | deadlines, RU | bus. */
+  .widget-row:has(.recent-mail-widget):has(.moodle-deadlines-widget) .widget-lists:has(> .crous-card-widget):has(> .transit-card-widget) > .widget-card {
+    flex: 1 1 calc(50% - 6px);
   }
 }
 
@@ -1874,6 +1959,11 @@
 
   .widget-lists > .widget-card:only-child {
     flex-basis: 100%;
+  }
+
+  /* As tall as the cards it's swiped with. */
+  .widget-lists > :is(.crous-card-widget, .transit-card-widget) {
+    height: auto;
   }
 
   /* A thin 20px row tucked under the strip, with the section gap below
@@ -2457,6 +2547,44 @@
   }
 }
 
+.app-card--editing {
+  background-color: var(--color-widget-bg);
+  border-color: var(--color-border);
+  transition:
+    scale 150ms ease,
+    box-shadow 150ms ease,
+    background-color 160ms ease;
+}
+
+.app-card.app-card--lifted {
+  position: relative;
+  z-index: 20;
+  scale: 1.03;
+  border-color: var(--color-brand);
+  box-shadow: 0 16px 36px -12px var(--color-shadow);
+}
+
+.app-card-grip {
+  animation: app-card-grip-in 200ms ease both;
+}
+
+@keyframes app-card-grip-in {
+  from { opacity: 0; transform: translateX(-6px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+.apps-grid--reordering,
+.apps-grid--reordering * {
+  cursor: grabbing !important;
+  user-select: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .app-card-grip {
+    animation: none;
+  }
+}
+
 /* Keep the dragged-over favorites flat while reordering. */
 .is-dragging .app-card:hover {
   background-color: transparent;
@@ -2620,6 +2748,7 @@
 
 .grade-feature-disabled,
 .latest-grade-widget.grade-feature-disabled:hover,
+.absences-widget.grade-feature-disabled:hover,
 .average-grade-widget.grade-feature-disabled:hover,
 .sidebar-grade-pocket.grade-feature-disabled:hover {
   background: #f4f4f4;
@@ -2714,6 +2843,7 @@
 
 :where([data-theme="dark"]) .grade-feature-disabled,
 :where([data-theme="dark"]) .latest-grade-widget.grade-feature-disabled:hover,
+:where([data-theme="dark"]) .absences-widget.grade-feature-disabled:hover,
 :where([data-theme="dark"]) .average-grade-widget.grade-feature-disabled:hover,
 :where([data-theme="dark"]) .sidebar-grade-pocket.grade-feature-disabled:hover {
   background: #151515;
@@ -2738,6 +2868,54 @@
   color: rgba(17, 17, 17, 0.68);
 }
 
+
+/* Guided tour: the desktop favourite star only shows on hover, keep it lit
+   while the tour points at it. */
+html[data-tour-active] [data-tour="favorite-star"] {
+  opacity: 1;
+}
+
+/* ── Grades page ──
+   index.css gives buttons and inputs `font: inherit` outside Tailwind's
+   layers, which beats every text-/font- utility. The grades page sizes its
+   controls with utilities, so it hands the font back to the layers
+   (Tailwind's preflight already inherits it). */
+.grades-page :where(button, input) {
+  font: revert-layer;
+}
+
+/* Arrival: cards rise and settle in reading order, with the dashboard
+   widgets' motion (--reveal-order is set per card). */
+.grades-reveal {
+  animation: grades-reveal-in 560ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  animation-delay: calc(var(--reveal-order, 0) * 60ms);
+  transform-origin: 50% 80%;
+}
+
+@keyframes grades-reveal-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px) scale(0.965);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .grades-reveal {
+    animation: none;
+  }
+}
+
+/* "Actualisation…" next to a page title: only shows when the background
+   refresh actually takes a moment, so a quick answer doesn't flash it. */
+.scodoc-refreshing {
+  animation: scodoc-refreshing-in 200ms ease-out 400ms both;
+}
+
+@keyframes scodoc-refreshing-in {
+  from {
+    opacity: 0;
+  }
+}
 
 /* ── "Compte aussi dans" (Mes notes, a UE's view) ──
    Each link carries its UE as a little ribbon: the UE's colour with a lit
@@ -4110,4 +4288,185 @@ li + li > .planning-row .planning-row-text {
   .planning-export-label {
     transition: none;
   }
+}
+
+/* ── « Bus » (TransitPage, TransitLineDiagram, TransitMap) ── */
+
+/* Real time: the dot breathes, unless motion is reduced. */
+.transit-live-dot {
+  animation: transit-live 1.6s ease-in-out infinite;
+}
+
+@keyframes transit-live {
+  50% { opacity: 0.35; }
+}
+
+/* A line's plan: a rail in the line's colour (--line-color) through every
+   stop, a ringed dot per stop, bigger at both ends. */
+.transit-diagram-rail {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 50%;
+  width: 6px;
+  margin-left: -3px;
+  background: var(--line-color);
+}
+
+.transit-diagram-rail.is-first {
+  top: 50%;
+}
+
+.transit-diagram-rail.is-last {
+  bottom: 50%;
+}
+
+.transit-diagram-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 999px;
+  border: 3px solid var(--line-color);
+  background: var(--color-widget-bg);
+}
+
+.transit-diagram-dot.is-end {
+  width: 18px;
+  height: 18px;
+  border-width: 4px;
+}
+
+/* Home and campus pins on the map. */
+.transit-pin {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.transit-pin > span {
+  display: inline-flex;
+  width: 30px;
+  height: 30px;
+  align-items: center;
+  justify-content: center;
+  border: 3px solid #fff;
+  border-radius: 999px;
+  box-shadow: 0 4px 12px rgb(0 0 0 / 0.25);
+  color: #fff;
+  font-size: 15px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.transit-pin.is-home > span {
+  background: #2563eb;
+}
+
+.transit-pin.is-campus > span {
+  background: #111827;
+}
+
+/* The OpenStreetMap tiles, darkened with the theme. */
+:where([data-theme="dark"]) .transit-map-tiles {
+  filter: invert(1) hue-rotate(180deg) brightness(0.9) contrast(0.9);
+}
+
+.transit-map .leaflet-container,
+.transit-map.leaflet-container {
+  font-family: inherit;
+  background: var(--color-bg-subtle);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .transit-live-dot {
+    animation: none;
+  }
+}
+
+/* ── Progress ring (ProgressRing: « Bus » countdown, « Menu du RU » service) ──
+   A track and its arc, drawn in on arrival like « UE validées »' ring. */
+.progress-ring-track,
+.progress-ring-value {
+  fill: none;
+  stroke-width: 13;
+}
+
+.progress-ring-track {
+  stroke: var(--color-border);
+}
+
+.progress-ring-value {
+  stroke-linecap: round;
+  transition: stroke-dasharray 600ms cubic-bezier(0.22, 1, 0.36, 1);
+  animation: progress-ring-in 900ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@keyframes progress-ring-in {
+  from { stroke-dasharray: 0 100; }
+}
+
+/* ── Journey strip (TransitUi › JourneyStrip) ──
+   Each part as wide as it lasts: buses in their colours (inline), the walk
+   dotted, a change hatched, the time to spare in green. The parts grow in
+   from the left, one after the other. */
+.journey-strip-part {
+  transform-origin: left center;
+  animation: journey-strip-in 420ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.journey-strip-part:nth-child(2) { animation-delay: 60ms; }
+.journey-strip-part:nth-child(3) { animation-delay: 120ms; }
+.journey-strip-part:nth-child(4) { animation-delay: 180ms; }
+.journey-strip-part:nth-child(5) { animation-delay: 240ms; }
+.journey-strip-part:nth-child(n + 6) { animation-delay: 300ms; }
+
+@keyframes journey-strip-in {
+  from { transform: scaleX(0); opacity: 0; }
+}
+
+.journey-strip-part.is-walk {
+  color: var(--color-text-muted);
+  background: radial-gradient(circle, var(--color-text-muted) 1.4px, transparent 1.6px) 0 50% / 7px 7px repeat-x;
+  opacity: 0.85;
+}
+
+.journey-strip-part.is-wait {
+  color: var(--color-text-muted);
+  background: repeating-linear-gradient(135deg, var(--color-border) 0 4px, transparent 4px 8px);
+}
+
+.journey-strip-part.is-spare {
+  background: #e3f5e1;
+  color: #2f7a2b;
+}
+
+:where([data-theme="dark"]) .journey-strip-part.is-spare {
+  background: #183a17;
+  color: #8fd88a;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .progress-ring-value,
+  .journey-strip-part {
+    animation: none;
+    transition: none;
+  }
+}
+
+/* « Menu du RU »'s live card: the student's break on the service bar,
+   hatched in the brand colour. */
+.ru-lunch-band {
+  background: repeating-linear-gradient(135deg, var(--color-brand) 0 6px, color-mix(in srgb, var(--color-brand) 82%, transparent) 6px 12px);
+  border-radius: 7px;
+}
+
+/* « Menu du RU »'s course icons: the course's colour (--accent, from
+   eventAccents) on a tile tinted with it. */
+.menu-tile {
+  color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 15%, transparent);
+}
+
+:where([data-theme="dark"]) .menu-tile {
+  color: var(--accent-dark);
+  background: color-mix(in srgb, var(--accent-dark) 22%, transparent);
 }

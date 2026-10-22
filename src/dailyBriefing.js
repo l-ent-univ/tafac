@@ -187,22 +187,41 @@ function describeDeadlines(items, now) {
   return null
 }
 
+// The bus the « Bus » card picked (src/components/WidgetTransit.jsx), when
+// it leaves today within BUS_HORIZON_HOURS: to class, or home.
+const BUS_HORIZON_HOURS = 3
+function describeBus(bus, now) {
+  const leaveAt = parseDate(bus?.leaveAt)
+  const departAt = parseDate(bus?.departAt)
+  if (!leaveAt || !departAt || departAt <= now || dayDiff(departAt, now) !== 0) return null
+  if (departAt.getTime() - now.getTime() > BUS_HORIZON_HOURS * 60 * 60 * 1000) return null
+  const line = bus.line ? `bus ${bus.line}` : 'bus'
+  if (bus.kind === 'from') {
+    return { long: `Retour en ${line} à ${formatHour(departAt)}`, short: `Retour à ${formatHour(departAt)}` }
+  }
+  return { long: `Pars à ${formatHour(leaveAt)}, ${line} à ${formatHour(departAt)}`, short: `${capitalize(line)} à ${formatHour(departAt)}` }
+}
+
 function joinFacts(facts, variant) {
   return facts.map((fact) => `${capitalize(fact[variant])}.`).join(' ')
 }
 
 // classes: { events: [{ start, end, title }], complete } from ADE, or null.
 // deadlines: Moodle items ({ dueAt, submitted, overdue }), or null.
+// bus: { kind: 'to' | 'from', leaveAt, departAt, line } from the « Bus »
+// card, or null.
 // Returns null when there is nothing useful to say (ADE or Moodle
 // unavailable, nothing due): the card then shows the greeting alone.
-export function buildDailyBriefing({ classes = null, deadlines = null, now = new Date() } = {}) {
+export function buildDailyBriefing({ classes = null, deadlines = null, bus = null, now = new Date() } = {}) {
   const { fact: classesFact } = describeClasses(classes, now)
   const deadlinesFact = describeDeadlines(deadlines, now)
-  // Display and priority order: classes, then deadlines. Work due today goes
-  // first: it is the most urgent, and reads oddly after "Demain :".
+  const busFact = describeBus(bus, now)
+  // Display and priority order: classes, the bus to take, then deadlines.
+  // Work due today goes first: it is the most urgent, and reads oddly after
+  // "Demain :".
   const facts = (deadlinesFact?.isToday
-    ? [deadlinesFact, classesFact]
-    : [classesFact, deadlinesFact]
+    ? [deadlinesFact, classesFact, busFact]
+    : [classesFact, busFact, deadlinesFact]
   ).filter(Boolean)
 
   if (facts.length === 0) {

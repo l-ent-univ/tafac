@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react'
 import { Icon } from '@iconify/react'
 import { accentStyle } from '../eventAccents'
+import { SIGNAL_STYLES } from '../mailSignalStyles'
 import { agendaDayText, durationText, formatTime, weekRangeText } from '../planningDates'
 import { isOngoing, listWeekDays } from '../planningEvents'
 import PlanningNote from './PlanningNote'
@@ -48,7 +49,7 @@ function PlanningListCard({ event, accent, ongoing, onOpen }) {
       className="planning-list-card widget-card widget-card-visible isolate relative flex w-full min-w-0 items-stretch gap-3 overflow-hidden rounded-[20px] border bg-widget-bg p-[13px] text-left text-text cursor-pointer 4xl:gap-4 4xl:px-4"
       style={accentStyle(accent)}
       onClick={() => onOpen(event)}
-      aria-label={`${formatTime(event.start)} à ${formatTime(event.end)}, ${event.title}${meta.map((part) => `, ${part.text}`).join('')}, ${duration}${ongoing ? ', en cours' : ''}`}
+      aria-label={`${formatTime(event.start)} à ${formatTime(event.end)}, ${event.title}${meta.map((part) => `, ${part.text}`).join('')}, ${duration}${ongoing ? ', en cours' : ''}${event.notice ? `, ${event.notice.label}` : ''}`}
     >
       <span className="latest-grade-wash planning-accent-fill" aria-hidden="true" />
       <span className="planning-list-bar planning-accent-fill" aria-hidden="true" />
@@ -66,6 +67,12 @@ function PlanningListCard({ event, accent, ongoing, onOpen }) {
           {meta.length ? (
             <span className="flex min-w-0 flex-wrap gap-x-3 gap-y-0.5 font-body text-[13.5px] font-medium leading-[1.35] text-text-muted">
               {meta.map((part) => <MetaLabel key={part.icon} icon={part.icon} text={part.text} />)}
+            </span>
+          ) : null}
+          {event.notice ? (
+            <span className={`inline-flex min-w-0 max-w-full items-center gap-1 justify-self-start rounded-full px-2 py-1 font-body text-[12.5px] font-semibold leading-none ${SIGNAL_STYLES[event.notice.kind].tint}`} aria-hidden="true">
+              <Icon icon={SIGNAL_STYLES[event.notice.kind].icon} className="size-3.5 shrink-0" />
+              <span className="truncate">{event.notice.label}</span>
             </span>
           ) : null}
         </span>

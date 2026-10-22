@@ -9,7 +9,7 @@ async function withAuthApp(options, run) {
   const config = await loadServerConfig('univ-exemple')
   const app = createEntAuthApp(config, {
     analytics: {},
-    session: { secret: 'a'.repeat(44), production: false },
+    session: { secret: 'a'.repeat(44), production: true },
     ...options,
   })
   const server = app.listen(0)

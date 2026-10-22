@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import SidebarStatPocket from './SidebarStatPocket'
-import { GRADES_LAUNCH_HREF, getAverageGrade, openGradesService } from '../entApi'
+import { navigateTo } from '../appRoute'
+import { GRADES_LAUNCH_HREF, getAverageGrade } from '../entApi'
 import {
   DEMO_AVERAGE_GRADE,
   GRADES_FEATURE_DISABLED,
@@ -55,7 +56,7 @@ function LiveSidebarAveragePocket() {
       value={averageDisplay}
       max="20"
       accentHue={330}
-      onClick={GRADES_LAUNCH_HREF ? openGradesService : undefined}
+      onClick={() => navigateTo('grades')}
       caption={promoDisplay ? `Promo : ${promoDisplay}` : ''}
       ariaLabel={`Moyenne du semestre: ${averageDisplay} sur 20${promoDisplay ? ` (promo: ${promoDisplay})` : ''}`}
       tooltipPrimary="Moyenne du semestre"

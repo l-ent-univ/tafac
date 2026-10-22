@@ -26,6 +26,13 @@ export const DASHBOARD_WIDGETS = [
       && Boolean(getEstablishmentConfig(establishment)?.gradeWidgets),
   },
   {
+    id: 'absences',
+    label: 'Absences',
+    icon: 'carbon:event-schedule',
+    isAvailable: (establishment) => Boolean(universityConfig.features?.grades)
+      && Boolean(getEstablishmentConfig(establishment)?.gradeWidgets),
+  },
+  {
     id: 'mail',
     label: 'Mails récents',
     icon: 'carbon:email',
@@ -36,6 +43,18 @@ export const DASHBOARD_WIDGETS = [
     label: 'Échéances Moodle',
     icon: 'carbon:task',
     isAvailable: () => Boolean(universityConfig.features?.moodleDeadlines),
+  },
+  {
+    id: 'crous',
+    label: 'Menu du RU',
+    icon: 'carbon:restaurant',
+    isAvailable: () => Boolean(universityConfig.features?.crous && universityConfig.crous?.region),
+  },
+  {
+    id: 'transit',
+    label: 'Bus',
+    icon: 'carbon:bus',
+    isAvailable: (establishment) => Boolean(universityConfig.features?.transit && universityConfig.transit?.campuses?.[establishment]),
   },
 ]
 

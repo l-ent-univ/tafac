@@ -38,6 +38,7 @@ export const branding = {
     team: [
       { name: 'Tom', login: 'tom-things' },
       { name: 'Lucas Lavajo', login: 'tryon-dev' },
+      { name: 'Elouan Passereau', login: 'Klaynight-dev' },
     ],
   },
 }
@@ -71,6 +72,10 @@ export const features = {
   // that grade (needs `grades`). Off: the dashboard's card already shows it.
   sidebarLatestGrade: false,
   weather: { enabled: true, defaultCity: 'Rennes' },
+  // « Menu du RU »: the CROUS's own menus (see `crous` below).
+  crous: true,
+  // « Bus »: the bus network around the campus (see `transit` below).
+  transit: true,
   serviceCategories: false,
   demo: true,
 }
@@ -105,4 +110,33 @@ export const gradesCopy = {
 export const appIcons = {
   style: 'phosphor-duotone',
   colorMode: 'soft',
+}
+
+// CROUS restaurants (features.crous): the region of the « Crous Mobile »
+// feeds (server/crousFeed.js), the RU shown first per establishment (the
+// feed's ids), and the meal price.
+export const crous = {
+  region: 'rennes',
+  defaultRestaurantByEstablishment: {
+    iutlan: 'r461',
+    enssat: 'r461',
+  },
+  fallbackRestaurant: 'r445',
+  // The CROUS's student meal: the same price for every student.
+  mealPrice: '1 €',
+}
+
+// Bus network (features.transit): its open data (GTFS, GTFS-RT trip
+// updates, read by server/transitFeed.js) and the campus of each
+// establishment it serves, where the classes take place. Establishments
+// without a campus here get no « Bus » page.
+export const transit = {
+  name: 'TILT',
+  attribution: 'Horaires TILT · Lannion-Trégor Communauté, licence ODbL',
+  gtfsUrl: 'https://www.korrigo.bzh/ftp/OPENDATA/TILT.gtfs.zip',
+  realtimeUrl: 'https://www.korrigo.bzh/ftp/OPENDATA/gtfsrt/TILT.GtfsRt.pb',
+  campuses: {
+    iutlan: { label: 'IUT de Lannion', lat: 48.7583, lon: -3.4545 },
+    enssat: { label: 'ENSSAT', lat: 48.7296, lon: -3.4626 },
+  },
 }

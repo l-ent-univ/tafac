@@ -1,14 +1,21 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Icon } from '@iconify/react'
+import universityConfig from '@university'
 import { openChangelog, useChangelog } from '../changelogStore'
 import { getPillIds } from '../changelogState'
 import { downloadSchoolCertificate, getCachedSchoolCertificateStatus, getSchoolCertificateStatus } from '../entApi'
+import { useSlidingIndicator } from '../useSlidingIndicator'
 import { usePlanningExport } from '../usePlanningExport'
 import { AboutContent, AboutTeam } from './AboutModal'
 import SettingsGroup, { RowText } from './SettingsGroup'
 import { CARD_CLASSES, MUTED_FILL_CLASSES, PRESSABLE_ROW_CLASSES, ROW_CLASSES } from '../settingsStyles'
 import { PrivacyContent } from './PrivacyModal'
+import { SlidingIndicator } from './SlidingIndicator'
 import Dropdown from './Dropdown'
+import { navigateTo } from '../appRoute'
+import { isTransitPageAvailable } from '../navItems'
+import { TRANSIT_NAME, getTransitCampus, placeName, updateTransitSettings, useTransitNetwork, useTransitSettings } from '../transitApi'
+import { disableReminders, enableReminders, isPushSupported } from '../transitPush'
 import LoadingDots from './LoadingDots'
 
 function buildSelectOptions(options, selectedOption) {
@@ -322,6 +329,97 @@ function LookaheadSetting({ days, options, onChange }) {
   )
 }
 
+const TRANSIT_MARGINS = [0, 5, 10, 15]
+
+// « Bus »: the student's stop (picked on the « Bus » page), how early to
+// reach class, and the push reminders (src/transitPush.js).
+function TransitSettings({ establishment, onOpenBusPage }) {
+  const settings = useTransitSettings()
+  const { network } = useTransitNetwork()
+  const [reminderState, setReminderState] = useState('idle')
+  const campus = getTransitCampus(establishment)
+  const homeName = placeName(network, settings.homePlaceId)
+
+  const handleReminders = async (on) => {
+    setReminderState('working')
+    try {
+      if (!on) {
+        await disableReminders()
+        setReminderState('idle')
+      } else {
+        setReminderState((await enableReminders()) === 'denied' ? 'denied' : 'idle')
+      }
+    } catch {
+      setReminderState('error')
+    }
+  }
+
+  let remindersDescription = settings.reminders ? 'Activés sur cet appareil' : 'Bus du matin, retour, retards et dernier bus'
+  if (!settings.homePlaceId) remindersDescription = 'Choisis d’abord ton arrêt'
+  if (reminderState === 'working') remindersDescription = 'Un instant…'
+  if (reminderState === 'denied') remindersDescription = 'Notifications refusées : autorise-les dans les réglages du navigateur'
+  if (reminderState === 'error') remindersDescription = 'Impossible de changer les rappels pour le moment'
+
+  return (
+    <>
+      <SettingsGroup title={`Bus ${TRANSIT_NAME}`}>
+        <button type="button" className={PRESSABLE_ROW_CLASSES} onClick={onOpenBusPage}>
+          <RowText icon="carbon:home" label="Ton arrêt" description={homeName ?? 'Pas encore choisi'} />
+          <span className="inline-flex shrink-0 items-center gap-1 font-body text-[14px] font-medium text-text-60">
+            {homeName ? 'Changer' : 'Choisir'}
+            <Icon icon="carbon:chevron-right" className="h-[14px] w-[14px]" aria-hidden="true" />
+          </span>
+        </button>
+        <div className="flex flex-col gap-[12px] px-4 pb-4 pt-[13px]">
+          <div className="flex items-center justify-between gap-3">
+            <span className="font-body text-[14px] font-medium leading-[1.35] text-text-60">Arriver avant le cours</span>
+            <span className={`inline-flex items-center rounded-full ${MUTED_FILL_CLASSES} px-[10px] py-[4px] font-body text-[13px] font-semibold leading-none text-[var(--color-text)]`}>
+              {settings.marginMin ? `${settings.marginMin} min` : 'Pile'}
+            </span>
+          </div>
+          <StepSlider
+            options={TRANSIT_MARGINS}
+            value={settings.marginMin}
+            onChange={(value) => updateTransitSettings({ marginMin: value })}
+            ariaLabel="Minutes d’avance avant le cours"
+          />
+          <div className="relative h-[15px]" aria-hidden="true">
+            {TRANSIT_MARGINS.map((option, index) => (
+              <span
+                key={option}
+                className="absolute top-0 -translate-x-1/2 whitespace-nowrap font-body text-[12px] font-medium leading-none text-text-50"
+                style={{ left: `calc(${STEP_SLIDER_KNOB_PX / 2}px + (100% - ${STEP_SLIDER_KNOB_PX}px) * ${index / (TRANSIT_MARGINS.length - 1)})` }}
+              >
+                {option ? `${option} min` : 'Pile'}
+              </span>
+            ))}
+          </div>
+        </div>
+      </SettingsGroup>
+      <SettingsGroup
+        title="Rappels"
+        footer={isPushSupported()
+          ? `Seuls l’heure et le bus de chaque rappel partent sur le serveur, jamais ton nom ni ton planning. La marche jusqu’à ${campus?.label ?? 'ton campus'} est déjà comptée.`
+          : 'Ce navigateur ne reçoit pas de notifications ici. Sur iPhone, ajoute l’app à l’écran d’accueil puis ouvre-la depuis là.'}
+      >
+        {isPushSupported() ? (
+          <label className={`${ROW_CLASSES} ${settings.homePlaceId && reminderState !== 'working' ? 'cursor-pointer' : 'opacity-60'}`}>
+            <RowText icon="carbon:notification" label="Rappels sur ton téléphone" description={remindersDescription} />
+            <Switch
+              checked={settings.reminders}
+              onChange={(on) => { if (settings.homePlaceId && reminderState !== 'working') void handleReminders(on) }}
+            />
+          </label>
+        ) : (
+          <div className={ROW_CLASSES}>
+            <RowText icon="carbon:notification-off" label="Rappels sur ton téléphone" description="Indisponibles sur ce navigateur" />
+          </div>
+        )}
+      </SettingsGroup>
+    </>
+  )
+}
+
 // « Documents »: the certificat de scolarité, only once the server confirmed
 // one exists (it asks MonDossierWeb, see server/schoolCertificate.js).
 function SchoolCertificateGroup() {
@@ -453,10 +551,16 @@ const THEME_CHOICES = [
 
 // Three-way pill: follow the device, or force light or dark.
 function ThemeSetting({ value, onChange }) {
+  const [themeRef, activeThemeBox] = useSlidingIndicator(value)
+
   return (
     <div className="flex flex-col gap-[7px]">
       <h4 className="m-0 px-1 font-body text-[13px] font-semibold leading-none text-text-60">Thème</h4>
-      <div className={`flex gap-1 rounded-full ${MUTED_FILL_CLASSES} p-1`}>
+      <div ref={themeRef} className={`relative flex gap-1 rounded-full ${MUTED_FILL_CLASSES} p-1`}>
+        <SlidingIndicator
+          box={activeThemeBox}
+          className="rounded-full border bg-widget-bg border-white dark:border-[rgba(255,255,255,0.08)] shadow-[0_1px_3px_rgba(0,0,0,0.06)]"
+        />
         {THEME_CHOICES.map((choice) => {
           const isActive = choice.id === value
           return (
@@ -464,11 +568,12 @@ function ThemeSetting({ value, onChange }) {
               key={choice.id}
               type="button"
               aria-pressed={isActive}
+              data-active={isActive ? 'true' : undefined}
               onClick={() => onChange(choice.id)}
-              className={`inline-flex h-9 min-w-0 flex-auto items-center justify-center gap-[6px] rounded-full border px-3 font-body text-[14px] font-medium text-[var(--color-text)] cursor-pointer transition-[background-color,box-shadow,border-color] duration-150 ease-in-out max-sm:text-[13px] ${
+              className={`relative inline-flex h-9 min-w-0 flex-auto items-center justify-center gap-[6px] rounded-full border border-transparent px-3 font-body text-[14px] font-medium text-[var(--color-text)] cursor-pointer transition-[background-color] duration-150 ease-in-out max-sm:text-[13px] ${
                 isActive
-                  ? 'bg-widget-bg border-white dark:border-[rgba(255,255,255,0.08)] shadow-[0_1px_3px_rgba(0,0,0,0.06)]'
-                  : 'bg-transparent border-transparent hover:bg-brand-subtle'
+                  ? 'bg-transparent'
+                  : 'bg-transparent hover:bg-brand-subtle'
               }`}
             >
               <Icon icon={choice.icon} className="h-4 w-4 shrink-0 max-sm:hidden" aria-hidden="true" />
@@ -589,9 +694,55 @@ function AccountModal({
   planningSelection = null,
   anonymousAnalytics = true,
   onAnonymousAnalyticsChange = null,
+  establishment = null,
+  onEstablishmentChange = null,
 }) {
   const [activeSectionId, setActiveSectionId] = useState('account')
   const tabRefs = useRef({})
+
+  const [moodleEmptySections, setMoodleEmptySections] = useState(() => {
+    try {
+      return localStorage.getItem('l-ent:moodle-show-empty-sections') === 'true'
+    } catch {
+      return false
+    }
+  })
+
+  const handleMoodleEmptySectionsChange = (nextVal) => {
+    setMoodleEmptySections(nextVal)
+    try {
+      localStorage.setItem('l-ent:moodle-show-empty-sections', String(nextVal))
+    } catch {
+      // Storage blocked: the choice lasts this session only.
+    }
+  }
+
+  const establishmentOptions = useMemo(() => {
+    const byId = universityConfig.establishments?.byId || {}
+    return Object.entries(byId).map(([id, conf]) => ({
+      id,
+      label: conf.label || id,
+    }))
+  }, [])
+
+  const canToggleWidgets = typeof onWidgetVisibilityChange === 'function' && widgetToggles.length > 0
+  const hasAppearance = typeof onThemeChange === 'function'
+    || typeof onCustomBackgroundChange === 'function'
+    || typeof onShowWallpaperChange === 'function'
+    || typeof onShowAppDescriptionsChange === 'function'
+  const hasPrivacy = typeof onAnonymousAnalyticsChange === 'function'
+
+  const sections = [
+    { id: 'account', label: 'Compte', icon: 'carbon:user-avatar' },
+    { id: 'planning', label: 'Planning', icon: 'carbon:calendar' },
+    canToggleWidgets ? { id: 'dashboard', label: 'Tableau de bord', icon: 'carbon:dashboard' } : null,
+    hasAppearance ? { id: 'appearance', label: 'Apparence', icon: 'carbon:image' } : null,
+    isTransitPageAvailable(establishment) ? { id: 'bus', label: 'Bus', icon: 'carbon:bus' } : null,
+    hasPrivacy ? { id: 'privacy', label: 'Confidentialité', icon: 'carbon:locked' } : null,
+    { id: 'about', label: 'À propos', icon: 'carbon:information' },
+  ].filter(Boolean)
+  const activeSection = sections.find((section) => section.id === activeSectionId) ?? sections[0]
+  const [settingsNavRef, activeSectionBox] = useSlidingIndicator(open ? `${activeSection.id}:${sections.length}` : null)
 
   useEffect(() => {
     if (!open) {
@@ -636,26 +787,10 @@ function AccountModal({
   const canConfigureLookahead = typeof onLookaheadChange === 'function'
     && Array.isArray(lookaheadOptions)
     && lookaheadOptions.length > 1
-  const canToggleWidgets = typeof onWidgetVisibilityChange === 'function' && widgetToggles.length > 0
   const nextClassToggle = canToggleWidgets ? widgetToggles.find((widget) => widget.id === 'nextClass') : null
   // The lookahead only tunes the "Prochain cours" card, so it lives under that
   // card's switch. Without the card in the list it falls back to Planning.
   const lookaheadInDashboard = canConfigureLookahead && Boolean(nextClassToggle)
-  const hasAppearance = typeof onThemeChange === 'function'
-    || typeof onCustomBackgroundChange === 'function'
-    || typeof onShowWallpaperChange === 'function'
-    || typeof onShowAppDescriptionsChange === 'function'
-  const hasPrivacy = typeof onAnonymousAnalyticsChange === 'function'
-
-  const sections = [
-    { id: 'account', label: 'Compte', icon: 'carbon:user-avatar' },
-    { id: 'planning', label: 'Planning', icon: 'carbon:calendar' },
-    canToggleWidgets ? { id: 'dashboard', label: 'Tableau de bord', icon: 'carbon:dashboard' } : null,
-    hasAppearance ? { id: 'appearance', label: 'Apparence', icon: 'carbon:image' } : null,
-    hasPrivacy ? { id: 'privacy', label: 'Confidentialité', icon: 'carbon:locked' } : null,
-    { id: 'about', label: 'À propos', icon: 'carbon:information' },
-  ].filter(Boolean)
-  const activeSection = sections.find((section) => section.id === activeSectionId) ?? sections[0]
 
   // On phones the tabs scroll sideways: bring the picked one fully into view.
   const selectSection = (sectionId) => {
@@ -728,6 +863,36 @@ function AccountModal({
                   <RowText icon="carbon:password" label="Gérer mon compte sur Sésame" />
                   <Icon icon="carbon:launch" className="h-4 w-4 shrink-0 text-text-60" aria-hidden="true" />
                 </button>
+              </SettingsGroup>
+            ) : null}
+
+            {establishmentOptions.length > 1 && typeof onEstablishmentChange === 'function' ? (
+              <SettingsGroup
+                title="Établissement & Formation"
+                footer="Adapte les fonctionnalités (notes, absences, services) et les fonds d'écran selon ton école ou composante."
+              >
+                <div className={ROW_CLASSES}>
+                  <RowText icon="carbon:education" label="Établissement" />
+                  <div className="relative">
+                    <select
+                      value={establishment || ''}
+                      onChange={(e) => onEstablishmentChange(e.target.value)}
+                      className={`h-9 rounded-full border-0 ${MUTED_FILL_CLASSES} px-3.5 pr-8 font-body text-[14px] font-medium text-[var(--color-text)] outline-none cursor-pointer appearance-none dark:hover:bg-[var(--color-bg-subtle)]`}
+                      aria-label="Sélectionner l'établissement"
+                    >
+                      {establishmentOptions.map((opt) => (
+                        <option key={opt.id} value={opt.id}>
+                          {opt.label}
+                        </option>
+                      ))}
+                    </select>
+                    <Icon
+                      icon="carbon:chevron-down"
+                      className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-text-60"
+                      aria-hidden="true"
+                    />
+                  </div>
+                </div>
               </SettingsGroup>
             ) : null}
 
@@ -852,8 +1017,20 @@ function AccountModal({
                 />
               </SettingsGroup>
             ) : null}
+            <SettingsGroup title="Moodle">
+              <SwitchRow
+                icon="carbon:view"
+                label="Afficher les sections vides"
+                description="Conserver les rubriques de cours sans document lors du filtrage"
+                checked={moodleEmptySections}
+                onChange={handleMoodleEmptySectionsChange}
+              />
+            </SettingsGroup>
           </>
         )
+
+      case 'bus':
+        return <TransitSettings establishment={establishment} onOpenBusPage={() => { onClose(); navigateTo('bus', { source: 'settings' }) }} />
 
       case 'privacy':
         return (
@@ -922,11 +1099,16 @@ function AccountModal({
 
         <div className="flex min-h-0 flex-1 max-sm:flex-col">
           <nav
-            className="flex w-[208px] shrink-0 flex-col gap-1 overflow-y-auto px-[13px] pb-[21px] max-sm:w-auto max-sm:flex-row max-sm:overflow-x-auto max-sm:px-[14px] max-sm:pb-[10px] max-sm:[scrollbar-width:none]"
+            ref={settingsNavRef}
+            className="relative flex w-[208px] shrink-0 flex-col gap-1 overflow-y-auto px-[13px] pb-[21px] max-sm:w-auto max-sm:flex-row max-sm:overflow-x-auto max-sm:px-[14px] max-sm:pb-[10px] max-sm:[scrollbar-width:none]"
             role="tablist"
             aria-orientation="vertical"
             aria-label="Sections des réglages"
           >
+            <SlidingIndicator
+              box={activeSectionBox}
+              className="rounded-full border bg-widget-bg border-white dark:border-[rgba(255,255,255,0.08)] shadow-[0_1px_3px_rgba(0,0,0,0.06)]"
+            />
             {sections.map((section) => {
               const isActive = section.id === activeSection.id
               return (
@@ -939,12 +1121,13 @@ function AccountModal({
                   aria-selected={isActive}
                   aria-controls="settings-panel"
                   tabIndex={isActive ? 0 : -1}
+                  data-active={isActive ? 'true' : undefined}
                   onClick={() => selectSection(section.id)}
                   onKeyDown={handleTabKeyDown}
-                  className={`inline-flex h-10 w-full shrink-0 items-center gap-2 rounded-full border px-3 text-left font-body text-[15px] font-medium leading-6 whitespace-nowrap text-text cursor-pointer transition-[background-color,box-shadow,border-color] duration-150 ease-in-out max-sm:w-auto max-sm:h-9 max-sm:text-[14px] ${
+                  className={`group relative inline-flex h-10 w-full shrink-0 items-center gap-2 rounded-full border border-transparent px-3 text-left font-body text-[15px] font-medium leading-6 whitespace-nowrap text-text cursor-pointer transition-[background-color] duration-150 ease-in-out max-sm:w-auto max-sm:h-9 max-sm:text-[14px] ${
                     isActive
-                      ? 'bg-widget-bg border-white dark:border-[rgba(255,255,255,0.08)] shadow-[0_1px_3px_rgba(0,0,0,0.06)]'
-                      : 'bg-transparent border-transparent hover:bg-brand-subtle'
+                      ? 'bg-transparent'
+                      : 'bg-transparent hover:bg-brand-subtle'
                   }`}
                 >
                   <Icon icon={section.icon} className="h-[17px] w-[17px] shrink-0" aria-hidden="true" />

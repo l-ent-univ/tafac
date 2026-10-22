@@ -10,7 +10,10 @@
 // mailCount / deadlinesCount: the badge numbers of "Mails récents" (unread)
 //   and "Échéances" (due within 48 h), null until loaded (src/listCardOrder.js).
 
-let sources = { classes: null, deadlines: null, mailCount: null, deadlinesCount: null }
+// bus: the next bus of the "Bus" card ({ kind, leaveAt, departAt, line }),
+//   null while that card isn't mounted or has none.
+
+let sources = { classes: null, deadlines: null, mailCount: null, deadlinesCount: null, bus: null }
 const listeners = new Set()
 
 export function publishBriefingSource(name, value) {

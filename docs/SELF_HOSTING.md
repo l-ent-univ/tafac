@@ -53,12 +53,14 @@ Pour figer une version, remplacer `latest` par un numéro (`ghcr.io/l-ent-univ/l
 | `TENANTS` | Universités servies (ids séparés par des virgules) | toutes |
 | `POSTHOG_PROJECT_KEY` | Mesure d'audience anonyme ([ANALYTICS.md](ANALYTICS.md)) | désactivée |
 | `PORT` | Port interne du conteneur | `3000` |
-| `DATA_DIR` | Dossier des icônes automatiques des applications | `/app/data` dans l'image, `./data` sinon |
+| `DATA_DIR` | Dossier des icônes automatiques des applications et des rappels de bus | `/app/data` dans l'image, `./data` sinon |
+| `VAPID_PUBLIC_KEY` / `VAPID_PRIVATE_KEY` | Clés des notifications push des rappels de bus | une paire créée au premier lancement dans `$DATA_DIR/transit-push/vapid.json` |
+| `VAPID_SUBJECT` | Contact donné aux services push (`mailto:` ou `https:`) | l'URL du dépôt |
 | `TRUST_PROXY` | Proxys dont l'en-tête `X-Forwarded-For` donne l'IP de l'étudiant (valeur `trust proxy` d'Express) | adresses locales et privées (Caddy, réseau Docker) |
 
 ## Icônes automatiques des applications
 
-Le serveur donne à chaque application du portail une icône et une couleur (voir [ADDING_A_UNIVERSITY.md](ADDING_A_UNIVERSITY.md#icônes-des-applications)) et mémorise ce choix pour que tous les étudiants d'une université voient la même tuile, d'un jour à l'autre. C'est la seule donnée que le serveur écrit :
+Le serveur donne à chaque application du portail une icône et une couleur (voir [ADDING_A_UNIVERSITY.md](ADDING_A_UNIVERSITY.md#icônes-des-applications)) et mémorise ce choix pour que tous les étudiants d'une université voient la même tuile, d'un jour à l'autre. Avec les [rappels de bus](#rappels-de-bus), c'est la seule donnée que le serveur écrit :
 
 - un fichier JSON par université : `$DATA_DIR/app-icons/<université>.json` (dans le conteneur : `/app/data/app-icons/univ-rennes.json`…), sur le volume `lent_data` ;
 - par service : son identifiant de portail, le concept d'icône, la teinte, le titre et la date du premier passage. **Aucune donnée d'étudiant** : ce sont les mêmes services pour tout le monde ;
@@ -82,6 +84,16 @@ docker compose exec lent vi /app/data/app-icons/univ-rennes.json   # ou docker c
 - **Refaire le choix d'un service** : supprimer son entrée. **Tout réinitialiser** : supprimer le fichier.
 - Un fichier JSON illisible n'est jamais écrasé : le serveur passe en mémoire seule jusqu'à ce qu'il soit réparé.
 - Les icônes faites main (`services.getAppIcon`, dans le code de l'université) restent prioritaires.
+
+## Rappels de bus
+
+La page « Bus » (`features.transit` et le bloc `transit` de l'université : GTFS, GTFS-RT, campus) peut envoyer des notifications push : bus du matin, bus retour, retard en temps réel, dernier bus parti avant la fin des cours. Le téléphone calcule lui-même ses bus et confie au serveur, pour les 7 jours à venir, seulement « à telle heure, tel bus, à tel arrêt » :
+
+- un fichier par université : `$DATA_DIR/transit-push/<université>.json`, sur le volume `lent_data` : l'abonnement push du navigateur et ses rappels. **Ni nom, ni identifiant ENT, ni emploi du temps** ;
+- la paire de clés VAPID dans `$DATA_DIR/transit-push/vapid.json` (ou `VAPID_PUBLIC_KEY` / `VAPID_PRIVATE_KEY`). Changer de clés invalide les abonnements : les étudiants devront réactiver les rappels ;
+- le serveur n'envoie qu'aux services push des navigateurs (Google, Mozilla, Apple, Microsoft), jamais à une autre adresse ; un abonnement révoqué (404/410) est effacé, un rappel passé aussi.
+
+Sur iPhone, les notifications ne marchent que dans l'app ajoutée à l'écran d'accueil (iOS 16.4 et plus).
 
 ## Changer de domaine
 

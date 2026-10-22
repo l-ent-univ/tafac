@@ -1,12 +1,14 @@
 // Université de Rennes — server-side configuration.
 // Never imported by client code: holds origins, auth-flow parameters and the
 // reverse-engineered ADE mobile-app credentials.
-import { appIcons, id, casOrigin, entOrigin, features, gradesCopy, gradesOrigin, mailWebmailUrl, moodleOrigin, planningServiceUrl, portalEntryPath } from './shared.js'
+import { appIcons, id, casOrigin, crous, entOrigin, features, gradesCopy, gradesOrigin, mailWebmailUrl, moodleOrigin, planningServiceUrl, portalEntryPath, transit } from './shared.js'
 
 export default {
   id,
   // Single source of truth for feature flags, shared with the client config.
   features,
+  crous,
+  transit,
 
   origins: {
     ent: entOrigin,

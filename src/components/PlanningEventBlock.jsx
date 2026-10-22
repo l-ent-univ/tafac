@@ -1,6 +1,7 @@
 import { Icon } from '@iconify/react'
 import { accentStyle } from '../eventAccents'
 import { layoutEventBlock } from '../eventBlockLayout'
+import { SIGNAL_STYLES, signalChipText } from '../mailSignalStyles'
 import { durationText, formatTime } from '../planningDates'
 
 // Text widths, measured on a canvas in the cards' body font (Inter: the
@@ -65,6 +66,18 @@ function PlanningEventBlock({ event, accent, variant, stackFirst = false, width,
   const content = (
     <>
       <span className="latest-grade-wash planning-accent-fill" aria-hidden="true" />
+      {/* What the mails say about it (mailSignals): a chip in its bottom
+          corner, its word as the block has room ("Annulé", "Salle B204"). */}
+      {event.notice ? (
+        <span
+          className={`absolute right-1.5 bottom-1.5 z-10 inline-flex max-w-[calc(100%-12px)] items-center gap-1 rounded-full px-1.5 py-[3px] font-body text-[11.5px] font-semibold leading-none shadow-xs ${SIGNAL_STYLES[event.notice.kind].tint}`}
+          title={event.notice.label}
+          aria-hidden="true"
+        >
+          <Icon icon={SIGNAL_STYLES[event.notice.kind].icon} className="size-3 shrink-0" />
+          {height >= 52 && width >= 96 ? <span className="truncate">{signalChipText(event.notice)}</span> : null}
+        </span>
+      ) : null}
       <span
         className="planning-bar planning-accent-fill"
         style={{ left: layout.bar.x, top: layout.bar.y, width: layout.bar.width, height: layout.bar.height }}
@@ -88,8 +101,10 @@ function PlanningEventBlock({ event, accent, variant, stackFirst = false, width,
       </span>
     </>
   )
+  // A class the mails call off (site closed, cancelled) is faded.
+  const isCalledOff = event.notice?.kind === 'closure' || event.notice?.kind === 'cancelled'
   const card = {
-    className: 'planning-block widget-card widget-card-visible isolate border bg-widget-bg text-text',
+    className: `planning-block widget-card widget-card-visible isolate border bg-widget-bg text-text${isCalledOff ? ' opacity-60' : ''}`,
     style: { width, height, borderRadius: layout.radius, ...accentStyle(accent), ...style },
   }
 
@@ -101,7 +116,7 @@ function PlanningEventBlock({ event, accent, variant, stackFirst = false, width,
       type="button"
       {...card}
       onClick={() => onOpen(event)}
-      aria-label={`${formatTime(event.start)} à ${formatTime(event.end)}, ${event.title}${[event.location, event.teacher].filter(Boolean).map((part) => `, ${part}`).join('')}, ${durationText(event.start, event.end)}`}
+      aria-label={`${formatTime(event.start)} à ${formatTime(event.end)}, ${event.title}${[event.location, event.teacher].filter(Boolean).map((part) => `, ${part}`).join('')}, ${durationText(event.start, event.end)}${event.notice ? `, ${event.notice.label}` : ''}`}
     >
       {content}
     </button>

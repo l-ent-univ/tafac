@@ -4,6 +4,8 @@ import { Icon, iconLoaded, loadIcons } from '@iconify/react'
 import universityConfig from '@university'
 import { toAppSlug, track } from '../analytics'
 import { fetchAppIcons, getCachedAppIcons } from '../appIcons'
+import { navigateTo } from '../appRoute'
+import { isGradesPageAvailable, isMailPageAvailable, isMoodlePageAvailable, isPlanningPageAvailable } from '../navItems'
 import { scoreAppSearch, searchApps } from '../appSearch'
 import { DEMO_PLANNING_APP_FNAME } from '../demoAccount'
 import { getGradesOrigin, opensGradesPageInApp } from '../gradesPortalApp'
@@ -106,6 +108,67 @@ function saveAppsOrder(applications) {
   } catch {
     // Storage unavailable
   }
+}
+
+// Order picked by hand in the edit mode of "Toutes les applications".
+const CUSTOM_ORDER_KEY = 'l-ent:apps-custom-order'
+const REORDER_SETTLE_MS = 220
+const REORDER_EASING = 'cubic-bezier(0.2, 0, 0, 1)'
+// Pause after a swap so tiles still sliding can't trigger the next one.
+const REORDER_COOLDOWN_MS = 90
+const AUTOSCROLL_EDGE = 80
+const AUTOSCROLL_MAX_SPEED = 18
+
+function loadCustomOrder() {
+  try {
+    const stored = JSON.parse(localStorage.getItem(CUSTOM_ORDER_KEY) || 'null')
+    return Array.isArray(stored) ? stored.filter((key) => typeof key === 'string') : []
+  } catch {
+    return []
+  }
+}
+
+function saveCustomOrder(keys) {
+  try {
+    if (keys.length === 0) {
+      localStorage.removeItem(CUSTOM_ORDER_KEY)
+    } else {
+      localStorage.setItem(CUSTOM_ORDER_KEY, JSON.stringify(keys))
+    }
+  } catch {
+    // Storage unavailable
+  }
+}
+
+// Apps picked by hand keep their place; apps the order never saw (new ones)
+// follow in their usual order.
+function applyCustomOrder(applications, orderKeys) {
+  if (orderKeys.length === 0) {
+    return applications
+  }
+
+  const rank = new Map(orderKeys.map((key, index) => [key, index]))
+  const known = []
+  const unknown = []
+  for (const application of applications) {
+    if (rank.has(getApplicationKey(application))) {
+      known.push(application)
+    } else {
+      unknown.push(application)
+    }
+  }
+  known.sort((left, right) => rank.get(getApplicationKey(left)) - rank.get(getApplicationKey(right)))
+  return [...known, ...unknown]
+}
+
+function getScrollParent(element) {
+  for (let node = element.parentElement; node; node = node.parentElement) {
+    const { overflowY } = getComputedStyle(node)
+    if ((overflowY === 'auto' || overflowY === 'scroll') && node.scrollHeight > node.clientHeight) {
+      return node
+    }
+  }
+  return document.scrollingElement || document.documentElement
 }
 
 // Puts each app only found in the favorites section among the other apps,
@@ -970,6 +1033,15 @@ function AvailableApplications({
   const [searchQuery, setSearchQuery] = useState('')
   const [selectedCategory, setSelectedCategory] = useState(null)
   const [isDragging, setIsDragging] = useState(false)
+  const [isEditingLayout, setIsEditingLayout] = useState(false)
+  const [hasEditedLayout, setHasEditedLayout] = useState(false)
+  const [customOrder, setCustomOrder] = useState(loadCustomOrder)
+  const [liftedKey, setLiftedKey] = useState('')
+  const gridRef = useRef(null)
+  const gridRectsRef = useRef(new Map())
+  const gridDragRef = useRef(null)
+  const gridPendingMoveRef = useRef(false)
+  const gridFocusKeyRef = useRef('')
   const launchRequestsRef = useRef(new Map())
   const launchBehaviorRequestsRef = useRef(new Map())
   const removalTimeoutsRef = useRef(new Map())
@@ -1005,17 +1077,21 @@ function AvailableApplications({
       (service) => !isLocalService(service) || !pinnedLocalKeys.has(getApplicationKey(service)),
     )
   }, [allServices, localPins])
+  const orderedServices = useMemo(
+    () => applyCustomOrder(visibleServices, customOrder),
+    [visibleServices, customOrder],
+  )
   const categories = useMemo(() => {
     const present = new Set(visibleServices.map((s) => s.category).filter(Boolean))
     return APP_CATEGORIES.map((c) => c.label).filter((label) => present.has(label))
   }, [visibleServices])
   const filteredServices = useMemo(() => {
-    let services = visibleServices
+    let services = orderedServices
     if (selectedCategory) {
       services = services.filter((s) => s.category === selectedCategory)
     }
     return searchApps(services, searchQuery)
-  }, [visibleServices, searchQuery, selectedCategory])
+  }, [orderedServices, searchQuery, selectedCategory])
   const highlightedFavoriteKeys = useMemo(() => {
     if (!searchQuery.trim()) return new Set()
     return new Set(
@@ -1538,6 +1614,254 @@ function AvailableApplications({
     }
   }
 
+  // ── Edit mode: reorder "Toutes les applications" ──
+  // The tile in hand follows the pointer (`translate`, written straight to the
+  // DOM every frame); the others slide into place with a FLIP animation when
+  // the order changes. `translate` is used rather than `transform` so the
+  // entrance animation can't override it.
+
+  function getGridKeys() {
+    const grid = gridRef.current
+    return grid ? [...grid.children].map((child) => child.dataset.appKey).filter(Boolean) : []
+  }
+
+  function snapshotGrid() {
+    const rects = new Map()
+    for (const child of gridRef.current?.children ?? []) {
+      if (child.dataset.appKey) {
+        rects.set(child.dataset.appKey, child.getBoundingClientRect())
+      }
+    }
+    gridRectsRef.current = rects
+  }
+
+  function moveGridKey(fromKey, toKey) {
+    const keys = getGridKeys()
+    const from = keys.indexOf(fromKey)
+    const to = keys.indexOf(toKey)
+    if (from === -1 || to === -1 || from === to) {
+      return false
+    }
+
+    snapshotGrid()
+    gridPendingMoveRef.current = true
+    const next = [...keys]
+    next.splice(from, 1)
+    next.splice(to, 0, fromKey)
+    setCustomOrder(next)
+    return true
+  }
+
+  function positionDragged() {
+    const drag = gridDragRef.current
+    if (!drag) return
+
+    drag.tile.style.translate = ''
+    const rect = drag.tile.getBoundingClientRect()
+    drag.tile.style.translate = `${drag.x - drag.grabX - rect.left}px ${drag.y - drag.grabY - rect.top}px`
+  }
+
+  function swapUnderPointer() {
+    const drag = gridDragRef.current
+    if (!drag || gridPendingMoveRef.current || performance.now() - drag.lastMoveAt < REORDER_COOLDOWN_MS) {
+      return
+    }
+
+    for (const child of gridRef.current?.children ?? []) {
+      const key = child.dataset.appKey
+      if (!key || key === drag.key) continue
+
+      const rect = child.getBoundingClientRect()
+      const insetX = rect.width * 0.2
+      const insetY = rect.height * 0.2
+      if (
+        drag.x > rect.left + insetX && drag.x < rect.right - insetX
+        && drag.y > rect.top + insetY && drag.y < rect.bottom - insetY
+      ) {
+        if (moveGridKey(drag.key, key)) {
+          drag.lastMoveAt = performance.now()
+        }
+        return
+      }
+    }
+  }
+
+  function tickDrag() {
+    const drag = gridDragRef.current
+    if (!drag) return
+
+    const { scroller } = drag
+    const isPage = scroller === document.scrollingElement || scroller === document.documentElement
+    const bounds = isPage ? { top: 0, bottom: window.innerHeight } : scroller.getBoundingClientRect()
+    let speed = 0
+    if (drag.y < bounds.top + AUTOSCROLL_EDGE) {
+      speed = -Math.min(1, (bounds.top + AUTOSCROLL_EDGE - drag.y) / AUTOSCROLL_EDGE) * AUTOSCROLL_MAX_SPEED
+    } else if (drag.y > bounds.bottom - AUTOSCROLL_EDGE) {
+      speed = Math.min(1, (drag.y - (bounds.bottom - AUTOSCROLL_EDGE)) / AUTOSCROLL_EDGE) * AUTOSCROLL_MAX_SPEED
+    }
+    if (speed !== 0) {
+      scroller.scrollTop += speed
+    }
+
+    positionDragged()
+    swapUnderPointer()
+    drag.raf = requestAnimationFrame(tickDrag)
+  }
+
+  function handleGripPointerDown(event, key) {
+    if (gridDragRef.current || (event.pointerType === 'mouse' && event.button !== 0)) {
+      return
+    }
+
+    const tile = event.currentTarget.closest('[data-app-key]')
+    if (!tile) return
+
+    event.preventDefault()
+    const rect = tile.getBoundingClientRect()
+    const drag = {
+      key,
+      tile,
+      x: event.clientX,
+      y: event.clientY,
+      grabX: event.clientX - rect.left,
+      grabY: event.clientY - rect.top,
+      scroller: getScrollParent(tile),
+      lastMoveAt: 0,
+      raf: 0,
+      stop: null,
+    }
+
+    const handleMove = (moveEvent) => {
+      drag.x = moveEvent.clientX
+      drag.y = moveEvent.clientY
+    }
+    drag.stop = () => {
+      window.removeEventListener('pointermove', handleMove)
+      window.removeEventListener('pointerup', drag.stop)
+      window.removeEventListener('pointercancel', drag.stop)
+      window.removeEventListener('blur', drag.stop)
+      cancelAnimationFrame(drag.raf)
+      gridDragRef.current = null
+      // Glide into the slot it ended up in.
+      tile.style.transition = `translate ${REORDER_SETTLE_MS}ms ${REORDER_EASING}, scale 150ms ease, box-shadow 150ms ease`
+      tile.style.translate = ''
+      window.setTimeout(() => { tile.style.transition = '' }, REORDER_SETTLE_MS + 30)
+      setLiftedKey('')
+    }
+
+    gridDragRef.current = drag
+    window.addEventListener('pointermove', handleMove)
+    window.addEventListener('pointerup', drag.stop)
+    window.addEventListener('pointercancel', drag.stop)
+    window.addEventListener('blur', drag.stop)
+    setLiftedKey(key)
+    drag.raf = requestAnimationFrame(tickDrag)
+  }
+
+  function handleGripKeyDown(event, key) {
+    const delta = { ArrowUp: -1, ArrowLeft: -1, ArrowDown: 1, ArrowRight: 1 }[event.key]
+    if (!delta) return
+
+    event.preventDefault()
+    if (gridPendingMoveRef.current) return
+
+    const keys = getGridKeys()
+    const target = keys[keys.indexOf(key) + delta]
+    if (target) {
+      gridFocusKeyRef.current = key
+      moveGridKey(key, target)
+    }
+  }
+
+  function toggleLayoutEditing() {
+    if (!isEditingLayout) {
+      setSearchQuery('')
+      setSelectedCategory(null)
+      setHasEditedLayout(true)
+    }
+    setIsEditingLayout((current) => !current)
+  }
+
+  function resetCustomOrder() {
+    snapshotGrid()
+    gridPendingMoveRef.current = true
+    setCustomOrder([])
+  }
+
+  useLayoutEffect(() => {
+    gridPendingMoveRef.current = false
+    const grid = gridRef.current
+    const previous = gridRectsRef.current
+    gridRectsRef.current = new Map()
+    if (!grid || previous.size === 0) return
+
+    const dragKey = gridDragRef.current?.key
+    const sliding = []
+    for (const child of grid.children) {
+      const key = child.dataset.appKey
+      const before = previous.get(key)
+      if (!key || !before || key === dragKey) continue
+
+      // Measure the new slot without the leftover of a slide still running.
+      child.style.transition = 'none'
+      child.style.translate = ''
+      const after = child.getBoundingClientRect()
+      const dx = before.left - after.left
+      const dy = before.top - after.top
+      if (dx === 0 && dy === 0) {
+        child.style.transition = ''
+        continue
+      }
+      child.style.translate = `${dx}px ${dy}px`
+      sliding.push(child)
+    }
+
+    if (sliding.length > 0) {
+      grid.getBoundingClientRect()
+      for (const child of sliding) {
+        child.style.transition = `translate ${REORDER_SETTLE_MS}ms ${REORDER_EASING}`
+        child.style.translate = ''
+        child.addEventListener('transitionend', () => {
+          child.style.transition = ''
+        }, { once: true })
+      }
+    }
+
+    positionDragged()
+
+    // Moving a focused node in the DOM drops its focus.
+    if (gridFocusKeyRef.current) {
+      const focusKey = gridFocusKeyRef.current
+      gridFocusKeyRef.current = ''
+      for (const child of grid.children) {
+        if (child.dataset.appKey === focusKey) {
+          child.querySelector('[data-grip]')?.focus()
+        }
+      }
+    }
+  }, [customOrder])
+
+  useEffect(() => {
+    saveCustomOrder(customOrder)
+  }, [customOrder])
+
+  useEffect(() => () => {
+    gridDragRef.current?.stop?.()
+  }, [])
+
+  useEffect(() => {
+    if (!isEditingLayout) return undefined
+
+    function handleKeyDown(event) {
+      if (event.key === 'Escape' && !gridDragRef.current) {
+        setIsEditingLayout(false)
+      }
+    }
+
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [isEditingLayout])
+
   async function launchApplicationFromAction(application, options = {}) {
     const launchKey = getApplicationKey(application)
     const { targetOverride = null, preparedWindow = null } = options
@@ -1826,6 +2150,75 @@ function AvailableApplications({
       return
     }
 
+    const titleLower = (application.title || '').toLowerCase()
+    const hrefLower = (application.href || '').toLowerCase()
+    const idLower = (application.id || '').toLowerCase()
+
+    if (
+      titleLower.includes('planning')
+      || titleLower.includes('emploi du temps')
+      || idLower.includes('ade')
+      || hrefLower.includes('planning')
+    ) {
+      if (isPlanningPageAvailable()) {
+        event.preventDefault()
+        navigateTo('planning')
+        return
+      }
+    }
+
+    if (
+      titleLower.includes('notes')
+      || titleLower.includes('scodoc')
+      || idLower.includes('notes')
+      || idLower.includes('scodoc')
+      || hrefLower.includes('notes')
+    ) {
+      if (isGradesPageAvailable(establishment)) {
+        event.preventDefault()
+        navigateTo('grades')
+        return
+      }
+    }
+
+    if (titleLower === 'absences' || idLower.includes('absences')) {
+      if (isGradesPageAvailable(establishment)) {
+        event.preventDefault()
+        navigateTo('absences')
+        return
+      }
+    }
+
+    if (
+      titleLower.includes('messagerie')
+      || titleLower.includes('mail')
+      || titleLower.includes('zimbra')
+      || titleLower.includes('partage')
+      || idLower.includes('mail')
+      || idLower.includes('partage')
+      || hrefLower.includes('partage')
+      || hrefLower.includes('mail')
+    ) {
+      if (isMailPageAvailable()) {
+        event.preventDefault()
+        navigateTo('mail')
+        return
+      }
+    }
+
+    if (
+      titleLower.includes('moodle')
+      || titleLower.includes('foad')
+      || idLower.includes('moodle')
+      || hrefLower.includes('moodle')
+    ) {
+      if (isMoodlePageAvailable()) {
+        event.preventDefault()
+        navigateTo('moodle')
+        return
+      }
+    }
+
     if (!application.fname) {
       return
     }
@@ -2000,19 +2393,44 @@ function AvailableApplications({
             <div className="flex items-center gap-[5px]">
               <Icon icon="carbon:app-switcher" className="w-[17px] h-[17px] text-brand shrink-0" aria-hidden="true" />
               <span className="text-base font-medium leading-[1.06]">Toutes les applications</span>
+              <button
+                type="button"
+                className={`layout-edit-toggle ml-1 flex items-center justify-center w-8 h-8 rounded-full border-none cursor-pointer transition-[background-color,color] duration-[120ms] ${isEditingLayout ? 'bg-brand text-bg' : 'bg-transparent text-text-muted hover:bg-brand-subtle hover:text-brand'}`}
+                aria-label={isEditingLayout ? "Terminer la modification de l'agencement" : "Modifier l'agencement des applications"}
+                aria-pressed={isEditingLayout}
+                title={isEditingLayout ? 'Terminer' : "Modifier l'agencement"}
+                onClick={toggleLayoutEditing}
+              >
+                <Icon icon={isEditingLayout ? 'carbon:checkmark' : 'carbon:edit'} className="w-4 h-4" aria-hidden="true" />
+              </button>
             </div>
-            <div className="relative">
-              <Icon icon="carbon:search" className="absolute left-3 top-1/2 -translate-y-1/2 w-[14px] h-[14px] text-text-muted pointer-events-none" aria-hidden="true" />
-              <input
-                type="text"
-                placeholder="Rechercher..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="app-search-input w-[180px] h-[36px] pl-8 pr-3 border border-border rounded-full bg-widget-bg text-text text-sm font-body leading-none placeholder:text-text-muted transition-[width,border-color] duration-200 focus:w-[240px] focus:border-text-muted max-sm:w-[140px] max-sm:focus:w-[180px]"
-              />
-            </div>
+            {isEditingLayout ? (
+              <div className="flex items-center gap-2">
+                <span className="text-[13px] font-medium text-text-muted max-sm:hidden">Glisse les poignées pour réordonner</span>
+                {customOrder.length > 0 ? (
+                  <button
+                    type="button"
+                    className="min-h-[34px] px-[14px] border border-border rounded-full bg-bg text-brand font-inherit text-sm font-semibold hover:bg-bg-subtle"
+                    onClick={resetCustomOrder}
+                  >
+                    Réinitialiser
+                  </button>
+                ) : null}
+              </div>
+            ) : (
+              <div className="relative" data-tour="search">
+                <Icon icon="carbon:search" className="absolute left-3 top-1/2 -translate-y-1/2 w-[14px] h-[14px] text-text-muted pointer-events-none" aria-hidden="true" />
+                <input
+                  type="text"
+                  placeholder="Rechercher..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="app-search-input w-[180px] h-[36px] pl-8 pr-3 border border-border rounded-full bg-widget-bg text-text text-sm font-body leading-none placeholder:text-text-muted transition-[width,border-color] duration-200 focus:w-[240px] focus:border-text-muted max-sm:w-[140px] max-sm:focus:w-[180px]"
+                />
+              </div>
+            )}
           </div>
-          {SHOW_CATEGORY_FILTERS && categories.length > 1 ? (
+          {SHOW_CATEGORY_FILTERS && categories.length > 1 && !isEditingLayout ? (
             <div className="flex items-center gap-2 flex-wrap max-md:flex-nowrap max-md:overflow-x-auto max-md:-mx-3 max-md:px-3 favorites-scroll-hide">
               <button
                 type="button"
@@ -2033,8 +2451,11 @@ function AvailableApplications({
               ))}
             </div>
           ) : null}
-          <div className="grid grid-cols-[repeat(auto-fill,minmax(260px,1fr))] gap-1.5 max-md:grid-cols-1 max-md:gap-1">
-            {filteredServices.map((service, index) => {
+          <div
+            ref={gridRef}
+            className={`grid grid-cols-[repeat(auto-fill,minmax(260px,1fr))] gap-1.5 max-md:grid-cols-1 max-md:gap-1 ${liftedKey ? 'apps-grid--reordering' : ''}`}
+          >
+            {(isEditingLayout ? orderedServices : filteredServices).map((service, index) => {
               const applicationKey = getApplicationKey(service)
               const resolvedLaunch = launchTargets[applicationKey]
               const href = resolvedLaunch?.href || service.href
@@ -2047,11 +2468,41 @@ function AvailableApplications({
               const favoriteEntry = favoritesByKey.get(applicationKey)
               const isFavorite = Boolean(favoriteEntry) && !exitingFavoriteKeys[applicationKey]
 
+              if (isEditingLayout) {
+                return (
+                  <div
+                    key={service.id}
+                    data-app-key={applicationKey}
+                    className={`app-card app-card--editing relative flex items-center gap-2.5 p-2 border rounded-[18px] min-w-0 select-none ${liftedKey === applicationKey ? 'app-card--lifted' : ''}`}
+                  >
+                    <button
+                      type="button"
+                      data-grip
+                      className="app-card-grip flex items-center justify-center w-7 h-9 -ml-1 rounded-[10px] border-none bg-transparent text-text-muted cursor-grab shrink-0 touch-none hover:text-brand focus-visible:outline-2 focus-visible:outline-brand"
+                      aria-label={`Déplacer ${service.title} (flèches du clavier pour réordonner)`}
+                      onPointerDown={(event) => handleGripPointerDown(event, applicationKey)}
+                      onKeyDown={(event) => handleGripKeyDown(event, applicationKey)}
+                    >
+                      <Icon icon="carbon:draggable" className="w-5 h-5" aria-hidden="true" />
+                    </button>
+                    <AppIcon
+                      title={service.title}
+                      assignment={tileAssignments.get(applicationKey)}
+                      className="w-10 h-10 rounded-[11px]"
+                    />
+                    <span className="flex flex-col gap-0.5 flex-1 min-w-0">
+                      <span className="text-[15px] font-semibold leading-[1.2] whitespace-nowrap overflow-hidden text-ellipsis">{service.title}</span>
+                    </span>
+                  </div>
+                )
+              }
+
               return (
                 <a
                   key={service.id}
-                  className={`app-card app-card-enter group relative flex items-center gap-2.5 p-2 border rounded-[18px] text-inherit no-underline min-w-0 focus-visible:outline-none ${isBusy || isLaunching ? 'pointer-events-none opacity-70' : ''} ${isContextOpen ? 'app-card--active' : ''}`}
-                  style={{ animationDelay: `${Math.min(index, 24) * 20}ms` }}
+                  data-app-key={applicationKey}
+                  className={`app-card ${hasEditedLayout ? '' : 'app-card-enter'} group relative flex items-center gap-2.5 p-2 border rounded-[18px] text-inherit no-underline min-w-0 focus-visible:outline-none ${isBusy || isLaunching ? 'pointer-events-none opacity-70' : ''} ${isContextOpen ? 'app-card--active' : ''}`}
+                  style={hasEditedLayout ? undefined : { animationDelay: `${Math.min(index, 24) * 20}ms` }}
                   href={href}
                   target={target || undefined}
                   rel={target === '_blank' || opensInApp ? 'noreferrer' : undefined}
@@ -2076,6 +2527,7 @@ function AvailableApplications({
                   </span>
                   <button
                     type="button"
+                    data-tour={index === 0 ? 'favorite-star' : undefined}
                     className={`app-card-action flex items-center justify-center w-8 h-8 rounded-full border-none bg-transparent cursor-pointer transition-[opacity,background-color,color] duration-[120ms] ease-in-out shrink-0 ${isFavorite ? 'text-brand opacity-100' : 'text-text-muted opacity-0 group-hover:opacity-70 group-focus-visible:opacity-70 focus-visible:opacity-100 max-md:opacity-50'}`}
                     aria-label={isFavorite ? 'Retirer des favoris' : 'Ajouter aux favoris'}
                     aria-pressed={isFavorite}

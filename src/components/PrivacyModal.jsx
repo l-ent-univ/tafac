@@ -148,6 +148,12 @@ export function PrivacyContent({ embedded = false, control = null, actions = nul
           ))}
         </div>
 
+        {universityConfig.features?.transit ? (
+          <p className="m-0 text-[14px] font-medium leading-[1.35] opacity-80">
+            🚌 Rappels de bus, si tu les actives : le serveur garde seulement l’heure et le bus de chaque rappel des 7 prochains jours, jamais ton nom ni ton planning. Coupe-les et tout est effacé.
+          </p>
+        ) : null}
+
         {actions || ANALYTICS_DOC_URL ? (
           <div className="flex flex-col items-center gap-3">
             {actions}

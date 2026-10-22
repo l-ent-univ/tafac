@@ -5,7 +5,9 @@ import { useWidgetLoadReport } from '../analytics'
 import { publishBriefingSource } from '../briefingSources'
 import { ENT_AUTH_PREFIX, getRecentEntLoginAgeMs, getRequestErrorKind } from '../entApi'
 import { accentStyle } from '../eventAccents'
+import { noticeForEvent } from '../mailSignals'
 import { toDayKey } from '../planningDates'
+import { useMailSignals } from '../useMailSignals'
 import { useEventAccents } from '../usePlanningWeeks'
 import {
   NEXT_CLASS_LOOKAHEAD_DAYS,
@@ -335,6 +337,7 @@ function WidgetNextClass({
   autoLoad = true,
   lookaheadDays = NEXT_CLASS_LOOKAHEAD_DAYS,
   onOpenPlanning = null,
+  establishment = null,
 }) {
   const resourceIds = useMemo(() => buildResourceIdsFromSelection(selection), [selection])
   const resourceKey = resourceIds.join('|')
@@ -696,6 +699,11 @@ function WidgetNextClass({
 
   // The course's colour as the planning gives it (the same one on its
   // page: eventAccents, handed out in the order the courses are seen).
+  // What the mails say about it (mailSignals): in place of its teacher.
+  const signals = useMailSignals()
+  const nextClassNotice = useMemo(() => (
+    signals.length && nextClass?.start ? noticeForEvent(signals, { ...nextClass, day: toDayKey(nextClass.start) }, establishment) : null
+  ), [signals, nextClass, establishment])
   const accentEvents = useMemo(() => (nextClass?.title ? [{ title: nextClass.title }] : []), [nextClass?.title])
   const accentFor = useEventAccents(accentEvents)
   const showsClass = widgetState.status === 'ready' && Boolean(nextClass)
@@ -776,7 +784,12 @@ function WidgetNextClass({
                       <span ref={locationRef} className="block min-w-0 leading-[1.06] text-[13px] overflow-hidden text-ellipsis whitespace-nowrap" title={nextClass.location}>{nextClass.location}</span>
                     </span>
                   ) : null}
-                  {nextClass.teacher ? (
+                  {nextClassNotice ? (
+                    <span className="flex items-center gap-[3px] min-w-0 font-semibold text-[#b76e00]" title={nextClassNotice.label}>
+                      <Icon icon="carbon:warning-filled" className="w-[14px] h-[14px] shrink-0" aria-hidden="true" />
+                      <span className="block min-w-0 leading-[1.06] text-[13px] overflow-hidden text-ellipsis whitespace-nowrap">{nextClassNotice.label}</span>
+                    </span>
+                  ) : nextClass.teacher ? (
                     <span className="flex items-center gap-[3px] min-w-0 text-text-muted max-xs:@max-[240px]:hidden">
                       <Icon icon="ph:user-square" className="w-[14px] h-[14px] shrink-0" aria-hidden="true" />
                       <span ref={teacherRef} className="block min-w-0 leading-[1.06] text-[13px] overflow-hidden text-ellipsis whitespace-nowrap" title={nextClass.teacher}>{nextClass.teacher}</span>

@@ -9,7 +9,7 @@
 // first label equals its id without dashes (univ-rennes → univrennes.lent…)
 // or when the host appears in the university's optional `hostnames` export
 // (shared.js). Unmatched hosts fall back to the UNIVERSITY default.
-// Frontends must be built per tenant with `npm run build:all` (dist/<id>/).
+import './server/patchNodeWarnings.js'
 import express from 'express'
 import { readFileSync } from 'node:fs'
 import path from 'node:path'

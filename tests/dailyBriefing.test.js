@@ -134,3 +134,11 @@ test('nothing to say gives null (the card shows the greeting alone)', () => {
   // Malformed events are ignored rather than crashing.
   assert.equal(buildDailyBriefing({ classes: { events: [{ start: 'n/a' }, null] }, now: at(12, 9) }), 'Pas de cours aujourd’hui.')
 })
+
+test('the bus card\'s next bus joins the briefing when it leaves soon', () => {
+  const bus = { kind: 'to', leaveAt: at(12, 7, 28), departAt: at(12, 7, 32), line: 'A' }
+  const text = buildDailyBriefing({ classes: { events: [], complete: false }, bus, now: at(12, 7) })
+  assert.equal(text, 'Pars à 7h28, bus A à 7h32.')
+  assert.equal(buildDailyBriefing({ classes: { events: [], complete: false }, bus, now: at(12, 3) }), null)
+  assert.equal(buildDailyBriefing({ classes: { events: [], complete: false }, bus: { ...bus, kind: 'from' }, now: at(12, 7) }), 'Retour en bus A à 7h32.')
+})

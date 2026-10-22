@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { getRequestErrorKind } from './entApi'
+import { getOfflineCache, setOfflineCache } from './offlineStorage'
 import { buildResourceIdsFromSelection, fetchUpcomingEvents } from './upcomingClasses'
 import { assignAccent } from './eventAccents'
 import { startOfWeek } from './planningDates'
@@ -28,12 +29,18 @@ export function usePlanningWeeks({ selection, user }) {
     setVersion((value) => value + 1)
     fetchUpcomingEvents({ selection, startDate: monday, lookaheadDays: 7 })
       .then(({ events }) => {
-        weeks.set(key, { status: 'loaded', events: mergeEvents(events.map(toPlanningEvent)) })
+        const weekEvents = mergeEvents(events.map(toPlanningEvent))
+        weeks.set(key, { status: 'loaded', events: weekEvents })
+        void setOfflineCache(`planning-week:${key}`, weekEvents)
       })
-      .catch((error) => {
+      .catch(async (error) => {
+        // Offline or ADE down: the week last seen on this device, if any.
+        const offline = entry?.events ? null : await getOfflineCache(`planning-week:${key}`).catch(() => null)
         weeks.set(key, entry?.events
           ? { status: 'loaded', events: entry.events }
-          : { status: 'unavailable', failedAt: Date.now(), errorKind: getRequestErrorKind(error) })
+          : offline?.data
+            ? { status: 'loaded', events: offline.data }
+            : { status: 'unavailable', failedAt: Date.now(), errorKind: getRequestErrorKind(error) })
       })
       .finally(() => setVersion((value) => value + 1))
   }, [scope, selection])

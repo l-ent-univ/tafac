@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 
-// Mail and deadlines cards when both are shown. On phones they sit side by
+// Mail and deadlines cards when both are shown (and the RU's, with them).
+// On phones they sit side by
 // side in a swipeable strip ("Phone layout" in overrides.css) with a pager
 // under it: one dot per card, the one in view drawn as a pill, a tap scrolls
 // to that card. From xs up the strip dissolves (display: contents) into the
@@ -77,7 +78,7 @@ function WidgetListStrip({ labels, visible = false, children }) {
       <div
         className={`widget-lists-pager justify-center transition-opacity duration-500 delay-[280ms] ${visible ? 'opacity-100' : 'opacity-0'}`}
         role="group"
-        aria-label="Cartes mails et échéances"
+        aria-label="Cartes mails, échéances et menu"
       >
         {labels.map((label, index) => {
           const isActive = index === activeIndex

@@ -395,13 +395,20 @@ function parsePortalDateTime(dateValue, timeValue) {
   return Number.isNaN(date.getTime()) ? null : date
 }
 
-function getPortalParticipants(event, categories) {
+function getPortalParticipantRefs(event, categories) {
   const allowedCategories = new Set(categories)
 
   return asArray(event?.eventParticipants)
     .filter((participant) => allowedCategories.has(String(participant?.category ?? '').toLowerCase()))
-    .map((participant) => normalizeLabel(participant?.name ?? participant?.fields?.NAME))
-    .filter(Boolean)
+    .map((participant) => ({
+      id: String(participant?.id ?? participant?.resourceId ?? '').trim() || null,
+      name: normalizeLabel(participant?.name ?? participant?.fields?.NAME),
+    }))
+    .filter((participant) => participant.name)
+}
+
+function getPortalParticipants(event, categories) {
+  return getPortalParticipantRefs(event, categories).map(({ name }) => name)
 }
 
 function normalizePortalEvent(event, resourceId) {
@@ -415,7 +422,8 @@ function normalizePortalEvent(event, resourceId) {
   }
 
   const endDate = parsePortalDateTime(event.date, event.endHour) ?? startDate
-  const instructors = getPortalParticipants(event, ['instructor', 'category2'])
+  const instructorRefs = getPortalParticipantRefs(event, ['instructor', 'category2'])
+  const instructors = instructorRefs.map(({ name }) => name)
   const rooms = getPortalParticipants(event, ['classroom', 'category3'])
   const groups = getPortalParticipants(event, ['trainee', 'category1', 'category8'])
   const fields = event.fields && typeof event.fields === 'object' ? event.fields : {}
@@ -432,6 +440,7 @@ function normalizePortalEvent(event, resourceId) {
     uid: String(event.id ?? event.activityId ?? ''),
     title,
     teacher: instructors.join(' - '),
+    teachers: instructorRefs,
     location: rooms.join(' - '),
     groups,
     groupsLabel: groups.join(', '),
@@ -475,6 +484,85 @@ function resolvePortalResourceIds(requestedResourceIds, context) {
 
 function unwrapPortalData(payload) {
   return payload && Object.prototype.hasOwnProperty.call(payload, 'data') ? payload.data : payload
+}
+
+function normalizeGroupKey(value) {
+  return normalizeLabel(value)
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+}
+
+function findPortalStudentRoot(root) {
+  return (root?.children ?? []).find((node) => (
+    String(node.id) === '-1' || String(node.family ?? '').toLowerCase() === 'trainee'
+  )) ?? root
+}
+
+// Locates the student's own group in the "Etudiants" branch from group names
+// seen in their courses, given as [{ name, count }] (count = number of courses
+// listing that group). A student's TP group shows up in CM, TD and TP courses
+// while the other groups of the promo only show up in CMs, so the most
+// frequent matching leaf wins. Ties fall back to the groups' common parent
+// (the promo or TD), which still covers every course of the student.
+export function findPortalStudentNodeByGroups(root, groupHints = []) {
+  const studentRoot = findPortalStudentRoot(root)
+  if (!studentRoot || groupHints.length === 0) {
+    return null
+  }
+
+  const counts = new Map()
+  for (const hint of groupHints) {
+    const key = normalizeGroupKey(hint?.name ?? hint)
+    if (key) {
+      counts.set(key, (counts.get(key) ?? 0) + (Number(hint?.count) || 1))
+    }
+  }
+
+  const candidates = []
+  const walk = (node, path) => {
+    const nextPath = [...path, node]
+    const children = node.children ?? []
+    if (children.length === 0) {
+      const count = counts.get(normalizeGroupKey(node.name))
+      if (count) {
+        candidates.push({ node, path: nextPath, count })
+      }
+      return
+    }
+    for (const child of children) {
+      walk(child, nextPath)
+    }
+  }
+  walk(studentRoot, findPortalTreePath(root, studentRoot.id)?.slice(0, -1) ?? [])
+
+  if (candidates.length === 0) {
+    return null
+  }
+
+  const topCount = Math.max(...candidates.map(({ count }) => count))
+  const best = candidates.filter(({ count }) => count === topCount)
+  if (best.length === 1) {
+    return { node: best[0].node, path: best[0].path, ambiguous: false }
+  }
+
+  // Deepest node shared by every tied path.
+  let commonLength = 0
+  const [firstPath, ...otherPaths] = best.map(({ path }) => path)
+  while (
+    commonLength < firstPath.length
+    && otherPaths.every((path) => String(path[commonLength]?.id) === String(firstPath[commonLength].id))
+  ) {
+    commonLength += 1
+  }
+  const commonPath = firstPath.slice(0, commonLength)
+  const commonNode = commonPath.at(-1)
+
+  if (!commonNode || isPortalTreeContainerNode(commonNode)) {
+    return { node: best[0].node, path: best[0].path, ambiguous: true }
+  }
+
+  return { node: commonNode, path: commonPath, ambiguous: true }
 }
 
 export function createPlanningPortalApiClient({
@@ -692,6 +780,7 @@ export function createPlanningPortalApiClient({
     requestedResourceId = '',
     fallbackResourceId = '',
     cacheScope = null,
+    groupHints = [],
   } = {}) {
     const context = await authenticatePortal(jar, { cacheScope })
     let cachedTree = getFreshCacheEntry(portalTreeCache, cacheScope, PORTAL_TREE_TTL_MS)
@@ -715,8 +804,19 @@ export function createPlanningPortalApiClient({
     const resources = fallbackNode ? [normalizePortalResource(fallbackNode)] : ownResources
     const requestedId = String(requestedResourceId ?? '').trim()
     const requestedPath = requestedId ? findPortalTreePath(cachedTree, requestedId) ?? [] : []
-    const accountResource = resources.find(({ id }) => id === requestedId) ?? resources[0] ?? null
-    const accountPath = accountResource ? findPortalTreePath(cachedTree, accountResource.id) ?? [] : []
+    let accountResource = resources.find(({ id }) => id === requestedId) ?? resources[0] ?? null
+    let accountPath = accountResource ? findPortalTreePath(cachedTree, accountResource.id) ?? [] : []
+    let accountSource = accountPath.length > 0 ? 'portal-account' : null
+
+    // No group on the ADE account: locate it from the student's courses.
+    if (accountPath.length === 0 && !requestedId && groupHints.length > 0) {
+      const hinted = findPortalStudentNodeByGroups(cachedTree, groupHints)
+      if (hinted) {
+        accountResource = { id: String(hinted.node.id), name: hinted.node.name }
+        accountPath = hinted.path
+        accountSource = hinted.ambiguous ? 'campus-groups-parent' : 'campus-groups'
+      }
+    }
     const currentPath = requestedPath.length > 0 ? requestedPath : accountPath
     const currentResource = currentPath.at(-1) ?? accountResource
     const defaultSelection = requestedId ? null : buildDefaultSelection(accountResource, accountPath)
@@ -755,6 +855,7 @@ export function createPlanningPortalApiClient({
       ).map(({ id }) => String(id)),
       selectionSchema: 'rennes-portal-v2',
       defaultSelection,
+      accountSource,
       resources,
       projectId: context.projectId,
       cache,
@@ -778,6 +879,55 @@ export function createPlanningPortalApiClient({
 
     return {
       results,
+      projectId: tree.projectId,
+      cache: tree.cache,
+    }
+  }
+
+  // Leaves of the "Enseignants" branch (category id -2), optionally filtered
+  // by name. Empty when the account is not allowed to browse teachers.
+  async function listPortalInstructors(jar, query = '', { cacheScope = null, limit = 60 } = {}) {
+    const tree = await fetchPortalTree(jar, { cacheScope })
+    const needle = normalizeLabel(query).toLocaleLowerCase('fr')
+    const instructorRoot = (tree.fullRoot?.children ?? []).find((node) => (
+      String(node.id) === '-2' || String(node.family ?? '').toLowerCase() === 'instructor'
+    ))
+    const teachers = instructorRoot
+      ? flattenPortalTree(instructorRoot)
+        .filter((node) => node !== instructorRoot && node.children.length === 0)
+        .filter((node) => !needle || normalizeLabel(node.name).toLocaleLowerCase('fr').includes(needle))
+        .slice(0, limit)
+        .map((node) => ({ id: String(node.id), name: node.name }))
+      : []
+
+    return {
+      available: Boolean(instructorRoot),
+      teachers,
+      projectId: tree.projectId,
+      cache: tree.cache,
+    }
+  }
+
+  // Leaves of the "Salles" branch (category id -3), each with the names of
+  // the folders above it (site, building…), for the free-room finder.
+  // Empty when the account is not allowed to browse rooms.
+  async function listPortalClassrooms(jar, { cacheScope = null } = {}) {
+    const tree = await fetchPortalTree(jar, { cacheScope })
+    const roomRoot = (tree.fullRoot?.children ?? []).find((node) => (
+      String(node.id) === '-3' || String(node.family ?? '').toLowerCase() === 'classroom'
+    ))
+    const rooms = []
+    const walk = (node, path) => {
+      for (const child of node.children ?? []) {
+        if (child.children?.length) walk(child, [...path, child.name])
+        else rooms.push({ id: String(child.id), name: child.name, path })
+      }
+    }
+    if (roomRoot) walk(roomRoot, [])
+
+    return {
+      available: Boolean(roomRoot),
+      rooms,
       projectId: tree.projectId,
       cache: tree.cache,
     }
@@ -890,6 +1040,8 @@ export function createPlanningPortalApiClient({
     fetchPortalEvents: retryOnStaleSession(fetchPortalEvents),
     fetchPortalStatus,
     fetchPortalTree: retryOnStaleSession(fetchPortalTree),
+    listPortalClassrooms,
+    listPortalInstructors,
     searchPortalTree,
   }
 }

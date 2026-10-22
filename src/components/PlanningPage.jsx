@@ -1,14 +1,23 @@
-import { useCallback, useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
 import { flushPlanningNavigation, trackPlanningAction, trackPlanningNavigation, usePlanningPageReport } from '../analytics'
+import { Icon } from '@iconify/react'
+import { navigateTo } from '../appRoute'
+import { SIGNAL_LABELS, groupSiteSignals, noticeForEvent } from '../mailSignals'
+import { requestMailMessage } from '../mailSelection'
+import { SIGNAL_STYLES, describeDays } from '../mailSignalStyles'
 import { describePlanningLoad, toPlanningPageSource, toPlanningView } from '../planningAnalytics'
-import { addDays, daysBetween, startOfWeek, toDayKey } from '../planningDates'
+import { addDays, daysBetween, relativeDayText, startOfWeek, toDayKey } from '../planningDates'
 import { weekColumns } from '../planningEvents'
 import { usePlanningWeeks, useEventAccents } from '../usePlanningWeeks'
 import { useHistorySheet } from '../useHistorySheet'
+import { useMailSignals } from '../useMailSignals'
+import { INLINE_BUTTON } from './AppPage'
+import { GradesNotice } from './GradesNotice'
 import PlanningDayPage from './PlanningDayPage'
 import PlanningEventSheet from './PlanningEventSheet'
 import PlanningHeader from './PlanningHeader'
 import PlanningListView from './PlanningListView'
+import PlanningTools from './planning/PlanningTools'
 import SwipePager from './SwipePager'
 
 // The view (one day, two side by side, or the week's list), kept in this
@@ -104,8 +113,9 @@ function useFontsReady() {
 // ("YYYY-MM-DD", the dashboard's "Prochain cours"), handed back with
 // onInitialDayHandled once taken. `arrivalSource`: how the student got here,
 // for the anonymous analytics (src/planningAnalytics.js); the page mounts
-// once per arrival.
-function PlanningPage({ selection = null, user = null, showWeekend = false, onOpenAccount = null, initialDay = null, onInitialDayHandled = () => {}, arrivalSource = 'other' }) {
+// once per arrival. `establishment`: the student's site, for the mails
+// announcing it blocked or closed (mailSignals).
+function PlanningPage({ selection = null, user = null, establishment = null, showWeekend = false, onOpenAccount = null, initialDay = null, onInitialDayHandled = () => {}, arrivalSource = 'other' }) {
   const now = useNow()
   const todayKey = toDayKey(now)
   const isWide = useWideLayout()
@@ -124,7 +134,16 @@ function PlanningPage({ selection = null, user = null, showWeekend = false, onOp
     onInitialDayHandled()
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [initialDay])
-  const { events, statusOn, errorKindOn, load, retry } = usePlanningWeeks({ selection, user })
+  const { events: loadedEvents, statusOn, errorKindOn, load, retry } = usePlanningWeeks({ selection, user })
+  // Each class with what the student's mails say about it (`notice`: the
+  // site blocked, the class cancelled, moved…, see mailSignals).
+  const signals = useMailSignals()
+  const events = useMemo(() => (signals.length
+    ? loadedEvents.map((event) => {
+      const notice = noticeForEvent(signals, event, establishment)
+      return notice ? { ...event, notice } : event
+    })
+    : loadedEvents), [loadedEvents, signals, establishment])
   const accentFor = useEventAccents(events)
   // Anonymous analytics: page_viewed, then how the week it opens on loaded
   // (categories only, never its classes or which week it is).
@@ -209,6 +228,19 @@ function PlanningPage({ selection = null, user = null, showWeekend = false, onOp
     setSelectedDay((day) => (byWeek ? stepWeeks(startOfWeek(day), count) : stepDays(day, count)))
   }
 
+  // The site blocked or on strike on a day shown (mailSignals): a notice
+  // over the days, as Mes notes' (its classes carry their chip).
+  const shownStart = byWeek ? startOfWeek(selectedDay) : selectedDay
+  const shownDays = Array.from({ length: byWeek ? 7 : dayCount }, (_, index) => addDays(shownStart, index))
+  // One notice per kind however many mails announced it, for the days shown.
+  const siteNotices = groupSiteSignals(signals, establishment)
+    .map((group) => ({ ...group, shown: group.days.filter((day) => shownDays.includes(day)) }))
+    .filter(({ shown }) => shown.length)
+  const openMail = (signal) => {
+    requestMailMessage(signal.id)
+    navigateTo('mail', { source: 'other' })
+  }
+
   return (
     <section className="planning-page w-full px-6 pt-4 pb-6 4xl:pt-5 max-md:px-3 max-md:pt-3 max-md:pb-5" aria-labelledby="planning-page-title">
       {/* The page's top, tinted apart from the hours as Mes notes' is (the
@@ -235,9 +267,53 @@ function PlanningPage({ selection = null, user = null, showWeekend = false, onOp
             }}
             onStep={(count) => stepBy(count, 'arrow')}
             onChangeView={changeView}
+            tools={<PlanningTools events={events} monday={startOfWeek(selectedDay)} selection={selection} />}
           />
         </div>
       </div>
+      {siteNotices.length ? (
+        <div className="planning-column grid gap-2 pt-5 max-md:pt-4">
+          {siteNotices.map(({ kind, shown, signals: mails }) => (
+            <GradesNotice
+              key={kind}
+              label={SIGNAL_LABELS[kind]}
+              title={SIGNAL_LABELS[kind]}
+              badge={mails.length > 1 ? `${mails.length} mails` : null}
+              media={(
+                <span className={`inline-flex size-9 shrink-0 items-center justify-center rounded-full ${SIGNAL_STYLES[kind].tint}`} aria-hidden="true">
+                  <Icon icon={SIGNAL_STYLES[kind].icon} className="size-[18px]" />
+                </span>
+              )}
+            >
+              <span className="grid justify-items-start gap-2">
+                <span>
+                  <strong className="font-semibold text-text">{describeDays(shown, todayKey)}</strong>
+                  {kind === 'closure'
+                    ? ` : tes cours ${shown.length > 1 ? 'de ces jours' : 'de ce jour'} sont sans doute annulés.`
+                    : ' : certains cours peuvent ne pas avoir lieu.'}
+                  {` Dernier mail : « ${mails[0].subject} ».`}
+                </span>
+                <span className="flex flex-wrap gap-1.5">
+                  {shown.length > 1 ? shown.map((day) => (
+                    <button
+                      key={day}
+                      type="button"
+                      className={`${INLINE_BUTTON} ${day === selectedDay && !byWeek ? 'border-brand! text-brand!' : ''}`}
+                      onClick={() => openDay(day)}
+                    >
+                      {relativeDayText(day, todayKey)}
+                    </button>
+                  )) : null}
+                  <button type="button" className={INLINE_BUTTON} onClick={() => openMail(mails[0])}>
+                    Voir le mail
+                    <Icon icon="carbon:arrow-right" className="size-3.5" aria-hidden="true" />
+                  </button>
+                </span>
+              </span>
+            </GradesNotice>
+          ))}
+        </div>
+      ) : null}
       <div
         ref={daysRef}
         className="planning-column planning-days pt-5 max-md:pt-4"
@@ -294,6 +370,7 @@ function PlanningPage({ selection = null, user = null, showWeekend = false, onOp
       {sheet.isOpen && openEvent ? (
         <PlanningEventSheet
           event={openEvent}
+          establishment={establishment}
           accent={accentFor(openEvent.title)}
           events={events}
           todayKey={todayKey}

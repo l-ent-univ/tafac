@@ -105,6 +105,7 @@ function useDailyBriefing({
     text: buildDailyBriefing({
       classes,
       deadlines: expectDeadlines && deadlines?.status === 'ok' ? deadlines.items : null,
+      bus: sources.bus,
       now,
     }),
   }
@@ -130,11 +131,13 @@ function GreetingCard({
   })
   const subtitle = greeting ?? briefing.text
   const isLoading = greeting == null && briefing.loading
-
   return (
     // On phones the card shrinks to what it says: the wave sits beside the
     // heading instead of above it, and the card loses its minimum height.
-    <article className={`widget-card group relative shadow-md flex-[0_1_280px] min-h-[140px] p-4 border border-white rounded-[22px] overflow-hidden bg-widget-bg text-base leading-6 min-w-0 max-2xl:flex-[1_1_calc(50%-6px)] max-2xl:min-w-[min(280px,100%)] max-md:min-h-[124px] max-md:p-3 max-md:rounded-[20px] max-xs:flex-[1_1_100%] max-xs:min-w-0 max-xs:min-h-0 flex flex-col justify-end gap-1 text-text ${visible ? 'widget-card-visible' : ''}`}>
+    <article
+      className={`greeting-card-widget widget-card group relative shadow-md flex-[0_1_280px] min-h-[140px] p-4 border border-white rounded-[22px] overflow-hidden bg-widget-bg text-base leading-6 min-w-0 max-2xl:flex-[1_1_calc(50%-6px)] max-2xl:min-w-[min(280px,100%)] max-md:min-h-[124px] max-md:p-3 max-md:rounded-[20px] max-xs:flex-[1_1_100%] max-xs:min-w-0 max-xs:min-h-0 flex flex-col justify-end gap-1 text-text hover:z-10 ${visible ? 'widget-card-visible' : ''}`}
+      aria-label={`Bonjour ${displayName}`}
+    >
       <div className="contents max-xs:flex max-xs:items-center max-xs:gap-2 max-xs:min-w-0 max-xs:pr-8">
         <Icon icon="ph:hand-waving" className="greeting-icon w-[34px] h-[34px] text-inherit shrink-0 max-xs:w-[26px] max-xs:h-[26px]" aria-hidden="true" />
         <h2 className="m-0 min-w-0 leading-[1.15] text-2xl font-bold overflow-hidden text-ellipsis whitespace-nowrap max-md:text-[22px] max-xs:text-xl" title={`Salut ${displayName} !`}>Salut {displayName} !</h2>
@@ -148,8 +151,11 @@ function GreetingCard({
         // 44px hit area on touch screens, same 16px cross.
         <button
           type="button"
-          className="absolute top-2.5 right-2.5 inline-flex items-center justify-center w-7 h-7 p-0 border-0 rounded-full bg-transparent text-text-muted opacity-0 cursor-pointer transition-[opacity,background-color,color] duration-[120ms] ease-in-out hover:bg-brand-subtle hover:text-text group-hover:opacity-100 focus-visible:opacity-100 [@media(hover:none)]:opacity-100 max-md:top-0.5 max-md:right-0.5 max-md:w-11 max-md:h-11"
-          onClick={onDismiss}
+          className="absolute top-2.5 right-2.5 z-20 inline-flex items-center justify-center w-7 h-7 p-0 border-0 rounded-full bg-transparent text-text-muted opacity-0 cursor-pointer transition-[opacity,background-color,color] duration-[120ms] ease-in-out hover:bg-brand-subtle hover:text-text group-hover:opacity-100 focus-visible:opacity-100 [@media(hover:none)]:opacity-100 max-md:top-0.5 max-md:right-0.5 max-md:w-11 max-md:h-11"
+          onClick={(e) => {
+            e.stopPropagation()
+            onDismiss()
+          }}
           aria-label="Masquer la carte de bienvenue"
           title="Masquer (réactivable dans Mon compte)"
         >

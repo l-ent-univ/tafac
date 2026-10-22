@@ -27,6 +27,13 @@ export const DEMO_LATEST_GRADE = {
   resource: 'SAE',
 }
 
+export const DEMO_ABSENCES = {
+  unjustified: '0 h',
+  justified: '4 h',
+  late: '1',
+  unjustifiedCount: 0,
+}
+
 function getTooltipWidth() {
   if (typeof window === 'undefined') {
     return 320

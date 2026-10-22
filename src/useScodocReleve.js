@@ -9,6 +9,7 @@ import {
   prefetchSemesterGrades,
 } from './entApi'
 import { getReleveDepartment, htmlToPlainText, listGradesSemesters } from './gradesReport'
+import { getOfflineCache, setOfflineCache } from './offlineStorage'
 import { describeLoadError } from './scodocPageUtils'
 
 // A failed load, as the page shows it (`error`, a message) and as the
@@ -44,6 +45,19 @@ export function useScodocReleve() {
   const [semesterPayloads, setSemesterPayloads] = useState({})
   const [departmentMessage, setDepartmentMessage] = useState(null)
 
+  // Try loading from persistent offline storage if memory/session is empty
+  useEffect(() => {
+    if (base.status === 'loading') {
+      getOfflineCache('scodoc:base').then((offline) => {
+        if (offline?.data) {
+          setBase((current) => (current.status === 'loading'
+            ? { status: 'ok', payload: offline.data, error: null, fromCache: true, offlineTime: offline.updatedAt }
+            : current))
+        }
+      })
+    }
+  }, [base.status])
+
   useEffect(() => {
     let cancelled = false
 
@@ -51,19 +65,34 @@ export function useScodocReleve() {
       .then((data) => {
         if (cancelled) return
         if (!data?.authenticated || data.error || !data.grades) {
-          // A cached copy beats an error screen while ScoDoc hiccups.
-          setBase((current) => (current.status === 'ok'
-            ? { ...current, fromCache: false }
-            : { ...describeFailure(data, null), payload: null, fromCache: false }))
+          // A cached copy beats an error screen while ScoDoc hiccups or is offline
+          getOfflineCache('scodoc:base').then((offline) => {
+            if (cancelled) return
+            if (offline?.data) {
+              setBase({ status: 'ok', payload: offline.data, error: null, fromCache: true, offlineTime: offline.updatedAt })
+            } else {
+              setBase((current) => (current.status === 'ok'
+                ? { ...current, fromCache: false }
+                : { ...describeFailure(data, null), payload: null, fromCache: false }))
+            }
+          })
           return
         }
         setBase({ status: 'ok', payload: data.grades, error: null, fromCache: false })
+        void setOfflineCache('scodoc:base', data.grades)
       })
       .catch((error) => {
         if (cancelled) return
-        setBase((current) => (current.status === 'ok'
-          ? { ...current, fromCache: false }
-          : { ...describeFailure(null, error), payload: null, fromCache: false }))
+        getOfflineCache('scodoc:base').then((offline) => {
+          if (cancelled) return
+          if (offline?.data) {
+            setBase({ status: 'ok', payload: offline.data, error: null, fromCache: true, offlineTime: offline.updatedAt })
+          } else {
+            setBase((current) => (current.status === 'ok'
+              ? { ...current, fromCache: false }
+              : { ...describeFailure(null, error), payload: null, fromCache: false }))
+          }
+        })
       })
 
     return () => { cancelled = true }

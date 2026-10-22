@@ -36,6 +36,7 @@ function AppHeader({ authenticated, checking, onPrimaryAction, onAccountAction }
                 className="header-account-btn inline-flex items-center justify-center gap-2 px-3 py-[10px] border border-white dark:border-[rgba(255,255,255,0.08)] rounded-full bg-widget-bg text-text text-[0.9rem] font-semibold leading-[1.06] whitespace-nowrap cursor-pointer transition-[background-color,opacity] duration-120 ease-in-out hover:not-disabled:bg-bg-subtle disabled:opacity-40 disabled:cursor-wait max-md:w-[42px] max-md:min-w-[42px] max-md:h-[42px] max-md:p-0 max-md:justify-center max-md:gap-0"
                 onClick={onAccountAction}
                 disabled={checking}
+                data-tour="account"
                 aria-label="Mon compte"
               >
                 <Icon icon="carbon:user-avatar" className="w-4 h-4 shrink-0 max-md:w-[1.1rem] max-md:h-[1.1rem]" aria-hidden="true" />

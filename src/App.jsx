@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from 'react'
 import { Icon } from '@iconify/react'
 import universityConfig from '@university'
 import favicon from './assets/favicon.png'
@@ -9,6 +9,7 @@ import AccountModal from './components/AccountModal'
 import ChangelogPill from './components/ChangelogPill'
 import { markChangelogEntrySeen, replayChangelogEntry, setChangelogAudience } from './changelogStore'
 import ChangelogSheet from './components/ChangelogSheet'
+import GuidedTour from './components/GuidedTour'
 import LentButton from './components/LentButton'
 import LoginPage from './components/LoginPage'
 import OnboardingCompletionPage from './components/OnboardingCompletionPage'
@@ -17,7 +18,9 @@ import OnboardingPage from './components/OnboardingPage'
 import PwaUpdateManager from './components/PwaUpdateManager'
 import UpdateNotice from './components/UpdateNotice'
 import ServiceNotice from './components/ServiceNotice'
+import MailSignalsNotice from './components/MailSignalsNotice'
 import WelcomeFromLent from './components/WelcomeFromLent'
+import OfflineBanner from './components/OfflineBanner'
 import { settingsTransfer } from './settingsTransferBoot'
 import { DEMO_CREDENTIALS, DEMO_SESSION_MODE } from './demoAccount'
 import { storeBrowserPasswordCredential } from './browserCredentials'
@@ -51,9 +54,16 @@ import LoadingDots from './components/LoadingDots'
 import { listHeroImages, resolveHeroImage } from './heroImage'
 import { getStoredTheme, persistTheme, watchTheme } from './theme'
 import MobileTabBar from './components/MobileTabBar'
-import { getMobileTabItems } from './navItems'
+import { getMobileTabItems, isCrousPageAvailable, isGradesPageAvailable, isMailPageAvailable, isMoodlePageAvailable, isPlanningPageAvailable, isTransitPageAvailable } from './navItems'
+import { getLastNavigationSource, navigateTo, scrollAppToTop, useAppRoute } from './appRoute'
+import AbsencesPage from './components/AbsencesPage'
+import MailPage from './components/MailPage'
+import MoodlePage from './components/MoodlePage'
+import CrousPage from './components/CrousPage'
+import TransitPage from './components/TransitPage'
+import { useTransitReminderSync } from './transitPush'
+import PageErrorBoundary from './components/PageErrorBoundary'
 import { getAvailableWidgets } from './dashboardWidgets'
-import { readHistoryNav, writeHistoryNav } from './appHistory'
 import useGradesFormation from './useGradesFormation'
 import { clearStoredCustomBackground, getStoredCustomBackground, saveCustomBackground } from './customBackground'
 import {
@@ -468,6 +478,25 @@ function findTpOptionByLabel(options, labelOrLabels) {
   return null
 }
 
+// Sidebar order of the pages, for the direction of the page slide.
+const PAGE_ORDER = ['dashboard', 'grades', 'absences', 'planning', 'mail', 'moodle', 'ru', 'bus']
+
+// What a page transition fades: each frosted card on its own (its blur keeps
+// working, unlike under a fading ancestor) and every block without one.
+// Cards with their own arrival animation (.grades-reveal) are left to it.
+function collectFadeBlocks(root, blocks = []) {
+  for (const child of root.children) {
+    if (child.classList.contains('widget-card')) {
+      if (!child.classList.contains('grades-reveal')) blocks.push(child)
+    } else if (child.querySelector('.widget-card')) {
+      collectFadeBlocks(child, blocks)
+    } else {
+      blocks.push(child)
+    }
+  }
+  return blocks
+}
+
 async function loadTdOptionsForAccountModal(yearOption) {
   const treeResponse = await getAdeTree(yearOption.resourceId)
   return buildNextTpStepFromTree(treeResponse?.tree)
@@ -790,6 +819,10 @@ function findAdeTreeNodeById(rootNode, targetId) {
 }
 
 function detectEstablishmentFromAdeTree(treePayload) {
+  if (!treePayload) {
+    return null
+  }
+
   const establishments = universityConfig.establishments
   if (!establishments) {
     return null
@@ -801,10 +834,16 @@ function detectEstablishmentFromAdeTree(treePayload) {
     .map((nodeId) => findAdeTreeNodeById(root, nodeId))
     .filter(Boolean)
 
-  const searchHaystack = currentNodes.flatMap((node) => [
-    String(node.name ?? ''),
-    String(node.path ?? ''),
-  ]).join(' | ').toLowerCase()
+  const searchHaystack = [
+    ...currentNodes.flatMap((node) => [String(node.name ?? ''), String(node.path ?? '')]),
+    String(treePayload?.defaultSelection?.contextLabel ?? ''),
+    String(treePayload?.defaultSelection?.programLabel ?? ''),
+    String(treePayload?.defaultSelection?.name ?? ''),
+  ].join(' | ').toLowerCase()
+
+  if (!searchHaystack.trim()) {
+    return establishments.fallbackId ?? 'iutlan'
+  }
 
   for (const rule of establishments.detectFromAdeTree ?? []) {
     if ((rule.includes ?? []).some((needle) => searchHaystack.includes(needle))) {
@@ -812,7 +851,82 @@ function detectEstablishmentFromAdeTree(treePayload) {
     }
   }
 
-  return establishments.fallbackId ?? null
+  return establishments.fallbackId ?? 'iutlan'
+}
+
+function detectEstablishmentFromSelection(selection) {
+  if (!selection) return null
+  const searchHaystack = [
+    selection.contextLabel,
+    selection.programLabel,
+    selection.parentLabel,
+    selection.label,
+  ].filter(Boolean).join(' | ').toLowerCase()
+
+  if (!searchHaystack.trim()) return null
+
+  for (const rule of universityConfig.establishments?.detectFromAdeTree ?? []) {
+    if ((rule.includes ?? []).some((needle) => searchHaystack.includes(needle))) {
+      return rule.id
+    }
+  }
+
+  if (searchHaystack.includes('enssat') || searchHaystack.includes('ingenieur') || searchHaystack.includes('photonique')) {
+    return 'enssat'
+  }
+
+  if (searchHaystack.includes('but') || searchHaystack.includes('iut') || searchHaystack.includes('iutlan')) {
+    return 'iutlan'
+  }
+
+  return null
+}
+
+function detectEstablishment({ treePayload = null, account = null, user = null, selection = null } = {}) {
+  const establishments = universityConfig.establishments
+  if (!establishments) {
+    return null
+  }
+
+  // 1. Check account attributes if available
+  const accountHaystack = [
+    account?.mail,
+    account?.email,
+    account?.department,
+    account?.ou,
+    account?.eduPersonPrimaryAffiliation,
+    user,
+  ].filter(Boolean).join(' | ').toLowerCase()
+
+  if (accountHaystack.includes('enssat')) {
+    return 'enssat'
+  }
+  if (accountHaystack.includes('iutlan') || accountHaystack.includes('iut-lannion') || accountHaystack.includes('iut lannion') || accountHaystack.includes('iut de lannion')) {
+    return 'iutlan'
+  }
+
+  // 2. Check TP selection
+  const fromSelection = detectEstablishmentFromSelection(selection)
+  if (fromSelection) {
+    return fromSelection
+  }
+
+  // 3. Check ADE tree
+  if (treePayload) {
+    return detectEstablishmentFromAdeTree(treePayload)
+  }
+
+  return null
+}
+
+function hasGradeWidgetsForEstablishment(est) {
+  if (!universityConfig.features?.grades) {
+    return false
+  }
+  if (!universityConfig.establishments) {
+    return true
+  }
+  return Boolean(universityConfig.establishments.byId?.[est]?.gradeWidgets)
 }
 
 function normalizeAdePathLabels(nodes) {
@@ -864,7 +978,31 @@ function buildTpSelectionOptions(nodes, parentNode, contextLabel, extraFields = 
 }
 
 function buildInitialTpOnboardingState(treePayload) {
-  const pathNodes = getAdeTreePathNodes(treePayload)
+  let pathNodes = getAdeTreePathNodes(treePayload)
+
+  // If the user's ADE portal account had no pre-assigned resource, pathNodes is empty.
+  // Instead of showing a dead-end error, look for the establishment branch or list top student formations.
+  if (pathNodes.length === 0 && treePayload?.root) {
+    const root = treePayload.root
+    const etudiantsNode = String(root.id) === '-1'
+      ? root
+      : (root.children ?? []).find((c) => String(c.id) === '-1' || /etudiant/i.test(c.name)) ?? root
+    const topBranches = etudiantsNode.children ?? []
+
+    const enssatBranch = topBranches.find((b) => /enssat/i.test(b.name))
+    if (enssatBranch) {
+      pathNodes = [etudiantsNode, enssatBranch].filter((n) => !['-100', '-1'].includes(String(n.id)))
+    } else if (topBranches.length > 0) {
+      return createEmptyTpOnboardingState({
+        contextLabel: 'Formations',
+        program: null,
+        yearOptions: buildTpSelectionOptions(topBranches, etudiantsNode, 'Formations'),
+        detectedSelections: { year: null, td: null, tp: null },
+        errorMessage: '',
+      })
+    }
+  }
+
   const pathLabels = normalizeAdePathLabels(pathNodes)
   const programNode = pathNodes.length >= 2 ? pathNodes[1] : pathNodes[0] ?? null
   const programIndex = programNode
@@ -1143,18 +1281,6 @@ function App() {
   const [hiddenWidgets, setHiddenWidgets] = useState(() => getStoredHiddenWidgets())
   const [customBackground, setCustomBackground] = useState(() => getStoredCustomBackground())
   const [showWallpaper, setShowWallpaper] = useState(() => getStoredShowWallpaper())
-  // Page shown next to the sidebar: 'dashboard' or 'grades'. Each switch is
-  // a history entry (see appHistory.js): back and forward move between
-  // pages, and a reload stays on the page.
-  const [activePage, setActivePage] = useState(() => readHistoryNav().page)
-  const activePageRef = useRef(activePage)
-  // How the student last came to « Mes notes », for its page_viewed
-  // (src/gradesAnalytics.js): a reload already on it counts as history.
-  const [gradesArrivalSource, setGradesArrivalSource] = useState(() => (readHistoryNav().page === 'grades' ? 'history' : 'other'))
-  // Likewise for the planning page (src/planningAnalytics.js).
-  const [planningArrivalSource, setPlanningArrivalSource] = useState(() => (readHistoryNav().page === 'planning' ? 'history' : 'other'))
-  // Page-switch animations only once the user has switched, not on first load.
-  const [hasSwitchedPage, setHasSwitchedPage] = useState(false)
   const [theme, setTheme] = useState(() => getStoredTheme())
   const [showAppDescriptions, setShowAppDescriptions] = useState(() => getStoredShowAppDescriptions())
   const [showPlanningWeekend, setShowPlanningWeekend] = useState(() => getStoredShowPlanningWeekend())
@@ -1349,7 +1475,8 @@ function App() {
     }
 
     function handleWindowKeydown(event) {
-      const key = event.key.toLowerCase()
+      const key = String(event.key ?? '').toLowerCase()
+      if (!key) return
 
       if ((event.metaKey || event.ctrlKey) && event.shiftKey && key === 'd') {
         event.preventDefault()
@@ -1462,7 +1589,23 @@ function App() {
     }
 
     setProfileUser(sessionState.user)
-    setEstablishment(getStoredEstablishment(sessionState.user))
+    const storedSel = getStoredTpSelection(sessionState.user)
+    const existingEst = getStoredEstablishment(sessionState.user)
+    const detected = detectEstablishment({
+      account: sessionState.account,
+      user: sessionState.user,
+      selection: storedSel,
+    })
+    let nextEstablishment = existingEst
+    if (!nextEstablishment || nextEstablishment === 'other') {
+      nextEstablishment = detected || universityConfig.establishments?.fallbackId || 'iutlan'
+    } else if (detected && detected !== existingEst) {
+      nextEstablishment = detected
+    }
+    if (nextEstablishment !== existingEst) {
+      persistEstablishment(nextEstablishment, sessionState.user)
+    }
+    setEstablishment(nextEstablishment)
     setSelectedTp(getStoredTpSelection(sessionState.user))
     setNextClassLookaheadDays(getStoredAdeLookaheadDays(sessionState.user))
     setHiddenWidgets(getStoredHiddenWidgets(sessionState.user))
@@ -1508,6 +1651,20 @@ function App() {
             return
           }
 
+          const currentEst = getStoredEstablishment(sessionState.user)
+          const resolvedEst = (!currentEst || currentEst === 'other')
+            ? (detectEstablishment({
+                account: sessionState.account,
+                user: sessionState.user,
+                selection: storedSelection,
+              }) || universityConfig.establishments?.fallbackId || 'iutlan')
+            : currentEst
+
+          if (resolvedEst !== currentEst) {
+            persistEstablishment(resolvedEst, sessionState.user)
+          }
+          setEstablishment(resolvedEst)
+
           setSelectedTp(storedSelection)
           setTpOnboardingState(createEmptyTpOnboardingState({
             contextLabel: storedSelection.contextLabel ?? '',
@@ -1521,31 +1678,47 @@ function App() {
           return
         }
 
+        let treeResponse = await getAdeTree()
+        let treePayload = treeResponse?.tree
+        let detectedEstablishment = detectEstablishment({
+          treePayload,
+          account: sessionState.account,
+          user: sessionState.user,
+        }) || universityConfig.establishments?.fallbackId || 'iutlan'
+
+        persistEstablishment(detectedEstablishment, sessionState.user)
+        setEstablishment(detectedEstablishment)
+
         let scodocGroupSelection = null
-        try {
-          const gradesResponse = await getGrades()
-          if (gradesResponse?.authenticated && !gradesResponse?.disabled) {
-            scodocGroupSelection = detectScodocGroupSelection(gradesResponse.grades)
+        if (hasGradeWidgetsForEstablishment(detectedEstablishment)) {
+          try {
+            const gradesResponse = await getGrades()
+            if (gradesResponse?.unavailable && detectedEstablishment === 'iutlan') {
+              // Kept for the later persists below, which would undo it.
+              detectedEstablishment = 'enssat'
+              persistEstablishment(detectedEstablishment, sessionState.user)
+              setEstablishment(detectedEstablishment)
+            } else if (gradesResponse?.authenticated && !gradesResponse?.disabled) {
+              scodocGroupSelection = detectScodocGroupSelection(gradesResponse.grades)
+            }
+          } catch {
+            // Grades are best-effort for onboarding auto-selection.
           }
-        } catch {
-          // Grades are best-effort for onboarding auto-selection.
         }
 
         // Debug panel, one shot: stop at the TP step even when it's detected.
         const forceTpChoice = debugForceTpChoiceRef.current
         debugForceTpChoiceRef.current = false
 
-        let treeResponse = await getAdeTree()
         // Planning never set up on the account (no group of its own): its
         // ScoDoc group, found in the planning, stands in for it.
-        if (!treeResponse?.tree?.defaultSelection?.resourceId && scodocGroupSelection?.tpAliases?.length) {
+        if (!treePayload?.defaultSelection?.resourceId && scodocGroupSelection?.tpAliases?.length) {
           const fallbackGroup = await findAdeGroupForScodoc(scodocGroupSelection).catch(() => null)
           if (fallbackGroup) {
             treeResponse = await getAdeTree('', { fallback: fallbackGroup.id })
+            treePayload = treeResponse?.tree
           }
         }
-        let treePayload = treeResponse?.tree
-        const detectedEstablishment = detectEstablishmentFromAdeTree(treePayload)
         const resolvedDefault = treePayload?.defaultSelection?.resourceId
           ? await resolveDefaultSelectionTp(treePayload.defaultSelection, {
             tdAliases: scodocGroupSelection?.tdAliases ?? [],
@@ -1689,7 +1862,7 @@ function App() {
           return
         }
 
-        if (!establishment) {
+        if (!getStoredEstablishment(sessionState.user)) {
           persistEstablishment('other', sessionState.user)
           setEstablishment('other')
         }
@@ -1709,8 +1882,9 @@ function App() {
     return () => {
       cancelled = true
     }
+  // Not `establishment`: this effect sets it, and a rerun would cancel
+  // the hydration midway (ENSSAT: iutlan → enssat → iutlan… forever).
   }, [
-    establishment,
     hasHydratedProfile,
     profileReloadNonce,
     profileUser,
@@ -1997,17 +2171,37 @@ function App() {
     user: sessionState.user,
   })
   const gradesSupported = gradesFormation !== 'other'
-  const hasGradesPage = useMemo(
-    () => getMobileTabItems(establishment, { gradesSupported }).some((item) => item.page === 'grades'),
-    [establishment, gradesSupported],
-  )
-  // The in-app planning page, on the same terms as its nav item
-  // (features.planning): the planning service's links open it instead.
-  const hasPlanningPage = useMemo(
-    () => getMobileTabItems(establishment, { gradesSupported }).some((item) => item.page === 'planning'),
-    [establishment, gradesSupported],
-  )
-  const hasMobileTabBar =useMemo(() => getMobileTabItems(establishment, { gradesSupported }).length > 0, [establishment, gradesSupported])
+  const hasMobileTabBar = useMemo(() => getMobileTabItems(establishment, { gradesSupported }).length > 0, [establishment, gradesSupported])
+  const route = useAppRoute()
+  // The sidebar and tab bar follow `route` right away (their highlight slides
+  // over); the page content renders from the deferred value, in the
+  // background, so mounting it doesn't freeze that animation.
+  const deferredRoute = useDeferredValue(route)
+  const scodocPagesAvailable = isGradesPageAvailable(establishment)
+  // « Mes notes » reads BUT relevés only; Absences works for any formation.
+  const gradesPageAvailable = scodocPagesAvailable && gradesSupported
+  const planningPageAvailable = isPlanningPageAvailable()
+  const mailPageAvailable = isMailPageAvailable()
+  const moodlePageAvailable = isMoodlePageAvailable()
+  const crousPageAvailable = isCrousPageAvailable()
+  const transitPageAvailable = isTransitPageAvailable(establishment)
+  // Bus reminders on: each open hands the server the coming days' ones.
+  useTransitReminderSync({ establishment, selection: selectedTp, sessionUser: sessionState.authenticated ? sessionState.user : '' })
+  const activeRoute = (deferredRoute === 'grades' && gradesPageAvailable)
+    || (deferredRoute === 'absences' && scodocPagesAvailable)
+    || (deferredRoute === 'planning' && planningPageAvailable)
+    || (deferredRoute === 'mail' && mailPageAvailable)
+    || (deferredRoute === 'moodle' && moodlePageAvailable)
+    || (deferredRoute === 'ru' && crousPageAvailable)
+    || (deferredRoute === 'bus' && transitPageAvailable)
+    ? deferredRoute
+    : 'dashboard'
+  const hasGradesPage = gradesPageAvailable
+  // The in-app planning page: the planning service's links open it instead.
+  const hasPlanningPage = planningPageAvailable
+  // How the page shown was reached, for « Mes notes »'s and the planning's
+  // page_viewed (src/gradesAnalytics.js, src/planningAnalytics.js).
+  const arrivalSource = getLastNavigationSource()
   // « Nouveautés » about « Mes notes » only reach students who have it: a
   // school with the page and a relevé confirmed BUT (not while unknown, so
   // the pill doesn't come and go). Those about the Planning page, students
@@ -2020,19 +2214,8 @@ function App() {
       ...(hasConfirmedPlanningPage ? ['planning-page'] : []),
     ])
   }, [hasConfirmedGradesPage, hasConfirmedPlanningPage])
-  // Falls back to the dashboard if the grades item goes away (establishment
-  // without grade widgets, feature switched off, a relevé that isn't BUT).
-  const isGradesPage = useMemo(
-    () => activePage === 'grades' && getMobileTabItems(establishment, { gradesSupported }).some((item) => item.page === 'grades'),
-    [activePage, establishment, gradesSupported],
-  )
-  // Likewise for the planning page (features.planning).
-  const isPlanningPage = useMemo(
-    () => activePage === 'planning' && getMobileTabItems(establishment, { gradesSupported }).some((item) => item.page === 'planning'),
-    [activePage, establishment, gradesSupported],
-  )
-  // The page the sidebar and the tab bar show as selected.
-  const shownPage = isGradesPage ? 'grades' : isPlanningPage ? 'planning' : 'dashboard'
+  const isGradesPage = activeRoute === 'grades'
+  const isPlanningPage = activeRoute === 'planning'
   // Being on « Mes notes » is having seen its launch, however the student
   // got there (tab, card, "Dernière note", app list, a reload on the page):
   // the dashboard card and the tab's « Nouveau » go. After the audience
@@ -2044,8 +2227,9 @@ function App() {
   useEffect(() => {
     if (isPlanningPage && hasConfirmedPlanningPage) markChangelogEntrySeen('planning')
   }, [isPlanningPage, hasConfirmedPlanningPage])
-  // The other pages sit on the plain background, like with the wallpaper off.
-  const isWallpaperShown = showWallpaper && shownPage === 'dashboard'
+  // The in-app pages sit on the plain background, like with the wallpaper
+  // off: their top is the tinted band (AppPage, « Mes notes »).
+  const isWallpaperShown = showWallpaper && activeRoute === 'dashboard'
 
   // Rejects with a user-facing message (shown in Mon compte) on failure.
   const handleCustomBackgroundChange = useCallback(async (file) => {
@@ -2075,13 +2259,11 @@ function App() {
   }, [sessionState.user])
   const [heroHeight, setHeroHeight] = useState(null)
   const heroObserverRef = useRef(null)
-  const dashboardColumnElementRef = useRef(null)
 
   // The hero photo runs behind the header and the whole widget row (one or
   // two lines, fewer when widgets are hidden), then fades just below it.
   // Callback ref: the dashboard column mounts after auth/onboarding settle.
   const dashboardColumnRef = useCallback((column) => {
-    dashboardColumnElementRef.current = column
     heroObserverRef.current?.disconnect()
     heroObserverRef.current = null
 
@@ -2102,73 +2284,29 @@ function App() {
     heroObserverRef.current = observer
   }, [])
 
-  // Shows a page at its top, once it's rendered. Wide screens scroll the
-  // column itself, narrower ones the window.
-  // `source`: how « Mes notes » or the planning was reached
-  // (src/gradesAnalytics.js, src/planningAnalytics.js).
-  const showPage = useCallback((page, source = 'other') => {
-    if (page === 'grades') setGradesArrivalSource(source)
-    if (page === 'planning') setPlanningArrivalSource(source)
-    setActivePage(page)
-    setHasSwitchedPage(true)
-    window.requestAnimationFrame(() => {
-      dashboardColumnElementRef.current?.scrollTo({ top: 0 })
-      window.scrollTo({ top: 0 })
-    })
-  }, [])
-
-  // Sidebar / tab bar page switch: a new history entry. `source` says where
-  // from, for « Mes notes »'s and the planning's page_viewed ('nav',
-  // 'tabbar'…).
-  const handleNavigatePage = useCallback((page, source = 'other') => {
-    if (page !== activePageRef.current) writeHistoryNav({ page })
-    showPage(page, source)
-  }, [showPage])
-
   // The dashboard's "Dernière note" (or the sidebar's, `source`): "Mes
   // notes", opened on that grade.
   const [pendingGradeRequest, setPendingGradeRequest] = useState(null)
   const handleOpenLatestGrade = useCallback((grade, source = 'dashboard_card') => {
     setPendingGradeRequest({ evaluationId: grade.id, moduleCode: grade.resource })
-    handleNavigatePage('grades', source)
-  }, [handleNavigatePage])
+    navigateTo('grades', { source })
+  }, [])
   const handleOpenSidebarGrade = useCallback((grade) => handleOpenLatestGrade(grade, 'sidebar_card'), [handleOpenLatestGrade])
   const clearPendingGradeRequest = useCallback(() => setPendingGradeRequest(null), [])
   // The grade service's app in the app lists ('tile': "Mes notes" rather
   // than ScoDoc) and the launch card ('launch_card') say which they are.
-  const handleOpenGradesPage = useCallback((source = 'tile') => handleNavigatePage('grades', source), [handleNavigatePage])
+  const handleOpenGradesPage = useCallback((source = 'tile') => navigateTo('grades', { source }), [])
   // The planning service's app in the app lists ('tile': the planning page
   // rather than the service) and its launch card ('launch_card').
-  const handleOpenPlanningPage = useCallback((source = 'tile') => handleNavigatePage('planning', source), [handleNavigatePage])
+  const handleOpenPlanningPage = useCallback((source = 'tile') => navigateTo('planning', { source }), [])
   // The dashboard's "Prochain cours": the planning page, opened on that
   // class's day (today without one).
   const [pendingPlanningDay, setPendingPlanningDay] = useState(null)
   const handleOpenPlanningDay = useCallback((day) => {
     setPendingPlanningDay(day ?? null)
-    handleNavigatePage('planning', 'dashboard_card')
-  }, [handleNavigatePage])
+    navigateTo('planning', { source: 'dashboard_card' })
+  }, [])
   const clearPendingPlanningDay = useCallback(() => setPendingPlanningDay(null), [])
-
-  // The current entry says which page it is (the first one included); the
-  // app sets scroll positions itself. Back and forward show the entry's page
-  // (a UE opened full page is handled by the grades page).
-  useEffect(() => {
-    activePageRef.current = activePage
-  }, [activePage])
-  useEffect(() => {
-    try {
-      window.history.scrollRestoration = 'manual'
-    } catch {
-      // Older browsers: their own restoration is harmless.
-    }
-    writeHistoryNav(readHistoryNav(), { replace: true })
-    const handlePopState = (event) => {
-      const { page } = readHistoryNav(event.state)
-      if (page !== activePageRef.current) showPage(page, 'history')
-    }
-    window.addEventListener('popstate', handlePopState)
-    return () => window.removeEventListener('popstate', handlePopState)
-  }, [showPage])
 
   const handleWidgetVisibilityChange = useCallback((widgetId, visible) => {
     track('setting_changed', { setting: 'widget_visibility', value: visible ? 'on' : 'off', widget: widgetId })
@@ -2179,6 +2317,12 @@ function App() {
       persistHiddenWidgets(next, sessionState.user)
       return next
     })
+  }, [sessionState.user])
+
+  const handleEstablishmentChange = useCallback((newEstablishment) => {
+    track('setting_changed', { setting: 'establishment', value: newEstablishment })
+    persistEstablishment(newEstablishment, sessionState.user)
+    setEstablishment(newEstablishment)
   }, [sessionState.user])
 
   const widgetToggles = useMemo(() => getAvailableWidgets(establishment).map((widget) => ({
@@ -2555,8 +2699,6 @@ function App() {
     try {
       const result = await logoutFromEnt()
       clearLegacySensitiveClientCaches()
-      setActivePage('dashboard')
-      writeHistoryNav({ page: 'dashboard' }, { replace: true })
       setSessionState({
         checking: false,
         authenticated: false,
@@ -2774,6 +2916,55 @@ function App() {
     sessionState.user,
     sessionState.givenName,
   )
+  const isDashboardShellVisible = sessionState.authenticated && !shouldHoldInitialRender && !isProfileSwitching
+    && !shouldShowTpSetup && !shouldShowCompletionScreen
+
+  // /notes or /absences for someone without ScoDoc pages (feature off,
+  // establishment without grades): show the dashboard and drop the dead URL.
+  useEffect(() => {
+    const unavailable = (route === 'grades' && !gradesPageAvailable)
+      || (route === 'absences' && !scodocPagesAvailable)
+      || (route === 'planning' && !planningPageAvailable)
+      || (route === 'mail' && !mailPageAvailable)
+      || (route === 'moodle' && !moodlePageAvailable)
+      || (route === 'ru' && !crousPageAvailable)
+      || (route === 'bus' && !transitPageAvailable)
+    if (isDashboardShellVisible && unavailable) {
+      navigateTo('dashboard', { replace: true })
+    }
+  }, [crousPageAvailable, gradesPageAvailable, isDashboardShellVisible, mailPageAvailable, moodlePageAvailable, planningPageAvailable, route, scodocPagesAvailable, transitPageAvailable])
+
+  const scodocPageRef = useRef(null)
+  const dashboardPageRef = useRef(null)
+  const previousRouteRef = useRef(activeRoute)
+
+  // Each page starts at the top and slides in from the side it comes from,
+  // in sidebar order: from the right going down the list, from the left
+  // going back up.
+  useEffect(() => {
+    const previousRoute = previousRouteRef.current
+    if (previousRoute === activeRoute) {
+      return
+    }
+
+    previousRouteRef.current = activeRoute
+    scrollAppToTop()
+
+    const page = activeRoute === 'dashboard' ? dashboardPageRef.current : scodocPageRef.current
+    if (!page?.animate || window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      return
+    }
+
+    const offset = PAGE_ORDER.indexOf(activeRoute) < PAGE_ORDER.indexOf(previousRoute) ? -28 : 28
+    const timing = { duration: 460, easing: 'cubic-bezier(0.16, 1, 0.3, 1)' }
+    // The page itself only slides: opacity on an ancestor would cut the
+    // cards' backdrop blur off from the photo until the end of the fade.
+    page.animate([{ transform: `translateX(${offset}px)` }, { transform: 'none' }], timing)
+    for (const block of collectFadeBlocks(page)) {
+      block.animate([{ opacity: 0 }, { opacity: 1 }], timing)
+    }
+  }, [activeRoute])
+
   const simpleLoadingDots = <LoadingDots className="text-text-muted" />
 
   return (
@@ -2827,26 +3018,28 @@ function App() {
             showChangelogPill={showChangelogPill}
             establishment={establishment}
             gradesSupported={gradesSupported}
-            activePage={shownPage}
-            onNavigatePage={handleNavigatePage}
             onOpenLatestGrade={universityConfig.features?.sidebarLatestGrade === true && sessionState.authenticated && hasGradesPage ? handleOpenSidebarGrade : null}
           />
-          <div ref={dashboardColumnRef} className={`app-column relative isolate flex flex-col flex-1 min-w-0 4xl:h-screen 4xl:overflow-y-auto 4xl:pl-[calc(var(--sidebar-width,280px)+12px)] ${hasMobileTabBar ? 'max-4xl:pb-[calc(env(safe-area-inset-bottom)+84px)]' : ''}`}>
+          <div ref={dashboardColumnRef} data-app-scroll-root className={`app-column relative isolate flex flex-col flex-1 min-w-0 4xl:h-screen 4xl:overflow-y-auto 4xl:pl-[calc(var(--sidebar-width,280px)+12px)] ${hasMobileTabBar ? 'max-4xl:pb-[calc(env(safe-area-inset-bottom)+84px)]' : ''}`}>
             {/* Hero image behind the header and widget cards, fading into the solid background. */}
             {isWallpaperShown ? (
               <div
                 aria-hidden="true"
-                className="dashboard-hero pointer-events-none absolute inset-x-0 top-0 -z-10 h-[230px] bg-cover bg-[center_40%] max-md:h-[260px] dark:opacity-60"
+                // Behind the ScoDoc pages the photo runs past the title down to the
+                // first cards, as it does behind the dashboard widgets.
+                className={`dashboard-hero pointer-events-none absolute inset-x-0 top-0 -z-10 bg-cover bg-[center_40%] transition-[height] duration-500 ease-out dark:opacity-60 ${
+                  activeRoute === 'dashboard' ? 'h-[230px] max-md:h-[260px]' : 'h-[420px] max-md:h-[440px]'
+                }`}
                 style={{
-                  ...(heroHeight ? { height: heroHeight } : null),
+                  // The measured height follows the widget row, hidden on other pages.
+                  ...(heroHeight && activeRoute === 'dashboard' ? { height: heroHeight } : null),
                   backgroundImage: `url("${heroImage.src}")`,
                   ...(heroImage.position ? { backgroundPosition: heroImage.position } : null),
                 }}
               />
             ) : null}
-            {/* On a phone, "Mes notes" and the planning start with their own
-                header: no top bar. */}
-            <div className={`${shownPage !== 'dashboard' ? 'max-md:hidden ' : ''}4xl:hidden`}>
+            {/* On a phone, the in-app pages start with their own title: no top bar. */}
+            <div className={`${activeRoute !== 'dashboard' ? 'max-md:hidden ' : ''}4xl:hidden`}>
               <AppHeader
                 authenticated={sessionState.authenticated}
                 checking={sessionState.checking}
@@ -2864,6 +3057,7 @@ function App() {
               // the cards rather than pushing them down a full row.
               <ChangelogPill className="4xl:hidden flex justify-end px-6 pt-2 -mb-2 max-md:px-3 max-md:pt-1.5" />
             ) : null}
+            <OfflineBanner className="mx-6 mt-3 max-md:mx-3" />
             {sessionState.warning ? (
               <div className="px-6 pt-3 max-md:px-3 4xl:pt-5">
                 <div className="flex items-start gap-3 rounded-[20px] border border-[#f2cf8f] bg-[#fff7e8] px-4 py-3 text-text shadow-[0_10px_30px_rgba(0,0,0,0.05)] dark:border-[#6a4d15] dark:bg-[#2f2410]">
@@ -2872,14 +3066,33 @@ function App() {
                 </div>
               </div>
             ) : null}
-            {shownPage === 'dashboard' ? (
-              <div className="px-6 pt-3 max-md:px-3 4xl:pt-5">
+            {activeRoute === 'dashboard' ? (
+              <div className="flex flex-col gap-2 px-6 pt-3 empty:hidden max-md:px-3 4xl:pt-5">
                 <ServiceNotice />
+                {sessionState.authenticated ? <MailSignalsNotice establishment={establishment} selection={selectedTp} user={sessionState.user} onOpenPlanningDay={hasPlanningPage ? handleOpenPlanningDay : null} /> : null}
               </div>
-            ) : null}
-            {/* Kept mounted behind other pages: coming back is instant and the
-                favorites it portals into the sidebar stay put. */}
-            <div className={`${hasSwitchedPage ? 'page-enter ' : ''}flex-1 min-h-0 4xl:flex-none 4xl:min-h-0`} hidden={shownPage !== 'dashboard'}>
+            ) : (
+              <div key={activeRoute} ref={scodocPageRef} className="flex-1 min-h-0 4xl:flex-none 4xl:min-h-0">
+                <PageErrorBoundary>
+                  {activeRoute === 'grades' ? <GradesPage user={sessionState.user} arrivalSource={arrivalSource} initialGradeRequest={pendingGradeRequest} onInitialGradeRequestHandled={clearPendingGradeRequest} /> : null}
+                  {activeRoute === 'absences' ? <AbsencesPage /> : null}
+                  {activeRoute === 'planning' ? (
+                    <PlanningPage selection={selectedTp} user={sessionState.user} establishment={establishment} showWeekend={showPlanningWeekend} onOpenAccount={handleOpenAccountModal} initialDay={pendingPlanningDay} onInitialDayHandled={clearPendingPlanningDay} arrivalSource={arrivalSource} />
+                  ) : null}
+                  {activeRoute === 'mail' ? (
+                    <MailPage />
+                  ) : null}
+                  {activeRoute === 'moodle' ? (
+                    <MoodlePage />
+                  ) : null}
+                  {activeRoute === 'ru' ? <CrousPage establishment={establishment} selection={selectedTp} sessionUser={sessionState.user} /> : null}
+                  {activeRoute === 'bus' ? <TransitPage establishment={establishment} selection={selectedTp} sessionUser={sessionState.user} /> : null}
+                </PageErrorBoundary>
+              </div>
+            )}
+            {/* Kept mounted on other pages: coming back is instant and the
+                widgets don't refetch or report a second dashboard view. */}
+            <div ref={dashboardPageRef} className="flex-1 min-h-0 4xl:flex-none 4xl:min-h-0" hidden={activeRoute !== 'dashboard'}>
               <WidgetContainer
                 userName={sessionState.givenName ?? sessionState.user}
                 isSessionReady={!sessionState.checking}
@@ -2900,30 +3113,13 @@ function App() {
                 showAppDescriptions={showAppDescriptions}
               />
             </div>
-            {isGradesPage ? (
-              <div className="page-enter flex-1 min-h-0 4xl:flex-none 4xl:min-h-0">
-                <GradesPage user={sessionState.user} arrivalSource={gradesArrivalSource} initialGradeRequest={pendingGradeRequest} onInitialGradeRequestHandled={clearPendingGradeRequest} />
-              </div>
-            ) : null}
-            {isPlanningPage ? (
-              <div className="page-enter flex-1 min-h-0 4xl:flex-none 4xl:min-h-0">
-                <PlanningPage selection={selectedTp} user={sessionState.user} showWeekend={showPlanningWeekend} onOpenAccount={handleOpenAccountModal} initialDay={pendingPlanningDay} onInitialDayHandled={clearPendingPlanningDay} arrivalSource={planningArrivalSource} />
-              </div>
-            ) : null}
             <div className="4xl:mt-auto">
               <AppFooter heroCredit={isWallpaperShown ? heroImage.credit : null} />
             </div>
-            {/* Fades each page switch in (see .page-switch-veil). Keyed by page
-                so it replays on every switch. */}
-            {hasSwitchedPage ? (
-              <div key={activePage} aria-hidden="true" className="page-switch-veil pointer-events-none absolute inset-0 z-20" />
-            ) : null}
           </div>
           <MobileTabBar
             establishment={establishment}
             gradesSupported={gradesSupported}
-            activePage={shownPage}
-            onNavigatePage={handleNavigatePage}
           />
         </div>
       ) : (
@@ -2967,6 +3163,8 @@ function App() {
         planningSelection={selectedTp}
         anonymousAnalytics={anonymousAnalytics}
         onAnonymousAnalyticsChange={isAnalyticsAvailable ? handleAnonymousAnalyticsChange : null}
+        establishment={establishment}
+        onEstablishmentChange={handleEstablishmentChange}
       />
       <WelcomeFromLent
         visible={welcomeFromLentOpen}
@@ -2980,6 +3178,10 @@ function App() {
         forceIos={forceIosPrompt}
         autoOpen={!settingsTransfer.arrived}
         onVisibleChange={setIsInstallPromptVisible}
+      />
+      <GuidedTour
+        enabled={sessionState.authenticated && !shouldShowCompletionScreen}
+        blocked={welcomeFromLentOpen || isInstallPromptVisible || isAccountModalOpen || hasPendingUpdate}
       />
       <ChangelogSheet />
       <PwaUpdateManager

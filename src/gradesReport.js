@@ -702,7 +702,8 @@ export function formatHour(value) {
   return `${hours}h${String(minutes).padStart(2, '0')}`
 }
 
-function formatDuration(hours) {
+// 2 → "2h", 1.5 → "1h30".
+export function formatDuration(hours) {
   if (hours <= 0) return '0h'
   const formatted = formatHour(hours)
   return formatted.endsWith('h00') ? formatted.slice(0, -2) : formatted
@@ -740,8 +741,6 @@ export function buildAbsenceReport(payload, releve, config) {
 
   const totals = { justified: 0, unjustified: 0, late: 0 }
   const entries = []
-  // Numeric start hour per entry: the formatted "8h00" sorts after "10h00".
-  const startHours = new Map()
   let spansSeveralDays = false
 
   for (const [date, list] of Object.entries(payload?.absences ?? {})) {
@@ -760,22 +759,23 @@ export function buildAbsenceReport(payload, releve, config) {
       const endDate = absence.dateFin && absence.dateFin !== date ? absence.dateFin : null
       if (endDate) spansSeveralDays = true
 
-      const entry = {
+      entries.push({
         id: `${date}-${start}-${entries.length}`,
         date,
         endDate,
         start: formatHour(start),
+        startHours: start,
         end: formatHour(end),
         subject: findModuleLabel(releve, absence.matiereComplet),
         teacher: formatTeacher(absence.enseignant),
         status,
-      }
-      entries.push(entry)
-      startHours.set(entry, start)
+        // Lateness is counted in occurrences, not hours.
+        hours: status === 'late' ? 0 : Math.max(0, end - start),
+      })
     }
   }
 
-  entries.sort((left, right) => right.date.localeCompare(left.date) || startHours.get(right) - startHours.get(left))
+  entries.sort((left, right) => right.date.localeCompare(left.date) || right.startHours - left.startHours)
 
   let totalLabels = {
     justified: formatDuration(totals.justified),
@@ -803,6 +803,79 @@ export function buildAbsenceReport(payload, releve, config) {
     // Hour totals mean nothing once an absence spans several days.
     totals: spansSeveralDays && !scodocTotals ? null : totalLabels,
   }
+}
+
+// Absences have to be justified within this long of their start (ScoDoc
+// passerelle default notice: 48 h).
+export const JUSTIFICATION_WINDOW_HOURS = 48
+
+// Hours left to justify an absence: positive while the window is open,
+// negative once it has closed. Null when the date is unreadable.
+export function hoursToJustify(entry, now = new Date()) {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(entry?.date ?? '')
+  if (!match) {
+    return null
+  }
+
+  const start = new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3]), 0, 0, 0)
+  start.setMinutes(Math.round((entry.startHours ?? 0) * 60))
+  const deadline = start.getTime() + JUSTIFICATION_WINDOW_HOURS * 3600 * 1000
+  return (deadline - now.getTime()) / 3600 / 1000
+}
+
+// The pre-filled mail to the department's secretariat. A mailto: link: the
+// mail is written and sent from the student's own mail client, nothing goes
+// through Tafac (and the link can't attach a file: the student adds it).
+export function buildJustificationMail({ to, student, entries, semesterLabel = null, formatDate }) {
+  const list = Array.isArray(entries) ? entries : [entries]
+  const name = [student?.firstName, student?.lastName].filter(Boolean).join(' ')
+  const day = (entry) => formatDate?.(entry.date) ?? entry.date
+  const lines = list.map((entry) => {
+    const detail = [entry.subject, entry.teacher ? `(${entry.teacher})` : null].filter(Boolean).join(' ')
+    return `- ${day(entry)}, ${entry.start} – ${entry.end}${detail ? ` · ${detail}` : ''}`
+  })
+  const subject = list.length === 1
+    ? `Justificatif d'absence du ${day(list[0])}${name ? ` - ${name}` : ''}`
+    : `Justificatif d'absences${name ? ` - ${name}` : ''}`
+  const body = [
+    'Bonjour,',
+    '',
+    list.length === 1
+      ? "Je vous transmets un justificatif pour l'absence suivante :"
+      : 'Je vous transmets un justificatif pour les absences suivantes :',
+    ...lines,
+    '',
+    semesterLabel ? `Semestre : ${semesterLabel}` : null,
+    '(justificatif en pièce jointe)',
+    '',
+    'Cordialement,',
+    name,
+  ].filter((line) => line != null).join('\n')
+
+  return {
+    to,
+    subject,
+    body,
+    href: `mailto:${to}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`,
+  }
+}
+
+// Hours missed per subject (lateness left out), most missed first: where a
+// department's absence malus would bite.
+export function summarizeAbsencesBySubject(entries) {
+  const bySubject = new Map()
+
+  for (const entry of entries) {
+    if (entry.status === 'late') continue
+    const subject = entry.subject ?? 'Matière non précisée'
+    const current = bySubject.get(subject) ?? { subject, hours: 0, unjustifiedHours: 0, count: 0 }
+    current.hours += entry.hours
+    current.count += 1
+    if (entry.status === 'unjustified') current.unjustifiedHours += entry.hours
+    bySubject.set(subject, current)
+  }
+
+  return [...bySubject.values()].sort((left, right) => right.hours - left.hours || left.subject.localeCompare(right.subject))
 }
 
 const HTML_ENTITIES = {
