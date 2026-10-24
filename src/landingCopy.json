@@ -182,7 +182,8 @@
   },
   "beta": {
     "title": "Juste pour préciser, Tafac est encore en bêta !",
-    "body": "Avec mon équipe, nous travaillons à améliorer Tafac chaque jour. Le projet est encore jeune : vous pourrez rencontrer des bugs ou des fonctionnalités incomplètes. Vos retours et vos contributions nous aident à le faire progresser !"
+    "body": "Avec l’équipe, nous travaillons à améliorer Tafac chaque jour. Le projet est encore jeune : vous pourrez rencontrer des bugs ou des fonctionnalités incomplètes. Vos retours et vos contributions nous aident à le faire progresser !",
+    "photoCaption": "Tom"
   },
   "papillon": {
     "partOf": "fait partie de",
