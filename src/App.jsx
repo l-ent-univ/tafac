@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Icon } from '@iconify/react'
 import universityConfig from '@university'
 import { getPapillonUrl, PAPILLON_DEBUG_KEY, readPapillonDebugOverride } from './papillon'
+import { getLoadedUniversityId, writeUniversityChoice } from './universityRuntime'
 import favicon from './assets/favicon.png'
 import AppHeader from './components/AppHeader'
 import AppFooter from './components/AppFooter'
@@ -3249,6 +3250,21 @@ function App() {
                 }}
               >
                 Papillon {IS_PAPILLON_SHOWN ? '✓' : ''}
+              </button>
+              {/* Forgets the university picked on this device and reloads on
+                  the neutral page (src/universityRuntime.js). Signed out
+                  only: signed in, the session's university wins. */}
+              <button
+                type="button"
+                className="appearance-none border border-border rounded-[12px] bg-bg text-text py-[0.7rem] px-[0.9rem] font-inherit font-semibold leading-[1.1] disabled:opacity-45 disabled:cursor-not-allowed"
+                onClick={() => {
+                  writeUniversityChoice(null)
+                  window.location.assign('/')
+                }}
+                disabled={sessionState.authenticated}
+                title={sessionState.authenticated ? 'Se déconnecter d’abord : connecté, la session décide' : undefined}
+              >
+                Réinitialiser l'université ({getLoadedUniversityId() ?? 'aucune'})
               </button>
               <button
                 type="button"
