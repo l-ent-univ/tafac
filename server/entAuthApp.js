@@ -38,6 +38,7 @@ import {
   resolveSessionSecrets,
   unpackJarCookies,
 } from './sessionCookie.js'
+import { createLaunchTargetPolicy } from './launchTargets.js'
 import { createPlanningPortalApiClient } from '../planningPortalApi.js'
 import { SchoolCertificateUnavailableError, buildDemoCertificatePdf, openCertificateDownload } from './schoolCertificate.js'
 import { createPlanningRpcClient } from '../planningRpc.js'
@@ -208,6 +209,10 @@ const CAS_LOGOUT_TIMEOUT_MS = 4000
 function isCasHost(hostname) {
   return Boolean(hostname) && hostname === CAS_HOST
 }
+
+// Targets the launch relay may fetch with the session jar and send the
+// browser to: this university's services only (server/launchTargets.js).
+const launchTargets = createLaunchTargetPolicy(universityConfig)
 
 // Session cookie: an encrypted copy of the upstream cookie jar (CAS TGC
 // included), see server/sessionCookie.js. In production the secret must come
@@ -1536,6 +1541,16 @@ async function previewServerLaunch(targetUrl, session) {
     }
   }
 
+  // Not one of this university's services: the browser opens it itself.
+  if (!launchTargets.isAllowed(targetUrl)) {
+    return {
+      finalUrl: targetUrl,
+      chain: [],
+      useServerLaunch: false,
+      reason: 'target-not-allowed',
+    }
+  }
+
   if (!session) {
     return {
       finalUrl: targetUrl,
@@ -1628,6 +1643,17 @@ async function previewServerLaunch(targetUrl, session) {
           }
         }
 
+        // The chain leaves the university's services: the browser follows it.
+        if (!launchTargets.isAllowed(nextUrl)) {
+          return {
+            finalUrl: targetUrl,
+            chain,
+            useServerLaunch: false,
+            reason: 'direct-browser-launch',
+            ...launchCapabilities,
+          }
+        }
+
         currentUrl = nextUrl
         continue
       }
@@ -1643,6 +1669,16 @@ async function previewServerLaunch(targetUrl, session) {
             chain,
             useServerLaunch: true,
             reason: 'cas-html-redirect',
+            ...launchCapabilities,
+          }
+        }
+
+        if (!launchTargets.isAllowed(htmlRedirect)) {
+          return {
+            finalUrl: targetUrl,
+            chain,
+            useServerLaunch: false,
+            reason: 'direct-browser-launch',
             ...launchCapabilities,
           }
         }
@@ -2487,7 +2523,9 @@ app.get('/__ent_auth/launch', async (req, res) => {
   const targetUrl = req.query.url
   const debug = req.query.debug === '1'
 
-  if (!targetUrl || !/^https?:\/\//i.test(targetUrl)) {
+  // Only this university's services, never an arbitrary address: no open
+  // redirect from our domain, no server-side fetch of anything else.
+  if (typeof targetUrl !== 'string' || !launchTargets.isAllowed(targetUrl)) {
     return res.redirect('/')
   }
 
@@ -2573,6 +2611,11 @@ app.get('/__ent_auth/launch', async (req, res) => {
         const html = await response.text()
         const htmlRedirect = extractHtmlRedirect(html, currentUrl)
         if (htmlRedirect) {
+          // Leaving the university's services: the browser takes it from the target.
+          if (!launchTargets.isAllowed(htmlRedirect)) {
+            if (debug) return res.json({ finalUrl: targetUrl, chain, leftAllowedHosts: true })
+            return res.redirect(targetUrl)
+          }
           currentUrl = htmlRedirect
           continue
         }
@@ -2600,6 +2643,11 @@ app.get('/__ent_auth/launch', async (req, res) => {
         // are bound to the SP domain and can't be transferred to the browser.
         // Redirect the browser directly — it will complete the full auth flow itself.
         if (debug) return res.json({ finalUrl: targetUrl, chain, saml: true })
+        return res.redirect(targetUrl)
+      }
+
+      if (!launchTargets.isAllowed(nextUrl)) {
+        if (debug) return res.json({ finalUrl: targetUrl, chain, leftAllowedHosts: true })
         return res.redirect(targetUrl)
       }
 

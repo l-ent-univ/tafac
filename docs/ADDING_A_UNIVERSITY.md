@@ -119,6 +119,7 @@ Un feature à `false` : le serveur répond `{ disabled: true }` sur les endpoint
   }
   ```
   Le serveur parcourt la chaîne SSO du webmail (Shibboleth → CAS) avec une copie du cookie jar de session, puis lit la boîte via l'API Zimbra (SOAP `SearchRequest`/`GetFolderRequest`, repli REST `/service/home/~/inbox?fmt=json`). Résultat mis en cache 2 min par session. Le compte démo renvoie des mails fictifs. Pour un autre webmail (SOGo, Roundcube, Exchange…), ajoutez une fonction dans `MAIL_PROVIDERS` (`server/entAuthApp.js`) qui renvoie `{ unreadCount, webmailHref, messages }` ; un `provider` inconnu répond `500 { error: 'Mail provider not configured' }`.
+- `launch.allowedDomains` (optionnel) — domaines que le relais `/__ent_auth/launch` peut ouvrir avec la session, sous-domaines compris (Rennes : `['univ-rennes.fr', 'univ-rennes1.fr', 'iut-lannion.loxya.app']`). Les hôtes des origines et URLs de service de la config (ENT, CAS, ADE, Moodle, planning, notes, webmail, certificat) et les `signInDomains` sont déjà autorisés. Toute autre cible est renvoyée vers `/` par le relais et ouverte directement par le navigateur (`launch-preview` répond `useServerLaunch: false`, `reason: 'target-not-allowed'`). Ajoutez ici les domaines des applications de l'ENT protégées par le CAS de l'université, et ceux de vos `extraServices` (`client.js`).
 
 ## Icônes des applications
 
