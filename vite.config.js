@@ -1,4 +1,6 @@
 import { execSync } from 'node:child_process'
+import { readFileSync } from 'node:fs'
+import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import tailwindcss from '@tailwindcss/vite'
 import react from '@vitejs/plugin-react'
@@ -6,15 +8,18 @@ import { VitePWA } from 'vite-plugin-pwa'
 import { defineConfig, loadEnv } from 'vite'
 import { readAnalyticsConfig } from './server/analytics.js'
 import { resolveDataDir } from './server/appIcons.js'
+import { fillBrandingPlaceholders, fillPublicOrigin } from './server/appShell.js'
 import { createUniversitiesApp } from './server/universitiesApp.js'
 import { branding as neutralBranding } from './universities/neutral.js'
 import { listServedUniversityIds, loadSharedConfig, resolveMultiUniversity, resolveUniversityId } from './universities/index.js'
 
 // Every university, like tafac.fr, unless UNIVERSITY picks one (and
-// MULTI_UNIVERSITY isn't set): see universities/index.js.
+// MULTI_UNIVERSITY isn't set): see universities/index.js. The build is the
+// same either way; this only decides what the dev and preview servers serve.
 const multiUniversity = resolveMultiUniversity()
 const universityId = resolveUniversityId()
-const branding = multiUniversity ? neutralBranding : (await loadSharedConfig(universityId)).branding
+// The page's SEO text on the dev and preview servers, as server.js fills it.
+const pageBranding = multiUniversity ? neutralBranding : (await loadSharedConfig(universityId)).branding
 
 // Dev/preview backend: the same Express app the production server mounts
 // (server/universitiesApp.js). Unmatched requests fall through to Vite.
@@ -51,24 +56,28 @@ const entDevAuthPlugin = {
   configureServer(server) {
     return mountEntAuthApp(server)
   },
-  configurePreviewServer(server) {
-    return mountEntAuthApp(server)
-  },
-  // index.html carries %LENT_*% placeholders so titles/SEO follow the
-  // configured university in both dev and build. Its __PUBLIC_ORIGIN__ stays
-  // in the build, for the server to fill in per request (server.js); the dev
-  // server leaves the links relative.
-  transformIndexHtml(html, context) {
-    const replacements = {
-      LENT_APP_NAME: branding.appName,
-      LENT_SEO_TITLE: branding.seoTitle,
-      LENT_SEO_DESCRIPTION: branding.seoDescription,
-      LENT_REPO_URL: branding.about?.repoUrl ?? '',
-      LENT_ALTERNATE_NAMES_JSON: JSON.stringify(branding.alternateNames ?? []),
-    }
+  async configurePreviewServer(server) {
+    await mountEntAuthApp(server)
 
-    const filled = html.replace(/%(LENT_[A-Z_]+)%/g, (match, token) => replacements[token] ?? match)
-    return context?.server ? filled.replaceAll('__PUBLIC_ORIGIN__', '') : filled
+    // The built page with its placeholders filled, as server.js sends it.
+    const distDir = path.resolve(server.config.root, server.config.build.outDir)
+    server.middlewares.use((req, res, next) => {
+      const pathname = String(req.url ?? '').split('?')[0]
+      const isPage = (req.method === 'GET' || req.method === 'HEAD')
+        && !path.extname(pathname)
+        && String(req.headers.accept ?? '').includes('text/html')
+      if (!isPage) return next()
+
+      const html = readFileSync(path.join(distDir, 'index.html'), 'utf8')
+      res.setHeader('Content-Type', 'text/html; charset=utf-8')
+      res.end(fillPublicOrigin(fillBrandingPlaceholders(html, pageBranding), ''))
+    })
+  },
+  // index.html's %LENT_*% placeholders and __PUBLIC_ORIGIN__ stay in the
+  // build, for the server to fill as it sends the page (server/appShell.js);
+  // the dev server fills them here and leaves the links relative.
+  transformIndexHtml(html, context) {
+    return context?.server ? fillPublicOrigin(fillBrandingPlaceholders(html, pageBranding), '') : html
   },
 }
 
@@ -101,10 +110,11 @@ export default defineConfig({
       workbox: {
         navigateFallbackDenylist: [/^\/__ent_auth/, /^\/__ent_proxy/],
       },
+      // One build for every university: the installed app is Tafac's.
       manifest: {
-        name: branding.appName,
-        short_name: branding.appName,
-        description: branding.pwaDescription ?? branding.seoDescription,
+        name: neutralBranding.appName,
+        short_name: neutralBranding.appName,
+        description: neutralBranding.pwaDescription,
         lang: 'fr',
         id: '/',
         categories: ['education'],
