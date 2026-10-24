@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { Icon } from '@iconify/react'
 import universityConfig from '@university'
 import loginClouds from '../assets/login/login-clouds.webp'
@@ -12,7 +12,7 @@ import AboutModal from './AboutModal'
 import PapillonBadge from './PapillonBadge'
 import RenameNotice from './RenameNotice'
 import { APP_NAME } from '../seo'
-import { PICKER_PATH, getListedUniversities, isMultiUniversity } from '../universityRuntime'
+import { getListedUniversities, getLoadedUniversityId } from '../universityRuntime'
 
 const universityLogo = universityConfig.branding.logo
 const universityLogoAlt = universityConfig.branding.logoAlt ?? universityConfig.university?.name ?? ''
@@ -33,32 +33,82 @@ const LINK_CLASS = 'rounded-sm text-[14px] font-medium leading-[1.2] text-text-7
 // instead of the form. Each one is a link to /<slug>, which boots the page
 // for that university (src/universityBoot.js) and lands on its form.
 const isPicker = universityConfig.neutral === true
-// A university picked among several: « Changer d'université » brings the
-// list back. One university on the server (self-hosted): nothing to change.
-const canChangeUniversity = !isPicker && isMultiUniversity()
+// A university picked: the others the server lists, under the form (« aussi
+// disponible pour »), each to its own form. None on a single-university
+// server (self-hosted).
+const otherUniversities = isPicker
+  ? []
+  : getListedUniversities().filter((entry) => entry.id !== getLoadedUniversityId())
+const issuesUrl = repoUrl ? `${repoUrl.replace(/\/$/, '')}/issues` : null
+// The guide to adding a university, in the repo.
+const addUniversityUrl = repoUrl ? `${repoUrl.replace(/\/$/, '')}/blob/main/docs/ADDING_A_UNIVERSITY.md` : null
+// From this many universities, a search field over the list.
+const PICKER_SEARCH_FROM = 6
 
-const PICKER_ITEM_CLASS = 'group box-border flex w-full min-h-[60px] items-center gap-4 rounded-full border border-border-input bg-widget-bg px-5 py-3 text-left text-text font-body transition-[border-color,background-color] duration-150 hover:border-text-30 focus-visible:border-text-60'
-
+// The picker: a pill per university, like the form's fields (its logo, its
+// name, its address). A search field once the list is long; a way to ask
+// for a missing university.
 function UniversityPicker() {
   const universities = getListedUniversities()
+  const [query, setQuery] = useState('')
+  const shown = useMemo(() => {
+    const needle = query.trim().toLowerCase()
+    if (!needle) return universities
+    return universities.filter((entry) => `${entry.name} ${entry.shortName ?? ''} ${entry.slug}`.toLowerCase().includes(needle))
+  }, [query, universities])
 
   return (
-    <nav className="mt-6 flex w-full flex-col gap-3" aria-label="Universités">
-      {universities.map((entry) => (
-        <a key={entry.id} className={PICKER_ITEM_CLASS} href={`/${entry.slug}`}>
-          <span className="flex h-9 w-[92px] shrink-0 items-center justify-center">
-            {entry.logoUrl ? (
-              <img className="block max-h-9 w-auto max-w-[92px] object-contain dark:invert" src={entry.logoUrl} alt="" />
-            ) : null}
-          </span>
-          <span className="min-w-0 flex-1 text-[15px] font-semibold leading-[1.25]">{entry.name}</span>
-          <Icon icon="carbon:arrow-right" className="h-4 w-4 shrink-0 text-text-muted transition-transform duration-150 group-hover:translate-x-0.5" aria-hidden="true" />
-        </a>
-      ))}
-      {universities.length === 0 ? (
-        <p className="m-0 text-sm font-medium text-text-muted font-body">Aucune université disponible pour le moment</p>
+    <div className="mt-6 flex w-full flex-col gap-3">
+      {universities.length >= PICKER_SEARCH_FROM ? (
+        <div className="relative">
+          <Icon icon="carbon:search" className="pointer-events-none absolute left-[18px] top-1/2 h-4 w-4 -translate-y-1/2 text-text-muted" aria-hidden="true" />
+          <input
+            type="search"
+            className={`${FIELD_CLASS} pl-11`}
+            placeholder="Chercher une université"
+            aria-label="Chercher une université"
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+          />
+        </div>
       ) : null}
-    </nav>
+      <nav className="flex flex-col gap-2.5" aria-label="Universités">
+        {shown.map((entry) => (
+          <a
+            key={entry.id}
+            className="group box-border flex min-h-[76px] items-center gap-4 rounded-full border border-border-input bg-widget-bg py-3 pl-6 pr-5 text-left text-text no-underline transition-[border-color] duration-150 hover:border-text-30 focus-visible:border-text-60 max-md:gap-3 max-md:pl-5 max-md:pr-4"
+            href={`/${entry.slug}`}
+          >
+            <span className="flex h-11 w-[120px] shrink-0 items-center justify-start max-md:w-[96px]">
+              {entry.logoUrl ? (
+                <img className="block max-h-full w-auto max-w-full object-contain dark:invert" src={entry.logoUrl} alt="" />
+              ) : (
+                <Icon icon="carbon:education" className="h-7 w-7 text-text" aria-hidden="true" />
+              )}
+            </span>
+            <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+              <span className="text-[16px] font-bold leading-[1.2]">{entry.name}</span>
+              <span className="truncate text-[13px] font-medium leading-[1.2] text-text-muted font-body">tafac.fr/{entry.slug}</span>
+            </span>
+            <Icon icon="carbon:chevron-right" className="h-5 w-5 shrink-0 text-text-muted transition-colors duration-150 group-hover:text-text" aria-hidden="true" />
+          </a>
+        ))}
+        {universities.length === 0 ? (
+          <p className="m-0 text-sm font-medium text-text-muted font-body">Aucune université disponible pour le moment</p>
+        ) : null}
+        {universities.length > 0 && shown.length === 0 ? (
+          <p className="m-0 py-2 text-sm font-medium text-text-muted font-body">Aucune université ne correspond</p>
+        ) : null}
+      </nav>
+      {issuesUrl ? (
+        <p className="m-0 mt-2 text-[13px] font-medium leading-[1.4] text-text-muted font-body">
+          Ton université n'est pas dans la liste{'\u202f'}?{' '}
+          <a className={LINK_CLASS} href={issuesUrl} target="_blank" rel="noopener noreferrer">Dis-le-nous</a>
+          {' '}ou{' '}
+          <a className={LINK_CLASS} href={addUniversityUrl} target="_blank" rel="noopener noreferrer">ajoute-la</a>
+        </p>
+      ) : null}
+    </div>
   )
 }
 
@@ -312,11 +362,6 @@ function LoginPage({
                   </p>
                 ) : null}
 
-                  {canChangeUniversity ? (
-                    <a className={`${LINK_CLASS} mt-5 inline-block`} href={PICKER_PATH}>
-                      Changer d'université
-                    </a>
-                  ) : null}
                 </>
               )}
             </div>
@@ -324,6 +369,38 @@ function LoginPage({
         </div>
 
         <div className="flex shrink-0 flex-col items-center gap-3 px-6 pb-5 text-center max-3xl:px-5 max-md:px-4">
+          {/* The other universities, to their own form (/<slug>). */}
+          {otherUniversities.length > 0 ? (
+            <div
+              className="flex flex-wrap items-center justify-center gap-x-5 gap-y-3"
+              aria-label="Autres universités disponibles"
+            >
+              <p className="m-0 text-[13px] font-medium leading-[1.1] text-text-muted font-body">
+                {APP_NAME} est aussi disponible pour
+              </p>
+              <div className="flex flex-wrap items-center justify-center gap-x-6 gap-y-3">
+                {otherUniversities.map((entry) => (
+                  <a
+                    key={entry.id}
+                    className="rounded-md opacity-40 transition-opacity duration-120 hover:opacity-75 focus-visible:opacity-75"
+                    href={`/${entry.slug}`}
+                    title={`Se connecter — ${entry.name}`}
+                  >
+                    {entry.logoUrl ? (
+                      <img
+                        className="block h-7 w-auto max-w-[140px] object-contain grayscale dark:invert"
+                        src={entry.logoUrl}
+                        alt={entry.name}
+                      />
+                    ) : (
+                      <span className="text-[13px] font-semibold text-text font-body">{entry.name}</span>
+                    )}
+                  </a>
+                ))}
+              </div>
+            </div>
+          ) : null}
+
           <footer className="flex flex-wrap items-center justify-center gap-x-4 gap-y-1 text-[12px] font-medium leading-[1.4] text-text-muted font-body" aria-label="Copyright">
             <span>{universityConfig.branding.loginFooterLine}</span>
             {repoUrl ? (
