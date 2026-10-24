@@ -1,15 +1,17 @@
 // Production server: the backend of every university it serves
 // (server/universitiesApp.js) and the frontend, one build for all (dist/).
 //
-// Single university (default): serves the university picked by UNIVERSITY,
-// same behavior as always.
+// Every university (tafac.fr): MULTI_UNIVERSITY=1 (formerly MULTI_TENANT),
+// or no UNIVERSITY set. One process for all of them. A signed-in request
+// goes to its session's university; a signed-out one to the university
+// chosen on the login page, else the old per-university hostname rules, else
+// the default one (UNIVERSITY, else univ-rennes). The universities served are
+// the UNIVERSITIES list (formerly TENANTS), default: all non-example ones.
+// The page starts neutral and asks which one.
 //
-// Every university (MULTI_UNIVERSITY=1, formerly MULTI_TENANT): one process
-// for all of them. A signed-in request goes to its session's university; a
-// signed-out one to the university chosen on the login page, else the old
-// per-university hostname rules, else the UNIVERSITY default. The
-// universities served are the UNIVERSITIES list (formerly TENANTS), default:
-// all non-example ones. The page starts neutral and asks which one.
+// One university (a self-hosted instance): UNIVERSITY=<id> without
+// MULTI_UNIVERSITY (or MULTI_UNIVERSITY=0). That university only, no picker,
+// its own SEO text: same behavior as before.
 import express from 'express'
 import { readFileSync } from 'node:fs'
 import path from 'node:path'
@@ -18,13 +20,18 @@ import { shutdownAllAnalytics } from './server/analytics.js'
 import { fillBrandingPlaceholders, fillPublicOrigin } from './server/appShell.js'
 import { createUniversitiesApp } from './server/universitiesApp.js'
 import { branding as neutralBranding } from './universities/neutral.js'
-import { listServedUniversityIds, loadSharedConfig, resolveUniversityId } from './universities/index.js'
+import {
+  listServedUniversityIds,
+  loadSharedConfig,
+  resolveMultiUniversity,
+  resolveUniversityId,
+} from './universities/index.js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const DIST_DIR = path.join(__dirname, 'dist')
 
 const PORT = process.env.PORT || 3000
-const MULTI_UNIVERSITY = ['1', 'true', 'yes'].includes(String(process.env.MULTI_UNIVERSITY ?? process.env.MULTI_TENANT ?? '').toLowerCase())
+const MULTI_UNIVERSITY = resolveMultiUniversity()
 
 function getPublicOrigin(req) {
   const forwardedProto = String(req.headers['x-forwarded-proto'] || '').split(',')[0].trim()
