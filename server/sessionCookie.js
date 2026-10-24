@@ -324,6 +324,27 @@ export function fitSessionPayload({
   return { payload, kept: kept.length, dropped, size, overBudget: size > budget }
 }
 
+// The session carried by a request's cookies (parsed by cookie-parser): the
+// encrypted cookie wins, the legacy signed one is only read when no readable
+// encrypted one is present. → { data, legacyCookie } or null.
+export function readSessionCookies(cookies, { codec, cookieName }) {
+  const current = codec.decode(cookies?.[cookieName])
+  if (current) {
+    return { ...current, legacyCookie: false }
+  }
+
+  const legacy = codec.decode(cookies?.[LEGACY_SESSION_COOKIE_NAME])
+  return legacy ? { ...legacy, legacyCookie: true } : null
+}
+
+// University a session belongs to. Sessions issued before the field existed
+// carry no `uni`: they belong to `legacyUniversityId`, the university the
+// address served then (the default one on the root domain).
+export function getSessionUniversityId(data, legacyUniversityId = null) {
+  const uni = typeof data?.uni === 'string' && data.uni ? data.uni : null
+  return uni ?? legacyUniversityId ?? null
+}
+
 // Absolute cap: a session older than SESSION_ABSOLUTE_TTL_MS is gone whatever
 // the cookie's rolling expiry says (and so is a payload without a login time).
 export function isSessionDataExpired(data, now = Date.now()) {

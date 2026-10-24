@@ -335,7 +335,14 @@ function WidgetNextClass({
   autoLoad = true,
   lookaheadDays = NEXT_CLASS_LOOKAHEAD_DAYS,
   onOpenPlanning = null,
+  preview = null,
 }) {
+  // `preview`: ADE events to show (the landing page, which changes them),
+  // like the debug class: nothing loaded, cached or reported, not clickable.
+  const isStatic = debug || Boolean(preview)
+  const staticNextClass = useMemo(() => (preview
+    ? findNextClass(preview.map(decorateUpcomingEvent).filter(Boolean).sort(compareEvents))
+    : null), [preview])
   const resourceIds = useMemo(() => buildResourceIdsFromSelection(selection), [selection])
   const resourceKey = resourceIds.join('|')
   const cacheKey = useMemo(
@@ -344,13 +351,13 @@ function WidgetNextClass({
   )
   const hasResources = resourceIds.length > 0
   const [widgetState, setWidgetState] = useState(() => (
-    debug
-      ? createWidgetState({ status: 'ready', nextClass: buildFakeNextClass() })
+    isStatic
+      ? createWidgetState({ status: 'ready', nextClass: staticNextClass ?? buildFakeNextClass() })
       : createWidgetState({ status: hasResources ? (autoLoad ? 'loading' : 'paused') : 'unconfigured' })
   ))
   const [timeLabel, setTimeLabel] = useState('')
   const [wide, setWide] = useState(false)
-  useWidgetLoadReport('nextClass', getLoadOutcome(widgetState, debug))
+  useWidgetLoadReport('nextClass', getLoadOutcome(widgetState, isStatic))
   const visibleRef = useRef(visible)
   const loadedEventsRef = useRef([])
   const loadedCompleteRef = useRef(true)
@@ -440,7 +447,7 @@ function WidgetNextClass({
   }, [])
 
   const loadNextClass = useCallback(async ({ background = false } = {}) => {
-    if (debug) {
+    if (isStatic) {
       return
     }
 
@@ -524,7 +531,7 @@ function WidgetNextClass({
 
       loadingRef.current = false
     }
-  }, [cacheKey, debug, hasResources, selection, lookaheadDays])
+  }, [cacheKey, isStatic, hasResources, selection, lookaheadDays])
 
   useEffect(() => {
     abortControllerRef.current?.abort()
@@ -534,10 +541,10 @@ function WidgetNextClass({
     quietUntilRef.current = 0
     loadingRef.current = false
 
-    if (debug) {
+    if (isStatic) {
       setWidgetState(createWidgetState({
         status: 'ready',
-        nextClass: buildFakeNextClass(),
+        nextClass: staticNextClass ?? buildFakeNextClass(),
       }))
 
       return undefined
@@ -593,11 +600,11 @@ function WidgetNextClass({
       abortControllerRef.current = null
       loadingRef.current = false
     }
-  }, [autoLoad, cacheKey, debug, hasResources, loadNextClass, resourceKey])
+  }, [autoLoad, cacheKey, isStatic, staticNextClass, hasResources, loadNextClass, resourceKey])
 
   useEffect(() => {
     function updateWidgetState() {
-      const liveNextClass = debug
+      const liveNextClass = isStatic
         ? widgetState.nextClass
         : loadedEventsRef.current.length > 0
           ? syncNextClassFromLoadedEvents()
@@ -610,7 +617,7 @@ function WidgetNextClass({
       }
 
       if (
-        !debug
+        !isStatic
         && autoLoad
         && hasResources
         && visibleRef.current
@@ -629,10 +636,10 @@ function WidgetNextClass({
 
     const intervalId = window.setInterval(updateWidgetState, NEXT_CLASS_TICK_MS)
     return () => window.clearInterval(intervalId)
-  }, [autoLoad, debug, hasResources, loadNextClass, syncNextClassFromLoadedEvents, widgetState.nextClass])
+  }, [autoLoad, isStatic, hasResources, loadNextClass, syncNextClassFromLoadedEvents, widgetState.nextClass])
 
   useEffect(() => {
-    if (debug || !autoLoad || !hasResources) {
+    if (isStatic || !autoLoad || !hasResources) {
       return undefined
     }
 
@@ -661,7 +668,7 @@ function WidgetNextClass({
       window.removeEventListener('focus', handleForegroundRefresh)
       document.removeEventListener('visibilitychange', handleForegroundRefresh)
     }
-  }, [autoLoad, debug, hasResources, loadNextClass, syncNextClassFromLoadedEvents])
+  }, [autoLoad, isStatic, hasResources, loadNextClass, syncNextClassFromLoadedEvents])
 
   useEffect(() => {
     if (widgetState.status !== 'ready' || !nextClass) {
@@ -737,13 +744,13 @@ function WidgetNextClass({
 
   return (
     <article
-      className={`next-class-widget widget-card relative z-0 hover:z-10 shadow-md flex-[0_1_190px] h-[140px] p-4 border border-white rounded-[22px] overflow-visible text-base leading-6 min-w-0 max-2xl:flex-[1_1_calc(50%-6px)] max-2xl:min-w-[min(320px,100%)] max-md:h-[132px] max-md:p-3 max-md:rounded-[20px] max-xs:h-[140px] max-xs:min-w-0 max-xs:@container flex flex-col gap-[6px] text-text cursor-pointer ${isStatusWide ? 'max-xs:flex-[1_1_100%]' : 'max-xs:flex-[1_1_calc(50%-4px)]'} ${wide ? '2xl:flex-[0_1_380px]' : isStatusWide ? '2xl:flex-[0_1_300px]' : ''} ${visible ? 'widget-card-visible' : ''}`}
+      className={`next-class-widget widget-card relative z-0 hover:z-10 shadow-md flex-[0_1_190px] h-[140px] p-4 border border-white rounded-[22px] overflow-visible text-base leading-6 min-w-0 max-2xl:flex-[1_1_calc(50%-6px)] max-2xl:min-w-[min(320px,100%)] max-md:h-[132px] max-md:p-3 max-md:rounded-[20px] max-xs:h-[140px] max-xs:min-w-0 max-xs:@container flex flex-col gap-[6px] text-text ${preview ? '' : 'cursor-pointer'} ${isStatusWide ? 'max-xs:flex-[1_1_100%]' : 'max-xs:flex-[1_1_calc(50%-4px)]'} ${wide ? '2xl:flex-[0_1_380px]' : isStatusWide ? '2xl:flex-[0_1_300px]' : ''} ${visible ? 'widget-card-visible' : ''}`}
       style={showsClass ? accentStyle(accentFor(nextClass.title)) : undefined}
       aria-label={opensInApp ? 'Prochain cours, voir le planning' : 'Prochain cours ouvrir ADE'}
-      onClick={openPlanning}
-      onKeyDown={handleKeyDown}
-      role={opensInApp ? 'button' : 'link'}
-      tabIndex={0}
+      onClick={preview ? undefined : openPlanning}
+      onKeyDown={preview ? undefined : handleKeyDown}
+      role={preview ? undefined : opensInApp ? 'button' : 'link'}
+      tabIndex={preview ? undefined : 0}
     >
       {/* The course's wash, as the planning's blocks wear it, in a layer of
           its own clipped to the card's corners (the card lets its date
@@ -755,7 +762,7 @@ function WidgetNextClass({
       ) : null}
       {/* The "opens another site" arrow: none when the card opens the
           Planning page, as on "Dernière note". */}
-      {opensInApp ? null : <Icon icon="carbon:arrow-up-right" className="grade-corner-arrow absolute top-3 right-3 w-[14px] h-[14px] text-text opacity-0 transition-opacity duration-150 ease-in-out shrink-0" aria-hidden="true" />}
+      {opensInApp || preview ? null : <Icon icon="carbon:arrow-up-right" className="grade-corner-arrow absolute top-3 right-3 w-[14px] h-[14px] text-text opacity-0 transition-opacity duration-150 ease-in-out shrink-0" aria-hidden="true" />}
       <div className="flex items-center gap-[5px] min-w-0">
         <span className="m-0 min-w-0 leading-[1.06] text-base font-medium text-text-muted overflow-hidden text-ellipsis whitespace-nowrap max-md:text-[15px]">Prochain cours</span>
       </div>

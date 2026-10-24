@@ -34,10 +34,13 @@ import {
   createSessionCookieCodec,
   fitSessionPayload,
   getSessionCookieName,
+  getSessionUniversityId,
   isSessionDataExpired,
+  readSessionCookies,
   resolveSessionSecrets,
   unpackJarCookies,
 } from './sessionCookie.js'
+import { createLaunchTargetPolicy } from './launchTargets.js'
 import { createPlanningPortalApiClient } from '../planningPortalApi.js'
 import { SchoolCertificateUnavailableError, buildDemoCertificatePdf, openCertificateDownload } from './schoolCertificate.js'
 import { createPlanningRpcClient } from '../planningRpc.js'
@@ -82,8 +85,11 @@ function resolveTrustProxy(value) {
 
 // options.analytics: { projectKey, host } — defaults to POSTHOG_PROJECT_KEY /
 // POSTHOG_HOST from the environment (analytics are off without a key).
-// options.session: { secret, previousSecrets, production } — defaults to
-// SESSION_SECRET / SESSION_SECRET_PREVIOUS and NODE_ENV === 'production'.
+// options.session: { secret, previousSecrets, production, legacyUniversityId }
+// — defaults to SESSION_SECRET / SESSION_SECRET_PREVIOUS and NODE_ENV ===
+// 'production'. legacyUniversityId (an id, or a function of the request) is
+// the university of a session cookie issued before sessions carried one;
+// defaults to this university.
 // server.js (the production entry point) always passes production: true, the
 // Vite mount always passes false; tests inject a secret here.
 // options.appIcons: { dataDir } — defaults to DATA_DIR, else ./data (see
@@ -209,6 +215,10 @@ function isCasHost(hostname) {
   return Boolean(hostname) && hostname === CAS_HOST
 }
 
+// Targets the launch relay may fetch with the session jar and send the
+// browser to: this university's services only (server/launchTargets.js).
+const launchTargets = createLaunchTargetPolicy(universityConfig)
+
 // Session cookie: an encrypted copy of the upstream cookie jar (CAS TGC
 // included), see server/sessionCookie.js. In production the secret must come
 // from the environment and the cookie carries the __Host- prefix.
@@ -224,6 +234,14 @@ const sessionCodec = createSessionCookieCodec({
 })
 const SESSION_COOKIE_NAME = getSessionCookieName(IS_PRODUCTION)
 const SESSION_COOKIE_OPTIONS = buildSessionCookieOptions(IS_PRODUCTION)
+// Every session says which university it belongs to (`uni` in the payload);
+// this app only accepts its own, so one university's session never reaches
+// another one's services.
+const UNIVERSITY_ID = universityConfig.id
+const legacySessionUniversity = options.session?.legacyUniversityId ?? UNIVERSITY_ID
+function getLegacySessionUniversityId(req) {
+  return typeof legacySessionUniversity === 'function' ? legacySessionUniversity(req) : legacySessionUniversity
+}
 // In-memory sessions (full jar, caches) are dropped after this much idle time;
 // the cookie rebuilds them on the next request. The cookie itself follows the
 // rolling/absolute lifetimes in server/sessionCookie.js.
@@ -816,6 +834,7 @@ function setSessionCookie(res, session) {
   const { payload, dropped } = fitSessionPayload({
     data: {
       id: session.id,
+      uni: UNIVERSITY_ID,
       user: session.user,
       mode: session.mode ?? null,
       demoState: isDemoSession(session) ? normalizeDemoState(session.demoState) : null,
@@ -1284,13 +1303,7 @@ function getSessionLaunchCapabilities(session) {
 // The encrypted cookie wins; the legacy signed cookie is only consulted when
 // no readable encrypted one is present (first request after the switch).
 function readSessionCookie(req) {
-  const current = sessionCodec.decode(req.cookies?.[SESSION_COOKIE_NAME])
-  if (current) {
-    return { ...current, legacyCookie: false }
-  }
-
-  const legacy = sessionCodec.decode(req.cookies?.[LEGACY_SESSION_COOKIE_NAME])
-  return legacy ? { ...legacy, legacyCookie: true } : null
+  return readSessionCookies(req.cookies, { codec: sessionCodec, cookieName: SESSION_COOKIE_NAME })
 }
 
 function getSessionFromRequest(req) {
@@ -1299,6 +1312,11 @@ function getSessionFromRequest(req) {
   const decoded = readSessionCookie(req)
   const data = decoded?.data
   if (!data || typeof data.id !== 'string' || !data.id || isSessionDataExpired(data)) {
+    return null
+  }
+
+  // Another university's session: not signed in here.
+  if (getSessionUniversityId(data, getLegacySessionUniversityId(req)) !== UNIVERSITY_ID) {
     return null
   }
 
@@ -1536,6 +1554,16 @@ async function previewServerLaunch(targetUrl, session) {
     }
   }
 
+  // Not one of this university's services: the browser opens it itself.
+  if (!launchTargets.isAllowed(targetUrl)) {
+    return {
+      finalUrl: targetUrl,
+      chain: [],
+      useServerLaunch: false,
+      reason: 'target-not-allowed',
+    }
+  }
+
   if (!session) {
     return {
       finalUrl: targetUrl,
@@ -1628,6 +1656,17 @@ async function previewServerLaunch(targetUrl, session) {
           }
         }
 
+        // The chain leaves the university's services: the browser follows it.
+        if (!launchTargets.isAllowed(nextUrl)) {
+          return {
+            finalUrl: targetUrl,
+            chain,
+            useServerLaunch: false,
+            reason: 'direct-browser-launch',
+            ...launchCapabilities,
+          }
+        }
+
         currentUrl = nextUrl
         continue
       }
@@ -1643,6 +1682,16 @@ async function previewServerLaunch(targetUrl, session) {
             chain,
             useServerLaunch: true,
             reason: 'cas-html-redirect',
+            ...launchCapabilities,
+          }
+        }
+
+        if (!launchTargets.isAllowed(htmlRedirect)) {
+          return {
+            finalUrl: targetUrl,
+            chain,
+            useServerLaunch: false,
+            reason: 'direct-browser-launch',
             ...launchCapabilities,
           }
         }
@@ -2165,6 +2214,7 @@ app.get('/__ent_auth/session', async (req, res) => {
         degradedReason: null,
         canUseServerLaunch: false,
         analyticsEnabled: analytics.enabled,
+        university: UNIVERSITY_ID,
       })
     }
 
@@ -2177,6 +2227,7 @@ app.get('/__ent_auth/session', async (req, res) => {
         sessionSource: session.sessionSource ?? null,
         ...getSessionLaunchCapabilities(session),
         analyticsEnabled: analytics.enabled,
+        university: UNIVERSITY_ID,
       })
     }
 
@@ -2200,6 +2251,7 @@ app.get('/__ent_auth/session', async (req, res) => {
         degradedReason: null,
         canUseServerLaunch: false,
         analyticsEnabled: analytics.enabled,
+        university: UNIVERSITY_ID,
       })
     }
 
@@ -2216,6 +2268,7 @@ app.get('/__ent_auth/session', async (req, res) => {
       casCookieNames: session.jar.getCookieNamesForHost(CAS_HOST),
       ...launchCapabilities,
       analyticsEnabled: analytics.enabled,
+        university: UNIVERSITY_ID,
     })
   } catch (error) {
     res.status(500).json({
@@ -2253,6 +2306,7 @@ app.post('/__ent_auth/login', async (req, res) => {
         authenticated: true,
         user: session.user,
         sessionMode: DEMO_SESSION_MODE,
+        university: UNIVERSITY_ID,
       })
     }
 
@@ -2284,6 +2338,7 @@ app.post('/__ent_auth/login', async (req, res) => {
       authenticated: true,
       user: result.layout.user,
       sessionMode: session.mode ?? null,
+      university: UNIVERSITY_ID,
     })
   } catch (error) {
     const rateLimit = recordLoginFailure(req, req.body?.username)
@@ -2487,7 +2542,9 @@ app.get('/__ent_auth/launch', async (req, res) => {
   const targetUrl = req.query.url
   const debug = req.query.debug === '1'
 
-  if (!targetUrl || !/^https?:\/\//i.test(targetUrl)) {
+  // Only this university's services, never an arbitrary address: no open
+  // redirect from our domain, no server-side fetch of anything else.
+  if (typeof targetUrl !== 'string' || !launchTargets.isAllowed(targetUrl)) {
     return res.redirect('/')
   }
 
@@ -2573,6 +2630,11 @@ app.get('/__ent_auth/launch', async (req, res) => {
         const html = await response.text()
         const htmlRedirect = extractHtmlRedirect(html, currentUrl)
         if (htmlRedirect) {
+          // Leaving the university's services: the browser takes it from the target.
+          if (!launchTargets.isAllowed(htmlRedirect)) {
+            if (debug) return res.json({ finalUrl: targetUrl, chain, leftAllowedHosts: true })
+            return res.redirect(targetUrl)
+          }
           currentUrl = htmlRedirect
           continue
         }
@@ -2600,6 +2662,11 @@ app.get('/__ent_auth/launch', async (req, res) => {
         // are bound to the SP domain and can't be transferred to the browser.
         // Redirect the browser directly — it will complete the full auth flow itself.
         if (debug) return res.json({ finalUrl: targetUrl, chain, saml: true })
+        return res.redirect(targetUrl)
+      }
+
+      if (!launchTargets.isAllowed(nextUrl)) {
+        if (debug) return res.json({ finalUrl: targetUrl, chain, leftAllowedHosts: true })
         return res.redirect(targetUrl)
       }
 

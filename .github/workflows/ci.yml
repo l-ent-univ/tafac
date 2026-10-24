@@ -38,7 +38,7 @@ jobs:
       - run: npm ci
       - run: npm run lint
       - run: npm test
-      - run: npm run build:all
+      - run: npm run build
 
   docker-build:
     name: Docker build (no push)

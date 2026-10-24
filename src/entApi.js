@@ -4,9 +4,11 @@ import { evaluationTypeLabel, listGradesSemesters, summarizeAverage } from './gr
 import { readDistributionCounts } from './evaluationDistribution'
 import { pickAdeGroupForAlias } from './adeGroupMatch'
 import { buildParcoursTpAliases } from './scodocParcoursGroups'
+import { getLoadedUniversityId, getUniversityRequestHeaders } from './universityRuntime'
 
+// Null on the neutral page (no university picked yet).
 export const ENT_ORIGIN = universityConfig.origins.ent
-const ENT_HOST = new URL(ENT_ORIGIN).hostname
+const ENT_HOST = ENT_ORIGIN ? new URL(ENT_ORIGIN).hostname : ''
 const APP_BASE_URL = (() => {
   const rawBaseUrl = String(import.meta.env?.BASE_URL || '/').trim()
 
@@ -244,6 +246,7 @@ export async function requestEnt(path, options = {}) {
 export async function getAuthSession() {
   const response = await fetch(`${ENT_AUTH_PREFIX}/session`, {
     credentials: 'same-origin',
+    headers: getUniversityRequestHeaders(),
   })
 
   const payload = await parseJsonPayload(response)
@@ -260,13 +263,17 @@ export async function loginToEnt({ username, password }) {
   clearGradesCache()
   localStorage.removeItem(ADE_TIMETABLE_CACHE_KEY)
 
+  // Signed out, the server routes the login to the university picked on the
+  // login page (none on the neutral page: the default one).
+  const university = getLoadedUniversityId()
   const response = await fetch(`${ENT_AUTH_PREFIX}/login`, {
     method: 'POST',
     credentials: 'same-origin',
     headers: {
       'Content-Type': 'application/json',
+      ...getUniversityRequestHeaders(),
     },
-    body: JSON.stringify({ username, password }),
+    body: JSON.stringify({ username, password, ...(university ? { university } : {}) }),
   })
 
   const payload = await parseJsonPayload(response)
@@ -1135,8 +1142,22 @@ export async function getAverageGrade() {
 }
 
 export async function getLatestGrade() {
-  const data = await getGrades()
+  return findLatestGrade(await getGrades())
+}
 
+// The latest graded evaluation of a getGrades() answer, or { error }.
+export function findLatestGrade(data) {
+  const grades = listGradedEvaluations(data)
+  if (!Array.isArray(grades)) {
+    return grades
+  }
+
+  return grades[0] ?? { error: 'Aucune note trouvée', empty: true }
+}
+
+// Every graded evaluation of a getGrades() answer as the latest grade card
+// shows one, the most recent first (ties in relevé order), or { error }.
+export function listGradedEvaluations(data) {
   const resolved = resolveGradesReleve(data)
   if (resolved.error) {
     return resolved
@@ -1153,7 +1174,7 @@ export async function getLatestGrade() {
     .sort(([left], [right]) => left.localeCompare(right))
     .map(([code, module]) => module?.titre ?? code)
 
-  let latest = null
+  const grades = []
 
   for (const sectionKey of ['ressources', 'saes']) {
     const section = releve[sectionKey]
@@ -1164,34 +1185,33 @@ export async function getLatestGrade() {
         // `date` is ScoDoc's deprecated alias of date_debut.
         const date = evaluation.date_debut ?? evaluation.date
         if (!date || parseGradeValue(val) == null) continue
-        if (!latest || date > latest.date) {
-          // ScoDoc sends evaluation notes already on /20; note.max is the
-          // best grade of the promo, not the scale.
-          latest = {
-            id: evaluation.id ?? null,
-            semesterId,
-            subjectTitles,
-            ueColors,
-            // What the grade counts for in each UE (its wash, its accent).
-            weights: Object.entries(evaluation.poids ?? {})
-              .map(([ue, weight]) => ({ ue, weight: Number(weight) || 0 })),
-            date,
-            description: evaluation.description || resource.titre || code,
-            // "Rattrapage", "Session 2": labelled on the card as on "Mes notes".
-            typeLabel: evaluationTypeLabel(evaluation.evaluation_type),
-            note: val,
-            noteSur: '20',
-            noteMoy: evaluation.note?.moy ?? null,
-            resource: code,
-            resourceTitle: resource.titre ?? code,
-            coef: evaluation.coef ?? null,
-          }
-        }
+        // ScoDoc sends evaluation notes already on /20; note.max is the
+        // best grade of the promo, not the scale.
+        grades.push({
+          id: evaluation.id ?? null,
+          semesterId,
+          subjectTitles,
+          ueColors,
+          // What the grade counts for in each UE (its wash, its accent).
+          weights: Object.entries(evaluation.poids ?? {})
+            .map(([ue, weight]) => ({ ue, weight: Number(weight) || 0 })),
+          date,
+          description: evaluation.description || resource.titre || code,
+          // "Rattrapage", "Session 2": labelled on the card as on "Mes notes".
+          typeLabel: evaluationTypeLabel(evaluation.evaluation_type),
+          note: val,
+          noteSur: '20',
+          noteMoy: evaluation.note?.moy ?? null,
+          resource: code,
+          resourceTitle: resource.titre ?? code,
+          coef: evaluation.coef ?? null,
+        })
       }
     }
   }
 
-  return latest ?? { error: 'Aucune note trouvée', empty: true }
+  // Stable: equal dates keep the relevé's order.
+  return grades.sort((left, right) => (left.date < right.date ? 1 : left.date > right.date ? -1 : 0))
 }
 
 // ============================================================================

@@ -8,23 +8,37 @@ Trois exemples sont fournis :
 
 - **`universities/univ-rennes/`** — l'implémentation de référence, complète (CAS + ADE + Planning GWT + Moodle + établissements + icônes de services).
 - **`universities/example-minimal/`** — le strict minimum (ENT uPortal + CAS). Bon point de départ : copiez-le, renommez-le, remplissez vos valeurs.
-- **`universities/univ-exemple/`** — université fictive de démonstration : origins factices, mais compte démo (`demo@tafac.fr` / `tafac-demo`) et widgets activés. Sert à tester le flux d'ajout et le routage par sous-domaine de bout en bout.
+- **`universities/univ-exemple/`** — université fictive de démonstration : origins factices, mais compte démo (`demo@tafac.fr` / `tafac-demo`) et widgets activés. Sert à tester le flux d'ajout et le choix d'université de bout en bout (listée en dev seulement, `/exemple` partout).
 
 ## Démarrage rapide
 
 ```bash
 cp -r universities/example-minimal universities/univ-exemple
 # éditez universities/univ-exemple/{shared,client,server}.js (id, origins, branding)
-UNIVERSITY=univ-exemple npm run dev      # développement
-UNIVERSITY=univ-exemple npm run build    # build frontend
-UNIVERSITY=univ-exemple npm start        # production
+npm run dev                              # toutes les universités : choisissez la vôtre, ou /<slug>
+UNIVERSITY=univ-exemple npm run dev      # la vôtre seule, sans liste
+npm run build                            # un seul build pour toutes les universités
+UNIVERSITY=univ-exemple npm start        # production, votre université seule
 ```
 
-> **Important** : `UNIVERSITY` doit être identique au build et au run — le bundle frontend est généré pour une seule université. Sans variable, `univ-rennes` est utilisée. Copiez `.env.example` pour référence.
+Le build est le même pour toutes les universités : `UNIVERSITY` ne compte qu'à l'exécution. La page charge au démarrage le `client.js` de son université (un fichier par université, téléchargé à la demande).
 
-### Hébergement multi-université (sous-domaines)
+### Sur l'instance commune (toutes les universités)
 
-Une même instance peut servir plusieurs universités (voir README, section « Multi-université par sous-domaine ») : `npm run build:all` puis `MULTI_TENANT=1 npm start`. Votre université est alors accessible sur le sous-domaine `<id-sans-tirets>.<domaine>` ; pour utiliser d'autres hostnames, exportez-les dans `shared.js` :
+Avec `MULTI_UNIVERSITY=1` (ou sans `UNIVERSITY`), toutes les universités du dossier `universities/` (sauf `example-*`, ou la liste `UNIVERSITIES`) sont servies sur la même adresse. Votre université apparaît dans la liste de la page de connexion avec son nom et son logo, et a son lien direct `/<slug>`. Dans `shared.js` :
+
+```js
+export const university = {
+  name: 'Université de Rennes',   // nom dans la liste
+  shortName: 'Rennes',
+  slug: 'rennes',                 // tafac.fr/rennes (défaut : l'id sans « univ- »)
+  devOnly: true,                  // optionnel : listée seulement en dev, /<slug> marche partout
+}
+```
+
+Le logo de la liste est `assets/logo.svg` (ou `.png`, `.webp`, `.jpg`), servi par `/__ent_auth/universities/<id>/logo`.
+
+Les anciennes adresses par université restent routées vers elle : le sous-domaine `<id-sans-tirets>.<domaine>`, ou les noms exportés dans `shared.js` :
 
 ```js
 export const hostnames = ['rennes.tafac.example', 'ent-rennes.example.fr']
@@ -35,7 +49,7 @@ export const hostnames = ['rennes.tafac.example', 'ent-rennes.example.fr']
 | Fichier | Chargé par | Contenu |
 | --- | --- | --- |
 | `shared.js` | Node **et** navigateur | Données pures partagées : id, origins publics, flags de features, textes de branding. **Aucun import d'asset** (le serveur Node doit pouvoir l'importer). |
-| `client.js` | Navigateur uniquement (alias Vite `@university`) | Config complète côté client : branding + logo, liens d'aide, catégories/icônes de services, établissements. Peut importer des images. |
+| `client.js` | Navigateur uniquement (chargé au démarrage de la page, lu via `@university`) | Config complète côté client : branding + logo, liens d'aide, catégories/icônes de services, établissements. Peut importer des images. |
 | `server.js` | Node uniquement | Origins internes (CAS, ADE, Moodle, Planning), paramètres du flux d'auth, clés ADE rétro-ingéniérées. **Jamais envoyé au navigateur.** |
 
 ## Champs de configuration
@@ -48,7 +62,7 @@ export const hostnames = ['rennes.tafac.example', 'ent-rennes.example.fr']
 - `origins.moodle` (optionnel, `client.js`) — origine Moodle, pour le lien « Moodle » de la sidebar et de la barre d'onglets mobile (`/my/`, via `/__ent_auth/launch`). Requiert `features.moodle`. Le lien « Messagerie » n'a besoin que de `features.mail`.
 - `auth.portalEntryPath` — page d'atterrissage uPortal (souvent `/f/services/normal/render.uP`). Sert de point d'entrée de connexion, de `Referer` par défaut et de preuve d'authentification. Le serveur rejoue cette entrée avec le seul cookie CAS `TGC` (conservé chiffré dans le cookie de session) pour rétablir la session ENT en silence quand elle a expiré.
 - `auth.casLogoutPath` (optionnel, défaut `/logout`) — chemin de déconnexion du CAS Apereo, appelé à la déconnexion pour clore la session SSO côté université.
-- `branding` — `appName`, `defaultTitle`, `seoTitle`, `seoDescription`, `logo` (+ `logoAlt`, `loginFooterLine`, `loginPasswordNote` (ligne sous le formulaire de connexion sur le mot de passe), `alternateNames` (anciens noms, pour les moteurs de recherche), `about.*`). Le titre et la description doivent dire que le client n'est pas officiel. Utilisé par la page de connexion, la sidebar, le SEO, le manifest PWA et `index.html` (placeholders `%LENT_*%`).
+- `branding` — `appName`, `defaultTitle`, `seoTitle`, `seoDescription`, `logo` (+ `logoAlt`, `loginFooterLine`, `loginPasswordNote` (ligne sous le formulaire de connexion sur le mot de passe), `alternateNames` (anciens noms, pour les moteurs de recherche), `about.*`, `papillon` (`{ url }` : les mentions « Fait partie de Papillon » de la landing, de la connexion et d'À propos ; à omettre si l'instance n'est pas faite par l'équipe de Papillon)). Le titre et la description doivent dire que le client n'est pas officiel. Utilisé par la page de connexion, la sidebar, le SEO, le manifest PWA et `index.html` (placeholders `%LENT_*%`).
   - `lockup` / `lockupDark` (optionnels, `client.js` uniquement) — visuel combiné « Tafac × université » affiché dans la sidebar et le header (comme Rennes). Sans eux, le logo Tafac et votre `logo` sont composés côte à côte automatiquement.
   - `heroImages` (optionnel, `client.js` uniquement) — photos affichées en fond du haut du tableau de bord, en fondu vers le fond uni : `[{ src, credit: { author, license, url }, position? }]`. Plusieurs photos tournent chaque jour. Chaque établissement peut définir ses propres `heroImages` dans `establishments.byId`. Sans photo, un placeholder générique est affiché. Le crédit apparaît dans le footer : utilisez des images libres de droits (ex. Wikimedia Commons) et renseignez auteur + licence.
 - `features` — l'interrupteur général (voir ci-dessous).
@@ -119,6 +133,7 @@ Un feature à `false` : le serveur répond `{ disabled: true }` sur les endpoint
   }
   ```
   Le serveur parcourt la chaîne SSO du webmail (Shibboleth → CAS) avec une copie du cookie jar de session, puis lit la boîte via l'API Zimbra (SOAP `SearchRequest`/`GetFolderRequest`, repli REST `/service/home/~/inbox?fmt=json`). Résultat mis en cache 2 min par session. Le compte démo renvoie des mails fictifs. Pour un autre webmail (SOGo, Roundcube, Exchange…), ajoutez une fonction dans `MAIL_PROVIDERS` (`server/entAuthApp.js`) qui renvoie `{ unreadCount, webmailHref, messages }` ; un `provider` inconnu répond `500 { error: 'Mail provider not configured' }`.
+- `launch.allowedDomains` (optionnel) — domaines que le relais `/__ent_auth/launch` peut ouvrir avec la session, sous-domaines compris (Rennes : `['univ-rennes.fr', 'univ-rennes1.fr', 'iut-lannion.loxya.app']`). Les hôtes des origines et URLs de service de la config (ENT, CAS, ADE, Moodle, planning, notes, webmail, certificat) et les `signInDomains` sont déjà autorisés. Toute autre cible est renvoyée vers `/` par le relais et ouverte directement par le navigateur (`launch-preview` répond `useServerLaunch: false`, `reason: 'target-not-allowed'`). Ajoutez ici les domaines des applications de l'ENT protégées par le CAS de l'université, et ceux de vos `extraServices` (`client.js`).
 
 ## Icônes des applications
 
@@ -148,8 +163,8 @@ Pour améliorer les choix, ajoutez des mots-clés dans `APP_ICON_RULES` (`server
 
 ## Checklist de validation
 
-1. `npm run lint && UNIVERSITY=<id> npm run build` — le build doit passer.
-2. `UNIVERSITY=<id> npm run dev` — page de connexion : logo, textes, liens d'aide corrects.
+1. `npm run lint && npm test && npm run build` — tout doit passer.
+2. `npm run dev`, puis `/<slug>` — page de connexion : logo, textes, liens d'aide corrects ; votre université figure dans la liste de `/universites`.
 3. Connexion démo (`demo@tafac.fr` / `tafac-demo`) si `features.demo` — dashboard, grille d'applications.
 4. **Connexion réelle** avec un compte étudiant — c'est le seul test qui exerce CAS, le proxy ENT et les services activés.
 5. `grep -ri '<votre-univ>' src/ server/` ne doit rien retourner : tout doit vivre dans `universities/<id>/`.

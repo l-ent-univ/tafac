@@ -1,5 +1,5 @@
 // Université Exemple — fake university used to test the multi-university
-// setup end-to-end (subdomain routing, branding, demo account, widgets).
+// setup end-to-end (university picker, branding, demo account, widgets).
 // Its origins don't exist: only the demo login (demo@tafac.fr / tafac-demo)
 // works; real CAS logins fail cleanly.
 
@@ -8,6 +8,11 @@ export const id = 'univ-exemple'
 export const university = {
   name: 'Université Exemple',
   shortName: 'Exemple',
+  // /exemple opens the login page of this university.
+  slug: 'exemple',
+  // Demo university: listed in the picker on dev servers only, still
+  // reachable everywhere through its /exemple link.
+  devOnly: true,
 }
 
 export const branding = {
@@ -26,6 +31,8 @@ export const branding = {
     disclaimer: "Université fictive servant à tester l'ajout d'universités. Aucun service réel n'est relayé.",
     repoUrl: 'https://github.com/l-ent-univ/tafac',
   },
+  // Part of Papillon, as every Tafac instance (see univ-rennes/shared.js).
+  papillon: { url: 'https://papillon.bzh' },
 }
 
 // Fake origins (.example TLD is reserved for documentation): demo sessions

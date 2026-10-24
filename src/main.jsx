@@ -3,10 +3,18 @@ import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import './index.css'
 import './overrides.css'
-import App from './App.jsx'
+import { bootUniversity } from './universityBoot'
 
-createRoot(document.getElementById('root')).render(
-  <StrictMode>
-    <App />
-  </StrictMode>,
-)
+// App and everything it imports (the landing and its copy too) read the
+// university config when they load: imported once bootUniversity() has
+// filled it.
+bootUniversity()
+  .then(() => import('./App.jsx'))
+  .then((module) => {
+    const App = module.default
+    createRoot(document.getElementById('root')).render(
+      <StrictMode>
+        <App />
+      </StrictMode>,
+    )
+  })
