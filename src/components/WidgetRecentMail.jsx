@@ -118,13 +118,16 @@ function MailRow({ message, fallbackHref, now }) {
   )
 }
 
-function WidgetRecentMail({ visible = false }) {
-  const [state, setState] = useState({ status: 'loading', unreadCount: null, webmailHref: null, messages: [] })
+// `preview`: a getRecentMail() result to show as is (the landing page, which
+// changes it): nothing loaded or reported, no link to the webmail.
+function WidgetRecentMail({ visible = false, preview = null }) {
+  const [loadedState, setState] = useState({ status: 'loading', unreadCount: null, webmailHref: null, messages: [] })
+  const state = preview ?? loadedState
   const [storedWebmailHref, setStoredWebmailHref] = useState(() => readStoredHref(WEBMAIL_HREF_KEY))
   const [now, setNow] = useState(() => new Date())
   const lastLoadAtRef = useRef(0)
   const loadingRef = useRef(false)
-  useWidgetLoadReport('mail', getLoadOutcome(state))
+  useWidgetLoadReport('mail', preview ? null : getLoadOutcome(state))
 
   const loadMail = useCallback(async ({ background = false } = {}) => {
     if (loadingRef.current) return
@@ -149,11 +152,11 @@ function WidgetRecentMail({ visible = false }) {
   }, [])
 
   useEffect(() => {
-    void loadMail()
-  }, [loadMail])
+    if (!preview) void loadMail()
+  }, [loadMail, preview])
 
   useEffect(() => {
-    if (state.status !== 'ok' && state.status !== 'error') return undefined
+    if (preview || (state.status !== 'ok' && state.status !== 'error')) return undefined
 
     function refreshIfStale() {
       if (document.visibilityState !== 'visible') return
@@ -168,7 +171,7 @@ function WidgetRecentMail({ visible = false }) {
       window.clearInterval(intervalId)
       document.removeEventListener('visibilitychange', refreshIfStale)
     }
-  }, [loadMail, state.status])
+  }, [loadMail, preview, state.status])
 
   // Unread count, so the busier of mail and deadlines can go first.
   useEffect(() => {
@@ -185,7 +188,7 @@ function WidgetRecentMail({ visible = false }) {
     return null
   }
 
-  const webmailHref = state.webmailHref || storedWebmailHref
+  const webmailHref = preview ? null : state.webmailHref || storedWebmailHref
   const messages = state.messages.slice(0, MAX_VISIBLE_MESSAGES)
   const unreadCount = state.status === 'ok'
     ? (state.unreadCount ?? state.messages.filter((message) => message.unread).length)

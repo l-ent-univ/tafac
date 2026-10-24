@@ -92,13 +92,15 @@ function DisabledWidgetLatestGrade({ visible }) {
 // evaluation, grade pill, UE wash), "Nouveau" until read there. A click opens
 // it there (onOpenGrade), or the grade service without the in-app page.
 // Renders nothing until data is available (or on error).
-function LiveWidgetLatestGrade({ visible, user = null, onOpenGrade = null }) {
-  const [grade, setGrade] = useState(null)
+function LiveWidgetLatestGrade({ visible, user = null, onOpenGrade = null, preview = null }) {
+  const [loadedGrade, setGrade] = useState(null)
+  const grade = preview ?? loadedGrade
   const [isReady, setIsReady] = useState(false)
   const [loadOutcome, setLoadOutcome] = useState(null)
   useWidgetLoadReport('latestGrade', loadOutcome)
 
   useEffect(() => {
+    if (preview) return undefined
     let mounted = true
     let retryTimer = null
 
@@ -132,7 +134,7 @@ function LiveWidgetLatestGrade({ visible, user = null, onOpenGrade = null }) {
       mounted = false
       window.clearTimeout(retryTimer)
     }
-  }, [])
+  }, [preview])
 
   useEffect(() => {
     if (!grade || isReady || !visible) return undefined
@@ -158,10 +160,10 @@ function LiveWidgetLatestGrade({ visible, user = null, onOpenGrade = null }) {
   const day = formatGradeDay(grade.date)
   const wash = buildUeWash(grade.weights, Object.fromEntries(Object.entries(grade.ueColors ?? {}).map(([ue, color]) => [ue, paintUe(color)])))
   // Read on each render: coming back from "Mes notes", the badge follows.
-  const seen = grade.id != null ? readSeenEvaluationIds(user, grade.semesterId) : null
+  const seen = grade.id != null && !preview ? readSeenEvaluationIds(user, grade.semesterId) : null
   const isNew = Array.isArray(seen) && !seen.map(String).includes(String(grade.id))
   const opensInApp = Boolean(onOpenGrade)
-  const canOpen = opensInApp || Boolean(GRADES_LAUNCH_HREF)
+  const canOpen = !preview && (opensInApp || Boolean(GRADES_LAUNCH_HREF))
   const open = () => (opensInApp ? onOpenGrade(grade) : openGradesService())
   const handleKeyDown = (event) => {
     if (event.key === 'Enter' || event.key === ' ') {
@@ -195,12 +197,14 @@ function LiveWidgetLatestGrade({ visible, user = null, onOpenGrade = null }) {
   )
 }
 
-function WidgetLatestGrade({ visible = false, user = null, onOpenGrade = null }) {
-  if (GRADES_FEATURE_DISABLED) {
+// `preview`: a getLatestGrade() result to show as is (the landing page, which
+// changes it): nothing loaded or reported, not clickable.
+function WidgetLatestGrade({ visible = false, user = null, onOpenGrade = null, preview = null }) {
+  if (GRADES_FEATURE_DISABLED && !preview) {
     return <DisabledWidgetLatestGrade visible={visible} />
   }
 
-  return <LiveWidgetLatestGrade visible={visible} user={user} onOpenGrade={onOpenGrade} />
+  return <LiveWidgetLatestGrade visible={visible} user={user} onOpenGrade={onOpenGrade} preview={preview} />
 }
 
 export default WidgetLatestGrade

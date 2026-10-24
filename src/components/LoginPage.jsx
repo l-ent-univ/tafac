@@ -8,8 +8,10 @@ import loginIsland from '../assets/login/login-island.webp'
 import loginSky from '../assets/login/login-sky.webp'
 import loginLogo from '../assets/login/login-logo.webp'
 import LentButton from './LentButton'
+import BetaTag from './BetaTag'
 import LogoBut1 from './LogoBut1'
 import AboutModal from './AboutModal'
+import PapillonBadge from './PapillonBadge'
 import RenameNotice from './RenameNotice'
 import { APP_NAME } from '../seo'
 
@@ -98,6 +100,12 @@ function LoginPage({
               height="110"
             />
           </div>
+          {/* Under the logo: in beta, and the family it belongs to (as on the
+              landing page's header), in white on the sky. */}
+          <div className="flex flex-wrap items-center gap-3">
+            <BetaTag size="lg" onSky />
+            <PapillonBadge size="lg" className="text-white/85 hover:text-white" logoClassName="[filter:brightness(0)_invert(1)]" />
+          </div>
           <div className="flex w-full flex-col items-start gap-[10px] text-white">
             <h1 className="m-0 w-full text-[clamp(40px,6.7vh,60px)] font-bold leading-[0.9]">Cours, notes et services de ton université</h1>
             <p className="m-0 w-full text-[20px] font-semibold leading-[0.9] font-body">Une solution alternative, libre et ouverte</p>
@@ -171,10 +179,16 @@ function LoginPage({
 
         <div className="flex flex-1 flex-col items-center justify-center px-6 py-4 max-3xl:px-5 max-md:justify-start max-md:px-4 max-md:pt-8 max-md:pb-8">
           <div className="flex w-full max-w-[420px] flex-col items-center gap-7 max-md:gap-6">
-            {/* The left panel (its app logo and tagline) is hidden below
-                4xl: both here instead. */}
+            {/* The left panel (its app logo, Papillon's badge and tagline)
+                is hidden below 4xl: all three here instead. */}
             <div className="hidden flex-col items-center gap-3 text-center max-4xl:flex">
-              <LogoBut1 className="h-10" />
+              <div className="flex flex-col items-center gap-1.5">
+                <LogoBut1 className="h-10" />
+                <div className="flex flex-wrap items-center justify-center gap-2">
+                  <BetaTag />
+                  <PapillonBadge className="text-text-muted hover:text-text" />
+                </div>
+              </div>
               <p className="m-0 text-[15px] font-medium leading-[1.25] text-text-muted font-body">Cours, notes et services de ton université</p>
             </div>
 

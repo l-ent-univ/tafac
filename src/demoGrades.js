@@ -39,14 +39,15 @@ const DEMO_FORMATION = Object.freeze({
   titre_officiel: "Bachelor Universitaire de Technologie Métiers du Multimédia et de l'Internet",
 })
 
-// Everything shown: the demo is there to see every part of the page.
+// Everything shown but the ranks: the demo is there to see every part of the
+// page, without a rank to compare to (the data keeps them, for the tests).
 const DEMO_OPTIONS = Object.freeze({
   show_abs: true,
   show_ects: true,
   show_minmax: true,
   show_moypromo: true,
-  show_rangs: true,
-  show_ue_rangs: true,
+  show_rangs: false,
+  show_ue_rangs: false,
 })
 
 const DEMO_GRADES_CONFIG = Object.freeze({

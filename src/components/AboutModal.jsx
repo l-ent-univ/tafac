@@ -2,14 +2,17 @@ import { useEffect, useState } from 'react'
 import { Icon } from '@iconify/react'
 import universityConfig from '@university'
 import { useAnalyticsAvailable } from '../analytics'
+import { getPapillonUrl, readPapillonDebugOverride } from '../papillon'
 import { MUTED_FILL_CLASSES, PRESSABLE_ROW_CLASSES } from '../settingsStyles'
 import useRepoContributors from '../useRepoContributors'
+import BetaTag from './BetaTag'
 import PrivacyModal from './PrivacyModal'
 import SettingsGroup, { RowText } from './SettingsGroup'
 
 /* global __BUILD_HASH__ */
 
 const about = universityConfig.branding.about ?? {}
+const papillonUrl = getPapillonUrl(universityConfig.branding, readPapillonDebugOverride())
 
 // One person, a Réglages row: their GitHub avatar, a name, a line under it,
 // opening their GitHub profile.
@@ -86,8 +89,23 @@ export function AboutContent({ demoLinkLabel = '', onDemoLinkClick = null, onPri
   return (
     <div className="flex flex-col gap-3 font-body text-[15px] leading-[1.45]">
       <p className="m-0">
-        <strong>{universityConfig.branding.appName}</strong> {about.intro}
+        <strong>{universityConfig.branding.appName}</strong> <BetaTag className="align-[0.1em]" /> {about.intro}
       </p>
+      {/* Who makes it (branding.papillon). */}
+      {papillonUrl ? (
+        <p className="m-0">
+          {universityConfig.branding.appName} fait partie de{' '}
+          <a
+            href={papillonUrl}
+            className="text-text underline underline-offset-2"
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            Papillon
+          </a>
+          {' '}et est développé par la même équipe
+        </p>
+      ) : null}
       {about.disclaimer ? (
         <p className="m-0 text-text-secondary">
           {about.disclaimer}
