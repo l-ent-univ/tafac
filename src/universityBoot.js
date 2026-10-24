@@ -32,12 +32,15 @@ async function fetchUniversityDirectory() {
   }
 }
 
-// /<slug> and the picker's address are entry points: once read, the address
-// goes back to / (the app's pages don't live in the path).
+// /<slug> and the picker's address are entry points to signing in: once
+// read, the address becomes the login page's (App's LOGIN_PATH; / is the
+// landing page when signed out, and signed in the app leaves /login for /).
+const LOGIN_ENTRY_PATH = '/login'
+
 function clearEntryPath() {
   try {
     const { search, hash } = window.location
-    window.history.replaceState(window.history.state, '', `/${search}${hash}`)
+    window.history.replaceState(window.history.state, '', `${LOGIN_ENTRY_PATH}${search}${hash}`)
   } catch {
     // Sandboxed frame: the address stays.
   }
