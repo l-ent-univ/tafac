@@ -31,6 +31,8 @@ export const branding = {
     disclaimer: "Université fictive servant à tester l'ajout d'universités. Aucun service réel n'est relayé.",
     repoUrl: 'https://github.com/l-ent-univ/tafac',
   },
+  // Part of Papillon, as every Tafac instance (see univ-rennes/shared.js).
+  papillon: { url: 'https://papillon.bzh' },
 }
 
 // Fake origins (.example TLD is reserved for documentation): demo sessions

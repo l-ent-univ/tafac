@@ -154,6 +154,8 @@ test('listUeGroups carries a UE’s bonus, malus and rank, as ScoDoc gave them',
   const payload = buildDemoGradesPayload()
   const releve = payload['relevé']
   releve.ues['UE5.2'].malus = '0.50'
+  // The demo hides its ranks: shown here, as a department may.
+  releve.options = { ...releve.options, show_rangs: true, show_ue_rangs: true }
   const groups = Object.fromEntries(listUeGroups(buildGradesReport(releve, { config: payload.config })).map((ue) => [ue.code, ue]))
 
   // Already in the average: carried as is, nothing added.

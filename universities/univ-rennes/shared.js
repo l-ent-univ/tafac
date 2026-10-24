@@ -42,6 +42,11 @@ export const branding = {
       { name: 'Lucas Lavajo', login: 'tryon-dev' },
     ],
   },
+  // Tafac is part of Papillon (same team). The one switch for every mention
+  // of it (src/papillon.js): delete the block and they all go. Branding
+  // rather than a `features` entry, as it hides no widget or endpoint and
+  // carries the link, like `about.repoUrl`.
+  papillon: { url: 'https://papillon.bzh' },
 }
 
 // Public origin of the ENT portal — used by the frontend to normalize URLs

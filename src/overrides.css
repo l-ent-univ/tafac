@@ -807,6 +807,1403 @@
   transform: none;
 }
 
+/* Landing page: a lighter frost than the dashboard's (the blur behind each
+   card is recomputed while the page scrolls). */
+.landing-widgets .widget-card {
+  -webkit-backdrop-filter: blur(14px) saturate(1.3);
+  backdrop-filter: blur(14px) saturate(1.3);
+}
+
+/* On phones the greeting card is as tall as what it says, and the landing's
+   briefings take one line or two: it keeps two lines' room (1 line: 74 px,
+   2 lines: 92 px) so the title under it doesn't jump as they change. */
+@media (width < 520px) {
+  .landing-widgets .widget-card:has(.greeting-icon) {
+    min-height: 92px;
+  }
+}
+
+/* Landing page: the same intro, slower and further apart, one card after
+   the other in reading order. */
+.landing-widgets .widget-card {
+  transform: translateY(24px) scale(0.94);
+  transition-duration: 700ms, 1000ms, 150ms;
+}
+
+.landing-widgets .widget-card-visible {
+  transform: none;
+}
+
+.landing-widgets .next-class-widget {
+  --widget-delay: 120ms;
+}
+
+.landing-widgets .latest-grade-widget {
+  --widget-delay: 240ms;
+}
+
+.landing-widgets .recent-mail-widget {
+  --widget-delay: 360ms;
+}
+
+.landing-widgets .moodle-deadlines-widget {
+  --widget-delay: 480ms;
+}
+
+/* Landing page: the cards move on to other demo data together
+   (LandingPage); the text that changes scrolls up and out, then the new text
+   comes up from below. */
+.landing-widgets[data-swap="out"] :is(
+  .widget-card:has(.greeting-icon) :is(h2, p),
+  .next-class-widget > div:last-child,
+  .latest-grade-widget > div ~ :is(div, span),
+  .recent-mail-widget li,
+  .moodle-deadlines-widget li
+) {
+  animation: landing-text-out 450ms cubic-bezier(0.7, 0, 0.84, 0) both;
+}
+
+.landing-widgets[data-swap="in"] :is(
+  .widget-card:has(.greeting-icon) :is(h2, p),
+  .next-class-widget > div:last-child,
+  .latest-grade-widget > div ~ :is(div, span),
+  .recent-mail-widget li,
+  .moodle-deadlines-widget li
+) {
+  animation: landing-text-in 600ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+/* Opacity and transform only: the compositor runs them (a blur here
+   repainted the frosted cards on every frame). */
+@keyframes landing-text-out {
+  to {
+    opacity: 0;
+    transform: translateY(-12px);
+  }
+}
+
+@keyframes landing-text-in {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+}
+
+/* "Compatible avec" strip: the logos slide left forever, one half of the
+   track (UniversityMarquee) at a time, fading out at both ends under two
+   gradients of the page colour (a mask repainted the strip on every
+   frame). */
+.landing-marquee {
+  position: relative;
+}
+
+.landing-marquee::before,
+.landing-marquee::after {
+  content: "";
+  position: absolute;
+  inset-block: 0;
+  z-index: 1;
+  width: 15%;
+  pointer-events: none;
+}
+
+.landing-marquee::before {
+  left: 0;
+  background: linear-gradient(to right, var(--color-bg), transparent);
+}
+
+.landing-marquee::after {
+  right: 0;
+  background: linear-gradient(to left, var(--color-bg), transparent);
+}
+
+.landing-marquee-track {
+  animation: landing-marquee 30s linear infinite;
+  will-change: transform;
+}
+
+@keyframes landing-marquee {
+  to {
+    transform: translateX(-50%);
+  }
+}
+
+/* Landing phone and laptop mockups: their layers follow the pointer
+   (usePointerParallax sets --parallax-x / --parallax-y from -1 to 1), the
+   flower behind against it, the island in front the most. Eased, so a
+   quick move glides. */
+.landing-parallax {
+  --parallax-x: 0;
+  --parallax-y: 0;
+}
+
+.landing-parallax-back,
+.landing-parallax-mid,
+.landing-parallax-front {
+  transition: transform 600ms cubic-bezier(0.16, 1, 0.3, 1);
+  will-change: transform;
+}
+
+.landing-parallax-back {
+  transform: translate(calc(var(--parallax-x) * -10px), calc(var(--parallax-y) * -10px));
+}
+
+.landing-parallax-mid {
+  transform: translate(calc(var(--parallax-x) * 8px), calc(var(--parallax-y) * 6px));
+}
+
+.landing-parallax-front {
+  transform: translate(calc(var(--parallax-x) * 22px), calc(var(--parallax-y) * 16px));
+}
+
+/* Scroll parallax, subtle, driven by the scroll itself (no script, runs
+   off the main thread; without support, nothing moves). At the top, over the
+   first 800px of scroll, the sky falls behind the page by a quarter of it,
+   the clouds by an eighth and the cards by a sixteenth. Around the phone,
+   as each comes onto the screen, the flower behind lags and the island in
+   front leads, both settling where they're placed (`translate`, as the
+   pointer parallax holds `transform`). The laptop, when it comes first,
+   takes the same flower and island. The second device, in the row under,
+   rises a little as it comes in (.landing-device); it settles once fully
+   on screen, which the page's end always allows. */
+@supports (animation-timeline: scroll()) {
+  @media (prefers-reduced-motion: no-preference) {
+    .landing-scroll-sky,
+    .landing-scroll-clouds,
+    .landing-scroll-cards {
+      animation: linear both;
+      animation-timeline: scroll(root);
+      animation-range: 0 800px;
+    }
+
+    .landing-scroll-sky {
+      animation-name: landing-scroll-sky;
+    }
+
+    .landing-scroll-clouds {
+      animation-name: landing-scroll-clouds;
+    }
+
+    .landing-scroll-cards {
+      animation-name: landing-scroll-cards;
+    }
+
+    .landing-parallax-back,
+    .landing-parallax-front {
+      animation: linear both;
+      animation-timeline: view();
+      animation-range: entry 0% entry 100%;
+    }
+
+    /* Until it's mid-screen: on tall screens it's already in view at the top. */
+    .landing-parallax-back {
+      animation-name: landing-scroll-back;
+      animation-range: cover 0% cover 50%;
+    }
+
+    .landing-parallax-front {
+      animation-name: landing-scroll-front;
+    }
+
+    .landing-device {
+      animation: landing-scroll-device linear both;
+      animation-timeline: view();
+      animation-range: entry 0% entry 100%;
+    }
+  }
+}
+
+@keyframes landing-scroll-sky {
+  to {
+    transform: translateY(200px);
+  }
+}
+
+/* `transform`: the clouds' centring is on `translate`. */
+@keyframes landing-scroll-clouds {
+  to {
+    transform: translateY(100px);
+  }
+}
+
+@keyframes landing-scroll-cards {
+  to {
+    translate: 0 50px;
+  }
+}
+
+@keyframes landing-scroll-back {
+  from {
+    translate: 0 -40px;
+  }
+}
+
+@keyframes landing-scroll-front {
+  from {
+    translate: 0 56px;
+  }
+}
+
+@keyframes landing-scroll-device {
+  from {
+    translate: 0 48px;
+  }
+}
+
+/* The landing's feature pills, then the note under them, come in one by
+   one once the list is on screen (FeatureShowcase: data-revealed,
+   --reveal-index). With reduced motion they're simply there. */
+@media (prefers-reduced-motion: no-preference) {
+  .landing-feature {
+    opacity: 0;
+    translate: 0 16px;
+  }
+
+  .landing-features[data-revealed] .landing-feature {
+    animation: landing-feature-in 600ms cubic-bezier(0.16, 1, 0.3, 1) calc(var(--reveal-index) * 90ms) both;
+  }
+}
+
+@keyframes landing-feature-in {
+  to {
+    opacity: 1;
+    translate: 0 0;
+  }
+}
+
+/* The landing's last card (free, the team, the contact) rises in once on
+   screen (LandingContact: data-revealed). */
+@media (prefers-reduced-motion: no-preference) {
+  .landing-contact {
+    opacity: 0;
+    translate: 0 28px;
+    scale: 0.97;
+  }
+
+  .landing-contact[data-revealed] {
+    animation: landing-contact-in 900ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  }
+}
+
+@keyframes landing-contact-in {
+  to {
+    opacity: 1;
+    translate: 0 0;
+    scale: 1;
+  }
+}
+
+/* The glow at the end of the landing page (behind the last block and the
+   footer), from the bottom: Papillon's green, Tafac's yellow and sky. Static. */
+.landing-papillon-glow {
+  background:
+    radial-gradient(70% 85% at 50% 100%, rgb(41 148 122 / 0.3), transparent 70%),
+    radial-gradient(45% 60% at 12% 100%, rgb(250 204 21 / 0.22), transparent 70%),
+    radial-gradient(45% 60% at 88% 100%, rgb(86 136 175 / 0.28), transparent 70%);
+}
+
+:where([data-theme="dark"]) .landing-papillon-glow {
+  background:
+    radial-gradient(70% 85% at 50% 100%, rgb(41 148 122 / 0.4), transparent 70%),
+    radial-gradient(45% 60% at 12% 100%, rgb(250 204 21 / 0.16), transparent 70%),
+    radial-gradient(45% 60% at 88% 100%, rgb(86 136 175 / 0.32), transparent 70%);
+}
+
+/* The floating widgets drift up and down, each at its own pace
+   (FloatingWidgets: --float-duration, --float-delay, --float-distance);
+   `translate` only, so their `rotate` stays. */
+@media (prefers-reduced-motion: no-preference) {
+  .landing-float {
+    animation: landing-float var(--float-duration, 6s) ease-in-out var(--float-delay, 0s) infinite alternate;
+  }
+}
+
+@keyframes landing-float {
+  from {
+    translate: 0 0;
+  }
+
+  to {
+    translate: 0 var(--float-distance, -14px);
+  }
+}
+
+/* ── Landing header (LandingHeader) ──
+   Fixed at the top. On the sky at first: as wide as the page, nothing
+   behind it. Once the page scrolls (or the menu opens, data-floating), it
+   narrows into a frosted pill: its links' own pill fades into it and the
+   Papillon line folds away. The burger's menu drops from under it, plain
+   white (dark grey in dark mode). */
+.landing-header {
+  --landing-header-glass: rgb(255 255 255 / 0.72);
+  --landing-header-menu: #fff;
+  --landing-header-edge: rgb(255 255 255 / 0.8);
+}
+
+:where([data-theme="dark"]) .landing-header {
+  --landing-header-glass: rgb(28 28 28 / 0.72);
+  --landing-header-menu: #1c1c1c;
+  --landing-header-edge: rgb(255 255 255 / 0.1);
+}
+
+.landing-header-papillon-fold {
+  display: grid;
+  grid-template-rows: 1fr;
+  transition:
+    grid-template-rows 500ms cubic-bezier(0.16, 1, 0.3, 1),
+    opacity 300ms ease;
+}
+
+.landing-header[data-floating] .landing-header-papillon-fold {
+  grid-template-rows: 0fr;
+  opacity: 0;
+}
+
+.landing-header-bar {
+  width: 100%;
+  border-color: transparent;
+  background-color: transparent;
+  transition:
+    width 600ms cubic-bezier(0.16, 1, 0.3, 1),
+    translate 600ms cubic-bezier(0.16, 1, 0.3, 1),
+    background-color 400ms ease,
+    border-color 400ms ease,
+    box-shadow 400ms ease,
+    backdrop-filter 400ms ease;
+}
+
+.landing-header[data-floating] .landing-header-bar {
+  width: min(100%, 1040px);
+  translate: 0 4px;
+  border-color: var(--landing-header-edge);
+  background-color: var(--landing-header-glass);
+  box-shadow:
+    0 2px 6px rgb(52 18 0 / 0.06),
+    0 16px 36px -16px rgb(52 18 0 / 0.3);
+  backdrop-filter: blur(18px) saturate(1.4);
+  -webkit-backdrop-filter: blur(18px) saturate(1.4);
+}
+
+.landing-header-nav {
+  border-color: rgb(255 255 255 / 0.7);
+  background-color: rgb(255 255 255 / 0.45);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  transition:
+    background-color 400ms ease,
+    border-color 400ms ease;
+}
+
+:where([data-theme="dark"]) .landing-header-nav {
+  border-color: rgb(255 255 255 / 0.1);
+  background-color: rgb(0 0 0 / 0.3);
+}
+
+.landing-header[data-floating] .landing-header-nav {
+  border-color: transparent;
+  background-color: transparent;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+/* On phones, on the sky's blue: the wordmark, the Papillon line and the
+   burger white, with a faint shadow for the clouds; back to the text colour
+   in the pill. */
+@media (width < 640px) {
+  .landing-header:not([data-floating]) .landing-header-wordmark {
+    filter: brightness(0) invert(1) drop-shadow(0 1px 2px rgb(0 0 0 / 0.3));
+  }
+
+  .landing-header:not([data-floating]) .landing-header-burger {
+    color: #fff;
+    filter: drop-shadow(0 1px 2px rgb(0 0 0 / 0.3));
+  }
+
+  .landing-header:not([data-floating]) .landing-header-papillon {
+    color: #fff;
+    text-shadow: 0 1px 3px rgb(0 0 0 / 0.3);
+  }
+
+  .landing-header:not([data-floating]) .landing-header-papillon-logo {
+    filter: brightness(0) invert(1) drop-shadow(0 1px 2px rgb(0 0 0 / 0.3));
+  }
+}
+
+.landing-header-menu {
+  border-color: var(--landing-header-edge);
+  background-color: var(--landing-header-menu);
+  box-shadow:
+    0 2px 6px rgb(52 18 0 / 0.06),
+    0 24px 48px -20px rgb(52 18 0 / 0.35);
+  opacity: 0;
+  translate: 0 -8px;
+  scale: 0.98;
+  transform-origin: 50% 0;
+  visibility: hidden;
+  transition:
+    opacity 250ms ease,
+    translate 350ms cubic-bezier(0.16, 1, 0.3, 1),
+    scale 350ms cubic-bezier(0.16, 1, 0.3, 1),
+    visibility 0s linear 350ms;
+}
+
+.landing-header-menu[data-open] {
+  opacity: 1;
+  translate: 0 0;
+  scale: 1;
+  visibility: visible;
+  transition-delay: 0s;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .landing-header-bar,
+  .landing-header-papillon-fold,
+  .landing-header-menu {
+    transition-duration: 0s;
+  }
+}
+
+/* The FAQ's answers open and close smoothly, where the browser can animate
+   a <details> to its content's height (::details-content); elsewhere they
+   just show. */
+@supports selector(::details-content) {
+  @media (prefers-reduced-motion: no-preference) {
+    .landing-faq {
+      interpolate-size: allow-keywords;
+    }
+
+    .landing-faq details::details-content {
+      block-size: 0;
+      overflow: clip;
+      transition:
+        block-size 300ms cubic-bezier(0.16, 1, 0.3, 1),
+        content-visibility 300ms allow-discrete;
+    }
+
+    .landing-faq details[open]::details-content {
+      block-size: auto;
+    }
+  }
+}
+
+/* The widgets can be grabbed (useDragToPlay): they follow the pointer
+   closely, raised over the rest, then spring back home with a bounce. */
+.landing-drag {
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+  transition: transform 650ms cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.landing-drag[data-dragging] {
+  z-index: 10;
+  cursor: grabbing;
+  transition: transform 90ms ease-out;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .landing-drag {
+    transition: transform 200ms ease-out;
+  }
+}
+
+/* The landing's app icon comes in with the title: it drops and tilts into
+   place with a little bounce. */
+.landing-app-icon {
+  transform-origin: 50% 80%;
+  animation: landing-app-icon-in 900ms cubic-bezier(0.34, 1.56, 0.64, 1) 900ms both;
+}
+
+@keyframes landing-app-icon-in {
+  from {
+    opacity: 0;
+    transform: translateY(-18px) rotate(-20deg) scale(0.6);
+  }
+
+  40% {
+    opacity: 1;
+  }
+}
+
+/* The title fades in once the last card has landed. */
+.landing-cta {
+  animation: landing-cta-in 700ms cubic-bezier(0.16, 1, 0.3, 1) 900ms both;
+}
+
+@keyframes landing-cta-in {
+  from {
+    opacity: 0;
+    transform: translateY(12px) scale(0.96);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .landing-widgets .widget-card {
+    transform: none;
+    transition-duration: 300ms, 0ms, 150ms;
+  }
+
+  .landing-marquee-track,
+  .landing-app-icon {
+    animation: none;
+  }
+
+  .landing-widgets[data-swap] :is(
+    .widget-card:has(.greeting-icon) :is(h2, p),
+    .next-class-widget > div:last-child,
+    .latest-grade-widget > div ~ :is(div, span),
+    .recent-mail-widget li,
+    .moodle-deadlines-widget li
+  ) {
+    animation: none;
+  }
+
+  .landing-cta {
+    animation-name: landing-cta-fade;
+    animation-duration: 300ms;
+  }
+}
+
+@keyframes landing-cta-fade {
+  from {
+    opacity: 0;
+  }
+}
+
+/* ── Landing security ("Votre mot de passe ne fait que passer",
+   SecurityShowcase) ──
+   Cartoon icons (SecurityIcons) with badges on their corner, and tokens
+   travelling along the wires between them. The rules first give everything
+   its final state:
+   that's what reduced motion shows, still. With motion, it starts from the
+   beginning once on screen (data-revealed): the diagram in a calm loop,
+   paused while off screen (data-offscreen), the points' icons once. Only
+   transform and opacity move, on plain elements (no filter). */
+
+.landing-security {
+  --security-accent: var(--color-success-text);
+  /* The rounded block the whole section sits in: a green tint, the
+     colour of what's locked; the badges' rings cut out of it. */
+  --security-surface: #e6f2ea;
+  /* The icons' ink line: the page's text colour, as a pen over their
+     coloured fills; on a badge, the badge's own colour. */
+  --security-ink: var(--color-text);
+  /* One turn of the diagram. Its steps, in % of it: the password typed
+     0–10, the key to Tafac 10–22 and on to the university 23–35, the
+     check 35–40, the session back to Tafac 46–58, which locks it 58–61,
+     then to the device 61–73, the cookie 73–78, everything held until 94,
+     then cleared. */
+  --security-cycle: 11s;
+}
+
+:where([data-theme="dark"]) .landing-security {
+  --security-surface: #10201b;
+}
+
+/* Between two stops (200 px wide, the icon's 112 px box in their middle,
+   no fill): the line reaches on to the boxes' edges, the tokens set off and
+   arrive just inside them, clear of the icons. */
+.security-diagram {
+  --security-stop-gap: 44px;
+}
+
+.security-wire {
+  position: relative;
+  flex: 1 1 0;
+  min-width: 48px;
+  height: 112px;
+}
+
+.security-wire-line {
+  position: absolute;
+  top: 50%;
+  inset-inline: calc(var(--security-stop-gap) * -1);
+  height: 6px;
+  margin-top: -3px;
+  background: radial-gradient(circle, currentColor 1.5px, transparent 2px) center / 10px 6px repeat-x;
+}
+
+.security-token {
+  position: absolute;
+  inset-block: 0;
+  inset-inline: calc(var(--security-stop-gap) * -1 + 10px);
+  opacity: 0;
+}
+
+.security-token-chip {
+  position: absolute;
+  left: 0;
+  top: 50%;
+  margin: -18px 0 0 -18px;
+}
+
+.security-wire-label {
+  position: absolute;
+  left: 50%;
+  top: calc(50% + 24px);
+  transform: translateX(-50%);
+}
+
+/* The light a token leaves on the wire: a line growing from where it set
+   off (the bright end at the token), fading once it's arrived. Hidden at
+   rest. */
+.security-wire-glow {
+  position: absolute;
+  top: 50%;
+  inset-inline: calc(var(--security-stop-gap) * -1 + 10px);
+  height: 2px;
+  margin-top: -1px;
+  border-radius: 2px;
+  background: linear-gradient(var(--security-glow-dir), transparent, currentColor);
+  opacity: 0;
+  pointer-events: none;
+}
+
+.security-glow-out {
+  --security-glow-dir: to right;
+  transform-origin: left center;
+}
+
+.security-glow-back {
+  --security-glow-dir: to left;
+  transform-origin: right center;
+}
+
+/* A soft halo around a travelling token (behind its chip). */
+.security-token-chip::before {
+  content: '';
+  position: absolute;
+  inset: -6px;
+  z-index: -1;
+  border-radius: inherit;
+  background: currentColor;
+  opacity: 0;
+}
+
+/* The ring a stop sends out when something reaches it, in its colour. */
+.security-ripple {
+  position: absolute;
+  inset: 18%;
+  border: 2px solid currentColor;
+  border-radius: 50%;
+  opacity: 0;
+  pointer-events: none;
+}
+
+@media (width < 1024px) {
+  .security-diagram {
+    --security-stop-gap: 28px;
+  }
+}
+
+/* Narrow screens: the stops one under the other, their tile on the left;
+   the wire goes down from one tile to the next, HTTPS beside it, in line
+   with the text. */
+@media (width < 720px) {
+  .security-wire {
+    flex: none;
+    width: 76px;
+    min-width: 0;
+    height: 64px;
+  }
+
+  .security-wire-line {
+    inset: 0 auto;
+    left: 50%;
+    width: 6px;
+    height: auto;
+    margin: 0 0 0 -3px;
+    background-size: 6px 10px;
+    background-repeat: repeat-y;
+  }
+
+  .security-token {
+    inset: 0;
+  }
+
+  .security-token-chip {
+    left: 50%;
+    top: 0;
+  }
+
+  .security-wire-label {
+    left: calc(100% + 16px);
+    top: 50%;
+    transform: translateY(-50%);
+  }
+
+  .security-wire-glow {
+    inset: 0 auto;
+    left: 50%;
+    width: 2px;
+    height: auto;
+    margin: 0 0 0 -1px;
+  }
+
+  .security-glow-out {
+    --security-glow-dir: to bottom;
+    transform-origin: center top;
+  }
+
+  .security-glow-back {
+    --security-glow-dir: to top;
+    transform-origin: center bottom;
+  }
+}
+
+/* Final state: the password gone from the device, the padlock closed. */
+.security-device-key,
+.security-relay-open {
+  opacity: 0;
+}
+
+.security-badge {
+  --security-ink: currentColor;
+}
+
+/* Inside the icons, what moves (the phone's eyes, Tafac's lights) turns
+   about itself. */
+.security-device-eyes,
+.security-relay-led {
+  transform-box: fill-box;
+  transform-origin: center;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  /* Before it's on screen: the first frame of the loop. */
+  .security-device-cookie,
+  .security-relay-locked,
+  .security-uni-check {
+    opacity: 0;
+    transform: scale(0.3) rotate(-35deg);
+  }
+
+  .security-relay-open {
+    opacity: 1;
+  }
+
+  .security-diagram[data-revealed] .security-loop {
+    animation: var(--security-cycle) linear infinite both;
+  }
+
+  .security-diagram[data-offscreen] .security-loop {
+    animation-play-state: paused;
+  }
+
+  .security-diagram[data-revealed] .security-token {
+    animation-timing-function: cubic-bezier(0.45, 0, 0.55, 1);
+  }
+
+  /* Across on wide screens, down on narrow ones: a set of keyframes each.
+     The token box spans the whole wire, so it only moves and fades; the
+     chip in it grows as it leaves and shrinks as it lands, on the spot, in
+     step (its delay and easing inherited from the token). */
+  .security-diagram[data-revealed] .security-token-chip {
+    animation: security-chip var(--security-cycle) infinite both;
+    animation-delay: inherit;
+    animation-timing-function: inherit;
+  }
+
+  .security-diagram[data-offscreen] .security-token-chip {
+    animation-play-state: paused;
+  }
+
+  .security-diagram[data-revealed] :is(.security-travel-out-a, .security-travel-out-b) {
+    animation-name: security-travel-out-x;
+  }
+
+  .security-diagram[data-revealed] :is(.security-travel-back-a, .security-travel-back-b) {
+    animation-name: security-travel-back-x;
+  }
+
+  @media (width < 720px) {
+    .security-diagram[data-revealed] :is(.security-travel-out-a, .security-travel-out-b) {
+      animation-name: security-travel-out-y;
+    }
+
+    .security-diagram[data-revealed] :is(.security-travel-back-a, .security-travel-back-b) {
+      animation-name: security-travel-back-y;
+    }
+  }
+
+  .security-diagram[data-revealed] .security-travel-out-a {
+    animation-delay: calc(var(--security-cycle) * 0.1);
+  }
+
+  .security-diagram[data-revealed] .security-travel-out-b {
+    animation-delay: calc(var(--security-cycle) * 0.23);
+  }
+
+  .security-diagram[data-revealed] .security-travel-back-b {
+    animation-delay: calc(var(--security-cycle) * 0.46);
+  }
+
+  .security-diagram[data-revealed] .security-travel-back-a {
+    animation-delay: calc(var(--security-cycle) * 0.61);
+  }
+
+  .security-diagram[data-revealed] .security-device-key {
+    animation-name: security-device-key;
+  }
+
+  .security-diagram[data-revealed] .security-relay-icon {
+    animation: security-relay-icon var(--security-cycle) linear infinite both;
+  }
+
+  .security-diagram[data-offscreen] .security-relay-icon {
+    animation-play-state: paused;
+  }
+
+  .security-diagram[data-revealed] .security-relay-open {
+    animation-name: security-relay-open;
+  }
+
+  .security-diagram[data-revealed] .security-relay-locked {
+    animation-name: security-relay-locked;
+  }
+
+  .security-diagram[data-revealed] .security-uni-check {
+    animation-name: security-uni-check;
+  }
+
+  .security-diagram[data-revealed] .security-device-cookie {
+    animation-name: security-device-cookie;
+  }
+
+  /* The light on the wire leaves with its token (--security-glow-at). */
+  .security-diagram[data-revealed] .security-wire-glow {
+    animation-name: security-glow-x;
+    animation-delay: calc(var(--security-cycle) * var(--security-glow-at));
+  }
+
+  @media (width < 720px) {
+    .security-diagram[data-revealed] .security-wire-glow {
+      animation-name: security-glow-y;
+    }
+  }
+
+  .security-diagram[data-revealed] .security-token-chip::before {
+    animation: security-halo 1200ms cubic-bezier(0.16, 1, 0.3, 1) infinite;
+  }
+
+  .security-diagram[data-revealed] .security-ripple-relay {
+    animation-name: security-ripple-relay;
+  }
+
+  .security-diagram[data-revealed] .security-ripple-university {
+    animation-name: security-ripple-university;
+  }
+
+  .security-diagram[data-revealed] .security-ripple-device {
+    animation-name: security-ripple-device;
+  }
+
+  /* The device and the university take what reaches them, as Tafac does. */
+  .security-diagram[data-revealed] .security-uni-icon {
+    animation: security-uni-icon var(--security-cycle) linear infinite both;
+  }
+
+  .security-diagram[data-revealed] .security-device-icon {
+    animation: security-device-icon var(--security-cycle) linear infinite both;
+  }
+
+  .security-diagram[data-offscreen] :is(.security-uni-icon, .security-device-icon),
+  .security-diagram[data-offscreen] .security-token-chip::before {
+    animation-play-state: paused;
+  }
+
+  /* The phone blinks now and then; Tafac's lights come on as the key and
+     the session go through it (in step with the loop). */
+  .security-diagram[data-revealed] .security-device-eyes {
+    animation: security-blink 4.4s linear infinite;
+  }
+
+  .security-diagram[data-revealed] .security-relay-led {
+    animation: security-relay-led var(--security-cycle) linear infinite both;
+  }
+
+  .security-diagram[data-offscreen] :is(.security-device-eyes, .security-relay-led) {
+    animation-play-state: paused;
+  }
+
+  /* The points come in one by one, like the feature pills; then the icon
+     settles in its tile and the badge pops onto its corner (the
+     magnifying glass glides over the code). */
+  .security-point {
+    --security-point-delay: calc(var(--reveal-index) * 110ms);
+    opacity: 0;
+    translate: 0 28px;
+    scale: 0.96;
+  }
+
+  .security-point-icon {
+    opacity: 0;
+    transform: scale(0.4) rotate(-25deg);
+  }
+
+  .security-point-badge {
+    opacity: 0;
+    transform: scale(0.2) rotate(-90deg);
+  }
+
+  .security-point-lens {
+    transform: translate(-14px, -12px);
+  }
+
+  .security-points[data-revealed] .security-point {
+    animation: security-point-in 900ms cubic-bezier(0.16, 1, 0.3, 1) var(--security-point-delay) both;
+  }
+
+  .security-points[data-revealed] .security-point-icon {
+    animation: security-settle 800ms cubic-bezier(0.34, 1.56, 0.64, 1) calc(var(--security-point-delay) + 250ms) both;
+  }
+
+  .security-points[data-revealed] .security-point-badge {
+    animation: security-settle 650ms cubic-bezier(0.34, 1.56, 0.64, 1) calc(var(--security-point-delay) + 600ms) both;
+  }
+
+  .security-points[data-revealed] .security-point-lens {
+    animation-duration: 800ms;
+    animation-timing-function: cubic-bezier(0.16, 1, 0.3, 1);
+  }
+}
+
+@keyframes security-blink {
+  0%,
+  93%,
+  100% {
+    transform: scaleY(1);
+  }
+
+  96% {
+    transform: scaleY(0.12);
+  }
+}
+
+@keyframes security-relay-led {
+  0%,
+  20%,
+  30%,
+  56%,
+  66%,
+  100% {
+    opacity: 0.45;
+  }
+
+  22%,
+  27%,
+  58%,
+  63% {
+    opacity: 1;
+  }
+}
+
+/* The badges' pop: in a little past their size, then settled. */
+@keyframes security-device-key {
+  0% {
+    opacity: 0;
+    transform: scale(0.3) rotate(-35deg);
+  }
+
+  3% {
+    opacity: 1;
+    transform: scale(1.18) rotate(6deg);
+  }
+
+  5%,
+  9% {
+    opacity: 1;
+    transform: scale(1);
+  }
+
+  11%,
+  100% {
+    opacity: 0;
+    transform: scale(0.3) rotate(-35deg);
+  }
+}
+
+/* A token's trip: it sets off from one stop, glides along the wire (across,
+   or down on narrow screens) and lands on the other, growing as it leaves
+   and shrinking as it lands, then waits for the next turn. */
+@keyframes security-travel-out-x {
+  0% {
+    opacity: 0;
+    translate: 0 0;
+  }
+
+  2.5%,
+  9% {
+    opacity: 1;
+  }
+
+  12%,
+  100% {
+    opacity: 0;
+    translate: 100% 0;
+  }
+}
+
+@keyframes security-travel-back-x {
+  0% {
+    opacity: 0;
+    translate: 100% 0;
+  }
+
+  2.5%,
+  9% {
+    opacity: 1;
+  }
+
+  12%,
+  100% {
+    opacity: 0;
+    translate: 0 0;
+  }
+}
+
+@keyframes security-travel-out-y {
+  0% {
+    opacity: 0;
+    translate: 0 0;
+  }
+
+  2.5%,
+  9% {
+    opacity: 1;
+  }
+
+  12%,
+  100% {
+    opacity: 0;
+    translate: 0 100%;
+  }
+}
+
+@keyframes security-travel-back-y {
+  0% {
+    opacity: 0;
+    translate: 0 100%;
+  }
+
+  2.5%,
+  9% {
+    opacity: 1;
+  }
+
+  12%,
+  100% {
+    opacity: 0;
+    translate: 0 0;
+  }
+}
+
+@keyframes security-chip {
+  0% {
+    scale: 0.6;
+  }
+
+  2.5%,
+  9% {
+    scale: 1;
+  }
+
+  12%,
+  100% {
+    scale: 0.6;
+  }
+}
+
+/* The wire lights up behind the token (as long as its trip, the same
+   ease), then the light fades. */
+@keyframes security-glow-x {
+  0% {
+    opacity: 0.9;
+    scale: 0 1;
+    animation-timing-function: cubic-bezier(0.45, 0, 0.55, 1);
+  }
+
+  12% {
+    opacity: 0.9;
+    scale: 1;
+  }
+
+  20%,
+  100% {
+    opacity: 0;
+    scale: 1;
+  }
+}
+
+@keyframes security-glow-y {
+  0% {
+    opacity: 0.9;
+    scale: 1 0;
+    animation-timing-function: cubic-bezier(0.45, 0, 0.55, 1);
+  }
+
+  12% {
+    opacity: 0.9;
+    scale: 1;
+  }
+
+  20%,
+  100% {
+    opacity: 0;
+    scale: 1;
+  }
+}
+
+@keyframes security-halo {
+  from {
+    opacity: 0.28;
+    scale: 0.8;
+  }
+
+  to {
+    opacity: 0;
+    scale: 1.5;
+  }
+}
+
+/* A ring out of the stop as the token lands: Tafac twice (the key, then
+   the session), the university once (the key), the device once (the
+   session). */
+@keyframes security-ripple-relay {
+  0%,
+  21.9%,
+  27.1%,
+  57.9%,
+  63.1%,
+  100% {
+    opacity: 0;
+    scale: 0.6;
+  }
+
+  22%,
+  58% {
+    opacity: 0.6;
+    scale: 0.6;
+    animation-timing-function: cubic-bezier(0.16, 1, 0.3, 1);
+  }
+
+  27%,
+  63% {
+    opacity: 0;
+    scale: 1.7;
+  }
+}
+
+@keyframes security-ripple-university {
+  0%,
+  34.9%,
+  40.1%,
+  100% {
+    opacity: 0;
+    scale: 0.6;
+  }
+
+  35% {
+    opacity: 0.6;
+    scale: 0.6;
+    animation-timing-function: cubic-bezier(0.16, 1, 0.3, 1);
+  }
+
+  40% {
+    opacity: 0;
+    scale: 1.7;
+  }
+}
+
+@keyframes security-ripple-device {
+  0%,
+  72.9%,
+  78.1%,
+  100% {
+    opacity: 0;
+    scale: 0.6;
+  }
+
+  73% {
+    opacity: 0.6;
+    scale: 0.6;
+    animation-timing-function: cubic-bezier(0.16, 1, 0.3, 1);
+  }
+
+  78% {
+    opacity: 0;
+    scale: 1.7;
+  }
+}
+
+/* Each stop catches what lands on it: a bounce, a slight tilt, back. Tafac
+   the key, then the session; the university the key; the device the
+   session. */
+@keyframes security-relay-icon {
+  0%,
+  21.5%,
+  26%,
+  57.5%,
+  62%,
+  100% {
+    transform: none;
+  }
+
+  23%,
+  59% {
+    transform: scale(1.14) rotate(-4deg);
+  }
+
+  24.5%,
+  60.5% {
+    transform: scale(0.97) rotate(1deg);
+  }
+}
+
+@keyframes security-uni-icon {
+  0%,
+  34.5%,
+  39%,
+  100% {
+    transform: none;
+  }
+
+  36% {
+    transform: scale(1.14) rotate(-4deg);
+  }
+
+  37.5% {
+    transform: scale(0.97) rotate(1deg);
+  }
+}
+
+@keyframes security-device-icon {
+  0%,
+  72.5%,
+  77%,
+  100% {
+    transform: none;
+  }
+
+  74% {
+    transform: scale(1.14) rotate(-4deg);
+  }
+
+  75.5% {
+    transform: scale(0.97) rotate(1deg);
+  }
+}
+
+@keyframes security-relay-open {
+  0%,
+  57% {
+    opacity: 1;
+    transform: none;
+  }
+
+  60%,
+  96% {
+    opacity: 0;
+    transform: scale(0.3) rotate(-35deg);
+  }
+
+  99%,
+  100% {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes security-relay-locked {
+  0%,
+  58% {
+    opacity: 0;
+    transform: scale(0.3) rotate(-35deg);
+  }
+
+  61% {
+    opacity: 1;
+    transform: scale(1.18) rotate(6deg);
+  }
+
+  63%,
+  94% {
+    opacity: 1;
+    transform: none;
+  }
+
+  97%,
+  100% {
+    opacity: 0;
+    transform: scale(0.3) rotate(-35deg);
+  }
+}
+
+@keyframes security-uni-check {
+  0%,
+  35% {
+    opacity: 0;
+    transform: scale(0.3) rotate(-35deg);
+  }
+
+  38% {
+    opacity: 1;
+    transform: scale(1.18) rotate(6deg);
+  }
+
+  40%,
+  94% {
+    opacity: 1;
+    transform: none;
+  }
+
+  97%,
+  100% {
+    opacity: 0;
+    transform: scale(0.3) rotate(-35deg);
+  }
+}
+
+@keyframes security-device-cookie {
+  0%,
+  73% {
+    opacity: 0;
+    transform: scale(0.3) rotate(-35deg);
+  }
+
+  76% {
+    opacity: 1;
+    transform: scale(1.18) rotate(6deg);
+  }
+
+  78%,
+  94% {
+    opacity: 1;
+    transform: none;
+  }
+
+  97%,
+  100% {
+    opacity: 0;
+    transform: scale(0.3) rotate(-35deg);
+  }
+}
+
+@keyframes security-settle {
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes security-point-in {
+  to {
+    opacity: 1;
+    translate: 0 0;
+    scale: 1;
+  }
+}
+
 /* ── ECTS ring ("Crédits ECTS" card) ──
    Colours from the Figma card; the arc fills in once on mount. */
 

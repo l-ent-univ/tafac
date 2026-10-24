@@ -90,7 +90,9 @@ test('listGradesSemesters puts the newest semester first', () => {
 
 test('buildGradesReport reads the semester, UEs and modules of a BUT relevé', () => {
   const payload = buildDemoGradesPayload()
-  const report = buildGradesReport(payload['relevé'], { config: payload.config })
+  // The demo hides its ranks: shown here, as a department may.
+  const releve = { ...payload['relevé'], options: { ...payload['relevé'].options, show_rangs: true, show_ue_rangs: true } }
+  const report = buildGradesReport(releve, { config: payload.config })
 
   assert.equal(report.status, 'ok')
   assert.equal(report.department, 'MMI')
