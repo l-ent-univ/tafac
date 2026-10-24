@@ -1,206 +1,271 @@
-![Tafac](src/assets/lent-logo.svg)
+<p align="center">
+  <img src="src/assets/tafac-wordmark.svg" alt="Tafac" width="220" />
+</p>
 
-> **l'ent s'appelle désormais Tafac.** Même app, même équipe, nouveau nom : l'instance officielle est sur **[tafac.fr](https://tafac.fr)**.  
-> Certains identifiants techniques gardent l'ancien nom (image Docker `ghcr.io/l-ent-univ/l-ent`, clés `l-ent:*` du `localStorage`, cookie `__Host-lent_session`) : c'est voulu, les renommer déconnecterait les utilisateurs et effacerait leurs réglages.
+<p align="center">
+  Les cours, les notes et les services de ton université, au même endroit.
+</p>
 
-Interface alternative pour les portails ENT des universités françaises.  
-Regroupe notes, emploi du temps et services dans une seule page.
+<p align="center">
+  <a href="https://tafac.fr">Accéder à Tafac</a> ·
+  <a href="#démarrer-en-local">Développer</a> ·
+  <a href="#auto-hébergement">Auto-héberger</a> ·
+  <a href="docs/ADDING_A_UNIVERSITY.md">Ajouter une université</a>
+</p>
 
-Université supportée : **Université de Rennes**. Le projet est conçu pour être modulaire et accepter facilement de nouvelles universités et écoles : toute la partie spécifique à une université tient dans un seul dossier de configuration. **[Ajoutez la vôtre →](#-ajoutez-votre-université)**
+Tafac est un client web alternatif aux espaces numériques de travail universitaires (ENT). Il rassemble les applications de l’ENT, l’emploi du temps, les notes, les mails récents et les échéances Moodle dans une interface adaptée au téléphone comme à l’ordinateur.
 
-> Client non officiel, indépendant et non affilié aux universités concernées.  
-> La majorité du backend a été développée avec l'aide d'outils d'IA. S'attendre à un code peu optimisé !
+Tafac est un **projet étudiant libre, indépendant et non officiel**, sans affiliations aux universités. Ce projet fait partie de [Papillon](https://papillon.bzh). L’intégration réelle présente dans ce dépôt est celle de l’Université de Rennes, avec des fonctionnalités spécifiques à l’IUT de Lannion.
 
----
+## Ce que propose Tafac
 
-## Contexte
+| Espace | Fonctionnalités |
+| --- | --- |
+| **Accueil** | Résumé de la journée, prochain cours, dernière note, mails récents et échéances Moodle, selon les services disponibles pour la dite université. |
+| **Applications** | Catalogue issu de l’ENT avec les applications disponibles            |
+| **Planning** | Choix de la formation et des groupes TD/TP, différentes vues disponibles avec les détails des cours et des prochaines séances. |
+| **Export calendrier** | Téléchargement d’un fichier `.ics` couvrant 60 jours à partir du lundi de la semaine courante, importable dans un agenda. Il s’agit pour le momet d’un export ponctuel et non d’un abonnement synchronisé. |
+| **Mes notes** | Cette partie est spécifique aux B.U.T et supporte les relevés ScoDoc par semestre, UE, matières et SAÉ, détail des évaluations, statistiques disponibles, crédits ECTS et téléchargement du relevé PDF lorsque le département le propose. |
+| **Simulateur** | Modification de notes et ajout d’évaluations fictives pour estimer leur effet sur les moyennes et la validation des UE (Pour B.U.T uniquement). La simulation reste dans l’interface et ne modifie pas ScoDoc. |
+| **Compte** | Réglage du groupe TD/TP, quels widgets à afficher, changement du thème clair/sombre/automatique, fond personnalisé, couleurs et certificat de scolarité lorsque l’intégration est disponible. |
+| **Application installable** | PWA avec installation sur l’écran d’accueil et proposition des mises à jour. Les services universitaires nécessitent une connexion réseau. |
 
-Les portails ENT (uPortal + CAS, le standard des universités françaises) exposent les données étudiantes (notes, planning, services) à travers plusieurs interfaces séparées et datées. Tafac les agrège dans un dashboard unique, utilisable sur mobile comme sur desktop.
+Les moyennes recalculées et les simulations sont indicatives : les résultats publiés par l’établissement restent la référence. La page de notes est conçue pour les relevés **BUT** de ScoDoc ; elle ne prend pas en charge tous les formats de cursus.
 
-## 🎓 Ajoutez votre université
+## Universités et compatibilité
 
-Si votre université utilise un ENT uPortal derrière un CAS (probablement le cas), l'ajouter ne demande **aucune modification du code**; uniquement un dossier de configuration :
+Le dépôt fournit trois configurations :
 
-```bash
-cp -r universities/example-minimal universities/univ-lavotre
-# remplissez universities/univ-lavotre/{shared,client,server}.js
-# (nom, logo, URL de l'ENT et du CAS le reste est optionnel)
-npm run dev    # toutes les universités, votre dossier inclus
-UNIVERSITY=univ-lavotre npm run dev    # ou la vôtre seule
-```
+| Dossier | Usage |
+| --- | --- |
+| `universities/univ-rennes/` | Intégration finie : ENT uPortal, CAS, planning ADE, ScoDoc de l’IUT de Lannion, Moodle/FOAD, messagerie Partage et MonDossierWeb. |
+| `universities/univ-exemple/` | Université fictive pour tester le choix d’université et la démonstration. Ses adresses ne désignent aucun service réel. Elle est masquée dans la liste en production, mais reste accessible par `/exemple` si elle est servie. |
+| `universities/example-minimal/` | Point de départ pour une nouvelle intégration. Exclu de la liste des universités servies par défaut. |
 
-- Chaque feature (ADE, planning, Moodle, notes…) est **optionnelle** : ce que votre université n'a pas est proprement masqué.
-- `universities/univ-rennes/` sert d'implémentation de référence complète, `universities/univ-exemple/` de démo jouable (compte `demo@tafac.fr` / `tafac-demo`).
-- Une fois testée avec un vrai compte étudiant, **ouvrez une Pull Request** : votre université rejoint l'instance officielle (tafac.fr, choix de l'université à la connexion, lien direct `tafac.fr/<slug>`), ou déployez votre fork vous-même pour elle seule.
+La disponibilité dépend de l’université, de l’établissement, du compte et des services en amont. Dans la configuration Rennes actuelle, les widgets de notes et de prochain cours sont activés pour l’IUT de Lannion. La présence d’un établissement dans les règles de détection ne signifie pas que toutes les intégrations y sont disponibles.
 
-Guide pas-à-pas : **[docs/ADDING_A_UNIVERSITY.md](docs/ADDING_A_UNIVERSITY.md)**
+L’authentification implémentée repose sur un portail **uPortal et un formulaire CAS**. Ajouter une université utilisant un autre système peut nécessiter un nouvel adaptateur, au-delà d’un changement de configuration.
 
-## Fonctionnalités
+## Démarrer en local
 
-- Affichage temporairement désactivé de la moyenne générale, moyenne de promo et dernière note
-- Prochain cours et planning via ADE Campus et Planning GWT
-- Accès aux 30+ applications universitaires avec recherche et favoris
-- Météo locale (Open-Meteo)
-- Mode clair / sombre
-- PWA installable (iOS, Android)
-- Onboarding pour sélectionner année, groupe TD et TP
+> Une partie du code a été générée avec l’aide d’outils d’intelligence artificielle générative, mais systématiquement relue et vérifiée
 
-> Attention : Le projet a uniquement été testé pour le BUT MMI à Lannion et peut ne pas fonctionner correctement pour les autres formations de l'Université de Rennes
+Utiliser **Node.js 24** et npm pour suivre l’environnement de la CI et de l’image Docker.
 
-## Stack
-
-
-| Couche   | Technologies                     |
-| -------- | -------------------------------- |
-| Frontend | React 19, Tailwind CSS 4, Vite 7 |
-| Backend  | Node.js, Express 5               |
-| PWA      | vite-plugin-pwa, Service Worker  |
-
-
-## Installation
-
-Prérequis : Node.js 18+, npm.
-
-```bash
+```sh
 git clone https://github.com/l-ent-univ/tafac.git
 cd tafac
-npm install
+npm ci
 npm run dev
 ```
 
-### Production
+Ouvrir l’adresse indiquée par Vite, généralement `http://localhost:5173`. Le serveur de développement inclut le backend Express : il n’y a pas de second serveur à lancer. Aucun compte universitaire ni secret n’est nécessaire pour essayer la démonstration.
 
-```bash
-npm run build
-npm run start
+### Essayer la démonstration
+
+Utiliser l’accès démo de la page de connexion, ou saisir :
+
+| Champ | Valeur |
+| --- | --- |
+| Identifiant | `demo@tafac.fr` |
+| Mot de passe | `tafac-demo` |
+
+Les données universitaires de démonstration sont fictives. Ce mode permet de parcourir l’application sans se connecter à un ENT réel ; il ne valide pas le fonctionnement des intégrations universitaires.
+
+### Choisir les universités servies
+
+Sans variable `UNIVERSITY`, le serveur propose les universités configurées. Pour travailler sur Rennes uniquement :
+
+```sh
+UNIVERSITY=univ-rennes npm run dev
 ```
 
-Le serveur Express écoute sur le port `3000` (configurable via `PORT`).
+Pour sélectionner explicitement plusieurs configurations :
 
-### Variables d'environnement
-
-
-| Variable         | Description                                                        | Requis           |
-| ---------------- | ------------------------------------------------------------------ | ---------------- |
-| `PORT`           | Port du serveur (défaut : 3000)                                    | Non              |
-| `SESSION_SECRET` | Secret dont dérive la clé de chiffrement du cookie de session (≥ 32 octets, voir [Sécurité](#sécurité--confidentialité)) | Oui (production) |
-| `SESSION_SECRET_PREVIOUS` | Ancien(s) secret(s), séparés par des virgules, encore acceptés en lecture pendant une rotation | Non |
-| `UNIVERSITY`     | Seule université servie ; avec `MULTI_UNIVERSITY=1`, université par défaut (défaut : `univ-rennes`) | Non |
-| `MULTI_UNIVERSITY` | `1` : toutes les universités (choix à la connexion), `0` : `UNIVERSITY` seule. Absent : toutes si `UNIVERSITY` n'est pas définie. Ancien nom : `MULTI_TENANT` | Non |
-| `UNIVERSITIES`   | Universités servies (ids séparés par `,`, défaut : toutes sauf `example-*`). Ancien nom : `TENANTS` | Non |
-| `POSTHOG_PROJECT_KEY` | Clé PostHog : active la mesure d'audience anonyme côté serveur (absente = désactivée) | Non |
-| `POSTHOG_HOST`   | Hôte PostHog (défaut : `https://eu.i.posthog.com`, UE)              | Non              |
-| `ANALYTICS_EXCLUDED_USERS` | Identifiants ENT dont les événements ne sont jamais envoyés (séparés par `,`), par exemple les développeurs de l'instance | Non |
-| `POSTHOG_IN_DEV` | `1` pour que `npm run dev` envoie aussi à PostHog (coupé sinon) | Non |
-| `DATA_DIR`       | Dossier où le serveur mémorise les icônes automatiques des applications (défaut : `./data`, voir [docs/SELF_HOSTING.md](docs/SELF_HOSTING.md#icônes-automatiques-des-applications)) | Non |
-
-## Toutes les universités sur une adresse
-
-Un seul build et un seul serveur servent toutes les universités sur la même adresse (tafac.fr) :
-
-```bash
-npm run build                     # un seul dist/ pour toutes les universités
-MULTI_UNIVERSITY=1 npm start      # ou sans UNIVERSITY
+```sh
+MULTI_UNIVERSITY=1 UNIVERSITIES=univ-rennes,univ-exemple npm run dev
 ```
 
-- **Avant la connexion**, la page est neutre (Tafac, sans université) et propose la liste des universités. Chacune a son lien direct, `/<slug>` (`tafac.fr/rennes`), qui ouvre son formulaire. Le choix est gardé dans le navigateur (`l-ent:university`) ; « Changer d'université » ramène à la liste.
-- **Une fois connecté**, l'université est celle de la session : son id est dans le cookie de session chiffré, et le serveur n'envoie les requêtes qu'aux services de cette université. Changer d'université, c'est se déconnecter.
-- La page charge au démarrage la config de son université (`universities/<id>/client.js`, un fichier par université, téléchargé à la demande) : `GET /__ent_auth/universities` lui dit lesquelles existent et à laquelle elle est connectée.
-- Les anciennes adresses par université restent routées : premier label du nom d'hôte égal à l'id sans tirets (`univrennes.…`) ou nom listé dans l'export `hostnames` de `shared.js`. Les sessions ouvertes avant ce changement (sans université dans le cookie) appartiennent à l'université de leur adresse, Rennes sur le domaine racine.
-- Les réglages propres à une université (établissement, TP, favoris…) sont mis de côté quand le navigateur passe à une autre, puis remis en revenant (`src/universityStorage.js`).
+Les liens `/rennes` et `/exemple` ouvrent directement la connexion de l’université correspondante, si celle-ci est servie.
 
-**Une seule université** (instance auto-hébergée) : `UNIVERSITY=<id>` sans `MULTI_UNIVERSITY` (ou `MULTI_UNIVERSITY=0`). Pas de liste, sa config au démarrage, ses textes SEO : comme avant.
+**Un seul build frontend contient les configurations clientes de toutes les universités.** Le navigateur télécharge celle qui lui est attribuée au démarrage. Il n’est pas nécessaire de construire un `dist/` par université ; `build:all` est actuellement un alias de `build`.
 
-Sur Render (plan gratuit) : build command `npm install && npm run build`, start command `MULTI_UNIVERSITY=1 node server.js`.
+### Commandes du projet
 
-Avec Docker (serveur perso, VPS…) : chaque merge sur `main` publie une image `ghcr.io/l-ent-univ/l-ent`, voir [docs/SELF_HOSTING.md](docs/SELF_HOSTING.md) (Docker Compose + Caddy pour le HTTPS).
-
-## Sécurité & confidentialité
-
-- Tafac ne maintient pas de base de données applicative dédiée pour stocker les comptes étudiants.
-- Les données sont récupérées à la demande depuis les services de l'université configurée : CAS, ENT, ADE et Planning.
-- Le mot de passe ne sert qu'à la requête de connexion au CAS : il n'est jamais conservé, ni côté navigateur, ni en mémoire serveur, ni dans le cookie. La session repose sur le ticket CAS (cookie `TGC`), qui ouvre ensuite ADE, Moodle, la messagerie ou ScoDoc sans mot de passe.
-- Le cookie de session (`__Host-lent_session` : `Secure`, `HttpOnly`, `SameSite=Lax`) contient une copie **chiffrée** (AES-256-GCM, clé dérivée de `SESSION_SECRET`) des cookies universitaires, dont le `TGC`. Il permet de rester connecté (30 jours glissants, plafonnés à 30 jours depuis la connexion, et en pratique à la durée de vie du ticket CAS côté université) et de rétablir la session en silence après un redémarrage du serveur.
-- La déconnexion ferme aussi la session CAS côté université (`/logout`), ce qui rend inutilisable toute copie du cookie.
-- Les caches sensibles côté client sont vidés à la déconnexion et lors d'un échec de rafraîchissement de session.
-- Le menu debug est réservé au mode développement et n'est pas exposé dans le build de production.
-- Le point d'entrée de connexion est protégé par un rate limiting basique contre les tentatives répétées.
-- Mesure d'audience anonyme optionnelle (désactivée sans `POSTHOG_PROJECT_KEY`) : sans cookie, envoyée depuis le serveur vers PostHog UE, identifiant quotidien non réversible, aucune note, aucun mail, aucun identifiant. Désactivable dans *Mon compte*. Détails et réglages PostHog obligatoires : **[docs/ANALYTICS.md](docs/ANALYTICS.md)**.
-- Le projet vise une surface de stockage minimale, mais un déploiement sérieux nécessite tout de même HTTPS et une variable `SESSION_SECRET` forte en production.
-
-### Auto-hébergement : secret de session
-
-- `node server.js` refuse de démarrer sans `SESSION_SECRET`, ou si elle fait moins de 32 octets (le code ne contient aucune clé de secours : c'est un dépôt public). Générez-la avec `openssl rand -base64 32`.
-- Le serveur de production exige HTTPS : le cookie porte le préfixe `__Host-` et l'attribut `Secure` (les navigateurs l'acceptent aussi sur `http://localhost`). En dev (`npm run dev`), sans `SESSION_SECRET` une clé aléatoire est tirée à chaque démarrage ; mettez-en une dans `.env.local` pour garder vos sessions entre deux redémarrages.
-- **Rotation sans déconnecter personne** : placez l'ancienne valeur dans `SESSION_SECRET_PREVIOUS` (plusieurs valeurs possibles, séparées par des virgules), mettez la nouvelle dans `SESSION_SECRET`, redéployez. Les anciens cookies sont relus puis ré-émis avec la nouvelle clé ; retirez `SESSION_SECRET_PREVIOUS` quelques jours plus tard.
-- **Kill switch** : changer `SESSION_SECRET` sans renseigner `SESSION_SECRET_PREVIOUS` invalide instantanément toutes les sessions (tout le monde doit se reconnecter).
-
+| Commande | Rôle |
+| --- | --- |
+| `npm run dev` | Vite avec rechargement à chaud et backend intégré. |
+| `npm run lint` | Vérification ESLint. |
+| `npm test` | Tests avec le runner natif de Node.js. Certains ouvrent des serveurs HTTP locaux temporaires. |
+| `npm run build` | Compilation de l’interface et génération du service worker dans `dist/`. |
+| `npm run build:all` | Même compilation que `npm run build`. |
+| `npm run preview` | Prévisualisation locale du build avec le backend ; cookies en mode développement. |
+| `npm start` | Serveur de production Express ; nécessite un build et `SESSION_SECRET`. |
 
 ## Architecture
 
-```
-tafac/
-├── universities/          # ★ Une université = un dossier de config
-│   ├── univ-rennes/       #   Référence complète (Rennes)
-│   ├── univ-exemple/      #   Université fictive de démonstration
-│   └── example-minimal/   #   Squelette minimal à copier
-├── server.js              # Lanceur production (une ou toutes les universités)
-├── server/
-│   ├── universitiesApp.js # Aiguillage des requêtes vers l'université de la session
-│   └── entAuthApp.js      # Backend d'une université, partagé prod/dev : auth CAS, proxy, API
-├── adeApi.js              # Client ADE (emploi du temps)
-├── planningRpc.js         # Client RPC planning (GWT)
-├── adeUpcomingResolver.js # Résolution des prochains cours
-├── src/
-│   ├── App.jsx            # Composant racine, auth
-│   ├── entApi.js          # Client API portail ENT
-│   ├── weatherApi.js      # API météo
-│   ├── profileStorage.js  # Préférences utilisateur
-│   ├── components/
-│   │   ├── WidgetContainer.jsx
-│   │   ├── WidgetNextClass.jsx
-│   │   ├── AvailableApplications.jsx
-│   │   ├── OnboardingPage.jsx
-│   │   └── ...
-│   └── assets/
-└── public/
+L’interface utilise **React 19**, **Vite 7**, **Tailwind CSS 4** et **Iconify**. Le backend repose sur **Express 5**, les API natives de Node.js et des adaptateurs pour les services universitaires. Le code applicatif est écrit en JavaScript avec des modules ES.
+
+```text
+Navigateur : React / PWA
+    │
+    ├── /__ent_auth/*    Connexion, session et services intégrés
+    └── /__ent_proxy/*   Requêtes vers le portail ENT
+              │
+       Serveur Express
+              │
+       Sélection de l’université
+              │
+       CAS · uPortal · ADE · ScoDoc · Moodle · Zimbra · MonDossierWeb
 ```
 
-La config d'une université est lue côté serveur (`universities/<id>/server.js`) et chargée côté frontend au démarrage de la page : l'alias Vite `@university` désigne `src/university.js`, rempli par `src/universityBoot.js` avec `universities/<id>/client.js` (ou la config neutre `universities/neutral.js` avant le choix) avant le chargement d'`App`. Aucun autre fichier ne contient de valeur propre à une université.
+Au démarrage, le navigateur consulte `/__ent_auth/universities`, puis charge le `client.js` adapté avant d’importer l’application. Côté serveur, chaque université dispose de son propre backend configuré. Une requête authentifiée est routée vers l’université inscrite dans sa session ; le formulaire de connexion peut en sélectionner une nouvelle.
 
-## Intégrations
+| Fichier ou dossier | Responsabilité |
+| --- | --- |
+| `src/main.jsx`, `src/universityBoot.js` | Initialisation, choix d’université et chargement de l’application. |
+| `src/App.jsx` | Session, onboarding, tableau de bord et navigation principale. |
+| `src/components/` | Écrans, widgets, fenêtres et composants partagés. |
+| `src/entApi.js` | Appels au backend, normalisation des réponses et caches côté client. |
+| `src/gradesReport.js`, `src/gradeSimulation.js` | Lecture des relevés, calculs et projections de notes. |
+| `src/planning*.js`, `src/usePlanning*.js` | Dates, vues, chargement et export du planning. |
+| `src/profileStorage.js`, `src/universityStorage.js` | Préférences locales et séparation des réglages entre universités. |
+| `server.js` | Entrée de production : API, fichiers compilés et page HTML avec métadonnées. |
+| `server/universitiesApp.js` | Registre public et routage des requêtes entre universités. |
+| `server/entAuthApp.js` | Connexion CAS, sessions, proxy ENT et intégrations des services. |
+| `server/sessionCookie.js` | Chiffrement, durée de vie et rotation des cookies de session. |
+| `planningPortalApi.js` | Adaptateur du portail planning REST, utilisé pour Rennes. |
+| `planningRpc.js`, `adeApi.js`, `adeUpcomingResolver.js` | Adaptateurs planning GWT et ADE mobile, résolution des cours à venir. |
+| `server/appIcons.js` | Attribution et persistance des icônes des applications. |
+| `universities/` | Configuration, identité et ressources de chaque université. |
+| `tests/` | Tests des calculs, adaptateurs, sessions, routage, exports et comportements de l’interface. |
+| `deploy/`, `Dockerfile` | Image de production et déploiement avec Caddy. |
 
-Tafac communique avec les systèmes suivants :
+## Configuration
 
-- **CAS SSO** : authentification centralisée
-- **Portail ENT** : layout, portlets, marketplace
-- **ADE Campus** : emploi du temps (sessions chiffrées)
-- **Planning** : planning détaillé via GWT RPC
-- **Notes** : relevé ScoDoc (moyenne, dernière note, photo étudiante)
-- **Open-Meteo** : météo (API libre)
+| Variable | Effet |
+| --- | --- |
+| `UNIVERSITY` | Université unique, ou université par défaut en mode multiple. Valeur de repli : `univ-rennes`. |
+| `MULTI_UNIVERSITY` | `1` pour le choix entre universités, `0` pour une seule. Sans valeur explicite, le mode multiple est activé si `UNIVERSITY` n’est pas définie. L’image Docker impose `1` par défaut. |
+| `UNIVERSITIES` | Liste d’identifiants séparés par des virgules en mode multiple. Par défaut, tous les dossiers sauf ceux commençant par `example`. L’université par défaut est également incluse. |
+| `PORT` | Port du serveur de production, `3000` par défaut. |
+| `SESSION_SECRET` | Secret servant à dériver la clé de chiffrement des sessions. Obligatoire en production, au moins 32 octets. |
+| `SESSION_SECRET_PREVIOUS` | Anciens secrets, séparés par des virgules, acceptés pendant une rotation. |
+| `DATA_DIR` | Dossier des icônes persistantes : `./data` par défaut, `/app/data` dans Docker. |
+| `TRUST_PROXY` | Proxys autorisés à transmettre l’adresse du client à Express, notamment pour limiter les tentatives de connexion. Par défaut : réseaux locaux et privés. |
+| `POSTHOG_PROJECT_KEY` | Active les événements PostHog côté serveur. Absent : PostHog désactivé. |
+| `POSTHOG_HOST` | Destination PostHog, `https://eu.i.posthog.com` par défaut. |
+| `POSTHOG_IN_DEV` | `1` pour autoriser PostHog dans le serveur Vite, avec une clé configurée. |
+| `ANALYTICS_EXCLUDED_USERS` | Identifiants ENT dont les événements PostHog sont ignorés, séparés par des virgules. |
+| `BUILD_HASH` | Référence de commit affichée dans « À propos », fournie au moment du build si Git n’est pas disponible. |
 
-## Nouveautés (changelog)
+Passer `UNIVERSITY`, `MULTI_UNIVERSITY` et `UNIVERSITIES` dans l’environnement du processus. Le serveur Vite lit aussi les variables de session, de statistiques et `DATA_DIR` dans `.env` / `.env.local`. En production, `npm start` ne charge pas automatiquement de fichier `.env` ; Docker Compose le transmet au conteneur, ou Node peut le charger explicitement avec `node --env-file=.env server.js`.
 
-Les nouveautés visibles par les étudiants vivent dans [`src/changelog.js`](src/changelog.js). Quand un appareil a des entrées qu'il n'a pas encore vues, une petite pastille « Nouveautés » apparaît sur le tableau de bord ; elle disparaît dès que la liste est ouverte. La liste complète reste accessible dans Réglages › À propos.
+Les anciens noms `MULTI_TENANT` et `TENANTS` restent acceptés. Le fichier `.env.example` à la racine contient encore des commentaires sur l’ancien fonctionnement par builds et sous-domaines : pour le déploiement actuel, utiliser [`deploy/example.env`](deploy/example.env) et les variables ci-dessus.
 
-Pour annoncer une nouveauté, ajoutez **un objet en tête de `CHANGELOG`** : `id` unique (jamais modifié ensuite), `date` (`AAAA-MM-JJ`), `title`, `body` (une ou deux phrases, en tutoyant, sans jargon) et, au besoin, une `icon` Iconify. Une entrée qui ne concerne pas tout le monde déclare `universities: ['univ-rennes']` et/ou `features: ['mail']` (toutes les fonctionnalités listées doivent être actives dans `universityConfig.features`) ; ailleurs, elle est invisible et n'allume pas la pastille. Le commentaire en tête du fichier détaille les règles.
+## Sessions et données
 
-La première visite d'un appareil marque silencieusement toutes les entrées existantes comme vues (clé `l-ent:changelog-seen`) : seules les nouveautés publiées ensuite allument la pastille.
+**Les identifiants passent par le serveur Tafac**, qui les transmet au CAS de l’université et peut les utiliser pour initialiser ADE pendant la connexion. Le mot de passe n’est pas conservé dans la session ni enregistré par le backend. Le navigateur peut proposer de le mémoriser dans son propre gestionnaire de mots de passe.
 
-## Contribution
+Après connexion, Tafac conserve les cookies nécessaires aux services universitaires. Une partie de ces cookies, dont le ticket CAS, est transportée dans un cookie Tafac chiffré avec **AES-256-GCM**. En production, ce cookie est `HttpOnly`, `Secure`, `SameSite=Lax` et préfixé `__Host-`. La durée maximale prévue est de 30 jours depuis la connexion, mais la session universitaire peut expirer plus tôt.
 
-1. Forkez le projet
-2. Créez une branche (`git checkout -b feat/univ-lavotre` ou `feat/ma-fonctionnalite`)
-3. Committez (`git commit -m 'feat: ajouter mon université'`)
-4. Pushez (`git push origin feat/univ-lavotre`)
-5. Ouvrez une Pull Request
+Il n’y a pas de base de données applicative à installer. Les sessions actives et les caches des services sont en mémoire serveur ; les choix d’icônes des applications sont persistés dans `DATA_DIR`. Le navigateur conserve des préférences et certains caches locaux. Les réglages liés à l’université sont séparés lors d’un changement d’établissement.
 
-## Licence
+Sans secret en développement, une clé temporaire est créée : redémarrer le serveur invalide les sessions. En production, conserver un secret stable. Pour le renouveler sans déconnecter immédiatement les sessions existantes, placer l’ancien dans `SESSION_SECRET_PREVIOUS`.
 
-[GNU Affero General Public License v3.0](LICENSE)
+### Statistiques et services externes
 
-Toute version modifiée déployée publiquement doit rendre son code source disponible.
+Deux dispositifs distincts sont présents :
 
-## Crédits
+- **PostHog**, facultatif et appelé par le serveur : événements filtrés par une liste de propriétés autorisées, sans SDK PostHog dans le navigateur.
+- **Simple Analytics**, chargé côté navigateur dans les builds de production pour compter les pages vues lorsque le réglage de statistiques est activé. L’absence de clé PostHog ne désactive donc pas toute mesure d’audience.
 
-Fait par [@tom-things](https://github.com/tom-things)
+Le réglage **Statistiques anonymes**, activé par défaut, permet de désactiver les deux. Le fonctionnement détaillé et les propriétés autorisées sont décrits dans [`docs/ANALYTICS.md`](docs/ANALYTICS.md) (écrit à l'aide d'IAg).
+
+D’autres fonctionnalités font appel à des services externes : GitHub pour les contributeurs et Iconify pour les icônes. Une instance auto-hébergée conserve ces dépendances tant que leur code ou leur configuration n’est pas adapté.
+
+## Auto-hébergement
+
+Le dépôt fournit une image Docker réunissant le frontend et le serveur Express, ainsi qu’un déploiement Caddy pour HTTPS. L’image conserve son nom historique (l'ent) :
+
+```text
+ghcr.io/l-ent-univ/l-ent:latest
+```
+
+Depuis une copie du dépôt, sur un serveur disposant de Docker Compose :
+
+```sh
+cd deploy
+cp example.env .env
+openssl rand -base64 32
+```
+
+Reporter le secret généré dans `SESSION_SECRET` du fichier `.env`, puis remplacer `tafac.example.fr` dans `Caddyfile` par un domaine pointant vers le serveur. Les ports 80 et 443 doivent être accessibles à Caddy.
+
+Pour ne servir que Rennes, ajouter dans ce même `.env` :
+
+```dotenv
+MULTI_UNIVERSITY=0
+UNIVERSITY=univ-rennes
+```
+
+Démarrer l’instance :
+
+```sh
+docker compose up -d
+docker compose logs -f lent
+```
+
+Le déploiement monte un volume pour les icônes et des volumes pour Caddy. **HTTPS est nécessaire en production**, notamment pour le cookie de session sécurisé. Pour les mises à jour, le choix d’une version fixe, un autre reverse proxy ou la gestion des icônes, consulter [`docs/SELF_HOSTING.md`](docs/SELF_HOSTING.md).
+
+Hors Docker, compiler avec `npm ci` puis `npm run build`, fournir les variables d’environnement et lancer `npm start` derrière un reverse proxy HTTPS. Le serveur utilise aussi les sources du dépôt et ses dépendances de production ; conserver seulement `dist/` est insuffisant.
+
+## Ajouter une université
+
+Créer un nouveau dossier à partir du modèle minimal, avec un identifiant encore inutilisé :
+
+```sh
+cp -R universities/example-minimal universities/univ-mon-campus
+```
+
+Adapter les trois fichiers de configuration :
+
+| Fichier | Contenu |
+| --- | --- |
+| `shared.js` | Identifiant, noms, slug, textes publics et fonctionnalités. Données pures, lisibles par Node et le navigateur. |
+| `client.js` | Identité visuelle, images, liens, établissements et configuration de l’interface. Tout son contenu peut être envoyé au navigateur. |
+| `server.js` | Origines des services, paramètres de connexion et adaptateurs côté serveur. |
+
+Ajouter un logo dans `assets/`, renseigner les origines CAS/uPortal et n’activer que les intégrations configurées, puis lancer :
+
+```sh
+UNIVERSITY=univ-mon-campus npm run dev
+```
+
+Les services optionnels ont leurs propres paramètres. Les notes distinguent notamment trois états : `true` pour l’intégration active, `false` pour la masquer et `'disabled'` pour afficher son indisponibilité. L’ajout d’une configuration cliente nécessite ensuite de reconstruire le frontend.
+
+Le guide [`docs/ADDING_A_UNIVERSITY.md`](docs/ADDING_A_UNIVERSITY.md) détaille les champs, les intégrations et la personnalisation.
+
+## Contribuer
+
+Les contributions peuvent porter sur les intégrations universitaires, les fonctionnalités, l’interface, l’accessibilité, les tests ou la documentation. Pour un problème d’intégration, préciser l’université, le service concerné et les étapes de reproduction, sans publier d’identifiants, de cookies, de relevés ni d’autres données étudiantes.
+
+Avant de proposer une modification :
+
+```sh
+npm run lint
+npm test
+npm run build
+```
+
+Une contribution qui modifie un adaptateur ou un calcul doit inclure une vérification adaptée, avec des données fictives ou anonymisées. La démonstration facilite les essais d’interface, mais une validation avec le service réel reste nécessaire pour confirmer une nouvelle intégration.
+
+La [CI](.github/workflows/ci.yml) exécute lint, tests et build. Les pull requests déclenchent aussi une construction Docker sans publication. Après vérification, les pushes sur `main` publient une release et une image pour `linux/amd64` et `linux/arm64`, sauf si le message du commit de tête contient `[skip release]`. La version est calculée à partir des messages de commits conventionnels.
+
+## Équipe et licence
+
+Tafac est porté par [Tom](https://github.com/tom-things) et [Lucas Lavajo](https://github.com/tryon-dev), avec les [contributeurs du projet](https://github.com/l-ent-univ/tafac/graphs/contributors).
+
+Le projet fait partie de l’écosystème [Papillon](https://papillon.bzh).
+
+Le code est distribué sous **GNU AGPL-3.0-only** ; le texte complet est disponible dans [`LICENSE`](LICENSE). Les ressources tierces, notamment les polices et les photographies, conservent leurs licences et attributions respectives.
