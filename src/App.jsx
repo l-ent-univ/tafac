@@ -19,7 +19,6 @@ import PwaInstallPrompt from './components/PwaInstallPrompt'
 import OnboardingPage from './components/OnboardingPage'
 import PwaUpdateManager from './components/PwaUpdateManager'
 import UpdateNotice from './components/UpdateNotice'
-import ServiceNotice from './components/ServiceNotice'
 import WelcomeFromLent from './components/WelcomeFromLent'
 import { settingsTransfer } from './settingsTransferBoot'
 import { DEMO_CREDENTIALS, DEMO_SESSION_MODE } from './demoAccount'
@@ -2937,11 +2936,6 @@ function App() {
                   <Icon icon="carbon:warning-filled" className="mt-0.5 h-[18px] w-[18px] shrink-0 text-[#b76e00]" aria-hidden="true" />
                   <p className="m-0 text-sm font-medium leading-[1.5] font-body">{sessionState.warning}</p>
                 </div>
-              </div>
-            ) : null}
-            {shownPage === 'dashboard' ? (
-              <div className="px-6 pt-3 max-md:px-3 4xl:pt-5">
-                <ServiceNotice />
               </div>
             ) : null}
             {/* Kept mounted behind other pages: coming back is instant and the
