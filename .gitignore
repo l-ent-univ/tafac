@@ -31,5 +31,18 @@ API_GUIDE.md
 *.sln
 *.sw?
 
+# Native iOS package (kept out of the repo)
+ios/
+
+# Local name generator tool (not part of the app)
+name-lab/
+
+# Local copy editing tool (not part of the app)
+copy-lab/
+
+# Marketing booklet (kept out of the repo)
+build/marketing-booklet/
+outputs/marketing-booklet/
+
 # Server data (automatic app icons, see docs/SELF_HOSTING.md)
 data/

@@ -1,32 +1,37 @@
-// Production server.
+// Production server: the backend of every university it serves
+// (server/universitiesApp.js) and the frontend, one build for all (dist/).
 //
-// Single-tenant (default): serves the university picked by UNIVERSITY from
-// dist/ — same behavior as always.
+// Every university (tafac.fr): MULTI_UNIVERSITY=1 (formerly MULTI_TENANT),
+// or no UNIVERSITY set. One process for all of them. A signed-in request
+// goes to its session's university; a signed-out one to the university
+// chosen on the login page, else the old per-university hostname rules, else
+// the default one (UNIVERSITY, else univ-rennes). The universities served are
+// the UNIVERSITIES list (formerly TENANTS), default: all non-example ones.
+// The page starts neutral and asks which one.
 //
-// Multi-tenant (MULTI_TENANT=1): loads every university listed in TENANTS
-// (default: all non-example universities), builds one app per tenant, and
-// routes each request by hostname. A tenant matches when the request host's
-// first label equals its id without dashes (univ-rennes → univrennes.lent…)
-// or when the host appears in the university's optional `hostnames` export
-// (shared.js). Unmatched hosts fall back to the UNIVERSITY default.
-// Frontends must be built per tenant with `npm run build:all` (dist/<id>/).
+// One university (a self-hosted instance): UNIVERSITY=<id> without
+// MULTI_UNIVERSITY (or MULTI_UNIVERSITY=0). That university only, no picker,
+// its own SEO text: same behavior as before.
 import express from 'express'
 import { readFileSync } from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { shutdownAllAnalytics } from './server/analytics.js'
-import { createEntAuthApp } from './server/entAuthApp.js'
+import { fillBrandingPlaceholders, fillPublicOrigin } from './server/appShell.js'
+import { createUniversitiesApp } from './server/universitiesApp.js'
+import { branding as neutralBranding } from './universities/neutral.js'
 import {
-  listUniversityIds,
-  loadServerConfig,
+  listServedUniversityIds,
   loadSharedConfig,
+  resolveMultiUniversity,
   resolveUniversityId,
 } from './universities/index.js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
+const DIST_DIR = path.join(__dirname, 'dist')
 
 const PORT = process.env.PORT || 3000
-const MULTI_TENANT = ['1', 'true', 'yes'].includes(String(process.env.MULTI_TENANT ?? '').toLowerCase())
+const MULTI_UNIVERSITY = resolveMultiUniversity()
 
 function getPublicOrigin(req) {
   const forwardedProto = String(req.headers['x-forwarded-proto'] || '').split(',')[0].trim()
@@ -46,39 +51,42 @@ function getSafePublicOrigin(req) {
   return SAFE_ORIGIN.test(origin) ? origin : ''
 }
 
-function getRequestHost(req) {
-  const forwardedHost = String(req.headers['x-forwarded-host'] || '').split(',')[0].trim()
-  const host = forwardedHost || String(req.headers.host || '')
+const defaultUniversityId = resolveUniversityId()
+const universityIds = MULTI_UNIVERSITY ? listServedUniversityIds() : [defaultUniversityId]
+// SEO text of the page: Tafac's when every university is served, the
+// university's own when it's the only one.
+const pageBranding = MULTI_UNIVERSITY ? neutralBranding : (await loadSharedConfig(defaultUniversityId)).branding
 
-  return host.split(':')[0].toLowerCase()
-}
+// This is the production entry point: SESSION_SECRET is mandatory here and
+// the session cookie is Secure/__Host- (see server/sessionCookie.js).
+const universitiesApp = await createUniversitiesApp({
+  universityIds,
+  defaultUniversityId,
+  multi: MULTI_UNIVERSITY,
+  production: true,
+})
 
-// Full app for one university: auth/proxy backend + SEO routes + built frontend.
-function createTenantApp(universityConfig, distDir) {
-  const app = express()
+const app = express()
+app.use(universitiesApp)
 
-  // This is the production entry point: SESSION_SECRET is mandatory here and
-  // the session cookie is Secure/__Host- (see server/sessionCookie.js).
-  app.use(createEntAuthApp(universityConfig, { session: { production: true } }))
+app.get('/robots.txt', (req, res) => {
+  const origin = getPublicOrigin(req)
 
-  app.get('/robots.txt', (req, res) => {
-    const origin = getPublicOrigin(req)
+  res.type('text/plain')
+  res.send([
+    'User-agent: *',
+    'Allow: /',
+    'Disallow: /__ent_auth/',
+    'Disallow: /__ent_proxy/',
+    `Sitemap: ${origin}/sitemap.xml`,
+  ].join('\n'))
+})
 
-    res.type('text/plain')
-    res.send([
-      'User-agent: *',
-      'Allow: /',
-      'Disallow: /__ent_auth/',
-      'Disallow: /__ent_proxy/',
-      `Sitemap: ${origin}/sitemap.xml`,
-    ].join('\n'))
-  })
+app.get('/sitemap.xml', (req, res) => {
+  const origin = getPublicOrigin(req)
 
-  app.get('/sitemap.xml', (req, res) => {
-    const origin = getPublicOrigin(req)
-
-    res.type('application/xml')
-    res.send(`<?xml version="1.0" encoding="UTF-8"?>
+  res.type('application/xml')
+  res.send(`<?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   <url>
     <loc>${origin}/</loc>
@@ -86,90 +94,102 @@ function createTenantApp(universityConfig, distDir) {
     <priority>1.0</priority>
   </url>
 </urlset>`)
-  })
+})
 
-  // The built page, read once; its __PUBLIC_ORIGIN__ (canonical, link
-  // previews, structured data) becomes this request's address, so link
-  // previews, which don't run the app, get absolute URLs on every tenant.
-  let appShell = null
-  function sendAppShell(req, res, next) {
-    const origin = getSafePublicOrigin(req)
-
-    try {
-      appShell ??= readFileSync(path.join(distDir, 'index.html'), 'utf8')
-    } catch (error) {
-      next(error)
-      return
-    }
-    res.setHeader('Content-Language', 'fr')
-    if (origin) res.setHeader('Link', `<${origin}/>; rel="canonical"`)
-    res.type('html').send(appShell.replaceAll('__PUBLIC_ORIGIN__', origin))
+// The landing page as static HTML, with its FAQ's structured data, rendered
+// at build time (scripts/prerender-landing.mjs). Every university: the
+// neutral landing tafac.fr shows. Absent (a build without it, or one
+// university only): the page goes without.
+function readPrerenderedLanding() {
+  if (!MULTI_UNIVERSITY) return null
+  try {
+    return JSON.parse(readFileSync(path.join(DIST_DIR, '.prerender', 'landing.json'), 'utf8'))
+  } catch {
+    return null
   }
-
-  app.get('/', sendAppShell)
-  // The page under its file name would come out unfilled: the home page.
-  app.get('/index.html', (req, res) => res.redirect(301, '/'))
-
-  // Serve the built static files
-  app.use(express.static(distDir))
-
-  // Support for client-side routing (React Router)
-  app.get(/^.*$/, sendAppShell)
-
-  return app
 }
 
-const rootApp = express()
-const defaultUniversityId = resolveUniversityId()
-
-if (!MULTI_TENANT) {
-  const universityConfig = await loadServerConfig(defaultUniversityId)
-  rootApp.use(createTenantApp(universityConfig, path.join(__dirname, 'dist')))
-
-  rootApp.listen(PORT, () => {
-    console.log(`Server is running on http://localhost:${PORT} (university: ${universityConfig.id})`)
-  })
-} else {
-  const tenantIds = process.env.TENANTS
-    ? process.env.TENANTS.split(',').map((id) => resolveUniversityId(id.trim()))
-    : listUniversityIds().filter((id) => !id.startsWith('example'))
-
-  if (!tenantIds.includes(defaultUniversityId)) {
-    tenantIds.unshift(defaultUniversityId)
-  }
-
-  const tenantsById = new Map()
-  const tenantIdByHost = new Map()
-  const tenantIdByLabel = new Map()
-
-  for (const id of tenantIds) {
-    const config = await loadServerConfig(id)
-    const shared = await loadSharedConfig(id)
-    tenantsById.set(id, createTenantApp(config, path.join(__dirname, 'dist', id)))
-
-    // Default subdomain label: the id without dashes (univ-rennes → univrennes).
-    tenantIdByLabel.set(id.replace(/-/g, ''), id)
-    for (const hostname of shared.hostnames ?? []) {
-      tenantIdByHost.set(String(hostname).toLowerCase(), id)
-    }
-  }
-
-  function resolveTenantId(req) {
-    const host = getRequestHost(req)
-
-    return tenantIdByHost.get(host)
-      ?? tenantIdByLabel.get(host.split('.')[0])
-      ?? defaultUniversityId
-  }
-
-  rootApp.use((req, res, next) => {
-    tenantsById.get(resolveTenantId(req))(req, res, next)
-  })
-
-  rootApp.listen(PORT, () => {
-    console.log(`Server is running on http://localhost:${PORT} (multi-tenant: ${tenantIds.join(', ')}; default: ${defaultUniversityId})`)
-  })
+// The built page with the landing already in it, for search engines and
+// link previews (they don't run the app); the app renders over it.
+function withPrerenderedLanding(shell, landing) {
+  const structuredData = landing.structuredData
+    .map((data) => `<script type="application/ld+json">${JSON.stringify(data).replace(/</g, '\\u003c')}</script>`)
+    .join('')
+  return shell
+    .replace('<div id="root"></div>', () => `<div id="root">${landing.html}</div>`)
+    .replace('</head>', () => `${structuredData}</head>`)
 }
+
+// A session cookie (current or legacy name): a signed-in student, who gets
+// the app, not the landing.
+const SESSION_COOKIE_PATTERN = /(?:^|;\s*)(?:__Host-)?(?:lent_session|ent_front_session)=/
+
+// The page's own addresses (src/universityRuntime.js, App.jsx): the home
+// page, the login page, the picker and a university's /<slug>. Any other
+// gets the page too, but as a 404, so search engines don't index it.
+const CLIENT_PATHS = new Set(['/', '/login', '/universites'])
+function isClientPath(pathname) {
+  const clean = pathname.replace(/\/+$/, '') || '/'
+  if (CLIENT_PATHS.has(clean)) return true
+  const name = clean.slice(1)
+  return !name.includes('/') && Boolean(universitiesApp.locals.findUniversityId(name))
+}
+
+// The built page, read and filled with the SEO text once; its
+// __PUBLIC_ORIGIN__ (canonical, link previews, structured data) becomes this
+// request's address, so link previews, which don't run the app, get absolute
+// URLs on every address. The home page, signed out: with the landing in it.
+let appShell = null
+let landingShell = null
+function sendAppShell(req, res, next) {
+  const origin = getSafePublicOrigin(req)
+
+  try {
+    if (!appShell) {
+      appShell = fillBrandingPlaceholders(readFileSync(path.join(DIST_DIR, 'index.html'), 'utf8'), pageBranding)
+      const landing = readPrerenderedLanding()
+      landingShell = landing ? withPrerenderedLanding(appShell, landing) : appShell
+    }
+  } catch (error) {
+    next(error)
+    return
+  }
+
+  let pathname = req.path
+  try {
+    pathname = decodeURIComponent(req.path)
+  } catch {
+    // Malformed: matches no client path.
+  }
+  const isHome = pathname === '/'
+  const isSignedOut = !SESSION_COOKIE_PATTERN.test(req.headers.cookie ?? '')
+  const shell = isHome && isSignedOut ? landingShell : appShell
+
+  res.status(isClientPath(pathname) ? 200 : 404)
+  res.setHeader('Content-Language', 'fr')
+  // Signed out or in, / is one address with two pages.
+  if (isHome) res.setHeader('Vary', 'Cookie')
+  if (origin) res.setHeader('Link', `<${origin}/>; rel="canonical"`)
+  res.type('html').send(fillPublicOrigin(shell, origin))
+}
+
+app.get('/', sendAppShell)
+// The page under its file name would come out unfilled: the home page.
+app.get('/index.html', (req, res) => res.redirect(301, '/'))
+
+// Serve the built static files
+app.use(express.static(DIST_DIR))
+
+// Client-side entry points (/<slug> of a university, the picker) and any
+// other address: the page.
+app.get(/^.*$/, sendAppShell)
+
+app.listen(PORT, () => {
+  const mode = MULTI_UNIVERSITY
+    ? `universities: ${universitiesApp.locals.universityIds.join(', ')}; default: ${defaultUniversityId}`
+    : `university: ${defaultUniversityId}`
+  console.log(`Server is running on http://localhost:${PORT} (${mode})`)
+})
 
 // Flush pending anonymous analytics events (if enabled) before exiting.
 for (const signal of ['SIGTERM', 'SIGINT']) {

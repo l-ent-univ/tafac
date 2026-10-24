@@ -1,28 +1,29 @@
-# Tafac (formerly l'ent) production image: every university frontend (dist/<id>/) plus the
-# Express server, run in multi-tenant mode. See docs/SELF_HOSTING.md.
+# Tafac (formerly l'ent) production image: the frontend (one build for every university)
+# plus the Express server, serving every university (MULTI_UNIVERSITY=1, as on tafac.fr).
+# A self-hosted instance for one university sets MULTI_UNIVERSITY=0 and UNIVERSITY.
+# See docs/SELF_HOSTING.md.
 
-# --- Build: install everything, build one frontend per university ---
+# --- Build: install everything, build the frontend ---
 FROM node:24-alpine AS build
 WORKDIR /app
 COPY package.json package-lock.json ./
 RUN npm ci
 COPY . .
-ARG TENANTS
 # Commit shown in "À propos" (the build context has no .git).
 ARG BUILD_HASH
-RUN npm run build:all
+RUN npm run build
 
-# --- Runtime: production dependencies, sources and built frontends ---
+# --- Runtime: production dependencies, sources and built frontend ---
 FROM node:24-alpine
 WORKDIR /app
 ENV NODE_ENV=production \
-    MULTI_TENANT=1 \
+    MULTI_UNIVERSITY=1 \
     PORT=3000 \
     DATA_DIR=/app/data
 COPY package.json package-lock.json ./
 RUN npm ci --omit=dev && npm cache clean --force
 # The server imports a few modules from src/ (demo account), so the sources
-# stay; only the built frontends come from the build stage.
+# stay; only the built frontend comes from the build stage.
 COPY . .
 COPY --from=build /app/dist ./dist
 # Automatic app icons (server/appIcons.js) are remembered here: mount a

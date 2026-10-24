@@ -1,89 +1,83 @@
 import { execSync } from 'node:child_process'
+import { readFileSync } from 'node:fs'
+import path from 'node:path'
+import { fileURLToPath } from 'node:url'
 import tailwindcss from '@tailwindcss/vite'
 import react from '@vitejs/plugin-react'
 import { VitePWA } from 'vite-plugin-pwa'
 import { defineConfig, loadEnv } from 'vite'
 import { readAnalyticsConfig } from './server/analytics.js'
 import { resolveDataDir } from './server/appIcons.js'
-import { createEntAuthApp } from './server/entAuthApp.js'
-import { clientConfigPath, listUniversityIds, loadServerConfig, loadSharedConfig, resolveUniversityId } from './universities/index.js'
+import { fillBrandingPlaceholders, fillPublicOrigin } from './server/appShell.js'
+import { createUniversitiesApp } from './server/universitiesApp.js'
+import { branding as neutralBranding } from './universities/neutral.js'
+import { listServedUniversityIds, loadSharedConfig, resolveMultiUniversity, resolveUniversityId } from './universities/index.js'
 
+// Every university, like tafac.fr, unless UNIVERSITY picks one (and
+// MULTI_UNIVERSITY isn't set): see universities/index.js. The build is the
+// same either way; this only decides what the dev and preview servers serve.
+const multiUniversity = resolveMultiUniversity()
 const universityId = resolveUniversityId()
-const universityServerConfig = await loadServerConfig(universityId)
-const { branding } = await loadSharedConfig(universityId)
+// The page's SEO text on the dev and preview servers, as server.js fills it.
+const pageBranding = multiUniversity ? neutralBranding : (await loadSharedConfig(universityId)).branding
 
 // Dev/preview backend: the same Express app the production server mounts
-// (server/entAuthApp.js). Unmatched requests fall through to Vite.
+// (server/universitiesApp.js). Unmatched requests fall through to Vite.
 // POSTHOG_*, ANALYTICS_*, SESSION_SECRET* and DATA_DIR may come from the shell
 // or from .env / .env.local (shell wins). Without SESSION_SECRET the backend
 // uses a random per-process key: sessions then don't survive a dev-server
 // restart. Without DATA_DIR, automatic app icons are remembered in ./data.
 // No PostHog from the dev server unless POSTHOG_IN_DEV=1: what's tried here,
 // often with a real account, stays out of the real numbers.
-function mountEntAuthApp(server) {
+async function mountEntAuthApp(server) {
   const env = loadEnv(server.config.mode, server.config.envDir || process.cwd(), ['POSTHOG_', 'ANALYTICS_', 'SESSION_SECRET', 'DATA_DIR'])
-  const entAuthApp = createEntAuthApp(universityServerConfig, {
-    analytics: env.POSTHOG_IN_DEV === '1' ? readAnalyticsConfig(env) : { projectKey: null },
-    appIcons: { dataDir: resolveDataDir(env) },
+  const universitiesApp = await createUniversitiesApp({
+    universityIds: multiUniversity ? listServedUniversityIds() : [universityId],
+    defaultUniversityId: universityId,
+    multi: multiUniversity,
+    // Plain http://localhost: no Secure flag, no __Host- prefix.
+    production: false,
     session: {
       secret: env.SESSION_SECRET,
       previousSecrets: env.SESSION_SECRET_PREVIOUS,
-      // Plain http://localhost: no Secure flag, no __Host- prefix.
-      production: false,
     },
+    analytics: env.POSTHOG_IN_DEV === '1' ? readAnalyticsConfig(env) : { projectKey: null },
+    appIcons: { dataDir: resolveDataDir(env) },
   })
 
-  server.middlewares.use(entAuthApp)
+  server.middlewares.use(universitiesApp)
   server.httpServer?.once('close', () => {
-    void entAuthApp.locals.analytics.shutdown()
+    void universitiesApp.locals.shutdown()
   })
 }
 
 const entDevAuthPlugin = {
   name: 'ent-dev-auth',
   configureServer(server) {
-    // Dev-only tenant switcher: the bundle is baked per university, so
-    // /univexemple (or /univ-exemple) restarts the dev server on that
-    // university and lands on its login page — the dev counterpart of the
-    // production per-subdomain routing (server.js).
+    return mountEntAuthApp(server)
+  },
+  async configurePreviewServer(server) {
+    await mountEntAuthApp(server)
+
+    // The built page with its placeholders filled, as server.js sends it.
+    const distDir = path.resolve(server.config.root, server.config.build.outDir)
     server.middlewares.use((req, res, next) => {
-      const label = String(req.url ?? '').split('?')[0].replace(/^\/+|\/+$/g, '')
-      const targetId = listUniversityIds().find((id) => id === label || id.replace(/-/g, '') === label)
+      const pathname = String(req.url ?? '').split('?')[0]
+      const isPage = (req.method === 'GET' || req.method === 'HEAD')
+        && !path.extname(pathname)
+        && String(req.headers.accept ?? '').includes('text/html')
+      if (!isPage) return next()
 
-      if (!targetId) return next()
-
-      if (targetId === universityId) {
-        res.writeHead(302, { Location: '/' })
-        res.end()
-        return
-      }
-
-      process.env.UNIVERSITY = targetId
-      res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' })
-      res.end(`<!doctype html><meta http-equiv="refresh" content="1;url=/"><p>Bascule vers ${targetId}…</p>`)
-      server.restart()
+      const html = readFileSync(path.join(distDir, 'index.html'), 'utf8')
+      res.setHeader('Content-Type', 'text/html; charset=utf-8')
+      res.end(fillPublicOrigin(fillBrandingPlaceholders(html, pageBranding), ''))
     })
-
-    mountEntAuthApp(server)
   },
-  configurePreviewServer(server) {
-    mountEntAuthApp(server)
-  },
-  // index.html carries %LENT_*% placeholders so titles/SEO follow the
-  // configured university in both dev and build. Its __PUBLIC_ORIGIN__ stays
-  // in the build, for the server to fill in per request (server.js); the dev
-  // server leaves the links relative.
+  // index.html's %LENT_*% placeholders and __PUBLIC_ORIGIN__ stay in the
+  // build, for the server to fill as it sends the page (server/appShell.js);
+  // the dev server fills them here and leaves the links relative.
   transformIndexHtml(html, context) {
-    const replacements = {
-      LENT_APP_NAME: branding.appName,
-      LENT_SEO_TITLE: branding.seoTitle,
-      LENT_SEO_DESCRIPTION: branding.seoDescription,
-      LENT_REPO_URL: branding.about?.repoUrl ?? '',
-      LENT_ALTERNATE_NAMES_JSON: JSON.stringify(branding.alternateNames ?? []),
-    }
-
-    const filled = html.replace(/%(LENT_[A-Z_]+)%/g, (match, token) => replacements[token] ?? match)
-    return context?.server ? filled.replaceAll('__PUBLIC_ORIGIN__', '') : filled
+    return context?.server ? fillPublicOrigin(fillBrandingPlaceholders(html, pageBranding), '') : html
   },
 }
 
@@ -95,30 +89,34 @@ const gitHash = (() => {
 })()
 
 
-export default defineConfig({
+// `isSsrBuild`: the landing page's build-time render (scripts/prerender-landing.mjs),
+// which needs no service worker.
+export default defineConfig(({ isSsrBuild }) => ({
   resolve: {
     alias: {
-      '@university': clientConfigPath(universityId),
+      // The config of the university the page runs for, filled at boot
+      // (src/university.js, src/universityBoot.js).
+      '@university': fileURLToPath(new URL('./src/university.js', import.meta.url)),
     },
   },
   define: {
     __BUILD_HASH__: JSON.stringify(gitHash),
-    __UNIVERSITY_ID__: JSON.stringify(universityId),
   },
   plugins: [
     tailwindcss(),
     react(),
     entDevAuthPlugin,
-    VitePWA({
+    isSsrBuild ? null : VitePWA({
       registerType: 'prompt',
       includeAssets: ['icon.png', 'apple-touch-icon.png'],
       workbox: {
         navigateFallbackDenylist: [/^\/__ent_auth/, /^\/__ent_proxy/],
       },
+      // One build for every university: the installed app is Tafac's.
       manifest: {
-        name: branding.appName,
-        short_name: branding.appName,
-        description: branding.pwaDescription ?? branding.seoDescription,
+        name: neutralBranding.appName,
+        short_name: neutralBranding.appName,
+        description: neutralBranding.pwaDescription,
         lang: 'fr',
         id: '/',
         categories: ['education'],
@@ -147,9 +145,9 @@ export default defineConfig({
         ],
       },
     }),
-  ],
+  ].filter(Boolean),
   server: {
     allowedHosts: true,
     // /__ent_proxy is handled by the shared entAuthApp middleware above.
   },
-})
+}))

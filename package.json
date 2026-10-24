@@ -7,8 +7,8 @@
   "scripts": {
     "dev": "vite",
     "start": "node server.js",
-    "build": "vite build",
-    "build:all": "node scripts/build-all.mjs",
+    "build": "vite build && node --disable-warning=ExperimentalWarning scripts/prerender-landing.mjs",
+    "build:all": "npm run build",
     "lint": "eslint .",
     "test": "node --test tests/*.test.js",
     "preview": "vite preview"

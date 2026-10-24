@@ -1,0 +1,238 @@
+{
+  "header": {
+    "features": "Fonctionnalités",
+    "privacy": "Confidentialité",
+    "faq": "FAQ",
+    "code": "Code source",
+    "login": "Se connecter"
+  },
+  "hero": {
+    "title": "Cours, notes et services de votre université",
+    "subtitle": "Emploi du temps, notes, mails et rendus Moodle sur une seule page",
+    "cta": "Se connecter à mon ENT",
+    "disclaimer": "Projet étudiant indépendant, non officiel, non affilié à votre université",
+    "compatible": "Compatible avec :"
+  },
+  "features": {
+    "main": {
+      "title": "Ce que regroupe {appName}",
+      "intro": "{appName} se connecte aux services de votre université et rassemble votre emploi du temps, vos notes, vos rendus et mails sur une seule page, sur ordinateur comme sur téléphone",
+      "items": [
+        {
+          "title": "Emploi du temps",
+          "body": "Affichage du prochain cours en un clin d'œil"
+        },
+        {
+          "title": "Notes",
+          "body": "Les derniers résultats et moyenne générale"
+        },
+        {
+          "title": "Mails",
+          "body": "Les derniers mails reçus sur ton adresse universitaire"
+        },
+        {
+          "title": "Rendus Moodle",
+          "body": "Tout les devoirs à rendre et leur détails"
+        },
+        {
+          "title": "Et bien plus",
+          "body": ""
+        }
+      ],
+      "note": "Les fonctionnalités dépendent de ce que propose l’intégration de votre université"
+    },
+    "computer": {
+      "title": "Moyennes et planning",
+      "intro": "La moyenne générale, et le planning à la journée",
+      "items": [
+        {
+          "title": "Moyennes par UE pour les BUT",
+          "body": "Avec le coefficient de chaque matière"
+        },
+        {
+          "title": "Simulateur de notes",
+          "body": "Les moyennes avec des notes à venir"
+        },
+        {
+          "title": "Planning",
+          "body": "Par jour, par semaine ou en liste"
+        },
+        {
+          "title": "Export du planning",
+          "body": "Vers Google Agenda, Calendrier ou Outlook"
+        }
+      ]
+    },
+    "phone": {
+      "title": "Disponible sur le tél.",
+      "intro": "{appName} s’installe sur l’écran d’accueil du téléphone, sans passer par un store",
+      "items": [
+        {
+          "title": "Sur l’écran d’accueil",
+          "body": "Raccourci accessible sur ton écran d'applications"
+        },
+        {
+          "title": "Thème sombre",
+          "body": "Mode sombre pour préserver la vision"
+        },
+        {
+          "title": "Audience anonyme",
+          "body": "Aucune donnée personnelle collectée et aucun cookie de suivi"
+        },
+        {
+          "title": "Code source ouvert",
+          "body": "Disponible sur GitHub"
+        }
+      ]
+    }
+  },
+  "security": {
+    "title": "Sécurisé et respectueux de votre vie privée",
+    "intro": "{appName} ne fait que relayer vos échanges avec votre université : votre mot de passe n’est jamais enregistré, et la session **reste chiffrée dans votre navigateur**",
+    "points": {
+      "noStorage": {
+        "title": "Mot de passe jamais enregistré",
+        "body": "Votre mot de passe n'est transmis que lors de la connexion. Aucune base de donnée ni journal n'est utilisé"
+      },
+      "session": {
+        "title": "Session chiffrée",
+        "body": "Tafac sécurise votre session grâce à un cookie chiffré en AES-256, inaccessible aux scripts de la page et valable jusqu’à 30 jours."
+      },
+      "stats": {
+        "title": "Statistiques anonymes",
+        "body": "Tafac compte uniquement les visites, sans données personnelles ni cookies de suivi. Ces statistiques sont hébergées dans l’Union européenne et peuvent être désactivées à tout moment dans les réglages."
+      },
+      "source": {
+        "title": "Code source ouvert",
+        "body": "Sous licence AGPL, lisible et vérifiable",
+        "link": "Voir le code sur GitHub"
+      }
+    },
+    "passwordTitle": "Votre mot de passe ne fait que passer",
+    "passwordIntro": "{appName} le transmet à votre université pour vous connecter, **sans l’enregistrer**. Ensuite, il utilise la session ouverte par l’université, gardée chiffrée dans un cookie de votre navigateur",
+    "stops": {
+      "device": {
+        "title": "Votre appareil",
+        "body": "Garde la session dans un cookie chiffré"
+      },
+      "relay": {
+        "title": "{appName}",
+        "body": "Transmet le mot de passe sans l’enregistrer"
+      },
+      "university": {
+        "title": "Votre université",
+        "body": "Vérifie le mot de passe et ouvre la session"
+      }
+    },
+    "disclaimer": ""
+  },
+  "faq": {
+    "title": "Questions fréquentes",
+    "showMore": "Voir plus de questions",
+    "questions": {
+      "gratuit": {
+        "question": "{appName} est-il gratuit ?",
+        "answer": "Oui, entièrement, et sans publicité"
+      },
+      "officiel": {
+        "question": "{appName} est-il une application de mon université ?",
+        "answer": "Non. {appName} est un projet étudiant indépendant, non officiel et non affilié à votre université. Il affiche les données que publient les services de l’université (emploi du temps, notes, mails, Moodle) au même endroit"
+      },
+      "appareils": {
+        "question": "Sur quels appareils fonctionne {appName} ?",
+        "answer": "Tafac fonctionne sur téléphone, tablette et ordinateur, depuis un navigateur récent, sans téléchargement. Sur téléphone, vous pouvez aussi l’ajouter à votre écran d’accueil pour y accéder plus facilement."
+      },
+      "identifiants": {
+        "question": "Avec quels identifiants se connecter ?",
+        "answer": "Ceux de votre ENT, comme sur le site de l’université. Pas de compte à créer"
+      },
+      "motDePasse": {
+        "question": "Que devient mon mot de passe ?",
+        "answer": "{appName} transmet votre mot de passe à votre université pour vous connecter, sans jamais l’enregistrer. Seule la session créée par votre université est conservée dans votre navigateur, dans un cookie chiffré"
+      },
+      "donnees": {
+        "question": "{appName} collecte-t-il mes données personnelles ?",
+        "answer": "Non. {appName} ne collecte ni vos notes, ni vos mails, ni vos identifiants. Seules les visites sont comptées de façon anonyme, sans cookie de suivi. Ces statistiques sont hébergées dans l’Union européenne et peuvent être désactivées dans les réglages, sous « Statistiques anonymes »"
+      },
+      "session": {
+        "question": "Combien de temps je reste connecté ?",
+        "answer": "Votre session reste active jusqu’à 30 jours. Passé ce délai, il suffit de vous reconnecter. Si vous vous déconnectez, votre session est immédiatement supprimée de votre navigateur et fermée auprès de votre université."
+      },
+      "installer": {
+        "question": "Comment l’installer sur mon téléphone ?",
+        "answer": "Vous pouvez ajouter {appName} à votre écran d’accueil directement depuis votre navigateur.\n\nSur iPhone, ouvrez {appName} dans Safari, touchez « Partager », puis « Sur l’écran d’accueil ». Sur Android, ouvrez {appName} dans Chrome, puis sélectionnez « Installer l’application » ou « Ajouter à l’écran d’accueil » dans le menu.\n\n{appName} s’ouvre ensuite en plein écran, comme une application"
+      },
+      "notes": {
+        "question": "Pourquoi je ne vois pas mes notes ou mon prochain cours ?",
+        "answer": "Les données accessibles dans {appName} varient selon votre université et les services compatibles. Vous souhaitez ajouter des fonctionnalités pour votre université ? N’hésitez pas à contribuer au projet sur [GitHub](issues) !"
+      },
+      "universite": {
+        "question": "Mon université n’est pas dans la liste, que faire ?",
+        "answer": "Elle n’est pas encore prise en charge. Le code étant ouvert, n’importe qui peut l’ajouter : contribuez sur [GitHub](issues)"
+      },
+      "contribuer": {
+        "question": "Puis-je contribuer à {appName} ?",
+        "answer": "Oui. Le code est ouvert, sous licence AGPL, sur [GitHub](repo) : corrections, idées ou [ajout d’une université](addUniversity)"
+      },
+      "contact": {
+        "question": "Un bug, une idée, une question ?",
+        "answer": "Écrivez à l’équipe sur [GitHub](issues)"
+      }
+    }
+  },
+  "beta": {
+    "title": "Juste pour préciser, Tafac est encore en bêta !",
+    "body": "Avec l’équipe, nous travaillons à améliorer Tafac chaque jour. Le projet est encore jeune : vous pourrez rencontrer des bugs ou des fonctionnalités incomplètes. Vos retours et vos contributions nous aident à le faire progresser !",
+    "photoCaption": "Tom"
+  },
+  "papillon": {
+    "partOf": "fait partie de",
+    "title": "Fait par la même équipe que Papillon",
+    "body": "Papillon, c’est l’application libre et open source créée par des étudiants pour simplifier la vie scolaire. Avec Tafac, Tom et Lucas, membres de l’association Papillon, prolongent cette ambition à l’université : rendre vos outils du quotidien plus simples et plus agréables à utiliser.",
+    "cta": "Découvrir l’association Papillon"
+  },
+  "contact": {
+    "badge": "Gratuit",
+    "title": "Sans publicité, fait par des étudiants",
+    "body": "Une question, un bug ou une idée ? Écrivez à l’équipe sur GitHub",
+    "cta": "Nous écrire sur GitHub"
+  },
+  "footer": {
+    "tagline": "Projet étudiant indépendant, non officiel, non affilié à votre université",
+    "tafacColumn": "{appName}",
+    "features": "Fonctionnalités",
+    "privacy": "Confidentialité",
+    "faq": "Questions fréquentes",
+    "login": "Se connecter",
+    "projectColumn": "Projet",
+    "code": "Code source",
+    "report": "Signaler un problème",
+    "papillon": "Papillon",
+    "legal": "© {year} {appName} · Code sous licence AGPL"
+  },
+  "floatingWidgets": {
+    "nextClass": {
+      "title": "Prochain cours",
+      "course": "R5.02 Anglais",
+      "room": "B12 - Langues",
+      "time": "Dans 1h08"
+    },
+    "latestGrade": {
+      "title": "Dernière note",
+      "subject": "Développement Front",
+      "grade": "15.5",
+      "outOf": "/20"
+    },
+    "mail": {
+      "title": "Mails récents",
+      "badge": "7",
+      "from": "Thomas Lemoine",
+      "subject": "Rendu du TP React décalé"
+    },
+    "deadlines": {
+      "title": "Échéances",
+      "task": "TP 3 – API REST",
+      "status": "En retard"
+    }
+  }
+}

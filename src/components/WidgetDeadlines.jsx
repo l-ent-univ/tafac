@@ -207,13 +207,16 @@ function DeadlineRow({ item, fallbackHref, now }) {
   )
 }
 
-function WidgetDeadlines({ visible = false }) {
-  const [state, setState] = useState({ status: 'loading', moodleHref: null, items: [] })
+// `preview`: a getMoodleDeadlines() result to show as is (the landing page,
+// which changes it): nothing loaded or reported, no link to Moodle.
+function WidgetDeadlines({ visible = false, preview = null }) {
+  const [loadedState, setState] = useState({ status: 'loading', moodleHref: null, items: [] })
+  const state = preview ?? loadedState
   const [storedMoodleHref, setStoredMoodleHref] = useState(() => readStoredHref(MOODLE_HREF_KEY))
   const [now, setNow] = useState(() => new Date())
   const lastLoadAtRef = useRef(0)
   const loadingRef = useRef(false)
-  useWidgetLoadReport('deadlines', getLoadOutcome(state))
+  useWidgetLoadReport('deadlines', preview ? null : getLoadOutcome(state))
 
   const loadDeadlines = useCallback(async ({ background = false } = {}) => {
     if (loadingRef.current) return
@@ -238,8 +241,8 @@ function WidgetDeadlines({ visible = false }) {
   }, [])
 
   useEffect(() => {
-    void loadDeadlines()
-  }, [loadDeadlines])
+    if (!preview) void loadDeadlines()
+  }, [loadDeadlines, preview])
 
   // The greeting briefing reuses this list rather than asking Moodle again.
   useEffect(() => {
@@ -264,7 +267,7 @@ function WidgetDeadlines({ visible = false }) {
     function refreshIfStale() {
       if (document.visibilityState !== 'visible') return
       setNow(new Date())
-      if (Date.now() - lastLoadAtRef.current >= DEADLINES_REFRESH_MS) {
+      if (!preview && Date.now() - lastLoadAtRef.current >= DEADLINES_REFRESH_MS) {
         void loadDeadlines({ background: true })
       }
     }
@@ -275,7 +278,7 @@ function WidgetDeadlines({ visible = false }) {
       window.clearInterval(intervalId)
       document.removeEventListener('visibilitychange', refreshIfStale)
     }
-  }, [loadDeadlines, state.status])
+  }, [loadDeadlines, preview, state.status])
 
   // Hidden when Moodle can't be reached; the background refresh brings the
   // card back once it answers again.
@@ -283,7 +286,7 @@ function WidgetDeadlines({ visible = false }) {
     return null
   }
 
-  const moodleHref = state.moodleHref || storedMoodleHref
+  const moodleHref = preview ? null : state.moodleHref || storedMoodleHref
   const pending = state.status === 'ok' ? prioritizeDeadlines(state.items, now) : []
   const rows = pending.slice(0, MAX_VISIBLE_DEADLINES)
   const urgentItems = pending.filter((item) => isUrgent(item, now))

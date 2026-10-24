@@ -10,7 +10,7 @@ ghcr.io/l-ent-univ/l-ent:0.4.1      # version précise
 ghcr.io/l-ent-univ/l-ent:0.4        # dernière 0.4.x
 ```
 
-L'image contient le serveur Express et le frontend de chaque université (mode multi-tenant, `MULTI_TENANT=1`). Elle écoute sur le port 3000 et tourne avec un utilisateur non root. Elle n'écrit sur le disque que dans `/app/data` (icônes automatiques des applications, voir plus bas), monté en volume par `docker-compose.yml`.
+L'image contient le serveur Express et le frontend, un seul build pour toutes les universités. Par défaut elle les sert toutes, comme tafac.fr (`MULTI_UNIVERSITY=1` : page neutre avec le choix de l'université, puis l'université de la session). Elle écoute sur le port 3000 et tourne avec un utilisateur non root. Elle n'écrit sur le disque que dans `/app/data` (icônes automatiques des applications, voir plus bas), monté en volume par `docker-compose.yml`.
 
 ## Prérequis
 
@@ -36,6 +36,17 @@ L'image contient le serveur Express et le frontend de chaque université (mode m
 
 Derrière un autre reverse proxy (nginx, Traefik…), il suffit de transmettre `X-Forwarded-Proto` et `X-Forwarded-Host` au conteneur.
 
+### Une seule université
+
+Pour une instance dédiée à votre université (pas de liste, sa config dès le chargement, ses textes SEO), dans `.env` :
+
+```sh
+MULTI_UNIVERSITY=0
+UNIVERSITY=univ-rennes
+```
+
+Hors Docker, `UNIVERSITY=<id> node server.js` suffit (sans `MULTI_UNIVERSITY`).
+
 ## Mettre à jour
 
 ```sh
@@ -49,8 +60,9 @@ Pour figer une version, remplacer `latest` par un numéro (`ghcr.io/l-ent-univ/l
 | Variable | Rôle | Défaut |
 |---|---|---|
 | `SESSION_SECRET` | Secret de session (au moins 32 octets) | **obligatoire** |
-| `UNIVERSITY` | Université servie quand le nom d'hôte ne correspond à aucune | `univ-rennes` |
-| `TENANTS` | Universités servies (ids séparés par des virgules) | toutes |
+| `MULTI_UNIVERSITY` | `1` : toutes les universités (choix à la connexion) ; `0` : `UNIVERSITY` seule. Ancien nom : `MULTI_TENANT` | `1` dans l'image ; hors Docker, `1` sauf si `UNIVERSITY` est définie |
+| `UNIVERSITY` | L'université servie (`MULTI_UNIVERSITY=0`), sinon celle par défaut : compte démo depuis la page neutre, anciennes adresses inconnues | `univ-rennes` |
+| `UNIVERSITIES` | Universités servies (ids séparés par des virgules). Ancien nom : `TENANTS` | toutes sauf `example-*` |
 | `POSTHOG_PROJECT_KEY` | Mesure d'audience anonyme ([ANALYTICS.md](ANALYTICS.md)) | désactivée |
 | `PORT` | Port interne du conteneur | `3000` |
 | `DATA_DIR` | Dossier des icônes automatiques des applications | `/app/data` dans l'image, `./data` sinon |
@@ -91,7 +103,7 @@ Une PWA installée est liée à son domaine : déménager Tafac vers un nouveau 
 
 Le workflow [`.github/workflows/ci.yml`](../.github/workflows/ci.yml) :
 
-- sur chaque pull request : lint, tests, build de toutes les universités et build Docker (sans publication) ;
+- sur chaque pull request : lint, tests, build (un seul pour toutes les universités) et build Docker (sans publication) ;
 - sur chaque push sur `main` : la même vérification, puis une release `vX.Y.Z` avec des notes générées depuis les PR, puis l'image Docker.
 
 Le numéro de version suit les messages de commit depuis la dernière release : `feat` incrémente la mineure, `type!:` ou `BREAKING CHANGE` la majeure (la mineure tant qu'on est en 0.x), le reste le correctif. Mettre `[skip release]` dans le message du commit de tête pour ne rien publier.

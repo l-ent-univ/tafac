@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Icon } from '@iconify/react'
 import universityConfig from '@university'
+import { getPapillonUrl, PAPILLON_DEBUG_KEY, readPapillonDebugOverride } from './papillon'
+import { getLoadedUniversityId, writeUniversityChoice } from './universityRuntime'
 import favicon from './assets/favicon.png'
 import AppHeader from './components/AppHeader'
 import AppFooter from './components/AppFooter'
@@ -9,6 +11,7 @@ import AccountModal from './components/AccountModal'
 import ChangelogPill from './components/ChangelogPill'
 import { markChangelogEntrySeen, replayChangelogEntry, setChangelogAudience } from './changelogStore'
 import ChangelogSheet from './components/ChangelogSheet'
+import LandingPage from './components/LandingPage'
 import LentButton from './components/LentButton'
 import LoginPage from './components/LoginPage'
 import OnboardingCompletionPage from './components/OnboardingCompletionPage'
@@ -16,6 +19,7 @@ import PwaInstallPrompt from './components/PwaInstallPrompt'
 import OnboardingPage from './components/OnboardingPage'
 import PwaUpdateManager from './components/PwaUpdateManager'
 import UpdateNotice from './components/UpdateNotice'
+import ServiceNotice from './components/ServiceNotice'
 import WelcomeFromLent from './components/WelcomeFromLent'
 import { settingsTransfer } from './settingsTransferBoot'
 import { DEMO_CREDENTIALS, DEMO_SESSION_MODE } from './demoAccount'
@@ -97,6 +101,9 @@ const HERO_FADE_OVERHANG_PX = 80
 
 const DEFAULT_REQUEST_PATH = '/api/v4-3/dlm/layout.json'
 const DEBUG_MENU_ENABLED = import.meta.env.DEV
+// Whether the Papillon mentions show on this page load (the debug panel's
+// override included), for its toggle.
+const IS_PAPILLON_SHOWN = getPapillonUrl(universityConfig.branding, readPapillonDebugOverride()) !== null
 const ACCOUNT_MODAL_PROFILE_PHOTO_TIMEOUT_MS = 3000
 const ONBOARDING_COMPLETION_SCREEN_MS = 1000
 const LEGACY_SESSION_CACHE_KEY = 'l-ent:session-cache'
@@ -122,6 +129,19 @@ function clearLegacySensitiveClientCaches() {
 
   clearGradesCache()
   clearAdeTimetableCache()
+}
+
+// Signed in to another university than the one the page runs for (the demo
+// from the neutral page, before any pick): the page boots again for it, as
+// every module read the config when it loaded (src/university.js).
+function reloadForOtherUniversity(result) {
+  const university = result?.university
+  if (!university || university === universityConfig.id) {
+    return false
+  }
+
+  window.location.reload()
+  return true
 }
 
 async function clearClientRuntimeState() {
@@ -1091,6 +1111,15 @@ function reportSettingsTransfer() {
   track('settings_imported', { has_settings: settingsTransfer.importedKeys.length > 0 })
 }
 
+const LOGIN_PATH = '/login'
+
+// Installed app and arrivals from the old l'ent address skip the landing page.
+function shouldOpenOnLogin() {
+  return settingsTransfer.arrived
+    || window.matchMedia('(display-mode: standalone)').matches
+    || window.navigator.standalone === true
+}
+
 function App() {
   const debugCopyTimeoutRef = useRef(null)
   const [debugOpen, setDebugOpen] = useState(false)
@@ -1203,6 +1232,8 @@ function App() {
     error: '',
   })
   const [hasCheckedInitialSession, setHasCheckedInitialSession] = useState(false)
+  const [pathname, setPathname] = useState(() => window.location.pathname)
+  const [opensOnLogin] = useState(shouldOpenOnLogin)
   const [debugState, setDebugState] = useState({
     loading: false,
     label: 'Session',
@@ -1384,6 +1415,41 @@ function App() {
     faviconLink.setAttribute('type', 'image/png')
     faviconLink.setAttribute('href', favicon)
   }, [])
+
+  const navigate = useCallback((path, { replace = false } = {}) => {
+    if (window.location.pathname !== path) {
+      // Replacing keeps the entry's state (the in-app page, see appHistory.js).
+      if (replace) window.history.replaceState(window.history.state, '', path)
+      else window.history.pushState(null, '', path)
+    }
+    setPathname(path)
+  }, [])
+
+  useEffect(() => {
+    const handlePopState = () => setPathname(window.location.pathname)
+    window.addEventListener('popstate', handlePopState)
+    return () => window.removeEventListener('popstate', handlePopState)
+  }, [])
+
+  // Signed out, the app shows the landing page at / and the login page at
+  // /login. Signing in leaves /login for /, signing out (or the session
+  // expiring) goes to the landing page.
+  const showLoginPage = pathname === LOGIN_PATH || opensOnLogin
+  const wasAuthenticatedRef = useRef(false)
+  useEffect(() => {
+    if (sessionState.checking) return
+    if (sessionState.authenticated) {
+      wasAuthenticatedRef.current = true
+      if (pathname === LOGIN_PATH) navigate('/', { replace: true })
+      return
+    }
+    if (wasAuthenticatedRef.current) {
+      wasAuthenticatedRef.current = false
+      navigate('/', { replace: true })
+    } else if (showLoginPage && pathname !== LOGIN_PATH) {
+      navigate(LOGIN_PATH, { replace: true })
+    }
+  }, [sessionState.checking, sessionState.authenticated, pathname, showLoginPage, navigate])
 
   useEffect(() => {
     syncRuntimeSeo({ authenticated: sessionState.authenticated })
@@ -2465,6 +2531,7 @@ function App() {
         password: '',
       }))
       commitDebugState('Connexion', result)
+      if (reloadForOtherUniversity(result)) return
       await refreshSession()
     } catch (error) {
       const message = getFrenchAuthErrorMessage(error, 'login')
@@ -2515,6 +2582,7 @@ function App() {
         password: '',
       }))
       commitDebugState('Connexion demo', result)
+      if (reloadForOtherUniversity(result)) return
       await refreshSession()
     } catch (error) {
       const message = getFrenchAuthErrorMessage(error, 'login')
@@ -2871,6 +2939,11 @@ function App() {
                 </div>
               </div>
             ) : null}
+            {shownPage === 'dashboard' ? (
+              <div className="px-6 pt-3 max-md:px-3 4xl:pt-5">
+                <ServiceNotice />
+              </div>
+            ) : null}
             {/* Kept mounted behind other pages: coming back is instant and the
                 favorites it portals into the sidebar stay put. */}
             <div className={`${hasSwitchedPage ? 'page-enter ' : ''}flex-1 min-h-0 4xl:flex-none 4xl:min-h-0`} hidden={shownPage !== 'dashboard'}>
@@ -2920,6 +2993,8 @@ function App() {
             onNavigatePage={handleNavigatePage}
           />
         </div>
+      ) : !showLoginPage ? (
+        <LandingPage onLogin={() => navigate(LOGIN_PATH)} />
       ) : (
         <LoginPage
           credentials={credentials}
@@ -2972,7 +3047,7 @@ function App() {
       <PwaInstallPrompt
         forceShow={forceInstallPrompt || forceIosPrompt}
         forceIos={forceIosPrompt}
-        autoOpen={!settingsTransfer.arrived}
+        autoOpen={sessionState.authenticated && !settingsTransfer.arrived}
         onVisibleChange={setIsInstallPromptVisible}
       />
       <ChangelogSheet />
@@ -3029,6 +3104,30 @@ function App() {
                 >
                   Suivante
                 </button>
+              </div>
+            </div>
+          </section>
+
+          {/* The same setting as Réglages › Apparence, here too on the
+              landing and login pages; not counted as a setting change. */}
+          <section className="grid gap-3 p-4 border border-border rounded-2xl bg-bg-surface">
+            <div className="flex gap-3 justify-between items-center max-lg:flex-col max-lg:items-stretch">
+              <p className="m-0 text-[0.85rem] font-semibold text-text-secondary font-body">Thème</p>
+              <div className="flex gap-2">
+                {[['auto', 'Auto'], ['light', 'Clair'], ['dark', 'Sombre']].map(([value, label]) => (
+                  <button
+                    key={value}
+                    type="button"
+                    aria-pressed={theme === value}
+                    className={`appearance-none border border-border rounded-[12px] py-[0.7rem] px-[0.9rem] font-inherit font-semibold leading-[1.1] ${theme === value ? 'bg-brand text-bg' : 'bg-bg text-text'}`}
+                    onClick={() => {
+                      persistTheme(value)
+                      setTheme(value)
+                    }}
+                  >
+                    {label}
+                  </button>
+                ))}
               </div>
             </div>
           </section>
@@ -3130,17 +3229,48 @@ function App() {
               </button>
               <button
                 type="button"
-                className={`appearance-none border border-border rounded-[12px] text-text py-[0.7rem] px-[0.9rem] font-inherit font-semibold leading-[1.1] ${hasPendingUpdate ? 'bg-brand text-bg' : 'bg-bg'}`}
+                className={`appearance-none border border-border rounded-[12px] py-[0.7rem] px-[0.9rem] font-inherit font-semibold leading-[1.1] ${hasPendingUpdate ? 'bg-brand text-bg' : 'bg-bg text-text'}`}
                 onClick={() => setHasPendingUpdate((current) => !current)}
               >
                 Sidebar update {hasPendingUpdate ? '✓' : ''}
               </button>
               <button
                 type="button"
-                className={`appearance-none border border-border rounded-[12px] text-text py-[0.7rem] px-[0.9rem] font-inherit font-semibold leading-[1.1] ${debugNextClass ? 'bg-brand text-bg' : 'bg-bg'}`}
+                className={`appearance-none border border-border rounded-[12px] py-[0.7rem] px-[0.9rem] font-inherit font-semibold leading-[1.1] ${debugNextClass ? 'bg-brand text-bg' : 'bg-bg text-text'}`}
                 onClick={() => setDebugNextClass((c) => !c)}
               >
                 Prochain cours {debugNextClass ? '✓' : ''}
+              </button>
+              {/* « Fait partie de Papillon » and the rest, forced on or off on
+                  this device (src/papillon.js); read at load, so it reloads. */}
+              <button
+                type="button"
+                className={`appearance-none border border-border rounded-[12px] py-[0.7rem] px-[0.9rem] font-inherit font-semibold leading-[1.1] ${IS_PAPILLON_SHOWN ? 'bg-brand text-bg' : 'bg-bg text-text'}`}
+                onClick={() => {
+                  try {
+                    localStorage.setItem(PAPILLON_DEBUG_KEY, IS_PAPILLON_SHOWN ? 'off' : 'on')
+                  } catch {
+                    return
+                  }
+                  window.location.reload()
+                }}
+              >
+                Papillon {IS_PAPILLON_SHOWN ? '✓' : ''}
+              </button>
+              {/* Forgets the university picked on this device and reloads on
+                  the neutral page (src/universityRuntime.js). Signed out
+                  only: signed in, the session's university wins. */}
+              <button
+                type="button"
+                className="appearance-none border border-border rounded-[12px] bg-bg text-text py-[0.7rem] px-[0.9rem] font-inherit font-semibold leading-[1.1] disabled:opacity-45 disabled:cursor-not-allowed"
+                onClick={() => {
+                  writeUniversityChoice(null)
+                  window.location.assign('/')
+                }}
+                disabled={sessionState.authenticated}
+                title={sessionState.authenticated ? 'Se déconnecter d’abord : connecté, la session décide' : undefined}
+              >
+                Réinitialiser l'université ({getLoadedUniversityId() ?? 'aucune'})
               </button>
               <button
                 type="button"

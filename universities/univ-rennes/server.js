@@ -88,6 +88,14 @@ export default {
     menuCaption: 'Inscriptions',
   },
 
+  // Launch relay (/__ent_auth/launch): besides the hosts above, the domains
+  // whose services the ENT and the extra services (client.js) link to,
+  // subdomains included. Other links open directly in the browser
+  // (server/launchTargets.js).
+  launch: {
+    allowedDomains: ['univ-rennes.fr', 'univ-rennes1.fr', 'iut-lannion.loxya.app'],
+  },
+
   // Look of the automatic icons: see shared.js.
   appIcons,
 }
