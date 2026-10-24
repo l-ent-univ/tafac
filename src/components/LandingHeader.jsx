@@ -19,6 +19,12 @@ const SECTIONS = [
   { id: 'faq', label: copyText(copy.header.faq) },
 ]
 
+// On the body (see below); in place when there's no document, for the
+// landing page's build-time render (src/landingPrerender.jsx).
+function portalToBody(element) {
+  return typeof document === 'undefined' ? element : createPortal(element, document.body)
+}
+
 // Whether the page has been scrolled down. Two thresholds, so a phone's
 // bounce at the top doesn't flip it back and forth.
 function useIsScrolled() {
@@ -103,7 +109,7 @@ function LandingHeader({ onLogin }) {
   return (
     <>
       <div aria-hidden="true" className="mb-2 h-[74px] max-md:h-[64px]" style={{ height: barHeight || undefined }} />
-      {createPortal(
+      {portalToBody(
         <header
           ref={headerRef}
           data-floating={isFloating || undefined}
@@ -182,7 +188,6 @@ function LandingHeader({ onLogin }) {
             </nav>
           </div>
         </header>,
-        document.body,
       )}
     </>
   )

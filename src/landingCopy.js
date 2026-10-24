@@ -3,8 +3,7 @@ import universityConfig from '@university'
 import { getPapillonUrl, readPapillonDebugOverride } from './papillon'
 import landingCopy from './landingCopy.json'
 
-// Every string of the landing page, in landingCopy.json: edited by hand or on
-// the dev-only /copy page (LandingCopyEditor), which writes the file back.
+// Every string of the landing page, in landingCopy.json (edited by hand).
 // The strings are plain text with a little markup, read by renderCopy:
 // - {appName}, {year}: filled in here;
 // - **text**: put forward (the security section's green);
@@ -40,6 +39,14 @@ export function copyText(text) {
     .replace(/ »/g, '\u00a0»')
 }
 
+// The text without its markup: links as their text, put-forward parts as
+// plain text (structured data for search engines, scripts/prerender-landing.mjs).
+export function copyPlainText(text) {
+  return copyText(text)
+    .replace(/\[([^\]]+)\]\(\w+\)/g, '$1')
+    .replace(/\*\*([^*]+)\*\*/g, '$1')
+}
+
 // The text as React nodes: its links and its put-forward parts rendered.
 // `strongClassName`, `linkClassName`: their looks.
 export function renderCopy(text, { strongClassName = 'font-semibold', linkClassName = DEFAULT_LINK_CLASSES } = {}) {
@@ -71,6 +78,3 @@ export function renderCopy(text, { strongClassName = 'font-semibold', linkClassN
 
   return nodes
 }
-
-// The link names, for the editor's help line.
-export const COPY_LINK_NAMES = Object.keys(LINKS)

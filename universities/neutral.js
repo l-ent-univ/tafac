@@ -13,7 +13,7 @@ export const university = {
 export const branding = {
   appName: 'Tafac',
   defaultTitle: 'Tafac | Cours, notes et services de ton université',
-  seoTitle: "Tafac – client non officiel de l'ENT de ton université",
+  seoTitle: "Tafac – client non officiel de l'ENT de votre université",
   seoDescription:
     "Emploi du temps, notes, mails et rendus Moodle sur une seule page. Projet étudiant libre, non affilié aux universités.",
   pwaDescription:

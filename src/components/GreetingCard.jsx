@@ -28,7 +28,8 @@ function useDailyBriefing({
   lookaheadDays,
   expectDeadlines,
 }) {
-  const sources = useSyncExternalStore(subscribeBriefingSources, getBriefingSources)
+  // Same on the server (the landing page's build-time render).
+  const sources = useSyncExternalStore(subscribeBriefingSources, getBriefingSources, getBriefingSources)
   const [now, setNow] = useState(() => new Date())
   const [classesCache, setClassesCache] = useState(() => readClassesEntry(classesCacheKey))
   const [isRevealed, setIsRevealed] = useState(false)
@@ -110,6 +111,8 @@ function useDailyBriefing({
   }
 }
 
+// `headingAs`: the greeting's tag ('p' where the card is only a demo, as on
+// the landing page).
 function GreetingCard({
   displayName,
   greeting,
@@ -120,7 +123,9 @@ function GreetingCard({
   selection = null,
   lookaheadDays,
   expectDeadlines = false,
+  headingAs = 'h2',
 }) {
+  const Heading = headingAs
   const briefing = useDailyBriefing({
     classesSource,
     classesCacheKey,
@@ -137,7 +142,7 @@ function GreetingCard({
     <article className={`widget-card group relative shadow-md flex-[0_1_280px] min-h-[140px] p-4 border border-white rounded-[22px] overflow-hidden bg-widget-bg text-base leading-6 min-w-0 max-2xl:flex-[1_1_calc(50%-6px)] max-2xl:min-w-[min(280px,100%)] max-md:min-h-[124px] max-md:p-3 max-md:rounded-[20px] max-xs:flex-[1_1_100%] max-xs:min-w-0 max-xs:min-h-0 flex flex-col justify-end gap-1 text-text ${visible ? 'widget-card-visible' : ''}`}>
       <div className="contents max-xs:flex max-xs:items-center max-xs:gap-2 max-xs:min-w-0 max-xs:pr-8">
         <Icon icon="ph:hand-waving" className="greeting-icon w-[34px] h-[34px] text-inherit shrink-0 max-xs:w-[26px] max-xs:h-[26px]" aria-hidden="true" />
-        <h2 className="m-0 min-w-0 leading-[1.15] text-2xl font-bold overflow-hidden text-ellipsis whitespace-nowrap max-md:text-[22px] max-xs:text-xl" title={`Salut ${displayName} !`}>Salut {displayName} !</h2>
+        <Heading className="m-0 min-w-0 leading-[1.15] text-2xl font-bold overflow-hidden text-ellipsis whitespace-nowrap max-md:text-[22px] max-xs:text-xl" title={`Salut ${displayName} !`}>Salut {displayName} !</Heading>
       </div>
       {isLoading ? (
         <LoadingDots label="Chargement du résumé de ta journée" className="h-[18px] text-text-muted" />

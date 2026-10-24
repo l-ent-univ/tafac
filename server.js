@@ -96,23 +96,81 @@ app.get('/sitemap.xml', (req, res) => {
 </urlset>`)
 })
 
+// The landing page as static HTML, with its FAQ's structured data, rendered
+// at build time (scripts/prerender-landing.mjs). Every university: the
+// neutral landing tafac.fr shows. Absent (a build without it, or one
+// university only): the page goes without.
+function readPrerenderedLanding() {
+  if (!MULTI_UNIVERSITY) return null
+  try {
+    return JSON.parse(readFileSync(path.join(DIST_DIR, '.prerender', 'landing.json'), 'utf8'))
+  } catch {
+    return null
+  }
+}
+
+// The built page with the landing already in it, for search engines and
+// link previews (they don't run the app); the app renders over it.
+function withPrerenderedLanding(shell, landing) {
+  const structuredData = landing.structuredData
+    .map((data) => `<script type="application/ld+json">${JSON.stringify(data).replace(/</g, '\\u003c')}</script>`)
+    .join('')
+  return shell
+    .replace('<div id="root"></div>', () => `<div id="root">${landing.html}</div>`)
+    .replace('</head>', () => `${structuredData}</head>`)
+}
+
+// A session cookie (current or legacy name): a signed-in student, who gets
+// the app, not the landing.
+const SESSION_COOKIE_PATTERN = /(?:^|;\s*)(?:__Host-)?(?:lent_session|ent_front_session)=/
+
+// The page's own addresses (src/universityRuntime.js, App.jsx): the home
+// page, the login page, the picker and a university's /<slug>. Any other
+// gets the page too, but as a 404, so search engines don't index it.
+const CLIENT_PATHS = new Set(['/', '/login', '/universites'])
+function isClientPath(pathname) {
+  const clean = pathname.replace(/\/+$/, '') || '/'
+  if (CLIENT_PATHS.has(clean)) return true
+  const name = clean.slice(1)
+  return !name.includes('/') && Boolean(universitiesApp.locals.findUniversityId(name))
+}
+
 // The built page, read and filled with the SEO text once; its
 // __PUBLIC_ORIGIN__ (canonical, link previews, structured data) becomes this
 // request's address, so link previews, which don't run the app, get absolute
-// URLs on every address.
+// URLs on every address. The home page, signed out: with the landing in it.
 let appShell = null
+let landingShell = null
 function sendAppShell(req, res, next) {
   const origin = getSafePublicOrigin(req)
 
   try {
-    appShell ??= fillBrandingPlaceholders(readFileSync(path.join(DIST_DIR, 'index.html'), 'utf8'), pageBranding)
+    if (!appShell) {
+      appShell = fillBrandingPlaceholders(readFileSync(path.join(DIST_DIR, 'index.html'), 'utf8'), pageBranding)
+      const landing = readPrerenderedLanding()
+      landingShell = landing ? withPrerenderedLanding(appShell, landing) : appShell
+    }
   } catch (error) {
     next(error)
     return
   }
+
+  let pathname = req.path
+  try {
+    pathname = decodeURIComponent(req.path)
+  } catch {
+    // Malformed: matches no client path.
+  }
+  const isHome = pathname === '/'
+  const isSignedOut = !SESSION_COOKIE_PATTERN.test(req.headers.cookie ?? '')
+  const shell = isHome && isSignedOut ? landingShell : appShell
+
+  res.status(isClientPath(pathname) ? 200 : 404)
   res.setHeader('Content-Language', 'fr')
+  // Signed out or in, / is one address with two pages.
+  if (isHome) res.setHeader('Vary', 'Cookie')
   if (origin) res.setHeader('Link', `<${origin}/>; rel="canonical"`)
-  res.type('html').send(fillPublicOrigin(appShell, origin))
+  res.type('html').send(fillPublicOrigin(shell, origin))
 }
 
 app.get('/', sendAppShell)

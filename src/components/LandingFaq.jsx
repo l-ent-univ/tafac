@@ -38,11 +38,11 @@ const QUESTIONS = [
 // chevron last, opening on a click (<details>, one at a time) with the
 // answer under the question's text. Opens and closes smoothly where the
 // browser can (.landing-faq in overrides.css). The first FIRST_QUESTIONS
-// only, the rest behind a button.
+// only, the rest behind a button: hidden, but in the page, so search engines
+// read every answer (the FAQ's structured data lists them all).
 function LandingFaq({ className = '' }) {
   const [isExpanded, setExpanded] = useState(false)
   const hiddenCount = isExpanded ? 0 : Math.max(QUESTIONS.length - FIRST_QUESTIONS, 0)
-  const questions = hiddenCount > 0 ? QUESTIONS.slice(0, FIRST_QUESTIONS) : QUESTIONS
 
   return (
     <section id="faq" className={`landing-faq scroll-mt-28 flex justify-center px-6 max-md:px-4 ${className}`} aria-labelledby="faq-title">
@@ -51,9 +51,10 @@ function LandingFaq({ className = '' }) {
           {copyText(copy.faq.title)}
         </h2>
         <div className="mt-10 flex w-full flex-col gap-3 max-md:mt-8">
-          {questions.map(({ id, emoji, question, answer }) => (
+          {QUESTIONS.map(({ id, emoji, question, answer }, index) => (
             <details
               key={id}
+              hidden={hiddenCount > 0 && index >= FIRST_QUESTIONS}
               name="landing-faq"
               className="group rounded-[20px] border border-border bg-white px-6 transition-shadow duration-300 hover:shadow-[0_6px_20px_-10px_rgb(52_18_0/0.25)] open:shadow-[0_6px_20px_-10px_rgb(52_18_0/0.25)] dark:border-white/10 dark:bg-[#1c1c1c] max-md:rounded-[18px] max-md:px-4"
             >

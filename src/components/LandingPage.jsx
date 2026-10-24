@@ -134,7 +134,8 @@ function LandingPage({ onLogin }) {
             <img src={loginClouds} alt="" aria-hidden="true" draggable="false" className="landing-scroll-clouds pointer-events-none absolute bottom-0 left-1/2 -z-10 w-[max(1300px,140%)] max-w-none -translate-x-1/2 translate-y-[45%] dark:brightness-[0.6] max-md:w-[900px] max-xs:translate-y-[62%]" />
             <LandingHeader onLogin={onLogin} />
             <div className="landing-scroll-cards widget-row flex flex-wrap gap-3 items-stretch max-md:gap-2 overflow-visible p-2 -m-2">
-              <GreetingCard displayName={greeting?.displayName ?? ''} greeting={greeting?.greeting ?? null} visible={areWidgetsVisible} />
+              {/* A demo card, not a section of the page: no heading. */}
+              <GreetingCard displayName={greeting?.displayName ?? ''} greeting={greeting?.greeting ?? null} visible={areWidgetsVisible} headingAs="p" />
               <div className="contents">
                 <WidgetNextClass visible={areWidgetsVisible} preview={frameAt(preview.upcomingEvents, step) ?? []} />
               </div>
