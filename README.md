@@ -25,12 +25,13 @@ Si votre université utilise un ENT uPortal derrière un CAS (probablement le ca
 cp -r universities/example-minimal universities/univ-lavotre
 # remplissez universities/univ-lavotre/{shared,client,server}.js
 # (nom, logo, URL de l'ENT et du CAS le reste est optionnel)
-UNIVERSITY=univ-lavotre npm run dev
+npm run dev    # toutes les universités, votre dossier inclus
+UNIVERSITY=univ-lavotre npm run dev    # ou la vôtre seule
 ```
 
 - Chaque feature (ADE, planning, Moodle, notes…) est **optionnelle** : ce que votre université n'a pas est proprement masqué.
 - `universities/univ-rennes/` sert d'implémentation de référence complète, `universities/univ-exemple/` de démo jouable (compte `demo@tafac.fr` / `tafac-demo`).
-- Une fois testée avec un vrai compte étudiant, **ouvrez une Pull Request** : votre université peut être hébergée sur l'instance officielle, sur son propre sous-domaine (voir plus bas) ou déployez votre fork vous-même.
+- Une fois testée avec un vrai compte étudiant, **ouvrez une Pull Request** : votre université rejoint l'instance officielle (tafac.fr, choix de l'université à la connexion, lien direct `tafac.fr/<slug>`), ou déployez votre fork vous-même pour elle seule.
 
 Guide pas-à-pas : **[docs/ADDING_A_UNIVERSITY.md](docs/ADDING_A_UNIVERSITY.md)**
 
@@ -84,27 +85,33 @@ Le serveur Express écoute sur le port `3000` (configurable via `PORT`).
 | `PORT`           | Port du serveur (défaut : 3000)                                    | Non              |
 | `SESSION_SECRET` | Secret dont dérive la clé de chiffrement du cookie de session (≥ 32 octets, voir [Sécurité](#sécurité--confidentialité)) | Oui (production) |
 | `SESSION_SECRET_PREVIOUS` | Ancien(s) secret(s), séparés par des virgules, encore acceptés en lecture pendant une rotation | Non |
-| `UNIVERSITY`     | Université active, ou tenant par défaut (défaut : `univ-rennes`)   | Non              |
-| `MULTI_TENANT`   | `1` : sert plusieurs universités, routées par sous-domaine         | Non              |
-| `TENANTS`        | Universités servies/buildées en multi-tenant (ids séparés par `,`) | Non              |
+| `UNIVERSITY`     | Seule université servie ; avec `MULTI_UNIVERSITY=1`, université par défaut (défaut : `univ-rennes`) | Non |
+| `MULTI_UNIVERSITY` | `1` : toutes les universités (choix à la connexion), `0` : `UNIVERSITY` seule. Absent : toutes si `UNIVERSITY` n'est pas définie. Ancien nom : `MULTI_TENANT` | Non |
+| `UNIVERSITIES`   | Universités servies (ids séparés par `,`, défaut : toutes sauf `example-*`). Ancien nom : `TENANTS` | Non |
 | `POSTHOG_PROJECT_KEY` | Clé PostHog : active la mesure d'audience anonyme côté serveur (absente = désactivée) | Non |
 | `POSTHOG_HOST`   | Hôte PostHog (défaut : `https://eu.i.posthog.com`, UE)              | Non              |
 | `ANALYTICS_EXCLUDED_USERS` | Identifiants ENT dont les événements ne sont jamais envoyés (séparés par `,`), par exemple les développeurs de l'instance | Non |
 | `POSTHOG_IN_DEV` | `1` pour que `npm run dev` envoie aussi à PostHog (coupé sinon) | Non |
 | `DATA_DIR`       | Dossier où le serveur mémorise les icônes automatiques des applications (défaut : `./data`, voir [docs/SELF_HOSTING.md](docs/SELF_HOSTING.md#icônes-automatiques-des-applications)) | Non |
 
-## Multi-université par sous-domaine
+## Toutes les universités sur une adresse
 
-Une seule instance peut servir plusieurs universités, chacune sur son sous-domaine (`univrennes.tafac.example`, `univnantes.tafac.example`…) :
+Un seul build et un seul serveur servent toutes les universités sur la même adresse (tafac.fr) :
 
 ```bash
-npm run build:all                 # un bundle par université → dist/<id>/
-MULTI_TENANT=1 npm start          # routage par hostname
+npm run build                     # un seul dist/ pour toutes les universités
+MULTI_UNIVERSITY=1 npm start      # ou sans UNIVERSITY
 ```
 
-Une requête est associée à l'université dont le premier label du hostname égale son id sans tirets (`univ-rennes` → `univrennes.…`), ou dont le hostname figure dans l'export optionnel `hostnames` de son `shared.js`. Les hôtes inconnus (dont le domaine racine) retombent sur `UNIVERSITY`. Les cookies de session étant limités à l'hôte, chaque sous-domaine est isolé.
+- **Avant la connexion**, la page est neutre (Tafac, sans université) et propose la liste des universités. Chacune a son lien direct, `/<slug>` (`tafac.fr/rennes`), qui ouvre son formulaire. Le choix est gardé dans le navigateur (`l-ent:university`) ; « Changer d'université » ramène à la liste.
+- **Une fois connecté**, l'université est celle de la session : son id est dans le cookie de session chiffré, et le serveur n'envoie les requêtes qu'aux services de cette université. Changer d'université, c'est se déconnecter.
+- La page charge au démarrage la config de son université (`universities/<id>/client.js`, un fichier par université, téléchargé à la demande) : `GET /__ent_auth/universities` lui dit lesquelles existent et à laquelle elle est connectée.
+- Les anciennes adresses par université restent routées : premier label du nom d'hôte égal à l'id sans tirets (`univrennes.…`) ou nom listé dans l'export `hostnames` de `shared.js`. Les sessions ouvertes avant ce changement (sans université dans le cookie) appartiennent à l'université de leur adresse, Rennes sur le domaine racine.
+- Les réglages propres à une université (établissement, TP, favoris…) sont mis de côté quand le navigateur passe à une autre, puis remis en revenant (`src/universityStorage.js`).
 
-Sur Render (plan gratuit) : build command `npm install && npm run build:all`, start command `MULTI_TENANT=1 node server.js`, puis ajoutez chaque sous-domaine comme *custom domain* du service (un CNAME + une entrée Render par université ; un certificat TLS classique est émis par hostname, pas besoin de wildcard).
+**Une seule université** (instance auto-hébergée) : `UNIVERSITY=<id>` sans `MULTI_UNIVERSITY` (ou `MULTI_UNIVERSITY=0`). Pas de liste, sa config au démarrage, ses textes SEO : comme avant.
+
+Sur Render (plan gratuit) : build command `npm install && npm run build`, start command `MULTI_UNIVERSITY=1 node server.js`.
 
 Avec Docker (serveur perso, VPS…) : chaque merge sur `main` publie une image `ghcr.io/l-ent-univ/l-ent`, voir [docs/SELF_HOSTING.md](docs/SELF_HOSTING.md) (Docker Compose + Caddy pour le HTTPS).
 
@@ -137,9 +144,10 @@ tafac/
 │   ├── univ-rennes/       #   Référence complète (Rennes)
 │   ├── univ-exemple/      #   Université fictive de démonstration
 │   └── example-minimal/   #   Squelette minimal à copier
-├── server.js              # Lanceur production (mono ou multi-tenant)
+├── server.js              # Lanceur production (une ou toutes les universités)
 ├── server/
-│   └── entAuthApp.js      # Backend partagé prod/dev : auth CAS, proxy, API
+│   ├── universitiesApp.js # Aiguillage des requêtes vers l'université de la session
+│   └── entAuthApp.js      # Backend d'une université, partagé prod/dev : auth CAS, proxy, API
 ├── adeApi.js              # Client ADE (emploi du temps)
 ├── planningRpc.js         # Client RPC planning (GWT)
 ├── adeUpcomingResolver.js # Résolution des prochains cours
@@ -158,7 +166,7 @@ tafac/
 └── public/
 ```
 
-La config d'une université est lue côté serveur (`universities/<id>/server.js`) et injectée côté frontend via l'alias Vite `@university` (`universities/<id>/client.js`). Aucun autre fichier ne contient de valeur propre à une université.
+La config d'une université est lue côté serveur (`universities/<id>/server.js`) et chargée côté frontend au démarrage de la page : l'alias Vite `@university` désigne `src/university.js`, rempli par `src/universityBoot.js` avec `universities/<id>/client.js` (ou la config neutre `universities/neutral.js` avant le choix) avant le chargement d'`App`. Aucun autre fichier ne contient de valeur propre à une université.
 
 ## Intégrations
 
