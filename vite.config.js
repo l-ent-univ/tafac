@@ -1,4 +1,5 @@
 import { execSync } from 'node:child_process'
+import { fileURLToPath } from 'node:url'
 import tailwindcss from '@tailwindcss/vite'
 import react from '@vitejs/plugin-react'
 import { VitePWA } from 'vite-plugin-pwa'
@@ -6,10 +7,14 @@ import { defineConfig, loadEnv } from 'vite'
 import { readAnalyticsConfig } from './server/analytics.js'
 import { resolveDataDir } from './server/appIcons.js'
 import { createUniversitiesApp } from './server/universitiesApp.js'
-import { clientConfigPath, listUniversityIds, loadSharedConfig, resolveUniversityId } from './universities/index.js'
+import { branding as neutralBranding } from './universities/neutral.js'
+import { listServedUniversityIds, loadSharedConfig, resolveMultiUniversity, resolveUniversityId } from './universities/index.js'
 
+// Every university, like tafac.fr, unless UNIVERSITY picks one (and
+// MULTI_UNIVERSITY isn't set): see universities/index.js.
+const multiUniversity = resolveMultiUniversity()
 const universityId = resolveUniversityId()
-const { branding } = await loadSharedConfig(universityId)
+const branding = multiUniversity ? neutralBranding : (await loadSharedConfig(universityId)).branding
 
 // Dev/preview backend: the same Express app the production server mounts
 // (server/universitiesApp.js). Unmatched requests fall through to Vite.
@@ -22,9 +27,9 @@ const { branding } = await loadSharedConfig(universityId)
 async function mountEntAuthApp(server) {
   const env = loadEnv(server.config.mode, server.config.envDir || process.cwd(), ['POSTHOG_', 'ANALYTICS_', 'SESSION_SECRET', 'DATA_DIR'])
   const universitiesApp = await createUniversitiesApp({
-    universityIds: [universityId],
+    universityIds: multiUniversity ? listServedUniversityIds() : [universityId],
     defaultUniversityId: universityId,
-    multi: false,
+    multi: multiUniversity,
     // Plain http://localhost: no Secure flag, no __Host- prefix.
     production: false,
     session: {
@@ -44,28 +49,6 @@ async function mountEntAuthApp(server) {
 const entDevAuthPlugin = {
   name: 'ent-dev-auth',
   configureServer(server) {
-    // Dev-only tenant switcher: the bundle is baked per university, so
-    // /univexemple (or /univ-exemple) restarts the dev server on that
-    // university and lands on its login page — the dev counterpart of the
-    // production per-subdomain routing (server.js).
-    server.middlewares.use((req, res, next) => {
-      const label = String(req.url ?? '').split('?')[0].replace(/^\/+|\/+$/g, '')
-      const targetId = listUniversityIds().find((id) => id === label || id.replace(/-/g, '') === label)
-
-      if (!targetId) return next()
-
-      if (targetId === universityId) {
-        res.writeHead(302, { Location: '/' })
-        res.end()
-        return
-      }
-
-      process.env.UNIVERSITY = targetId
-      res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' })
-      res.end(`<!doctype html><meta http-equiv="refresh" content="1;url=/"><p>Bascule vers ${targetId}…</p>`)
-      server.restart()
-    })
-
     return mountEntAuthApp(server)
   },
   configurePreviewServer(server) {
@@ -100,12 +83,13 @@ const gitHash = (() => {
 export default defineConfig({
   resolve: {
     alias: {
-      '@university': clientConfigPath(universityId),
+      // The config of the university the page runs for, filled at boot
+      // (src/university.js, src/universityBoot.js).
+      '@university': fileURLToPath(new URL('./src/university.js', import.meta.url)),
     },
   },
   define: {
     __BUILD_HASH__: JSON.stringify(gitHash),
-    __UNIVERSITY_ID__: JSON.stringify(universityId),
   },
   plugins: [
     tailwindcss(),

@@ -4,9 +4,11 @@ import { evaluationTypeLabel, listGradesSemesters, summarizeAverage } from './gr
 import { readDistributionCounts } from './evaluationDistribution'
 import { pickAdeGroupForAlias } from './adeGroupMatch'
 import { buildParcoursTpAliases } from './scodocParcoursGroups'
+import { getLoadedUniversityId, getUniversityRequestHeaders } from './universityRuntime'
 
+// Null on the neutral page (no university picked yet).
 export const ENT_ORIGIN = universityConfig.origins.ent
-const ENT_HOST = new URL(ENT_ORIGIN).hostname
+const ENT_HOST = ENT_ORIGIN ? new URL(ENT_ORIGIN).hostname : ''
 const APP_BASE_URL = (() => {
   const rawBaseUrl = String(import.meta.env?.BASE_URL || '/').trim()
 
@@ -244,6 +246,7 @@ export async function requestEnt(path, options = {}) {
 export async function getAuthSession() {
   const response = await fetch(`${ENT_AUTH_PREFIX}/session`, {
     credentials: 'same-origin',
+    headers: getUniversityRequestHeaders(),
   })
 
   const payload = await parseJsonPayload(response)
@@ -260,13 +263,17 @@ export async function loginToEnt({ username, password }) {
   clearGradesCache()
   localStorage.removeItem(ADE_TIMETABLE_CACHE_KEY)
 
+  // Signed out, the server routes the login to the university picked on the
+  // login page (none on the neutral page: the default one).
+  const university = getLoadedUniversityId()
   const response = await fetch(`${ENT_AUTH_PREFIX}/login`, {
     method: 'POST',
     credentials: 'same-origin',
     headers: {
       'Content-Type': 'application/json',
+      ...getUniversityRequestHeaders(),
     },
-    body: JSON.stringify({ username, password }),
+    body: JSON.stringify({ username, password, ...(university ? { university } : {}) }),
   })
 
   const payload = await parseJsonPayload(response)

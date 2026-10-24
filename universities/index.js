@@ -29,10 +29,6 @@ export function resolveUniversityId(rawId = process.env.UNIVERSITY) {
   return id
 }
 
-export function clientConfigPath(id) {
-  return path.join(UNIVERSITIES_DIR, id, 'client.js')
-}
-
 export async function loadServerConfig(rawId) {
   const id = resolveUniversityId(rawId)
   // Built as a runtime path (not a static template literal) so bundlers that

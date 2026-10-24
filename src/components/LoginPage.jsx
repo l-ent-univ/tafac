@@ -1,4 +1,3 @@
-/* global __UNIVERSITY_ID__ */
 import { useState } from 'react'
 import { Icon } from '@iconify/react'
 import universityConfig from '@university'
@@ -28,7 +27,7 @@ const PANEL_WIDTH = 'min(529px, 47vw)'
 const FIELD_CLASS = 'box-border w-full min-h-[52px] rounded-full border border-border-input bg-widget-bg px-[18px] py-[15px] text-base leading-none text-text font-body transition-[border-color,box-shadow] duration-150 hover:border-text-30 focus-visible:border-text-60'
 const LINK_CLASS = 'rounded-sm text-[14px] font-medium leading-[1.2] text-text-70 underline decoration-text-30 underline-offset-[3px] transition-colors duration-120 hover:text-text hover:decoration-current font-body'
 
-const activeUniversityId = typeof __UNIVERSITY_ID__ !== 'undefined' ? __UNIVERSITY_ID__ : universityConfig.id
+const activeUniversityId = universityConfig.id
 const otherUniversities = universityShowcase.filter(
   (entry) => entry.id !== activeUniversityId && (!entry.devOnly || import.meta.env.DEV),
 )
@@ -36,7 +35,7 @@ const otherUniversities = universityShowcase.filter(
 // Subdomain labels of every tenant we know about client-side, used to strip
 // an existing tenant label from the hostname before adding the target's.
 const tenantLabels = new Set(
-  [activeUniversityId, ...universityShowcase.map((entry) => entry.id)].map((id) => id.replace(/-/g, '')),
+  [activeUniversityId, ...universityShowcase.map((entry) => entry.id)].filter(Boolean).map((id) => id.replace(/-/g, '')),
 )
 
 // Login URL of another tenant. Tenants live on `<id-without-dashes>.<root>`

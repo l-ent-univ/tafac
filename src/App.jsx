@@ -124,6 +124,19 @@ function clearLegacySensitiveClientCaches() {
   clearAdeTimetableCache()
 }
 
+// Signed in to another university than the one the page runs for (the demo
+// from the neutral page, before any pick): the page boots again for it, as
+// every module read the config when it loaded (src/university.js).
+function reloadForOtherUniversity(result) {
+  const university = result?.university
+  if (!university || university === universityConfig.id) {
+    return false
+  }
+
+  window.location.reload()
+  return true
+}
+
 async function clearClientRuntimeState() {
   try {
     localStorage.clear()
@@ -2465,6 +2478,7 @@ function App() {
         password: '',
       }))
       commitDebugState('Connexion', result)
+      if (reloadForOtherUniversity(result)) return
       await refreshSession()
     } catch (error) {
       const message = getFrenchAuthErrorMessage(error, 'login')
@@ -2515,6 +2529,7 @@ function App() {
         password: '',
       }))
       commitDebugState('Connexion demo', result)
+      if (reloadForOtherUniversity(result)) return
       await refreshSession()
     } catch (error) {
       const message = getFrenchAuthErrorMessage(error, 'login')
