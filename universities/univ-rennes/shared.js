@@ -7,6 +7,8 @@ export const id = 'univ-rennes'
 export const university = {
   name: 'Université de Rennes',
   shortName: 'Rennes',
+  // /rennes opens the login page of this university.
+  slug: 'rennes',
 }
 
 // Branding text (no assets here — the logo lives in client.js so this file

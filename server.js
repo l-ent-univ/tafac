@@ -1,32 +1,27 @@
 // Production server.
 //
-// Single-tenant (default): serves the university picked by UNIVERSITY from
-// dist/ — same behavior as always.
+// Single university (default): serves the university picked by UNIVERSITY
+// from dist/ — same behavior as always.
 //
-// Multi-tenant (MULTI_TENANT=1): loads every university listed in TENANTS
-// (default: all non-example universities), builds one app per tenant, and
-// routes each request by hostname. A tenant matches when the request host's
-// first label equals its id without dashes (univ-rennes → univrennes.lent…)
-// or when the host appears in the university's optional `hostnames` export
-// (shared.js). Unmatched hosts fall back to the UNIVERSITY default.
-// Frontends must be built per tenant with `npm run build:all` (dist/<id>/).
+// Every university (MULTI_UNIVERSITY=1, formerly MULTI_TENANT): one process
+// and one backend for all of them (server/universitiesApp.js). A signed-in
+// request goes to its session's university; a signed-out one to the
+// university chosen on the login page, else the old per-university hostname
+// rules, else the UNIVERSITY default. The universities served are the
+// UNIVERSITIES list (formerly TENANTS), default: all non-example ones.
+// Frontends are built per university with `npm run build:all` (dist/<id>/).
 import express from 'express'
 import { readFileSync } from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { shutdownAllAnalytics } from './server/analytics.js'
-import { createEntAuthApp } from './server/entAuthApp.js'
-import {
-  listUniversityIds,
-  loadServerConfig,
-  loadSharedConfig,
-  resolveUniversityId,
-} from './universities/index.js'
+import { createUniversitiesApp } from './server/universitiesApp.js'
+import { listServedUniversityIds, resolveUniversityId } from './universities/index.js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
 const PORT = process.env.PORT || 3000
-const MULTI_TENANT = ['1', 'true', 'yes'].includes(String(process.env.MULTI_TENANT ?? '').toLowerCase())
+const MULTI_UNIVERSITY = ['1', 'true', 'yes'].includes(String(process.env.MULTI_UNIVERSITY ?? process.env.MULTI_TENANT ?? '').toLowerCase())
 
 function getPublicOrigin(req) {
   const forwardedProto = String(req.headers['x-forwarded-proto'] || '').split(',')[0].trim()
@@ -46,51 +41,13 @@ function getSafePublicOrigin(req) {
   return SAFE_ORIGIN.test(origin) ? origin : ''
 }
 
-function getRequestHost(req) {
-  const forwardedHost = String(req.headers['x-forwarded-host'] || '').split(',')[0].trim()
-  const host = forwardedHost || String(req.headers.host || '')
-
-  return host.split(':')[0].toLowerCase()
-}
-
-// Full app for one university: auth/proxy backend + SEO routes + built frontend.
-function createTenantApp(universityConfig, distDir) {
+// SEO routes + built frontend of one university.
+function createFrontendApp(distDir) {
   const app = express()
-
-  // This is the production entry point: SESSION_SECRET is mandatory here and
-  // the session cookie is Secure/__Host- (see server/sessionCookie.js).
-  app.use(createEntAuthApp(universityConfig, { session: { production: true } }))
-
-  app.get('/robots.txt', (req, res) => {
-    const origin = getPublicOrigin(req)
-
-    res.type('text/plain')
-    res.send([
-      'User-agent: *',
-      'Allow: /',
-      'Disallow: /__ent_auth/',
-      'Disallow: /__ent_proxy/',
-      `Sitemap: ${origin}/sitemap.xml`,
-    ].join('\n'))
-  })
-
-  app.get('/sitemap.xml', (req, res) => {
-    const origin = getPublicOrigin(req)
-
-    res.type('application/xml')
-    res.send(`<?xml version="1.0" encoding="UTF-8"?>
-<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
-  <url>
-    <loc>${origin}/</loc>
-    <changefreq>weekly</changefreq>
-    <priority>1.0</priority>
-  </url>
-</urlset>`)
-  })
 
   // The built page, read once; its __PUBLIC_ORIGIN__ (canonical, link
   // previews, structured data) becomes this request's address, so link
-  // previews, which don't run the app, get absolute URLs on every tenant.
+  // previews, which don't run the app, get absolute URLs on every address.
   let appShell = null
   function sendAppShell(req, res, next) {
     const origin = getSafePublicOrigin(req)
@@ -119,57 +76,64 @@ function createTenantApp(universityConfig, distDir) {
   return app
 }
 
-const rootApp = express()
 const defaultUniversityId = resolveUniversityId()
+const universityIds = MULTI_UNIVERSITY ? listServedUniversityIds() : [defaultUniversityId]
 
-if (!MULTI_TENANT) {
-  const universityConfig = await loadServerConfig(defaultUniversityId)
-  rootApp.use(createTenantApp(universityConfig, path.join(__dirname, 'dist')))
+// This is the production entry point: SESSION_SECRET is mandatory here and
+// the session cookie is Secure/__Host- (see server/sessionCookie.js).
+const universitiesApp = await createUniversitiesApp({
+  universityIds,
+  defaultUniversityId,
+  multi: MULTI_UNIVERSITY,
+  production: true,
+})
 
-  rootApp.listen(PORT, () => {
-    console.log(`Server is running on http://localhost:${PORT} (university: ${universityConfig.id})`)
-  })
-} else {
-  const tenantIds = process.env.TENANTS
-    ? process.env.TENANTS.split(',').map((id) => resolveUniversityId(id.trim()))
-    : listUniversityIds().filter((id) => !id.startsWith('example'))
+const rootApp = express()
+rootApp.use(universitiesApp)
 
-  if (!tenantIds.includes(defaultUniversityId)) {
-    tenantIds.unshift(defaultUniversityId)
-  }
+rootApp.get('/robots.txt', (req, res) => {
+  const origin = getPublicOrigin(req)
 
-  const tenantsById = new Map()
-  const tenantIdByHost = new Map()
-  const tenantIdByLabel = new Map()
+  res.type('text/plain')
+  res.send([
+    'User-agent: *',
+    'Allow: /',
+    'Disallow: /__ent_auth/',
+    'Disallow: /__ent_proxy/',
+    `Sitemap: ${origin}/sitemap.xml`,
+  ].join('\n'))
+})
 
-  for (const id of tenantIds) {
-    const config = await loadServerConfig(id)
-    const shared = await loadSharedConfig(id)
-    tenantsById.set(id, createTenantApp(config, path.join(__dirname, 'dist', id)))
+rootApp.get('/sitemap.xml', (req, res) => {
+  const origin = getPublicOrigin(req)
 
-    // Default subdomain label: the id without dashes (univ-rennes → univrennes).
-    tenantIdByLabel.set(id.replace(/-/g, ''), id)
-    for (const hostname of shared.hostnames ?? []) {
-      tenantIdByHost.set(String(hostname).toLowerCase(), id)
-    }
-  }
+  res.type('application/xml')
+  res.send(`<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <url>
+    <loc>${origin}/</loc>
+    <changefreq>weekly</changefreq>
+    <priority>1.0</priority>
+  </url>
+</urlset>`)
+})
 
-  function resolveTenantId(req) {
-    const host = getRequestHost(req)
+const frontendsById = new Map(universitiesApp.locals.universityIds.map((id) => [
+  id,
+  createFrontendApp(MULTI_UNIVERSITY ? path.join(__dirname, 'dist', id) : path.join(__dirname, 'dist')),
+]))
 
-    return tenantIdByHost.get(host)
-      ?? tenantIdByLabel.get(host.split('.')[0])
-      ?? defaultUniversityId
-  }
+// The page of the university the request was routed to (universitiesApp).
+rootApp.use((req, res, next) => {
+  frontendsById.get(res.locals.university?.id ?? defaultUniversityId)(req, res, next)
+})
 
-  rootApp.use((req, res, next) => {
-    tenantsById.get(resolveTenantId(req))(req, res, next)
-  })
-
-  rootApp.listen(PORT, () => {
-    console.log(`Server is running on http://localhost:${PORT} (multi-tenant: ${tenantIds.join(', ')}; default: ${defaultUniversityId})`)
-  })
-}
+rootApp.listen(PORT, () => {
+  const mode = MULTI_UNIVERSITY
+    ? `universities: ${universitiesApp.locals.universityIds.join(', ')}; default: ${defaultUniversityId}`
+    : `university: ${defaultUniversityId}`
+  console.log(`Server is running on http://localhost:${PORT} (${mode})`)
+})
 
 // Flush pending anonymous analytics events (if enabled) before exiting.
 for (const signal of ['SIGTERM', 'SIGINT']) {

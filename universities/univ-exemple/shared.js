@@ -8,6 +8,11 @@ export const id = 'univ-exemple'
 export const university = {
   name: 'Université Exemple',
   shortName: 'Exemple',
+  // /exemple opens the login page of this university.
+  slug: 'exemple',
+  // Demo university: listed in the picker on dev servers only, still
+  // reachable everywhere through its /exemple link.
+  devOnly: true,
 }
 
 export const branding = {

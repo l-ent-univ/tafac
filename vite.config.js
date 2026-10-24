@@ -5,37 +5,39 @@ import { VitePWA } from 'vite-plugin-pwa'
 import { defineConfig, loadEnv } from 'vite'
 import { readAnalyticsConfig } from './server/analytics.js'
 import { resolveDataDir } from './server/appIcons.js'
-import { createEntAuthApp } from './server/entAuthApp.js'
-import { clientConfigPath, listUniversityIds, loadServerConfig, loadSharedConfig, resolveUniversityId } from './universities/index.js'
+import { createUniversitiesApp } from './server/universitiesApp.js'
+import { clientConfigPath, listUniversityIds, loadSharedConfig, resolveUniversityId } from './universities/index.js'
 
 const universityId = resolveUniversityId()
-const universityServerConfig = await loadServerConfig(universityId)
 const { branding } = await loadSharedConfig(universityId)
 
 // Dev/preview backend: the same Express app the production server mounts
-// (server/entAuthApp.js). Unmatched requests fall through to Vite.
+// (server/universitiesApp.js). Unmatched requests fall through to Vite.
 // POSTHOG_*, ANALYTICS_*, SESSION_SECRET* and DATA_DIR may come from the shell
 // or from .env / .env.local (shell wins). Without SESSION_SECRET the backend
 // uses a random per-process key: sessions then don't survive a dev-server
 // restart. Without DATA_DIR, automatic app icons are remembered in ./data.
 // No PostHog from the dev server unless POSTHOG_IN_DEV=1: what's tried here,
 // often with a real account, stays out of the real numbers.
-function mountEntAuthApp(server) {
+async function mountEntAuthApp(server) {
   const env = loadEnv(server.config.mode, server.config.envDir || process.cwd(), ['POSTHOG_', 'ANALYTICS_', 'SESSION_SECRET', 'DATA_DIR'])
-  const entAuthApp = createEntAuthApp(universityServerConfig, {
-    analytics: env.POSTHOG_IN_DEV === '1' ? readAnalyticsConfig(env) : { projectKey: null },
-    appIcons: { dataDir: resolveDataDir(env) },
+  const universitiesApp = await createUniversitiesApp({
+    universityIds: [universityId],
+    defaultUniversityId: universityId,
+    multi: false,
+    // Plain http://localhost: no Secure flag, no __Host- prefix.
+    production: false,
     session: {
       secret: env.SESSION_SECRET,
       previousSecrets: env.SESSION_SECRET_PREVIOUS,
-      // Plain http://localhost: no Secure flag, no __Host- prefix.
-      production: false,
     },
+    analytics: env.POSTHOG_IN_DEV === '1' ? readAnalyticsConfig(env) : { projectKey: null },
+    appIcons: { dataDir: resolveDataDir(env) },
   })
 
-  server.middlewares.use(entAuthApp)
+  server.middlewares.use(universitiesApp)
   server.httpServer?.once('close', () => {
-    void entAuthApp.locals.analytics.shutdown()
+    void universitiesApp.locals.shutdown()
   })
 }
 
@@ -64,10 +66,10 @@ const entDevAuthPlugin = {
       server.restart()
     })
 
-    mountEntAuthApp(server)
+    return mountEntAuthApp(server)
   },
   configurePreviewServer(server) {
-    mountEntAuthApp(server)
+    return mountEntAuthApp(server)
   },
   // index.html carries %LENT_*% placeholders so titles/SEO follow the
   // configured university in both dev and build. Its __PUBLIC_ORIGIN__ stays

@@ -7,6 +7,8 @@ export const id = 'example-minimal'
 export const university = {
   name: 'Mon Université',
   shortName: 'MonUniv',
+  // /monuniv opens the login page of this university.
+  slug: 'monuniv',
 }
 
 export const branding = {
