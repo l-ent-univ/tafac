@@ -34,7 +34,9 @@ import {
   createSessionCookieCodec,
   fitSessionPayload,
   getSessionCookieName,
+  getSessionUniversityId,
   isSessionDataExpired,
+  readSessionCookies,
   resolveSessionSecrets,
   unpackJarCookies,
 } from './sessionCookie.js'
@@ -83,8 +85,11 @@ function resolveTrustProxy(value) {
 
 // options.analytics: { projectKey, host } — defaults to POSTHOG_PROJECT_KEY /
 // POSTHOG_HOST from the environment (analytics are off without a key).
-// options.session: { secret, previousSecrets, production } — defaults to
-// SESSION_SECRET / SESSION_SECRET_PREVIOUS and NODE_ENV === 'production'.
+// options.session: { secret, previousSecrets, production, legacyUniversityId }
+// — defaults to SESSION_SECRET / SESSION_SECRET_PREVIOUS and NODE_ENV ===
+// 'production'. legacyUniversityId (an id, or a function of the request) is
+// the university of a session cookie issued before sessions carried one;
+// defaults to this university.
 // server.js (the production entry point) always passes production: true, the
 // Vite mount always passes false; tests inject a secret here.
 // options.appIcons: { dataDir } — defaults to DATA_DIR, else ./data (see
@@ -229,6 +234,14 @@ const sessionCodec = createSessionCookieCodec({
 })
 const SESSION_COOKIE_NAME = getSessionCookieName(IS_PRODUCTION)
 const SESSION_COOKIE_OPTIONS = buildSessionCookieOptions(IS_PRODUCTION)
+// Every session says which university it belongs to (`uni` in the payload);
+// this app only accepts its own, so one university's session never reaches
+// another one's services.
+const UNIVERSITY_ID = universityConfig.id
+const legacySessionUniversity = options.session?.legacyUniversityId ?? UNIVERSITY_ID
+function getLegacySessionUniversityId(req) {
+  return typeof legacySessionUniversity === 'function' ? legacySessionUniversity(req) : legacySessionUniversity
+}
 // In-memory sessions (full jar, caches) are dropped after this much idle time;
 // the cookie rebuilds them on the next request. The cookie itself follows the
 // rolling/absolute lifetimes in server/sessionCookie.js.
@@ -821,6 +834,7 @@ function setSessionCookie(res, session) {
   const { payload, dropped } = fitSessionPayload({
     data: {
       id: session.id,
+      uni: UNIVERSITY_ID,
       user: session.user,
       mode: session.mode ?? null,
       demoState: isDemoSession(session) ? normalizeDemoState(session.demoState) : null,
@@ -1289,13 +1303,7 @@ function getSessionLaunchCapabilities(session) {
 // The encrypted cookie wins; the legacy signed cookie is only consulted when
 // no readable encrypted one is present (first request after the switch).
 function readSessionCookie(req) {
-  const current = sessionCodec.decode(req.cookies?.[SESSION_COOKIE_NAME])
-  if (current) {
-    return { ...current, legacyCookie: false }
-  }
-
-  const legacy = sessionCodec.decode(req.cookies?.[LEGACY_SESSION_COOKIE_NAME])
-  return legacy ? { ...legacy, legacyCookie: true } : null
+  return readSessionCookies(req.cookies, { codec: sessionCodec, cookieName: SESSION_COOKIE_NAME })
 }
 
 function getSessionFromRequest(req) {
@@ -1304,6 +1312,11 @@ function getSessionFromRequest(req) {
   const decoded = readSessionCookie(req)
   const data = decoded?.data
   if (!data || typeof data.id !== 'string' || !data.id || isSessionDataExpired(data)) {
+    return null
+  }
+
+  // Another university's session: not signed in here.
+  if (getSessionUniversityId(data, getLegacySessionUniversityId(req)) !== UNIVERSITY_ID) {
     return null
   }
 
@@ -2201,6 +2214,7 @@ app.get('/__ent_auth/session', async (req, res) => {
         degradedReason: null,
         canUseServerLaunch: false,
         analyticsEnabled: analytics.enabled,
+        university: UNIVERSITY_ID,
       })
     }
 
@@ -2213,6 +2227,7 @@ app.get('/__ent_auth/session', async (req, res) => {
         sessionSource: session.sessionSource ?? null,
         ...getSessionLaunchCapabilities(session),
         analyticsEnabled: analytics.enabled,
+        university: UNIVERSITY_ID,
       })
     }
 
@@ -2236,6 +2251,7 @@ app.get('/__ent_auth/session', async (req, res) => {
         degradedReason: null,
         canUseServerLaunch: false,
         analyticsEnabled: analytics.enabled,
+        university: UNIVERSITY_ID,
       })
     }
 
@@ -2252,6 +2268,7 @@ app.get('/__ent_auth/session', async (req, res) => {
       casCookieNames: session.jar.getCookieNamesForHost(CAS_HOST),
       ...launchCapabilities,
       analyticsEnabled: analytics.enabled,
+        university: UNIVERSITY_ID,
     })
   } catch (error) {
     res.status(500).json({
@@ -2289,6 +2306,7 @@ app.post('/__ent_auth/login', async (req, res) => {
         authenticated: true,
         user: session.user,
         sessionMode: DEMO_SESSION_MODE,
+        university: UNIVERSITY_ID,
       })
     }
 
@@ -2320,6 +2338,7 @@ app.post('/__ent_auth/login', async (req, res) => {
       authenticated: true,
       user: result.layout.user,
       sessionMode: session.mode ?? null,
+      university: UNIVERSITY_ID,
     })
   } catch (error) {
     const rateLimit = recordLoginFailure(req, req.body?.username)
