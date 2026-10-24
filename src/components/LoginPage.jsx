@@ -11,6 +11,7 @@ import LogoBut1 from './LogoBut1'
 import AboutModal from './AboutModal'
 import PapillonBadge from './PapillonBadge'
 import RenameNotice from './RenameNotice'
+import ServiceNotice from './ServiceNotice'
 import { APP_NAME } from '../seo'
 import { getListedUniversities, getLoadedUniversityId } from '../universityRuntime'
 
@@ -269,6 +270,10 @@ function LoginPage({
                   </p>
                 </div>
               </header>
+
+              {/* A university's outage notice (`serviceNotice`), over its
+                  form; none on the neutral picker. */}
+              <ServiceNotice className="mt-5" />
 
               {isPicker ? <UniversityPicker /> : null}
 
