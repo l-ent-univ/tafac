@@ -1,10 +1,12 @@
 import { Icon } from '@iconify/react'
 import universityConfig from '@university'
+import { isServiceNoticeHiddenByDebug } from '../serviceNoticeDebug'
 
-const notice = universityConfig.serviceNotice ?? null
+const notice = isServiceNoticeHiddenByDebug() ? null : universityConfig.serviceNotice ?? null
 
 // University-wide outage banner (`serviceNotice` in the university's
-// client.js). Renders nothing when the config has none.
+// client.js). Renders nothing when the config has none, or when the debug
+// panel hides it (src/serviceNoticeDebug.js).
 export default function ServiceNotice({ className = '' }) {
   if (!notice) return null
 
