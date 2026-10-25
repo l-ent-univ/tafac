@@ -102,15 +102,39 @@ function ReportPdfButton({ semesterId, semester, releveType }) {
 
 // Next to the PDF, tinted: opens the simulation sheet (GradeSimulatorModal).
 // On a phone an icon in a round button like the PDF's (touch area 44px).
-function SimulateButton({ onClick }) {
+// `colors`: the semester's UE colours, washed softly up from the bottom of
+// the button and drifting (.simulate-button-wash in overrides.css); none,
+// the brand's. With a mouse, the wash leans towards the pointer: its offset
+// from the middle, -1 to 1, as --simulate-shift (set on the element, no
+// re-render).
+function followPointer(event) {
+  const rect = event.currentTarget.getBoundingClientRect()
+  const shift = ((event.clientX - rect.left) / rect.width) * 2 - 1
+  event.currentTarget.style.setProperty('--simulate-shift', Math.max(-1, Math.min(1, shift)).toFixed(3))
+}
+
+function releasePointer(event) {
+  event.currentTarget.style.removeProperty('--simulate-shift')
+}
+
+function SimulateButton({ onClick, colors = [] }) {
+  const wash = colors.length > 0
+    ? `linear-gradient(100deg, ${[...colors, colors[0]].join(', ')})`
+    : null
   return (
     <button
       type="button"
       onClick={onClick}
       aria-haspopup="dialog"
       aria-label="Simuler mes notes"
-      className="simulate-button inline-flex items-center gap-1.5 rounded-full border px-3.5 py-2 font-body text-[14px] font-semibold cursor-pointer transition-colors duration-150 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand max-md:relative max-md:size-10 max-md:justify-center max-md:p-0 max-md:after:absolute max-md:after:-inset-[3px]"
+      className="simulate-button relative isolate inline-flex items-center gap-1.5 rounded-full border px-3.5 py-2 font-body text-[14px] font-semibold cursor-pointer focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand max-md:size-10 max-md:justify-center max-md:p-0 max-md:after:absolute max-md:after:-inset-[3px]"
+      style={wash ? { '--simulate-wash': wash } : undefined}
+      onPointerMove={followPointer}
+      onPointerLeave={releasePointer}
     >
+      <span className="simulate-button-wash-frame rounded-[inherit]" aria-hidden="true">
+        <span className="simulate-button-wash" />
+      </span>
       <Icon icon="carbon:calculator" className="size-4 max-md:size-[18px]" aria-hidden="true" />
       <span className="max-md:hidden">Simuler</span>
     </button>
@@ -231,6 +255,7 @@ function GradesPage({ user = null, arrivalSource = 'other', initialGradeRequest 
   // each grade with the UEs it counts for.
   const paintUe = useUeColor()
   const ueColors = useMemo(() => Object.fromEntries((report?.ues ?? []).map((ue) => [ue.code, paintUe(ue.color)])), [report, paintUe])
+  const simulateColors = useMemo(() => Object.values(ueColors).filter(Boolean), [ueColors])
   // One icon per subject of the semester, in the tiles' icon set, assigned
   // by module code so a subject keeps its icon as grades come in.
   const subjectIcon = useMemo(() => assignSubjectIcons(
@@ -369,7 +394,7 @@ function GradesPage({ user = null, arrivalSource = 'other', initialGradeRequest 
           {!ueFocused ? <SemesterSelect semesters={semesters} value={activeId} onChange={changeSemester} /> : null}
           {(canSimulate || canExportPdf) && !ueFocused ? (
             <div className="ml-auto flex items-center gap-2 self-center max-md:ml-0 max-md:shrink-0">
-              {canSimulate ? <SimulateButton onClick={simulator.open} /> : null}
+              {canSimulate ? <SimulateButton onClick={simulator.open} colors={simulateColors} /> : null}
               {canExportPdf ? <ReportPdfButton key={activeId} semesterId={activeId} semester={activeSemester} releveType={releve.type} /> : null}
             </div>
           ) : null}
