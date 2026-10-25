@@ -1,19 +1,15 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Icon } from '@iconify/react'
 import universityConfig from '@university'
-import { getPapillonUrl, PAPILLON_DEBUG_KEY, readPapillonDebugOverride } from './papillon'
-import { isServiceNoticeHiddenByDebug, SERVICE_NOTICE_DEBUG_KEY } from './serviceNoticeDebug'
-import { getLoadedUniversityId, writeUniversityChoice } from './universityRuntime'
 import favicon from './assets/favicon.png'
 import AppHeader from './components/AppHeader'
 import AppFooter from './components/AppFooter'
 import Sidebar from './components/Sidebar'
 import AccountModal from './components/AccountModal'
 import ChangelogPill from './components/ChangelogPill'
-import { markChangelogEntrySeen, replayChangelogEntry, setChangelogAudience } from './changelogStore'
+import { markChangelogEntrySeen, setChangelogAudience } from './changelogStore'
 import ChangelogSheet from './components/ChangelogSheet'
 import LandingPage from './components/LandingPage'
-import LentButton from './components/LentButton'
 import LoginPage from './components/LoginPage'
 import OnboardingCompletionPage from './components/OnboardingCompletionPage'
 import PwaInstallPrompt from './components/PwaInstallPrompt'
@@ -22,6 +18,7 @@ import PwaUpdateManager from './components/PwaUpdateManager'
 import UpdateNotice from './components/UpdateNotice'
 import WelcomeFromLent from './components/WelcomeFromLent'
 import { settingsTransfer } from './settingsTransferBoot'
+import { appendPreviewToken, findProfilePhotoCandidate } from './profilePhoto'
 import { DEMO_CREDENTIALS, DEMO_SESSION_MODE } from './demoAccount'
 import { storeBrowserPasswordCredential } from './browserCredentials'
 import { syncRuntimeSeo } from './seo'
@@ -51,7 +48,7 @@ import WidgetContainer from './components/WidgetContainer'
 import GradesPage from './components/GradesPage'
 import PlanningPage from './components/PlanningPage'
 import LoadingDots from './components/LoadingDots'
-import { listHeroImages, resolveHeroImage } from './heroImage'
+import { resolveHeroImage } from './heroImage'
 import { getStoredTheme, persistTheme, watchTheme } from './theme'
 import MobileTabBar from './components/MobileTabBar'
 import { getMobileTabItems } from './navItems'
@@ -69,58 +66,29 @@ import {
   useAnalyticsAvailable,
 } from './analytics'
 import {
-  ENT_ORIGIN,
-  buildEntProxyHref,
   clearAdeTimetableCache,
   clearGradesCache,
   detectScodocGroupSelection,
   findAdeGroupForScodoc,
   getAccountInfo,
-  getAdeAlerts,
-  getAdeCalendarMetadata,
-  getAdeStatus,
-  getAdeTimetable,
   getAdeTree,
-  getAdeUpcoming,
   getAuthSession,
-  getAverageGrade,
   getGrades,
-  getLatestGrade,
-  getLayout,
-  getMarketplaceEntries,
-  getPlanning,
   getStudentProfilePictureMeta,
   loginToEnt,
   logoutFromEnt,
-  requestEnt,
-  searchAde,
 } from './entApi'
 
 // How far the hero photo extends below the widget row before fully fading.
 const HERO_FADE_OVERHANG_PX = 80
 
-const DEFAULT_REQUEST_PATH = '/api/v4-3/dlm/layout.json'
 const DEBUG_MENU_ENABLED = import.meta.env.DEV
-// Whether the Papillon mentions show on this page load (the debug panel's
-// override included), for its toggle.
-const IS_PAPILLON_SHOWN = getPapillonUrl(universityConfig.branding, readPapillonDebugOverride()) !== null
-// Whether the debug panel hides the outage notice on this page load.
-const IS_SERVICE_NOTICE_HIDDEN = isServiceNoticeHiddenByDebug()
+// Dev only: a constant false in production builds, so the menu's chunk is
+// never emitted there.
+const DebugMenu = DEBUG_MENU_ENABLED ? lazy(() => import('./components/debug/DebugMenu')) : null
 const ACCOUNT_MODAL_PROFILE_PHOTO_TIMEOUT_MS = 3000
 const ONBOARDING_COMPLETION_SCREEN_MS = 1000
 const LEGACY_SESSION_CACHE_KEY = 'l-ent:session-cache'
-const LOCAL_STORAGE_ACCOUNT_KEYS = [ESTABLISHMENT_KEY, STUDENT_TP_KEY]
-const LOCAL_STORAGE_SETTINGS_KEYS = [
-  'l-ent:favorites-order',
-  'l-ent:local-pins',
-  'l-ent:weather-city',
-  'l-ent:grade-colors',
-  'l-ent:visit-count',
-  'l-ent:pwa-prompt-dismissed',
-]
-const LOCAL_STORAGE_CACHE_KEYS = [
-  'l-ent:ade-timetable-cache',
-]
 
 function clearLegacySensitiveClientCaches() {
   try {
@@ -144,225 +112,6 @@ function reloadForOtherUniversity(result) {
 
   window.location.reload()
   return true
-}
-
-async function clearClientRuntimeState() {
-  try {
-    localStorage.clear()
-  } catch {
-    // Ignore storage failures
-  }
-
-  try {
-    sessionStorage.clear()
-  } catch {
-    // Ignore storage failures
-  }
-
-  if (typeof window !== 'undefined' && 'caches' in window) {
-    try {
-      const cacheKeys = await window.caches.keys()
-      await Promise.all(cacheKeys.map((cacheKey) => window.caches.delete(cacheKey)))
-    } catch {
-      // Ignore cache storage failures
-    }
-  }
-
-  if (typeof navigator !== 'undefined' && 'serviceWorker' in navigator) {
-    try {
-      const registrations = await navigator.serviceWorker.getRegistrations()
-      await Promise.all(registrations.map((registration) => registration.unregister()))
-    } catch {
-      // Ignore service worker failures
-    }
-  }
-}
-
-function prettyPrint(value) {
-  if (typeof value === 'string') {
-    return value
-  }
-
-  if (value === undefined) {
-    return ''
-  }
-
-  return JSON.stringify(value, null, 2)
-}
-
-async function copyTextToClipboard(text) {
-  if (navigator.clipboard?.writeText) {
-    await navigator.clipboard.writeText(text)
-    return
-  }
-
-  const textarea = document.createElement('textarea')
-  textarea.value = text
-  textarea.setAttribute('readonly', '')
-  textarea.style.position = 'absolute'
-  textarea.style.left = '-9999px'
-  document.body.appendChild(textarea)
-  textarea.select()
-  document.execCommand('copy')
-  document.body.removeChild(textarea)
-}
-
-function parseStoredDebugValue(rawValue) {
-  if (rawValue == null) {
-    return null
-  }
-
-  try {
-    return JSON.parse(rawValue)
-  } catch {
-    return rawValue
-  }
-}
-
-function collectLocalStorageEntries(keys) {
-  return Object.fromEntries(keys.map((key) => [key, parseStoredDebugValue(localStorage.getItem(key))]))
-}
-
-function buildLocalStorageDebugSnapshot(userId = null) {
-  try {
-    const allKeys = Array.from({ length: localStorage.length }, (_, index) => localStorage.key(index))
-      .filter(Boolean)
-      .sort((left, right) => left.localeCompare(right))
-    const lentKeys = allKeys.filter((key) => key.startsWith('l-ent:'))
-    const knownKeys = new Set([
-      ...LOCAL_STORAGE_ACCOUNT_KEYS,
-      ...LOCAL_STORAGE_SETTINGS_KEYS,
-      ...LOCAL_STORAGE_CACHE_KEYS,
-    ])
-    const extraLentKeys = lentKeys.filter((key) => !knownKeys.has(key))
-
-    return {
-      currentUser: userId ?? null,
-      summary: {
-        totalLocalStorageKeys: allKeys.length,
-        lentKeys: lentKeys.length,
-        extraLentKeys: extraLentKeys.length,
-      },
-      account: collectLocalStorageEntries(LOCAL_STORAGE_ACCOUNT_KEYS),
-      settings: collectLocalStorageEntries(LOCAL_STORAGE_SETTINGS_KEYS),
-      caches: collectLocalStorageEntries(LOCAL_STORAGE_CACHE_KEYS),
-      otherLentEntries: Object.fromEntries(extraLentKeys.map((key) => [key, parseStoredDebugValue(localStorage.getItem(key))])),
-      allLentKeys: lentKeys,
-    }
-  } catch (error) {
-    return {
-      error: getErrorMessage(error),
-    }
-  }
-}
-
-function appendDebugPreviewToken(url, token) {
-  if (!url) {
-    return null
-  }
-
-  const separator = url.includes('?') ? '&' : '?'
-  return `${url}${separator}ts=${encodeURIComponent(token)}`
-}
-
-const PROFILE_PHOTO_KEY_PATTERN = /(?:^|[_-])(picture|photo|avatar|portrait|image)(?:$|[_-])/i
-
-function normalizeProfilePhotoSource(value) {
-  const source = String(value ?? '').trim()
-
-  if (!source) {
-    return null
-  }
-
-  if (/^data:image\//i.test(source)) {
-    return {
-      src: source,
-      kind: 'data-uri',
-    }
-  }
-
-  if (/^https?:\/\//i.test(source)) {
-    if (source.startsWith(ENT_ORIGIN)) {
-      return {
-        src: buildEntProxyHref(source),
-        kind: 'ent-url',
-      }
-    }
-
-    return {
-      src: source,
-      kind: 'url',
-    }
-  }
-
-  if (source.startsWith('/')) {
-    return {
-      src: buildEntProxyHref(source),
-      kind: 'relative-url',
-    }
-  }
-
-  if (source.length > 200 && /^[A-Za-z0-9+/=\s]+$/.test(source)) {
-    return {
-      src: `data:image/jpeg;base64,${source.replace(/\s+/g, '')}`,
-      kind: 'base64',
-    }
-  }
-
-  return null
-}
-
-function findProfilePhotoCandidate(node, currentPath = 'account', visited = new WeakSet(), depth = 0) {
-  if (!node || depth > 6) {
-    return null
-  }
-
-  if (typeof node !== 'object') {
-    return null
-  }
-
-  if (visited.has(node)) {
-    return null
-  }
-
-  visited.add(node)
-
-  if (Array.isArray(node)) {
-    for (let index = 0; index < node.length; index += 1) {
-      const match = findProfilePhotoCandidate(node[index], `${currentPath}[${index}]`, visited, depth + 1)
-      if (match) {
-        return match
-      }
-    }
-    return null
-  }
-
-  for (const [key, value] of Object.entries(node)) {
-    const nextPath = `${currentPath}.${key}`
-
-    if (typeof value === 'string' && PROFILE_PHOTO_KEY_PATTERN.test(key)) {
-      const normalized = normalizeProfilePhotoSource(value)
-
-      if (normalized) {
-        return {
-          ...normalized,
-          fieldPath: nextPath,
-          rawValue: value,
-        }
-      }
-    }
-  }
-
-  for (const [key, value] of Object.entries(node)) {
-    if (value && typeof value === 'object') {
-      const match = findProfilePhotoCandidate(value, `${currentPath}.${key}`, visited, depth + 1)
-      if (match) {
-        return match
-      }
-    }
-  }
-
-  return null
 }
 
 function getTrimmedString(value) {
@@ -635,7 +384,7 @@ async function resolveAccountProfilePhoto(account, { timeoutMs = ACCOUNT_MODAL_P
       const { profilePictureInfo } = profilePictureResult
 
       if (profilePictureInfo?.available && profilePictureInfo.previewUrl) {
-        return appendDebugPreviewToken(profilePictureInfo.previewUrl, String(Date.now()))
+        return appendPreviewToken(profilePictureInfo.previewUrl, String(Date.now()))
       }
     }
   } finally {
@@ -645,29 +394,6 @@ async function resolveAccountProfilePhoto(account, { timeoutMs = ACCOUNT_MODAL_P
   }
 
   return fallbackPhotoSrc
-}
-
-function resolveDebugImagePreviewFromSnapshot(snapshot) {
-  const data = snapshot?.data
-  const token = snapshot?.capturedAt ?? String(Date.now())
-
-  if (data?.available && data?.previewUrl) {
-    return {
-      src: appendDebugPreviewToken(data.previewUrl, token),
-      fieldPath: 'student-pic',
-      kind: data.source ?? 'profile-photo',
-    }
-  }
-
-  if (data?.photo?.available && data?.photo?.previewUrl) {
-    return {
-      src: appendDebugPreviewToken(data.photo.previewUrl, token),
-      fieldPath: data.photo.fieldPath ?? 'account',
-      kind: data.photo.sourceKind ?? 'account',
-    }
-  }
-
-  return null
 }
 
 function getErrorMessage(error) {
@@ -1123,13 +849,11 @@ function shouldOpenOnLogin() {
 }
 
 function App() {
-  const debugCopyTimeoutRef = useRef(null)
   const [debugOpen, setDebugOpen] = useState(false)
+  const toggleDebugMenu = useCallback(() => setDebugOpen((current) => !current), [])
+  const closeDebugMenu = useCallback(() => setDebugOpen(false), [])
   // Debug menu: shifts the daily hero photo pick to preview the others.
   const [heroOffset, setHeroOffset] = useState(0)
-  const [debugOutputTab, setDebugOutputTab] = useState('api')
-  const [debugCopyState, setDebugCopyState] = useState('idle')
-  const [debugImagePreview, setDebugImagePreview] = useState(null)
   const [forceInstallPrompt, setForceInstallPrompt] = useState(false)
   const [forceIosPrompt, setForceIosPrompt] = useState(false)
   const [forceUpdatePrompt, setForceUpdatePrompt] = useState(false)
@@ -1160,13 +884,10 @@ function App() {
     }
   }, [])
   const [debugNextClass, setDebugNextClass] = useState(false)
-  const usernameInputRef = useRef(null)
   const [credentials, setCredentials] = useState({
     username: '',
     password: '',
   })
-  const [requestPath, setRequestPath] = useState(DEFAULT_REQUEST_PATH)
-  const [adeSearchQuery, setAdeSearchQuery] = useState('')
   const [establishment, setEstablishment] = useState(() => getStoredEstablishment())
   const [selectedTp, setSelectedTp] = useState(() => getStoredTpSelection())
   const [nextClassLookaheadDays, setNextClassLookaheadDays] = useState(() => getStoredAdeLookaheadDays())
@@ -1243,6 +964,17 @@ function App() {
     payload: buildDebugSnapshot('Session', { status: 'initializing' }),
   })
 
+  // The debug menu's « Appels » output: the session, sign-in and sign-out
+  // flows report into it too, so it lives here.
+  const startDebugState = useCallback((label) => {
+    setDebugState((current) => ({
+      ...current,
+      loading: true,
+      label,
+      error: '',
+    }))
+  }, [])
+
   const commitDebugState = useCallback((label, data, error = '') => {
     setDebugState({
       loading: false,
@@ -1262,13 +994,7 @@ function App() {
     }))
 
     if (exposeOutput) {
-      setDebugOutputTab('api')
-      setDebugState((current) => ({
-        ...current,
-        loading: true,
-        label: 'Session',
-        error: '',
-      }))
+      startDebugState('Session')
     }
 
     try {
@@ -1341,31 +1067,11 @@ function App() {
     } finally {
       setHasCheckedInitialSession(true)
     }
-  }, [commitDebugState])
+  }, [commitDebugState, startDebugState])
 
   useEffect(() => {
     clearLegacySensitiveClientCaches()
   }, [])
-
-  const runDebugAction = useCallback(async (label, action) => {
-    setDebugOutputTab('api')
-    setDebugImagePreview(null)
-    setDebugState((current) => ({
-      ...current,
-      loading: true,
-      label,
-      error: '',
-    }))
-
-    try {
-      const result = await action()
-      commitDebugState(label, result)
-      return result
-    } catch (error) {
-      commitDebugState(label, null, getErrorMessage(error))
-      return null
-    }
-  }, [commitDebugState])
 
   useEffect(() => {
     const timeoutId = window.setTimeout(() => {
@@ -1374,36 +1080,6 @@ function App() {
 
     return () => window.clearTimeout(timeoutId)
   }, [refreshSession])
-
-  useEffect(() => {
-    if (!DEBUG_MENU_ENABLED) {
-      return undefined
-    }
-
-    function handleWindowKeydown(event) {
-      const key = event.key.toLowerCase()
-
-      if ((event.metaKey || event.ctrlKey) && event.shiftKey && key === 'd') {
-        event.preventDefault()
-        setDebugOpen((current) => !current)
-      }
-
-      if (key === 'escape') {
-        setDebugOpen(false)
-      }
-    }
-
-    window.addEventListener('keydown', handleWindowKeydown)
-    return () => window.removeEventListener('keydown', handleWindowKeydown)
-  }, [])
-
-  useEffect(() => {
-    return () => {
-      if (debugCopyTimeoutRef.current !== null) {
-        window.clearTimeout(debugCopyTimeoutRef.current)
-      }
-    }
-  }, [])
 
   useEffect(() => {
     let faviconLink = document.querySelector("link[rel='icon']")
@@ -1456,18 +1132,6 @@ function App() {
   useEffect(() => {
     syncRuntimeSeo({ authenticated: sessionState.authenticated })
   }, [sessionState.authenticated, pathname])
-
-  useEffect(() => {
-    if (!DEBUG_MENU_ENABLED || !debugOpen || sessionState.authenticated) {
-      return undefined
-    }
-
-    const animationFrameId = window.requestAnimationFrame(() => {
-      usernameInputRef.current?.focus()
-    })
-
-    return () => window.cancelAnimationFrame(animationFrameId)
-  }, [debugOpen, sessionState.authenticated])
 
   useEffect(() => {
     if (!completionScreenState.visible) {
@@ -2056,7 +1720,6 @@ function App() {
       ? { src: customBackground, position: null, credit: null }
       : resolveHeroImage(establishment, new Date(), heroOffset)
   ), [customBackground, establishment, heroOffset])
-  const heroImageCount = useMemo(() => listHeroImages(establishment).length, [establishment])
   // BUT-only features ("Mes notes", the grade card) hide for a student whose
   // relevé is another formation's; unknown keeps them (no flicker for BUT).
   const gradesFormation = useGradesFormation({
@@ -2511,12 +2174,7 @@ function App() {
       checking: true,
       error: '',
     }))
-    setDebugState((current) => ({
-      ...current,
-      loading: true,
-      label: 'Connexion',
-      error: '',
-    }))
+    startDebugState('Connexion')
 
     try {
       const result = await loginToEnt(credentials)
@@ -2568,12 +2226,7 @@ function App() {
       checking: true,
       error: '',
     }))
-    setDebugState((current) => ({
-      ...current,
-      loading: true,
-      label: 'Connexion demo',
-      error: '',
-    }))
+    startDebugState('Connexion demo')
 
     try {
       const result = await loginToEnt(DEMO_CREDENTIALS)
@@ -2614,12 +2267,7 @@ function App() {
       checking: true,
       error: '',
     }))
-    setDebugState((current) => ({
-      ...current,
-      loading: true,
-      label: 'Deconnexion',
-      error: '',
-    }))
+    startDebugState('Deconnexion')
 
     try {
       const result = await logoutFromEnt()
@@ -2649,17 +2297,6 @@ function App() {
       }))
       commitDebugState('Deconnexion', null, message)
     }
-  }
-
-  function handleCustomRequest(event) {
-    event.preventDefault()
-
-    const path = requestPath.trim()
-    if (!path) {
-      return
-    }
-
-    void runDebugAction(`GET ${path}`, () => requestEnt(path))
   }
 
   function handleHeaderAction() {
@@ -2697,139 +2334,6 @@ function App() {
     setDebugOpen(false)
   }, [sessionState.authenticated, sessionState.user])
 
-  const handleDebugFullReset = useCallback(async () => {
-    setDebugState((current) => ({
-      ...current,
-      loading: true,
-      label: 'Reset complet',
-      error: '',
-    }))
-
-    try {
-      if (sessionState.authenticated) {
-        try {
-          await logoutFromEnt()
-        } catch {
-          // Continue with the client reset even if server logout fails.
-        }
-      }
-
-      await clearClientRuntimeState()
-      window.location.reload()
-    } catch (error) {
-      const message = getErrorMessage(error)
-      commitDebugState('Reset complet', null, message)
-    }
-  }, [commitDebugState, sessionState.authenticated])
-
-  const handleDebugProfilePhoto = useCallback(async () => {
-    setDebugOutputTab('api')
-    setDebugImagePreview(null)
-    setDebugState((current) => ({
-      ...current,
-      loading: true,
-      label: 'Photo profil',
-      error: '',
-    }))
-
-    try {
-      let profilePictureInfo = null
-
-      try {
-        profilePictureInfo = await getStudentProfilePictureMeta()
-      } catch (profilePhotoError) {
-        profilePictureInfo = {
-          available: false,
-          source: 'profile-photo',
-          error: getErrorMessage(profilePhotoError),
-        }
-      }
-
-      const profilePreviewUrl = profilePictureInfo?.available && profilePictureInfo?.previewUrl
-        ? `${profilePictureInfo.previewUrl}${profilePictureInfo.previewUrl.includes('?') ? '&' : '?'}ts=${Date.now()}`
-        : null
-
-      if (profilePreviewUrl) {
-        setDebugImagePreview({
-          src: profilePreviewUrl,
-          fieldPath: 'student-pic',
-          kind: profilePictureInfo.source ?? 'profile-photo',
-        })
-
-        commitDebugState('Photo profil', profilePictureInfo)
-        return
-      }
-
-      const accountResponse = await getAccountInfo()
-      const accountPayload = accountResponse?.account ?? null
-      const photoCandidate = findProfilePhotoCandidate(accountPayload)
-
-      setDebugImagePreview(photoCandidate ? {
-        src: photoCandidate.src,
-        fieldPath: photoCandidate.fieldPath,
-        kind: photoCandidate.kind,
-      } : null)
-
-      commitDebugState('Photo profil', {
-        profilePicture: profilePictureInfo,
-        authenticated: accountResponse?.authenticated ?? false,
-        photo: photoCandidate ? {
-          available: true,
-          fieldPath: photoCandidate.fieldPath,
-          sourceKind: photoCandidate.kind,
-          previewUrl: photoCandidate.src,
-        } : {
-          available: false,
-          reason: "Aucun champ d'image courant n'a été trouvé dans les données du compte.",
-        },
-        account: accountPayload,
-      })
-    } catch (error) {
-      setDebugImagePreview(null)
-      commitDebugState('Photo profil', null, getErrorMessage(error))
-    }
-  }, [commitDebugState])
-
-  const sessionLabel = sessionState.checking
-    ? 'Vérification de session...'
-    : sessionState.authenticated
-      ? sessionState.user
-        ? `Connecté : ${sessionState.user}`
-        : 'Connecté'
-      : 'Déconnecté'
-
-  const output = prettyPrint(
-    debugState.payload
-      ?? buildDebugSnapshot('Debug', { message: 'Aucune sortie disponible.' }),
-  )
-  const localStorageOutput = prettyPrint(buildLocalStorageDebugSnapshot(sessionState.user))
-  const debugPanelTitle = debugOutputTab === 'storage' ? 'Stockage local' : (debugState.label || 'Sortie JSON')
-  const debugPanelDescription = debugOutputTab === 'storage'
-    ? 'Clés locales liées au compte, aux réglages et aux caches de l’app.'
-    : 'Sortie JSON brute des appels locaux et proxifiés.'
-  const debugPanelOutput = debugOutputTab === 'storage' ? localStorageOutput : output
-  const resolvedDebugImagePreview = resolveDebugImagePreviewFromSnapshot(debugState.payload) ?? debugImagePreview
-  const handleCopyDebugOutput = useCallback(async () => {
-    if (!debugPanelOutput) {
-      return
-    }
-
-    try {
-      await copyTextToClipboard(debugPanelOutput)
-      setDebugCopyState('copied')
-    } catch {
-      setDebugCopyState('error')
-    }
-
-    if (debugCopyTimeoutRef.current !== null) {
-      window.clearTimeout(debugCopyTimeoutRef.current)
-    }
-
-    debugCopyTimeoutRef.current = window.setTimeout(() => {
-      setDebugCopyState('idle')
-      debugCopyTimeoutRef.current = null
-    }, 1600)
-  }, [debugPanelOutput])
   const shouldHoldInitialRender = !hasCheckedInitialSession && sessionState.checking
   const isProfileSwitching = sessionState.authenticated && profileUser !== sessionState.user
   const shouldShowTpSetup = sessionState.authenticated && !selectedTp
@@ -2837,7 +2341,6 @@ function App() {
   const currentTpOnboardingStep = getCurrentTpOnboardingStep(tpOnboardingState)
   const currentTpStepOptions = getCurrentTpStepOptions(tpOnboardingState)
   const currentDetectedSelection = getDetectedSelectionForStep(tpOnboardingState, currentTpOnboardingStep)
-  const selectedAdeResourceId = selectedTp?.resourceId ?? undefined
   const accountDisplayInfo = getAccountDisplayInfo(
     sessionState.account,
     sessionState.user,
@@ -3055,436 +2558,40 @@ function App() {
         onApplyHandlerChange={(fn) => { applyUpdateRef.current = fn }}
       />
 
-      {DEBUG_MENU_ENABLED && debugOpen ? (
-        <aside className="fixed top-4 right-4 bottom-4 w-[min(720px,calc(100vw-2rem))] flex flex-col gap-3 p-4 bg-context-bg text-text border border-border corners-[20px] shadow-[0_24px_80px_var(--color-shadow)] backdrop-blur-[10px] overflow-y-auto overflow-x-hidden overscroll-contain z-30 max-lg:top-3 max-lg:right-3 max-lg:left-3 max-lg:bottom-3 max-lg:w-auto" role="dialog" aria-modal="false" aria-label="Menu debug">
-          <header className="flex gap-4 justify-between items-center max-lg:flex-col max-lg:items-stretch">
-            <div>
-              <p className="m-0 mb-1 text-xs font-bold tracking-[0.08em] uppercase text-text-muted font-body">Mode debug</p>
-              <h1 className="m-0 text-xl font-bold">ENT minimal</h1>
-              <p className="m-0 text-[0.9rem] text-text-muted font-body">Cmd/Ctrl + Shift + D pour afficher ou masquer.</p>
-            </div>
-            <button
-              type="button"
-              className="appearance-none border border-border corners-[12px] bg-bg text-text py-[0.7rem] px-[0.9rem] font-inherit font-semibold leading-[1.1] disabled:opacity-45 disabled:cursor-wait"
-              onClick={() => setDebugOpen(false)}
-            >
-              Fermer
-            </button>
-          </header>
-
-          <section className="grid gap-3 p-4 border border-border corners-[16px] bg-bg-surface">
-            <div className="flex gap-3 justify-between items-center max-lg:flex-col max-lg:items-stretch">
-              <div className="min-w-0">
-                <p className="m-0 text-[0.85rem] font-semibold text-text-secondary font-body">Photo du bandeau</p>
-                <p className="m-0 text-[0.9rem] text-text-muted font-body">
-                  {customBackground
-                    ? 'Fond personnalisé actif : la rotation est ignorée.'
-                    : heroImageCount > 1
-                      ? `${listHeroImages(establishment).findIndex((image) => image.src === heroImage.src) + 1} / ${heroImageCount}${heroImage.credit?.author ? ` · ${heroImage.credit.author}` : ''}`
-                      : heroImageCount === 1 ? 'Une seule photo configurée.' : 'Aucune photo : image générique.'}
-                </p>
-              </div>
-              <div className="flex gap-2">
-                <button
-                  type="button"
-                  className="appearance-none border border-border corners-[12px] bg-bg text-text py-[0.7rem] px-[0.9rem] font-inherit font-semibold leading-[1.1] disabled:opacity-45"
-                  onClick={() => setHeroOffset((current) => current - 1)}
-                  disabled={Boolean(customBackground) || heroImageCount < 2}
-                >
-                  Précédente
-                </button>
-                <button
-                  type="button"
-                  className="appearance-none border border-border corners-[12px] bg-bg text-text py-[0.7rem] px-[0.9rem] font-inherit font-semibold leading-[1.1] disabled:opacity-45"
-                  onClick={() => setHeroOffset((current) => current + 1)}
-                  disabled={Boolean(customBackground) || heroImageCount < 2}
-                >
-                  Suivante
-                </button>
-              </div>
-            </div>
-          </section>
-
-          {/* The same setting as Réglages › Apparence, here too on the
-              landing and login pages; not counted as a setting change. */}
-          <section className="grid gap-3 p-4 border border-border corners-[16px] bg-bg-surface">
-            <div className="flex gap-3 justify-between items-center max-lg:flex-col max-lg:items-stretch">
-              <p className="m-0 text-[0.85rem] font-semibold text-text-secondary font-body">Thème</p>
-              <div className="flex gap-2">
-                {[['auto', 'Auto'], ['light', 'Clair'], ['dark', 'Sombre']].map(([value, label]) => (
-                  <button
-                    key={value}
-                    type="button"
-                    aria-pressed={theme === value}
-                    className={`appearance-none border border-border corners-[12px] py-[0.7rem] px-[0.9rem] font-inherit font-semibold leading-[1.1] ${theme === value ? 'bg-brand text-bg' : 'bg-bg text-text'}`}
-                    onClick={() => {
-                      persistTheme(value)
-                      setTheme(value)
-                    }}
-                  >
-                    {label}
-                  </button>
-                ))}
-              </div>
-            </div>
-          </section>
-
-          <section className="grid gap-3 p-4 border border-border corners-[16px] bg-bg-surface">
-            <div className="flex gap-3 justify-between items-center max-lg:flex-col max-lg:items-stretch">
-              <span className={`inline-flex items-center min-h-8 py-[0.35rem] px-3 rounded-full text-[0.92rem] font-semibold ${sessionState.authenticated ? 'bg-success-bg text-success-text' : 'bg-bg-subtle text-text-secondary'}`}>
-                {sessionLabel}
-              </span>
-              <button
-                type="button"
-                className="appearance-none border border-border corners-[12px] bg-bg text-text py-[0.7rem] px-[0.9rem] font-inherit font-semibold leading-[1.1] disabled:opacity-45 disabled:cursor-wait"
-                onClick={() => void refreshSession({ exposeOutput: true })}
-                disabled={sessionState.checking}
-              >
-                Session
-              </button>
-            </div>
-
-            {!sessionState.authenticated ? (
-              <form className="grid gap-3" onSubmit={handleLogin}>
-                <div className="grid grid-cols-2 gap-3 max-lg:grid-cols-1">
-                  <label className="grid gap-[0.35rem] min-w-0">
-                    <span className="text-[0.85rem] font-semibold text-text-secondary font-body">Identifiant</span>
-                    <input
-                      ref={usernameInputRef}
-                      autoComplete="username"
-                      type="text"
-                      className="w-full min-w-0 py-3 px-[0.85rem] border border-border corners-[12px] bg-bg text-text"
-                      value={credentials.username}
-                      onChange={(event) => setCredentials((current) => ({ ...current, username: event.target.value }))}
-                    />
-                  </label>
-
-                  <label className="grid gap-[0.35rem] min-w-0">
-                    <span className="text-[0.85rem] font-semibold text-text-secondary font-body">Mot de passe</span>
-                    <input
-                      autoComplete="current-password"
-                      type="password"
-                      className="w-full min-w-0 py-3 px-[0.85rem] border border-border corners-[12px] bg-bg text-text"
-                      value={credentials.password}
-                      onChange={(event) => setCredentials((current) => ({ ...current, password: event.target.value }))}
-                    />
-                  </label>
-                </div>
-
-                <div className="flex gap-3 flex-wrap max-lg:flex-col max-lg:items-stretch">
-                  <LentButton type="submit" loading={sessionState.checking}>
-                    Se connecter
-                  </LentButton>
-                </div>
-              </form>
-            ) : (
-              <div className="flex gap-3 justify-between items-center max-lg:flex-col max-lg:items-stretch">
-                <p className="m-0 text-[0.9rem] text-text-muted font-body">Session active pour {sessionState.user ?? 'un utilisateur connecte'}.</p>
-                <button
-                  type="button"
-                  className="appearance-none border border-border corners-[12px] bg-bg text-text py-[0.7rem] px-[0.9rem] font-inherit font-semibold leading-[1.1] disabled:opacity-45 disabled:cursor-wait"
-                  onClick={() => void handleLogout()}
-                  disabled={sessionState.checking}
-                >
-                  Se deconnecter
-                </button>
-              </div>
-            )}
-
-            {sessionState.error ? <p className="m-0 text-error font-body">{sessionState.error}</p> : null}
-          </section>
-
-          <section className="grid gap-3 p-4 border border-border corners-[16px] bg-bg-surface">
-            <div className="flex gap-3 flex-wrap max-lg:flex-col max-lg:items-stretch">
-                <button
-                type="button"
-                className="appearance-none border border-border corners-[12px] bg-bg text-text py-[0.7rem] px-[0.9rem] font-inherit font-semibold leading-[1.1]"
-                onClick={showInstallPrompt}
-              >
-                PWA Prompt
-              </button>
-              <button
-                type="button"
-                className="appearance-none border border-border corners-[12px] bg-bg text-text py-[0.7rem] px-[0.9rem] font-inherit font-semibold leading-[1.1]"
-                onClick={() => { setForceIosPrompt(true); setTimeout(() => setForceIosPrompt(false), 100) }}
-              >
-                PWA Prompt iOS
-              </button>
-              <button
-                type="button"
-                className="appearance-none border border-border corners-[12px] bg-bg text-text py-[0.7rem] px-[0.9rem] font-inherit font-semibold leading-[1.1]"
-                onClick={() => setForceUpdatePrompt(true)}
-              >
-                PWA Update Prompt
-              </button>
-              <button
-                type="button"
-                className="appearance-none border border-border corners-[12px] bg-bg text-text py-[0.7rem] px-[0.9rem] font-inherit font-semibold leading-[1.1]"
-                onClick={() => setWelcomeFromLentOpen(true)}
-              >
-                Arrivée depuis l'ent
-              </button>
-              <button
-                type="button"
-                className={`appearance-none border border-border corners-[12px] py-[0.7rem] px-[0.9rem] font-inherit font-semibold leading-[1.1] ${hasPendingUpdate ? 'bg-brand text-bg' : 'bg-bg text-text'}`}
-                onClick={() => setHasPendingUpdate((current) => !current)}
-              >
-                Sidebar update {hasPendingUpdate ? '✓' : ''}
-              </button>
-              <button
-                type="button"
-                className={`appearance-none border border-border corners-[12px] py-[0.7rem] px-[0.9rem] font-inherit font-semibold leading-[1.1] ${debugNextClass ? 'bg-brand text-bg' : 'bg-bg text-text'}`}
-                onClick={() => setDebugNextClass((c) => !c)}
-              >
-                Prochain cours {debugNextClass ? '✓' : ''}
-              </button>
-              {/* « Fait partie de Papillon » and the rest, forced on or off on
-                  this device (src/papillon.js); read at load, so it reloads. */}
-              <button
-                type="button"
-                className={`appearance-none border border-border corners-[12px] py-[0.7rem] px-[0.9rem] font-inherit font-semibold leading-[1.1] ${IS_PAPILLON_SHOWN ? 'bg-brand text-bg' : 'bg-bg text-text'}`}
-                onClick={() => {
-                  try {
-                    localStorage.setItem(PAPILLON_DEBUG_KEY, IS_PAPILLON_SHOWN ? 'off' : 'on')
-                  } catch {
-                    return
-                  }
-                  window.location.reload()
-                }}
-              >
-                Papillon {IS_PAPILLON_SHOWN ? '✓' : ''}
-              </button>
-              {/* The university's outage notice (ServiceNotice), hidden on
-                  this device; read at load, so it reloads. */}
-              <button
-                type="button"
-                className={`appearance-none border border-border corners-[12px] py-[0.7rem] px-[0.9rem] font-inherit font-semibold leading-[1.1] ${IS_SERVICE_NOTICE_HIDDEN ? 'bg-brand text-bg' : 'bg-bg text-text'}`}
-                onClick={() => {
-                  try {
-                    if (IS_SERVICE_NOTICE_HIDDEN) localStorage.removeItem(SERVICE_NOTICE_DEBUG_KEY)
-                    else localStorage.setItem(SERVICE_NOTICE_DEBUG_KEY, '1')
-                  } catch {
-                    return
-                  }
-                  window.location.reload()
-                }}
-              >
-                Masquer l'avis {IS_SERVICE_NOTICE_HIDDEN ? '✓' : ''}
-              </button>
-              {/* Forgets the university picked on this device and reloads on
-                  the neutral page (src/universityRuntime.js). Signed out
-                  only: signed in, the session's university wins. */}
-              <button
-                type="button"
-                className="appearance-none border border-border corners-[12px] bg-bg text-text py-[0.7rem] px-[0.9rem] font-inherit font-semibold leading-[1.1] disabled:opacity-45 disabled:cursor-not-allowed"
-                onClick={() => {
-                  writeUniversityChoice(null)
-                  window.location.assign('/')
-                }}
-                disabled={sessionState.authenticated}
-                title={sessionState.authenticated ? 'Se déconnecter d’abord : connecté, la session décide' : undefined}
-              >
-                Réinitialiser l'université ({getLoadedUniversityId() ?? 'aucune'})
-              </button>
-              <button
-                type="button"
-                className="appearance-none border border-border corners-[12px] bg-bg text-text py-[0.7rem] px-[0.9rem] font-inherit font-semibold leading-[1.1] disabled:opacity-45 disabled:cursor-not-allowed"
-                onClick={() => handleDebugRestartOnboarding()}
-                disabled={!sessionState.authenticated || sessionState.checking}
-              >
-                Refaire onboarding
-              </button>
-              {/* The TP step that students reach when their TP isn't found, even when it is. */}
-              <button
-                type="button"
-                className="appearance-none border border-border corners-[12px] bg-bg text-text py-[0.7rem] px-[0.9rem] font-inherit font-semibold leading-[1.1] disabled:opacity-45 disabled:cursor-not-allowed"
-                onClick={() => handleDebugRestartOnboarding({ forceTpChoice: true })}
-                disabled={!sessionState.authenticated || sessionState.checking}
-              >
-                Onboarding : forcer le choix du TP
-              </button>
-              {/* Brings back the « Mes notes » launch as on release day (the
-                  dashboard card and the tab's « Nouveau »), only where it
-                  applies. */}
-              <button
-                type="button"
-                className="appearance-none border border-border corners-[12px] bg-bg text-text py-[0.7rem] px-[0.9rem] font-inherit font-semibold leading-[1.1] disabled:opacity-45 disabled:cursor-wait"
-                onClick={() => void runDebugAction('Nouveautés : rejouer « Mes notes »', () => (
-                  replayChangelogEntry('mes-notes')
-                    ? { replayed: true }
-                    : { replayed: false, note: 'L’entrée ne s’applique pas ici : pas de page Mes notes, ou relevé non BUT (ou pas encore lu).' }
-                ))}
-                disabled={debugState.loading}
-              >
-                Nouveautés : rejouer « Mes notes »
-              </button>
-              {/* Likewise for the Planning's launch. */}
-              <button
-                type="button"
-                className="appearance-none border border-border corners-[12px] bg-bg text-text py-[0.7rem] px-[0.9rem] font-inherit font-semibold leading-[1.1] disabled:opacity-45 disabled:cursor-wait"
-                onClick={() => void runDebugAction('Nouveautés : rejouer « Planning »', () => (
-                  replayChangelogEntry('planning')
-                    ? { replayed: true }
-                    : { replayed: false, note: 'L’entrée ne s’applique pas ici : pas de page Planning, ou pas connecté.' }
-                ))}
-                disabled={debugState.loading}
-              >
-                Nouveautés : rejouer « Planning »
-              </button>
-              <button
-                type="button"
-                className="appearance-none border border-border corners-[12px] bg-[#5b1f1f] text-white py-[0.7rem] px-[0.9rem] font-inherit font-semibold leading-[1.1] disabled:opacity-45 disabled:cursor-wait"
-                onClick={() => void handleDebugFullReset()}
-                disabled={debugState.loading || sessionState.checking}
-              >
-                Reset complet
-              </button>
-              <button
-                type="button"
-                className="appearance-none border border-border corners-[12px] bg-bg text-text py-[0.7rem] px-[0.9rem] font-inherit font-semibold leading-[1.1] disabled:opacity-45 disabled:cursor-wait"
-                onClick={() => void handleDebugProfilePhoto()}
-                disabled={debugState.loading || !sessionState.authenticated}
-              >
-                Photo profil
-              </button>
-            {['Account', 'Layout', 'Planning', 'Marketplace', 'Grades', 'Latest Grade', 'Average Grade'].map((label) => (
-                <button
-                  key={label}
-                  type="button"
-                  className="appearance-none border border-border corners-[12px] bg-bg text-text py-[0.7rem] px-[0.9rem] font-inherit font-semibold leading-[1.1] disabled:opacity-45 disabled:cursor-wait"
-                  onClick={() => void runDebugAction(label, () => {
-                    const actions = { Account: getAccountInfo, Layout: getLayout, Planning: getPlanning, Marketplace: getMarketplaceEntries, Grades: getGrades, 'Latest Grade': getLatestGrade, 'Average Grade': getAverageGrade }
-                    return actions[label]()
-                  })}
-                  disabled={debugState.loading}
-                >
-                  {label}
-                </button>
-              ))}
-            </div>
-
-            <div className="mt-1">
-              <p className="m-0 mb-2 text-xs font-bold tracking-[0.08em] uppercase text-text-muted font-body">ADE Schedule API</p>
-              <div className="flex gap-3 flex-wrap max-lg:flex-col max-lg:items-stretch">
-                {['ADE Status', 'ADE Calendar', 'ADE Tree', 'ADE Timetable', 'ADE Upcoming', 'ADE Alerts'].map((label) => (
-                  <button
-                    key={label}
-                    type="button"
-                    className="appearance-none border border-border corners-[12px] bg-bg text-text py-[0.7rem] px-[0.9rem] font-inherit font-semibold leading-[1.1] disabled:opacity-45 disabled:cursor-wait"
-                    onClick={() => void runDebugAction(label, () => {
-                      const actions = {
-                        'ADE Status': () => getAdeStatus(),
-                        'ADE Calendar': () => getAdeCalendarMetadata({ resourceId: selectedAdeResourceId }),
-                        'ADE Tree': () => getAdeTree(),
-                        'ADE Timetable': () => getAdeTimetable({ force: true, resourceId: selectedAdeResourceId }),
-                        'ADE Upcoming': () => getAdeUpcoming({
-                          date: new Date().toISOString().slice(0, 10),
-                          lookaheadDays: nextClassLookaheadDays,
-                          selection: selectedTp,
-                        }),
-                        'ADE Alerts': () => getAdeAlerts(),
-                      }
-                      return actions[label]()
-                    })}
-                    disabled={debugState.loading}
-                  >
-                    {label}
-                  </button>
-                ))}
-              </div>
-              <form className="flex gap-3 items-end mt-3 max-lg:flex-col max-lg:items-stretch" onSubmit={(event) => { event.preventDefault(); void runDebugAction(`ADE Search: ${adeSearchQuery}`, () => searchAde(adeSearchQuery)) }}>
-                <label className="grid gap-[0.35rem] min-w-0 flex-1">
-                  <span className="text-[0.85rem] font-semibold text-text-secondary font-body">ADE Search</span>
-                  <input
-                    type="text"
-                    className="w-full min-w-0 py-3 px-[0.85rem] border border-border corners-[12px] bg-bg text-text"
-                    value={adeSearchQuery}
-                    onChange={(event) => setAdeSearchQuery(event.target.value)}
-                    placeholder="Cours, prof, groupe..."
-                  />
-                </label>
-                <LentButton type="submit" className="shrink-0" disabled={debugState.loading || !adeSearchQuery.trim()}>
-                  Search
-                </LentButton>
-              </form>
-            </div>
-
-            <form className="flex gap-3 items-end max-lg:flex-col max-lg:items-stretch" onSubmit={handleCustomRequest}>
-              <label className="grid gap-[0.35rem] min-w-0 flex-1">
-                <span className="text-[0.85rem] font-semibold text-text-secondary font-body">Endpoint ENT</span>
-                <input
-                  type="text"
-                  className="w-full min-w-0 py-3 px-[0.85rem] border border-border corners-[12px] bg-bg text-text"
-                  value={requestPath}
-                  onChange={(event) => setRequestPath(event.target.value)}
-                  placeholder="/api/v4-3/dlm/layout.json"
-                />
-              </label>
-              <LentButton type="submit" className="shrink-0" disabled={debugState.loading || !requestPath.trim()}>
-                GET
-              </LentButton>
-            </form>
-          </section>
-
-          <section className="flex-1 min-h-[320px] grid gap-3 p-4 border border-border corners-[16px] bg-bg-surface grid-rows-[auto_auto_minmax(0,1fr)] shrink-0">
-            <div className="flex gap-3 justify-between items-center max-lg:flex-col max-lg:items-stretch">
-              <div>
-                <div className="inline-flex items-center gap-1 rounded-full border border-border bg-bg p-1 mb-2">
-                  <button
-                    type="button"
-                    className={`rounded-full px-3 py-1.5 text-[0.82rem] font-semibold transition-colors ${debugOutputTab === 'api' ? 'bg-text text-bg' : 'bg-transparent text-text-muted hover:text-text'}`}
-                    onClick={() => setDebugOutputTab('api')}
-                  >
-                    Appels
-                  </button>
-                  <button
-                    type="button"
-                    className={`rounded-full px-3 py-1.5 text-[0.82rem] font-semibold transition-colors ${debugOutputTab === 'storage' ? 'bg-text text-bg' : 'bg-transparent text-text-muted hover:text-text'}`}
-                    onClick={() => setDebugOutputTab('storage')}
-                  >
-                    Stockage local
-                  </button>
-                </div>
-                <strong>{debugPanelTitle}</strong>
-                <p className="m-0 text-[0.9rem] text-text-muted font-body">{debugPanelDescription}</p>
-              </div>
-              <div className="flex items-center gap-2 max-lg:w-full max-lg:justify-between">
-                {debugOutputTab === 'api' && debugState.loading ? <span className="m-0 text-[0.9rem] text-text-muted font-body">Chargement...</span> : null}
-                <button
-                  type="button"
-                  className="appearance-none border border-border corners-[12px] bg-bg text-text py-[0.65rem] px-[0.85rem] font-inherit font-semibold leading-[1.1] disabled:opacity-45 disabled:cursor-not-allowed"
-                  onClick={() => void handleCopyDebugOutput()}
-                  disabled={!debugPanelOutput}
-                >
-                  {debugCopyState === 'copied' ? 'Copié' : debugCopyState === 'error' ? 'Réessayer' : 'Copier'}
-                </button>
-              </div>
-            </div>
-
-            {debugOutputTab === 'api' && debugState.error ? <p className="m-0 text-error font-body">{debugState.error}</p> : null}
-            {debugOutputTab === 'api' && resolvedDebugImagePreview ? (
-              <div className="corners-[14px] border border-border bg-bg p-4 flex flex-col gap-3">
-                <div className="flex items-center gap-4">
-                  <img
-                    src={resolvedDebugImagePreview.src}
-                    alt="Photo de profil"
-                    className="h-20 w-20 rounded-full object-cover border border-border bg-bg-subtle"
-                  />
-                  <div className="min-w-0">
-                    <p className="m-0 text-sm font-semibold text-text">Photo détectée</p>
-                    <p className="m-0 mt-1 text-[0.82rem] text-text-muted font-body break-all">
-                      {resolvedDebugImagePreview.fieldPath}
-                    </p>
-                    <p className="m-0 mt-1 text-[0.82rem] text-text-muted font-body">
-                      Source: {resolvedDebugImagePreview.kind}
-                    </p>
-                  </div>
-                </div>
-              </div>
-            ) : null}
-            <pre className="m-0 min-h-0 h-full overflow-auto p-4 corners-[14px] border border-border bg-bg text-text text-[0.85rem] leading-[1.45] whitespace-pre-wrap break-words">{debugPanelOutput}</pre>
-          </section>
-        </aside>
+      {DebugMenu ? (
+        <Suspense fallback={null}>
+          <DebugMenu
+            open={debugOpen}
+            onToggle={toggleDebugMenu}
+            onClose={closeDebugMenu}
+            sessionState={sessionState}
+            onRefreshSession={() => void refreshSession({ exposeOutput: true })}
+            credentials={credentials}
+            onCredentialsChange={(field, value) => setCredentials((current) => ({ ...current, [field]: value }))}
+            onLogin={handleLogin}
+            onLogout={() => void handleLogout()}
+            onRestartOnboarding={handleDebugRestartOnboarding}
+            debugState={debugState}
+            onDebugStart={startDebugState}
+            onDebugCommit={commitDebugState}
+            theme={theme}
+            onThemeChange={setTheme}
+            establishment={establishment}
+            heroImage={heroImage}
+            hasCustomBackground={Boolean(customBackground)}
+            onHeroShift={(step) => setHeroOffset((current) => current + step)}
+            debugNextClass={debugNextClass}
+            onDebugNextClassChange={setDebugNextClass}
+            hasPendingUpdate={hasPendingUpdate}
+            onPendingUpdateChange={setHasPendingUpdate}
+            onShowInstallPrompt={showInstallPrompt}
+            onShowIosPrompt={() => { setForceIosPrompt(true); setTimeout(() => setForceIosPrompt(false), 100) }}
+            onShowUpdatePrompt={() => setForceUpdatePrompt(true)}
+            onShowWelcomeFromLent={() => setWelcomeFromLentOpen(true)}
+            selectedTp={selectedTp}
+            nextClassLookaheadDays={nextClassLookaheadDays}
+          />
+        </Suspense>
       ) : null}
     </main>
   )
