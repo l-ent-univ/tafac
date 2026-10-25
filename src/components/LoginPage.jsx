@@ -348,7 +348,7 @@ function LoginPage({
                     </div>
                   </div>
 
-                  <LentButton type="submit" className="mt-5 w-full font-bold!" loading={checking}>
+                  <LentButton type="submit" className="mt-5 min-h-[52px]! w-full text-[16px]!" loading={checking}>
                     Se connecter
                   </LentButton>
                 </form>

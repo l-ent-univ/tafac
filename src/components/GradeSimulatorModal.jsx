@@ -8,9 +8,9 @@ import { addCustomEvaluations } from '../gradeSimulation'
 import { readSemesterUes } from '../semesterUes'
 import { useUeColor } from '../useUeColor'
 import { buildSegmentPath, pointAt } from '../ueRingGeometry'
-import LentButton from './LentButton'
 import GradeSimulatorReveal from './GradeSimulatorReveal'
 import GradeSimulatorUe from './GradeSimulatorUe'
+import LentButton from './LentButton'
 import CloseButton from './CloseButton'
 
 const FOCUSABLE_SELECTOR = 'button:not([disabled]), input:not([disabled]), [href], [tabindex]:not([tabindex="-1"])'
@@ -476,9 +476,9 @@ function GradeSimulatorModal({ report = null, releve = null, config = null, seme
             <span className={`min-w-0 flex-1 truncate font-body text-[14px] font-medium ${hasInvalid ? 'text-error' : 'text-text-secondary'}`} aria-live="polite">
               {hasInvalid ? 'Une note n’est pas valide' : `${editCount} ${editCount > 1 ? 'notes modifiées' : 'note modifiée'}`}
             </span>
-            <LentButton className="min-h-[44px] px-5 py-[11px] text-[16px]" disabled={hasInvalid} onClick={showReveal}>
+            <LentButton disabled={hasInvalid} onClick={showReveal}>
               Suivant
-              <Icon icon="carbon:arrow-right" className="ml-2 inline-block size-[18px] align-[-4px]" aria-hidden="true" />
+              <Icon icon="carbon:arrow-right" className="size-4" aria-hidden="true" />
             </LentButton>
           </footer>
         ) : null}
@@ -507,9 +507,9 @@ function GradeSimulatorModal({ report = null, releve = null, config = null, seme
                 {activeUe ? activeUe.title || formatUeCode(activeUe.code) : 'Aucune UE'}
               </p>
             </div>
-            <LentButton className="min-h-[46px] px-6 py-3 text-[16px]" disabled={!activeUe} onClick={goToUe}>
+            <LentButton disabled={!activeUe} onClick={goToUe}>
               Suivant
-              <Icon icon="carbon:arrow-right" className="ml-2 inline-block size-[18px] align-[-4px]" aria-hidden="true" />
+              <Icon icon="carbon:arrow-right" className="size-4" aria-hidden="true" />
             </LentButton>
           </div>
         )}

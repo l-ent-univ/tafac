@@ -7,6 +7,7 @@ import { NewBadge, ScorePill, ScoreText } from './SubjectsList'
 import UeBadge from './UeBadge'
 import { useUeColor } from '../useUeColor'
 import CloseButton from './CloseButton'
+import LentButton from './LentButton'
 
 const FOCUSABLE_SELECTOR = 'button:not([disabled]), [href], [tabindex]:not([tabindex="-1"])'
 const PASS_MARK = 10
@@ -643,15 +644,10 @@ function ExplainerDialog({ ues, onClose }) {
               </button>
             ))}
           </div>
-          <button
-            ref={nextRef}
-            type="button"
-            className="inline-flex min-h-[40px] items-center gap-[6px] rounded-full border-0 bg-brand px-4 text-bg transition-colors duration-150 hover:bg-brand-hover"
-            onClick={() => (isLast ? onClose() : goTo(stepIndex + 1))}
-          >
-            <span className="font-body text-[14px] font-semibold leading-none">{isLast ? 'Compris' : 'Suivant'}</span>
+          <LentButton ref={nextRef} className="min-h-[40px]! px-4! text-[14px]!" onClick={() => (isLast ? onClose() : goTo(stepIndex + 1))}>
+            {isLast ? 'Compris' : 'Suivant'}
             {!isLast ? <Icon icon="carbon:arrow-right" className="size-4" aria-hidden="true" /> : null}
-          </button>
+          </LentButton>
         </footer>
         <p className="sr-only" aria-live="polite">{announcement}</p>
       </section>

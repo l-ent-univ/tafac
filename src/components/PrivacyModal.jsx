@@ -13,6 +13,7 @@ import housesImage from '../assets/privacy/houses.webp'
 import butterflyImage from '../assets/privacy/butterfly.webp'
 import { APP_NAME } from '../seo'
 import CloseButton from './CloseButton'
+import LentButton from './LentButton'
 
 // "Tes données restent à toi": what the anonymous audience measurement does
 // and doesn't do, in the illustrated style of the Figma presentation screens
@@ -205,13 +206,9 @@ function PrivacyModal({ open, onClose }) {
 
         <PrivacyContent
           actions={(
-            <button
-              type="button"
-              className="lent-button inline-flex h-11 items-center justify-center rounded-full border-0 px-7 text-[15px] font-semibold text-white cursor-pointer"
-              onClick={onClose}
-            >
+            <LentButton className="px-7!" onClick={onClose}>
               Compris
-            </button>
+            </LentButton>
           )}
         />
       </section>

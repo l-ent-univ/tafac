@@ -332,52 +332,32 @@
   }
 }
 
-/* ── Primary button depth ── */
+/* ── Primary button (LentButton) ──
+   The brand colour, flat, on a soft shadow that deepens on hover; pressed,
+   it settles (and shrinks a little, in LentButton). */
 
 .lent-button {
-  background: linear-gradient(180deg, #2a2a2a 0%, #111111 100%);
-  box-shadow:
-    0 1px 0 0 rgba(255, 255, 255, 0.12) inset,
-    0 6px 16px -4px rgba(0, 0, 0, 0.35),
-    0 2px 6px -2px rgba(0, 0, 0, 0.2);
+  background-color: var(--color-brand);
+  color: var(--color-bg);
+  box-shadow: 0 1px 2px rgb(52 18 0 / 0.14), 0 6px 14px -6px rgb(52 18 0 / 0.4);
+  transition: background-color 150ms ease, box-shadow 150ms ease, transform 100ms ease-out, opacity 150ms ease;
 }
 
 .lent-button:hover:not(:disabled) {
-  background: linear-gradient(180deg, #333333 0%, #1a1a1a 100%);
-  box-shadow:
-    0 1px 0 0 rgba(255, 255, 255, 0.15) inset,
-    0 8px 20px -4px rgba(0, 0, 0, 0.4),
-    0 3px 8px -2px rgba(0, 0, 0, 0.25);
+  background-color: var(--color-brand-hover);
+  box-shadow: 0 1px 2px rgb(52 18 0 / 0.16), 0 10px 20px -8px rgb(52 18 0 / 0.45);
 }
 
 .lent-button:active:not(:disabled) {
-  box-shadow:
-    0 1px 0 0 rgba(255, 255, 255, 0.08) inset,
-    0 2px 6px -2px rgba(0, 0, 0, 0.2);
+  box-shadow: 0 1px 2px rgb(52 18 0 / 0.14);
 }
 
 :where([data-theme="dark"]) .lent-button {
-  background: linear-gradient(180deg, #e8e8e8 0%, #d0d0d0 100%);
-  color: #111;
-  box-shadow:
-    0 1px 0 0 rgba(255, 255, 255, 0.5) inset,
-    0 6px 16px -4px rgba(0, 0, 0, 0.5),
-    0 2px 6px -2px rgba(0, 0, 0, 0.3);
+  box-shadow: 0 1px 2px rgb(0 0 0 / 0.4), 0 6px 14px -6px rgb(0 0 0 / 0.6);
 }
 
 :where([data-theme="dark"]) .lent-button:hover:not(:disabled) {
-  background: linear-gradient(180deg, #f0f0f0 0%, #dcdcdc 100%);
-  box-shadow:
-    0 1px 0 0 rgba(255, 255, 255, 0.6) inset,
-    0 8px 20px -4px rgba(0, 0, 0, 0.55),
-    0 3px 8px -2px rgba(0, 0, 0, 0.35);
-}
-
-:where([data-theme="dark"]) .lent-button:active:not(:disabled) {
-  background: linear-gradient(180deg, #d4d4d4 0%, #c0c0c0 100%);
-  box-shadow:
-    0 1px 0 0 rgba(255, 255, 255, 0.3) inset,
-    0 2px 6px -2px rgba(0, 0, 0, 0.3);
+  box-shadow: 0 1px 2px rgb(0 0 0 / 0.45), 0 10px 20px -8px rgb(0 0 0 / 0.7);
 }
 
 /* ── Custom scrollbars ──

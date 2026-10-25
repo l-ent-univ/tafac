@@ -564,7 +564,7 @@ function GradeSimulatorReveal({ ue, ues, releve, overrides, flyFrom = null, onEd
           <Icon icon="carbon:arrow-left" className="size-[18px]" aria-hidden="true" />
           Modifier mes notes
         </button>
-        <LentButton className="ml-auto min-h-[44px] px-6 py-[11px] text-[16px]" onClick={onClose}>
+        <LentButton className="ml-auto" onClick={onClose}>
           Terminer
         </LentButton>
       </footer>
