@@ -20,7 +20,7 @@ import {
 
 // On phones the card shares its row with "Prochain cours" (same height, exact
 // halves), so the module code moves under the evaluation title.
-const CARD_CLASSES = 'latest-grade-widget isolate widget-card shadow-md flex-[0_1_280px] h-[140px] p-4 border rounded-[22px] overflow-hidden text-base leading-6 min-w-0 max-2xl:flex-[1_1_calc(50%-6px)] max-2xl:min-w-0 max-md:h-[124px] max-md:p-3 max-md:rounded-[20px] max-xs:flex-[1_1_calc(50%-4px)] max-xs:h-[140px] relative'
+const CARD_CLASSES = 'latest-grade-widget isolate widget-card shadow-md flex-[0_1_280px] h-[140px] p-4 border card-corners overflow-hidden text-base leading-6 min-w-0 max-2xl:flex-[1_1_calc(50%-6px)] max-2xl:min-w-0 max-md:h-[124px] max-md:p-3 max-xs:flex-[1_1_calc(50%-4px)] max-xs:h-[140px] relative'
 
 function LatestGradeHeader() {
   return (

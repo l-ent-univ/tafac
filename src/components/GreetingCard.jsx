@@ -139,7 +139,7 @@ function GreetingCard({
   return (
     // On phones the card shrinks to what it says: the wave sits beside the
     // heading instead of above it, and the card loses its minimum height.
-    <article className={`widget-card group relative shadow-md flex-[0_1_280px] min-h-[140px] p-4 border border-white rounded-[22px] overflow-hidden bg-widget-bg text-base leading-6 min-w-0 max-2xl:flex-[1_1_calc(50%-6px)] max-2xl:min-w-[min(280px,100%)] max-md:min-h-[124px] max-md:p-3 max-md:rounded-[20px] max-xs:flex-[1_1_100%] max-xs:min-w-0 max-xs:min-h-0 flex flex-col justify-end gap-1 text-text ${visible ? 'widget-card-visible' : ''}`}>
+    <article className={`widget-card group relative shadow-md flex-[0_1_280px] min-h-[140px] p-4 border border-white card-corners overflow-hidden bg-widget-bg text-base leading-6 min-w-0 max-2xl:flex-[1_1_calc(50%-6px)] max-2xl:min-w-[min(280px,100%)] max-md:min-h-[124px] max-md:p-3 max-xs:flex-[1_1_100%] max-xs:min-w-0 max-xs:min-h-0 flex flex-col justify-end gap-1 text-text ${visible ? 'widget-card-visible' : ''}`}>
       <div className="contents max-xs:flex max-xs:items-center max-xs:gap-2 max-xs:min-w-0 max-xs:pr-8">
         <Icon icon="ph:hand-waving" className="greeting-icon w-[34px] h-[34px] text-inherit shrink-0 max-xs:w-[26px] max-xs:h-[26px]" aria-hidden="true" />
         <Heading className="m-0 min-w-0 leading-[1.15] text-2xl font-bold overflow-hidden text-ellipsis whitespace-nowrap max-md:text-[22px] max-xs:text-xl" title={`Salut ${displayName} !`}>Salut {displayName} !</Heading>

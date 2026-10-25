@@ -28,7 +28,7 @@ export function GradesNotice({ icon = null, media = null, tint = null, label, ti
   }, [collapsible, expanded, children])
 
   return (
-    <div role="note" aria-label={label} className="grades-notice widget-card widget-card-visible relative isolate flex items-start gap-3 rounded-[18px] border bg-widget-bg p-3 text-text shadow-md max-md:gap-2.5">
+    <div role="note" aria-label={label} className="grades-notice widget-card widget-card-visible relative isolate flex items-start gap-3 card-corners-sm border bg-widget-bg p-3 text-text shadow-md max-md:gap-2.5">
       {tint ? <span className="grades-notice-tint" style={{ backgroundColor: tint }} aria-hidden="true" /> : null}
       {media ?? (
         <span className="inline-flex size-9 shrink-0 items-center justify-center rounded-full bg-brand-subtle text-text" aria-hidden="true">

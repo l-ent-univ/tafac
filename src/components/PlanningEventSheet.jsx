@@ -30,7 +30,7 @@ function SheetRow({ icon, title, detail, onClick }) {
     : <li className={className}>{content}</li>
 }
 
-const CARD_CLASSES = 'widget-card widget-card-visible m-0 list-none overflow-hidden border bg-widget-bg px-0 py-1 rounded-[22px] max-md:rounded-[20px]'
+const CARD_CLASSES = 'widget-card widget-card-visible m-0 list-none overflow-hidden border bg-widget-bg px-0 py-1 card-corners'
 
 // A class's sheet, laid out as the iOS app's (EventDetailViewController)
 // and drawn as a grade's (GradeDetailModal): the course's colour washing
