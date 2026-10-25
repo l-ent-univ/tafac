@@ -8,7 +8,7 @@ import { buildSegmentPath, pointAt } from '../ueRingGeometry'
 import LentButton from './LentButton'
 import UeBadge from './UeBadge'
 
-const CARD_CLASSES = 'widget-card widget-card-visible shadow-md border border-white rounded-[22px] bg-widget-bg text-text p-2 min-w-0 max-md:rounded-[20px]'
+const CARD_CLASSES = 'widget-card widget-card-visible shadow-md border border-white card-corners bg-widget-bg text-text p-2 min-w-0'
 
 // The gauge: the UE ring again (the dial's ribbon), as a dashboard arc from
 // 0 (bottom left) to 20 (bottom right), so 10, the pass mark, is right at

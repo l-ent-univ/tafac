@@ -30,6 +30,60 @@
   border-color: rgba(255, 255, 255, 0.08);
 }
 
+/* ── Widget corners ──
+   The cards' corners: a smooth curve (corner-shape: superellipse(1.3)) where
+   the browser draws it (Chrome, Edge), else the round corner closest to it
+   (0.85 × its radius: Safari, Firefox), the same shape within a quarter of a
+   pixel. card-corners for the widgets, card-corners-sm for the smaller cards
+   (app tiles, Planning's list, the grades' notice). Inner layers follow with
+   border-radius: inherit, and the curve below. */
+
+.card-corners {
+  border-radius: 31px;
+}
+
+.card-corners-sm {
+  border-radius: 22px;
+}
+
+@media (width < 48rem) {
+  .card-corners {
+    border-radius: 27px;
+  }
+
+  .card-corners-sm {
+    border-radius: 20px;
+  }
+}
+
+@supports (corner-shape: superellipse(1.3)) {
+  .card-corners,
+  .card-corners-sm,
+  /* The layers inside that take the card's corners (border-radius:
+     inherit): corner-shape isn't inherited. */
+  :is(.card-corners, .card-corners-sm) :is(.rounded-\[inherit\], .grades-notice-tint) {
+    corner-shape: superellipse(1.3);
+  }
+
+  .card-corners {
+    border-radius: 36px;
+  }
+
+  .card-corners-sm {
+    border-radius: 26px;
+  }
+
+  @media (width < 48rem) {
+    .card-corners {
+      border-radius: 32px;
+    }
+
+    .card-corners-sm {
+      border-radius: 24px;
+    }
+  }
+}
+
 /* ── Sidebar: floating frosted panel ── */
 
 .sidebar-panel {
@@ -2754,7 +2808,7 @@
    it half see-through mid-way, and their clip cut the shadow off). The
    snapshots are clipped to the card's corners, not the shadow. */
 ::view-transition-group(*.ue-card) {
-  border-radius: 24px;
+  border-radius: 31px;
   background: var(--color-widget-bg);
   box-shadow: 0 0 0 1px rgb(52 18 0 / 0.04), 0 1px 3px rgb(52 18 0 / 0.06), 0 10px 28px -14px rgb(52 18 0 / 0.16);
 }
@@ -2765,7 +2819,16 @@
 
 ::view-transition-image-pair(*.ue-card) {
   overflow: clip;
-  border-radius: 24px;
+  border-radius: 31px;
+}
+
+/* As the cards' (card-corners). */
+@supports (corner-shape: superellipse(1.3)) {
+  ::view-transition-group(*.ue-card),
+  ::view-transition-image-pair(*.ue-card) {
+    border-radius: 36px;
+    corner-shape: superellipse(1.3);
+  }
 }
 
 ::view-transition-old(*.ue-card),

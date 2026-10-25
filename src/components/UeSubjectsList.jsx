@@ -15,7 +15,7 @@ import { useUeColor } from '../useUeColor'
 // a shorter last row (5 UEs: 3 + 2) shares the full width too. A tile never
 // grows downward: it opens into the full-page view.
 const COLUMNS_CLASSES = 'flex flex-wrap gap-3 max-md:gap-2'
-const CARD_CLASSES = '@container isolate relative overflow-hidden widget-card widget-card-visible shadow-md border border-white rounded-[22px] bg-widget-bg text-text p-2 min-w-0 max-md:rounded-[20px]'
+const CARD_CLASSES = '@container isolate relative overflow-hidden widget-card widget-card-visible shadow-md border border-white card-corners bg-widget-bg text-text p-2 min-w-0'
 
 const STATE_LABELS = {
   validated: 'Validée',

@@ -17,7 +17,7 @@ const DAY_FORMAT = new Intl.DateTimeFormat('fr-FR', { day: 'numeric', month: 'sh
 // One card per group, stacked in a single column at every width (each card
 // is a query container for its own rows).
 const GROUPS_CLASSES = 'grid items-start gap-3 max-md:gap-2'
-const CARD_CLASSES = '@container widget-card widget-card-visible shadow-md border border-white rounded-[22px] bg-widget-bg text-text p-2 min-w-0 max-md:rounded-[20px]'
+const CARD_CLASSES = '@container widget-card widget-card-visible shadow-md border border-white card-corners bg-widget-bg text-text p-2 min-w-0'
 // The pills of the "Dernières notes" cards, a size down: neutral, the number
 // and "/20" trimmed to cap height so the padding is even.
 const PILL_CLASSES = 'inline-flex shrink-0 items-end gap-[2px] rounded-full border border-border bg-bg-subtle text-text'

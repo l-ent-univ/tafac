@@ -11,7 +11,7 @@ import CardInfoTip from './CardInfoTip'
 const GROW = 3
 const GROW_LENGTH = 150
 const easeOutCubic = (progress) => 1 - (1 - progress) ** 3
-const CARD_CLASSES = 'ue-widget widget-card shadow-md size-[188px] shrink-0 p-4 border rounded-[22px] overflow-hidden text-base leading-6 border-white bg-widget-bg flex flex-col gap-[6px] text-text max-md:order-1 max-md:h-auto max-md:min-h-[160px] max-md:w-auto max-md:flex-[1_0_clamp(136px,40%,170px)] max-md:snap-start max-md:p-3 max-md:rounded-[20px] relative'
+const CARD_CLASSES = 'ue-widget widget-card shadow-md size-[188px] shrink-0 p-4 border card-corners overflow-hidden text-base leading-6 border-white bg-widget-bg flex flex-col gap-[6px] text-text max-md:order-1 max-md:h-auto max-md:min-h-[160px] max-md:w-auto max-md:flex-[1_0_clamp(136px,40%,170px)] max-md:snap-start max-md:p-3 relative'
 
 function formatAverage(value) {
   return String(parseFloat(value.toFixed(2)))

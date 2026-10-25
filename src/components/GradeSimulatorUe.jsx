@@ -7,7 +7,7 @@ import { ScoreText } from './SubjectsList'
 import UeBadge from './UeBadge'
 
 const DAY_FORMAT = new Intl.DateTimeFormat('fr-FR', { day: 'numeric', month: 'short' })
-const CARD_CLASSES = 'widget-card widget-card-visible shadow-md border border-white rounded-[22px] bg-widget-bg text-text p-2 min-w-0 max-md:rounded-[20px]'
+const CARD_CLASSES = 'widget-card widget-card-visible shadow-md border border-white card-corners bg-widget-bg text-text p-2 min-w-0'
 
 function formatDay(date) {
   const time = Date.parse(date)

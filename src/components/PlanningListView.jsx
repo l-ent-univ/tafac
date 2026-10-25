@@ -45,7 +45,7 @@ function PlanningListCard({ event, accent, ongoing, onOpen }) {
   return (
     <button
       type="button"
-      className="planning-list-card widget-card widget-card-visible isolate relative flex w-full min-w-0 items-stretch gap-3 overflow-hidden rounded-[20px] border bg-widget-bg p-[13px] text-left text-text cursor-pointer 4xl:gap-4 4xl:px-4"
+      className="planning-list-card widget-card widget-card-visible isolate relative flex w-full min-w-0 items-stretch gap-3 overflow-hidden card-corners-sm border bg-widget-bg p-[13px] text-left text-text cursor-pointer 4xl:gap-4 4xl:px-4"
       style={accentStyle(accent)}
       onClick={() => onOpen(event)}
       aria-label={`${formatTime(event.start)} à ${formatTime(event.end)}, ${event.title}${meta.map((part) => `, ${part.text}`).join('')}, ${duration}${ongoing ? ', en cours' : ''}`}

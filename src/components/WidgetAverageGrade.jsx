@@ -18,7 +18,7 @@ import {
 // than its 168 so the evolution line keeps a clear gap above the number (the
 // ECTS card beside it matches), stretched to its row. On phones the first,
 // widest card of the overview's strip, its texts a size down to fit.
-const CARD_CLASSES = 'average-grade-widget widget-card shadow-md w-full max-w-[443px] min-h-[188px] p-4 border rounded-[22px] overflow-hidden text-base leading-6 min-w-0 max-md:w-auto max-md:max-w-none max-md:min-h-[160px] max-md:flex-[1_0_clamp(140px,50%,200px)] max-md:snap-start max-md:p-3 max-md:rounded-[20px] relative'
+const CARD_CLASSES = 'average-grade-widget widget-card shadow-md w-full max-w-[443px] min-h-[188px] p-4 border card-corners overflow-hidden text-base leading-6 min-w-0 max-md:w-auto max-md:max-w-none max-md:min-h-[160px] max-md:flex-[1_0_clamp(140px,50%,200px)] max-md:snap-start max-md:p-3 relative'
 
 function AverageGradeHeader({ estimated = false, final = false }) {
   return (
