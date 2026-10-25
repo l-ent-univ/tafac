@@ -1,9 +1,9 @@
 import universityConfig from '@university'
+import { branding as neutralBranding } from '../universities/neutral.js'
+import { getListedUniversities, getLoadedUniversityId, isMultiUniversity, readSeoPage } from './universityRuntime'
 
 export const APP_NAME = universityConfig.branding.appName
 export const APP_DEFAULT_TITLE = universityConfig.branding.defaultTitle
-export const SEO_TITLE = universityConfig.branding.seoTitle
-export const SEO_DESCRIPTION = universityConfig.branding.seoDescription
 export const SEO_ROBOTS_CONTENT = 'index,follow,max-image-preview:large,max-snippet:-1,max-video-preview:-1'
 
 const OG_IMAGE_PATH = '/og-image.jpg'
@@ -40,23 +40,23 @@ function setCanonicalLink(href) {
 
 // The site (its name and former names, for the name shown in search
 // results) and the app, as index.html has them.
-function buildStructuredData(pageUrl, imageUrl) {
+function buildStructuredData(siteUrl, imageUrl, branding) {
   return [
     {
       '@context': 'https://schema.org',
       '@type': 'WebSite',
       name: APP_NAME,
-      alternateName: universityConfig.branding.alternateNames ?? [],
-      url: pageUrl,
+      alternateName: branding.alternateNames ?? [],
+      url: siteUrl,
       inLanguage: 'fr-FR',
     },
     {
       '@context': 'https://schema.org',
       '@type': 'WebApplication',
       name: APP_NAME,
-      url: pageUrl,
+      url: siteUrl,
       image: imageUrl,
-      description: SEO_DESCRIPTION,
+      description: branding.seoDescription,
       applicationCategory: 'EducationalApplication',
       operatingSystem: 'Web, iOS, Android',
       inLanguage: 'fr-FR',
@@ -67,41 +67,45 @@ function buildStructuredData(pageUrl, imageUrl) {
   ]
 }
 
-function syncStructuredData(pageUrl, imageUrl) {
+function syncStructuredData(siteUrl, imageUrl, branding) {
   const script = ensureHeadNode(
     `script#${STRUCTURED_DATA_SCRIPT_ID}`,
     'script',
     { id: STRUCTURED_DATA_SCRIPT_ID, type: 'application/ld+json' },
   )
 
-  script.textContent = JSON.stringify(buildStructuredData(pageUrl, imageUrl))
+  script.textContent = JSON.stringify(buildStructuredData(siteUrl, imageUrl, branding))
 }
 
-// Signed out (the login page, the one search engines see): the SEO title as
-// it is, so the result's title is the page's.
-export function buildDocumentTitle(authenticated) {
-  return authenticated ? APP_DEFAULT_TITLE : SEO_TITLE
-}
-
+// Signed out (the landing and login pages, the ones search engines see): the
+// SEO title as it is, so the result's title is the page's.
 export function syncRuntimeSeo({ authenticated = false } = {}) {
   if (typeof document === 'undefined' || typeof window === 'undefined') {
     return
   }
 
-  // Always the home page: the app is one page whatever its path or query.
-  const pageUrl = new URL('/', window.location.origin).toString()
+  const loadedId = getLoadedUniversityId()
+  const page = readSeoPage({
+    pathname: authenticated ? '/' : window.location.pathname,
+    multiUniversity: isMultiUniversity(),
+    university: getListedUniversities().find((entry) => entry.id === loadedId) ?? null,
+    branding: universityConfig.branding,
+    neutral: neutralBranding,
+  })
+  const { seoTitle, seoDescription } = page.branding
+  const siteUrl = new URL('/', window.location.origin).toString()
+  const pageUrl = new URL(page.path, window.location.origin).toString()
   const imageUrl = new URL(OG_IMAGE_PATH, window.location.origin).toString()
-  const title = buildDocumentTitle(authenticated)
 
   document.documentElement.setAttribute('lang', 'fr')
-  document.title = title
+  document.title = authenticated ? APP_DEFAULT_TITLE : seoTitle
 
-  setMetaByName('description', SEO_DESCRIPTION)
+  setMetaByName('description', seoDescription)
   setMetaByName('robots', SEO_ROBOTS_CONTENT)
   setMetaByName('googlebot', SEO_ROBOTS_CONTENT)
   setMetaByName('twitter:card', 'summary_large_image')
-  setMetaByName('twitter:title', SEO_TITLE)
-  setMetaByName('twitter:description', SEO_DESCRIPTION)
+  setMetaByName('twitter:title', seoTitle)
+  setMetaByName('twitter:description', seoDescription)
   setMetaByName('twitter:url', pageUrl)
   setMetaByName('twitter:image', imageUrl)
   setMetaByName('twitter:image:alt', `Aperçu de l'application ${APP_NAME}`)
@@ -109,12 +113,12 @@ export function syncRuntimeSeo({ authenticated = false } = {}) {
   setMetaByProperty('og:type', 'website')
   setMetaByProperty('og:locale', 'fr_FR')
   setMetaByProperty('og:site_name', APP_NAME)
-  setMetaByProperty('og:title', SEO_TITLE)
-  setMetaByProperty('og:description', SEO_DESCRIPTION)
+  setMetaByProperty('og:title', seoTitle)
+  setMetaByProperty('og:description', seoDescription)
   setMetaByProperty('og:url', pageUrl)
   setMetaByProperty('og:image', imageUrl)
   setMetaByProperty('og:image:alt', `Aperçu de l'application ${APP_NAME}`)
 
   setCanonicalLink(pageUrl)
-  syncStructuredData(pageUrl, imageUrl)
+  syncStructuredData(siteUrl, imageUrl, page.branding)
 }

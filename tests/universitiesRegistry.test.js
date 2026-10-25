@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { fillBrandingPlaceholders, fillPublicOrigin } from '../server/appShell.js'
+import { fillBrandingPlaceholders, fillPagePath, fillPublicOrigin } from '../server/appShell.js'
 import { branding as neutralBranding } from '../universities/neutral.js'
 import {
   listServedUniversityIds,
@@ -50,4 +50,12 @@ test('the page gets its SEO text and address from the server', () => {
   const html = '<title>%LENT_SEO_TITLE%</title><meta content="%LENT_APP_NAME%"><script>{"alternateName": %LENT_ALTERNATE_NAMES_JSON%, "sameAs": ["%LENT_REPO_URL%"], "url": "__PUBLIC_ORIGIN__/"}</script>%LENT_UNKNOWN%'
   const filled = fillPublicOrigin(fillBrandingPlaceholders(html, neutralBranding), 'https://tafac.fr')
   assert.equal(filled, `<title>${neutralBranding.seoTitle}</title><meta content="Tafac"><script>{"alternateName": ["l'ent"], "sameAs": ["https://github.com/l-ent-univ/tafac"], "url": "https://tafac.fr/"}</script>%LENT_UNKNOWN%`)
+})
+
+test('a university\'s page has its own address in its canonical and link previews', () => {
+  const html = '<link rel="canonical" href="__PUBLIC_ORIGIN__/" /><meta property="og:url" content="__PUBLIC_ORIGIN__/" /><meta content="__PUBLIC_ORIGIN__/og-image.jpg" /><script>{"url": "__PUBLIC_ORIGIN__/"}</script>'
+  assert.equal(
+    fillPublicOrigin(fillPagePath(html, '/rennes'), 'https://tafac.fr'),
+    '<link rel="canonical" href="https://tafac.fr/rennes" /><meta property="og:url" content="https://tafac.fr/rennes" /><meta content="https://tafac.fr/og-image.jpg" /><script>{"url": "https://tafac.fr/"}</script>',
+  )
 })

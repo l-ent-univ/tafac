@@ -110,3 +110,15 @@ export function pickBootUniversity({ info, entry = null, storedChoice = null }) 
   if (served(info.host)) return info.host
   return null
 }
+
+// The page's address and SEO text, as the server sends them (server.js): on
+// a server with every university, a university's /<slug> has its own (its
+// landing page) and any other address Tafac's, whichever university was
+// picked; on a single-university server, the university's everywhere. Pure:
+// tested in tests/universityRuntime.test.js.
+export function readSeoPage({ pathname, multiUniversity, university, branding, neutral }) {
+  if (!multiUniversity) return { path: '/', branding }
+  const clean = String(pathname ?? '').replace(/\/+$/, '').toLowerCase()
+  if (university?.slug && clean === `/${university.slug}`) return { path: `/${university.slug}`, branding }
+  return { path: '/', branding: neutral }
+}

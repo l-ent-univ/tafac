@@ -25,7 +25,7 @@ Le build est le même pour toutes les universités : `UNIVERSITY` ne compte qu'�
 
 ### Sur l'instance commune (toutes les universités)
 
-Avec `MULTI_UNIVERSITY=1` (ou sans `UNIVERSITY`), toutes les universités du dossier `universities/` (sauf `example-*`, ou la liste `UNIVERSITIES`) sont servies sur la même adresse. Votre université apparaît dans la liste de la page de connexion avec son nom et son logo, et a son lien direct `/<slug>`. Dans `shared.js` :
+Avec `MULTI_UNIVERSITY=1` (ou sans `UNIVERSITY`), toutes les universités du dossier `universities/` (sauf `example-*`, ou la liste `UNIVERSITIES`) sont servies sur la même adresse. Votre université apparaît dans la liste de la page de connexion avec son nom et son logo, et a sa page `/<slug>` (sa landing, dont le bouton mène à sa connexion). Dans `shared.js` :
 
 ```js
 export const university = {
@@ -62,7 +62,7 @@ export const hostnames = ['rennes.tafac.example', 'ent-rennes.example.fr']
 - `origins.moodle` (optionnel, `client.js`) — origine Moodle, pour le lien « Moodle » de la sidebar et de la barre d'onglets mobile (`/my/`, via `/__ent_auth/launch`). Requiert `features.moodle`. Le lien « Messagerie » n'a besoin que de `features.mail`.
 - `auth.portalEntryPath` — page d'atterrissage uPortal (souvent `/f/services/normal/render.uP`). Sert de point d'entrée de connexion, de `Referer` par défaut et de preuve d'authentification. Le serveur rejoue cette entrée avec le seul cookie CAS `TGC` (conservé chiffré dans le cookie de session) pour rétablir la session ENT en silence quand elle a expiré.
 - `auth.casLogoutPath` (optionnel, défaut `/logout`) — chemin de déconnexion du CAS Apereo, appelé à la déconnexion pour clore la session SSO côté université.
-- `branding` — `appName`, `defaultTitle`, `seoTitle`, `seoDescription`, `logo` (+ `logoAlt`, `loginFooterLine`, `loginPasswordNote` (ligne sous le formulaire de connexion sur le mot de passe), `alternateNames` (anciens noms, pour les moteurs de recherche), `about.*`, `papillon` (`{ url }` : les mentions « Fait partie de Papillon » de la landing, de la connexion et d'À propos ; à omettre si l'instance n'est pas faite par l'équipe de Papillon)). Le titre et la description doivent dire que le client n'est pas officiel. Utilisé par la page de connexion, la sidebar, le SEO, le manifest PWA et `index.html` (placeholders `%LENT_*%`).
+- `branding` — `appName`, `defaultTitle`, `seoTitle`, `seoDescription`, `logo` (+ `logoAlt`, `loginFooterLine`, `loginPasswordNote` (ligne sous le formulaire de connexion sur le mot de passe), `alternateNames` (anciens noms, pour les moteurs de recherche), `about.*`, `papillon` (`{ url }` : les mentions « Fait partie de Papillon » de la landing, de la connexion et d'À propos ; à omettre si l'instance n'est pas faite par l'équipe de Papillon)). `nameInText` : le nom de l'université au milieu d'une phrase (« l’Université de Rennes »), repris par la landing de `tafac.fr/<slug>` (`{university}` dans `src/landingCopy.json`) ; sans lui, « votre université ». La description doit dire que le client n'est pas officiel. Sur un serveur qui sert toutes les universités, `/<slug>` est la landing de l'université (déconnecté), avec son `seoTitle` et sa `seoDescription`, et figure dans le sitemap : c'est elle qui ressort quand on cherche l'ENT de cette université. Utilisé par la page de connexion, la sidebar, le SEO, le manifest PWA et `index.html` (placeholders `%LENT_*%`).
   - `lockup` / `lockupDark` (optionnels, `client.js` uniquement) — visuel combiné « Tafac × université » affiché dans la sidebar et le header (comme Rennes). Sans eux, le logo Tafac et votre `logo` sont composés côte à côte automatiquement.
   - `heroImages` (optionnel, `client.js` uniquement) — photos affichées en fond du haut du tableau de bord, en fondu vers le fond uni : `[{ src, credit: { author, license, url }, position? }]`. Plusieurs photos tournent chaque jour. Chaque établissement peut définir ses propres `heroImages` dans `establishments.byId`. Sans photo, un placeholder générique est affiché. Le crédit apparaît dans le footer : utilisez des images libres de droits (ex. Wikimedia Commons) et renseignez auteur + licence.
 - `features` — l'interrupteur général (voir ci-dessous).
@@ -164,7 +164,7 @@ Pour améliorer les choix, ajoutez des mots-clés dans `APP_ICON_RULES` (`server
 ## Checklist de validation
 
 1. `npm run lint && npm test && npm run build` — tout doit passer.
-2. `npm run dev`, puis `/<slug>` — page de connexion : logo, textes, liens d'aide corrects ; votre université figure dans la liste de `/universites`.
+2. `npm run dev`, puis `/<slug>` et son bouton « Se connecter à mon ENT » — page de connexion : logo, textes, liens d'aide corrects ; votre université figure dans la liste de `/universites`.
 3. Connexion démo (`demo@tafac.fr` / `tafac-demo`) si `features.demo` — dashboard, grille d'applications.
 4. **Connexion réelle** avec un compte étudiant — c'est le seul test qui exerce CAS, le proxy ENT et les services activés.
 5. `grep -ri '<votre-univ>' src/ server/` ne doit rien retourner : tout doit vivre dans `universities/<id>/`.
