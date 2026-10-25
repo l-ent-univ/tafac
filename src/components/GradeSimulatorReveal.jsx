@@ -222,7 +222,7 @@ function DeltaChip({ move }) {
 // change.
 function MoveRow({ badge, label, move, start, delay }) {
   return (
-    <li className="flex min-w-0 items-center gap-3 rounded-[14px] px-2 py-[8px] max-sm:gap-[10px]">
+    <li className="flex min-w-0 items-center gap-3 corners-[14px] px-2 py-[8px] max-sm:gap-[10px]">
       {badge}
       <span className="grid min-w-0 flex-1 gap-[3px]">
         <span className="truncate font-body text-[14.5px] font-semibold leading-[1.3] text-text" title={label}>{label}</span>
@@ -530,7 +530,7 @@ function GradeSimulatorReveal({ ue, ues, releve, overrides, flyFrom = null, onEd
                 {general.value != null ? (
                   <MoveRow
                     badge={(
-                      <span className="inline-flex size-9 shrink-0 items-center justify-center rounded-[11px] bg-brand-subtle">
+                      <span className="inline-flex size-9 shrink-0 items-center justify-center corners-[11px] bg-brand-subtle">
                         <Icon icon="carbon:chart-line" className="size-[18px] text-text" />
                       </span>
                     )}
@@ -558,7 +558,7 @@ function GradeSimulatorReveal({ ue, ues, releve, overrides, flyFrom = null, onEd
       <footer className="ue-reveal-footer relative z-10 flex items-center gap-3 rounded-b-[25px] border-t border-border bg-bg px-6 py-3 max-sm:rounded-b-none max-sm:px-4 max-sm:pb-[max(12px,env(safe-area-inset-bottom))]">
         <button
           type="button"
-          className="inline-flex min-h-[44px] items-center justify-center gap-2 whitespace-nowrap rounded-[32px] border border-border-input bg-transparent px-5 font-body text-[16px] font-semibold text-text transition-colors duration-150 hover:bg-bg-subtle max-sm:flex-1 max-sm:px-4"
+          className="inline-flex min-h-[44px] items-center justify-center gap-2 whitespace-nowrap corners-[32px] border border-border-input bg-transparent px-5 font-body text-[16px] font-semibold text-text transition-colors duration-150 hover:bg-bg-subtle max-sm:flex-1 max-sm:px-4"
           onClick={() => onEdit(badgeRef.current?.getBoundingClientRect() ?? null)}
         >
           <Icon icon="carbon:arrow-left" className="size-[18px]" aria-hidden="true" />

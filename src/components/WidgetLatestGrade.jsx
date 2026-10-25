@@ -34,14 +34,14 @@ function LatestGradeValue({ noteDisplay, noteMax, accentColor = null }) {
   return (
     <div className="flex items-start gap-[5px] max-md:items-end">
       <div
-        className="w-[6px] h-[39px] rounded-[25px] shrink-0 relative overflow-hidden max-md:h-[34px]"
+        className="w-[6px] h-[39px] corners-[25px] shrink-0 relative overflow-hidden max-md:h-[34px]"
         style={accentColor ? { background: accentColor } : undefined}
         aria-hidden="true"
       >
         {accentColor ? (
-          <div className="absolute inset-0 rounded-[25px]" style={{ background: 'linear-gradient(180deg, rgba(255,255,255,0.5) 0%, transparent 70%)' }} />
+          <div className="absolute inset-0 corners-[25px]" style={{ background: 'linear-gradient(180deg, rgba(255,255,255,0.5) 0%, transparent 70%)' }} />
         ) : (
-          <div className="absolute inset-0 rounded-[25px] bg-black dark:bg-white" />
+          <div className="absolute inset-0 corners-[25px] bg-black dark:bg-white" />
         )}
       </div>
       <div className="flex items-end gap-[3px] leading-[1.06]">

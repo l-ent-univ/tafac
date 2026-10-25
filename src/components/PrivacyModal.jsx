@@ -12,6 +12,7 @@ import bikeImage from '../assets/privacy/bike.webp'
 import housesImage from '../assets/privacy/houses.webp'
 import butterflyImage from '../assets/privacy/butterfly.webp'
 import { APP_NAME } from '../seo'
+import CloseButton from './CloseButton'
 
 // "Tes données restent à toi": what the anonymous audience measurement does
 // and doesn't do, in the illustrated style of the Figma presentation screens
@@ -113,7 +114,7 @@ const getSections = (embedded) => [
 export function PrivacyContent({ embedded = false, control = null, actions = null }) {
   return (
     <>
-      <div className={embedded ? 'mx-auto w-full max-w-[420px] shrink-0 overflow-hidden rounded-[20px]' : ''}>
+      <div className={embedded ? 'mx-auto w-full max-w-[420px] shrink-0 overflow-hidden corners-[20px]' : ''}>
         <PrivacyIllustration />
       </div>
 
@@ -194,20 +195,13 @@ function PrivacyModal({ open, onClose }) {
       role="presentation"
     >
       <section
-        className="privacy-modal relative font-body w-[min(500px,100%)] max-h-[calc(100dvh-40px)] overflow-y-auto overflow-x-hidden rounded-[28px] border border-[var(--color-border)] bg-[#f5f3ed] text-[#341200] animate-modal-card-in dark:bg-[var(--color-bg)] dark:text-[var(--color-text)]"
+        className="privacy-modal relative font-body w-[min(500px,100%)] max-h-[calc(100dvh-40px)] overflow-y-auto overflow-x-hidden corners-[28px] border border-[var(--color-border)] bg-[#f5f3ed] text-[#341200] animate-modal-card-in dark:bg-[var(--color-bg)] dark:text-[var(--color-text)]"
         role="dialog"
         aria-modal="true"
         aria-labelledby="privacy-modal-title"
         onClick={(event) => event.stopPropagation()}
       >
-        <button
-          type="button"
-          className="absolute top-3 right-3 z-10 inline-flex h-[34px] w-[34px] items-center justify-center rounded-full border border-white/70 bg-white/80 p-0 text-[#341200] backdrop-blur-md transition-colors duration-[120ms] hover:bg-white cursor-pointer"
-          onClick={onClose}
-          aria-label="Fermer"
-        >
-          <Icon icon="carbon:close" className="h-4 w-4" aria-hidden="true" />
-        </button>
+        <CloseButton glass className="absolute top-3 right-3 z-10" onClick={onClose} />
 
         <PrivacyContent
           actions={(

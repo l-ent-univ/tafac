@@ -61,7 +61,7 @@ export function GradesNotice({ icon = null, media = null, tint = null, label, ti
             }}
             aria-expanded={expanded}
             aria-controls={bodyId}
-            className="-mx-1 mt-0.5 cursor-pointer rounded-md border-0 bg-transparent px-1 py-0.5 text-text underline decoration-text-30 underline-offset-[3px] transition-colors hover:decoration-text max-md:relative max-md:after:absolute max-md:after:-inset-x-2 max-md:after:-inset-y-2.5"
+            className="-mx-1 mt-0.5 cursor-pointer corners-[6px] border-0 bg-transparent px-1 py-0.5 text-text underline decoration-text-30 underline-offset-[3px] transition-colors hover:decoration-text max-md:relative max-md:after:absolute max-md:after:-inset-x-2 max-md:after:-inset-y-2.5"
           >
             <span className="font-body text-[13px] font-semibold">{expanded ? 'Réduire' : 'Lire la suite'}</span>
           </button>

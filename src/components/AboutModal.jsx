@@ -8,6 +8,7 @@ import useRepoContributors from '../useRepoContributors'
 import BetaTag from './BetaTag'
 import PrivacyModal from './PrivacyModal'
 import SettingsGroup, { RowText } from './SettingsGroup'
+import CloseButton from './CloseButton'
 
 /* global __BUILD_HASH__ */
 
@@ -190,7 +191,7 @@ function AboutModal({
       role="presentation"
     >
       <section
-        className="w-[min(440px,100%)] max-h-[calc(100dvh-40px)] overflow-y-auto overscroll-contain rounded-[22px] border border-[var(--color-border)] bg-[var(--color-bg)] text-[var(--color-text)] animate-modal-card-in max-sm:max-h-[calc(100dvh-28px)]"
+        className="w-[min(440px,100%)] max-h-[calc(100dvh-40px)] overflow-y-auto overscroll-contain corners-[22px] border border-[var(--color-border)] bg-[var(--color-bg)] text-[var(--color-text)] animate-modal-card-in max-sm:max-h-[calc(100dvh-28px)]"
         role="dialog"
         aria-modal="true"
         aria-labelledby="about-modal-title"
@@ -201,14 +202,7 @@ function AboutModal({
             <h2 id="about-modal-title" className="m-0 text-[22px] font-bold leading-[1.1]">
               À propos
             </h2>
-            <button
-              type="button"
-              className="inline-flex h-[34px] w-[34px] items-center justify-center rounded-full border border-[rgba(27,27,27,0.16)] bg-[#f3f1eb] p-0 text-[var(--color-text)] transition-colors duration-[120ms] hover:bg-[#edebe5] dark:border-[var(--color-border)] dark:bg-[var(--color-bg-muted)] dark:hover:bg-[var(--color-bg-subtle)]"
-              onClick={onClose}
-              aria-label="Fermer"
-            >
-              <Icon icon="carbon:close" className="h-4 w-4" aria-hidden="true" />
-            </button>
+            <CloseButton onClick={onClose} />
           </div>
 
           <AboutContent demoLinkLabel={demoLinkLabel} onDemoLinkClick={onDemoLinkClick}>

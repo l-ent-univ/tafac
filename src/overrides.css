@@ -36,7 +36,7 @@
    (0.85 × its radius: Safari, Firefox), the same shape within a quarter of a
    pixel. card-corners for the widgets, card-corners-sm for the smaller cards
    (app tiles, Planning's list, the grades' notice). Inner layers follow with
-   border-radius: inherit, and the curve below. */
+   border-radius and corner-shape: inherit (rounded-[inherit] below). */
 
 .card-corners {
   border-radius: 31px;
@@ -58,10 +58,7 @@
 
 @supports (corner-shape: superellipse(1.3)) {
   .card-corners,
-  .card-corners-sm,
-  /* The layers inside that take the card's corners (border-radius:
-     inherit): corner-shape isn't inherited. */
-  :is(.card-corners, .card-corners-sm) :is(.rounded-\[inherit\], .grades-notice-tint) {
+  .card-corners-sm {
     corner-shape: superellipse(1.3);
   }
 
@@ -82,6 +79,12 @@
       border-radius: 24px;
     }
   }
+}
+
+/* A layer that takes its parent's corners takes its curve too: corner-shape
+   isn't inherited by itself. */
+.rounded-\[inherit\] {
+  corner-shape: inherit;
 }
 
 /* ── Sidebar: floating frosted panel ── */
@@ -214,8 +217,38 @@
 }
 
 /* A sheet's close button (a grade's, a class's), of the tab bar's glass. */
+/* ── Close button (CloseButton) ──
+   A soft tint of the text colour (plain) or frosted glass (below), the ×
+   a little muted until hovered; it gives a little when pressed. */
+
+.close-button {
+  transition: background-color 120ms ease, transform 100ms ease-out;
+}
+
+.close-button svg {
+  opacity: 0.72;
+  transition: opacity 120ms ease;
+}
+
+.close-button:active:not(:disabled) {
+  transform: scale(0.92);
+}
+
+.close-button--plain {
+  background-color: color-mix(in srgb, var(--color-text) 7%, transparent);
+}
+
+@media (hover: hover) {
+  .close-button:hover:not(:disabled) svg {
+    opacity: 1;
+  }
+
+  .close-button--plain:hover:not(:disabled) {
+    background-color: color-mix(in srgb, var(--color-text) 12%, transparent);
+  }
+}
+
 .glass-close-button {
-  border: 1px solid rgb(255 255 255 / 0.7);
   background-color: rgb(252 251 248 / 0.45);
   background-image: linear-gradient(180deg, rgb(255 255 255 / 0.45), rgb(255 255 255 / 0.08));
   -webkit-backdrop-filter: blur(22px) saturate(1.8);
@@ -225,13 +258,8 @@
     inset 0 -1px 0 rgb(52 18 0 / 0.04),
     0 6px 16px -6px rgb(52 18 0 / 0.22),
     0 1px 4px rgb(52 18 0 / 0.08);
-  cursor: pointer;
-  transition: background-color 120ms ease, transform 100ms ease-out;
 }
 
-.glass-close-button:active {
-  transform: scale(0.94);
-}
 
 @media (hover: hover) {
   .glass-close-button:hover {
@@ -240,7 +268,6 @@
 }
 
 :where([data-theme="dark"]) .glass-close-button {
-  border-color: rgb(255 255 255 / 0.12);
   background-color: rgb(28 28 28 / 0.45);
   background-image: linear-gradient(180deg, rgb(255 255 255 / 0.1), rgb(255 255 255 / 0.02));
   box-shadow:
@@ -1530,6 +1557,7 @@
   inset: -6px;
   z-index: -1;
   border-radius: inherit;
+  corner-shape: inherit;
   background: currentColor;
   opacity: 0;
 }
@@ -3563,6 +3591,7 @@
     position: absolute;
     inset: 0;
     border-radius: inherit;
+    corner-shape: inherit;
     background: inherit;
     animation: nav-new-pulse 2.2s cubic-bezier(0.2, 0.8, 0.2, 1) 0.6s 6 backwards;
   }
@@ -3848,6 +3877,7 @@
   position: absolute;
   inset: 0;
   border-radius: inherit;
+  corner-shape: inherit;
   border: 1px solid transparent;
   background: linear-gradient(180deg, rgba(255, 255, 255, 0.9), transparent 70%) border-box;
   -webkit-mask:
@@ -4132,6 +4162,11 @@
   padding: 9px 11px;
   border: 1px solid rgba(255, 255, 255, 0.16);
   border-radius: 14px;
+
+  @supports (corner-shape: superellipse(1.3)) {
+    border-radius: calc(14px / 0.853);
+    corner-shape: superellipse(1.3);
+  }
   background: rgba(17, 17, 17, 0.94);
   color: #ffffff;
   box-shadow: 0 14px 30px rgba(17, 17, 17, 0.2);
@@ -4356,6 +4391,7 @@
   inset: 0;
   z-index: -1;
   border-radius: inherit;
+  corner-shape: inherit;
   opacity: 0.14;
   pointer-events: none;
   -webkit-mask-image: linear-gradient(to right, #000 0%, rgb(0 0 0 / 0.3) 100%);
@@ -4387,6 +4423,11 @@
 .subject-evaluation {
   border: 1px solid var(--color-border);
   border-radius: 16px;
+
+  @supports (corner-shape: superellipse(1.3)) {
+    border-radius: calc(16px / 0.853);
+    corner-shape: superellipse(1.3);
+  }
   background-color: var(--color-widget-bg);
   box-shadow: 0 6px 18px -8px var(--color-shadow);
   transition:
@@ -4927,6 +4968,11 @@
   padding: 0;
   border: 0;
   border-radius: 14px;
+
+  @supports (corner-shape: superellipse(1.3)) {
+    border-radius: calc(14px / 0.853);
+    corner-shape: superellipse(1.3);
+  }
   background: transparent;
   cursor: pointer;
 }
@@ -4998,6 +5044,11 @@
   height: 32px;
   border: 0;
   border-radius: 10px;
+
+  @supports (corner-shape: superellipse(1.3)) {
+    border-radius: calc(10px / 0.853);
+    corner-shape: superellipse(1.3);
+  }
   background: transparent;
   color: var(--color-brand);
   cursor: pointer;
@@ -5396,6 +5447,11 @@ li + li > .planning-row .planning-row-text {
   padding: 4px 6px;
   border: 0;
   border-radius: 8px;
+
+  @supports (corner-shape: superellipse(1.3)) {
+    border-radius: calc(8px / 0.853);
+    corner-shape: superellipse(1.3);
+  }
   background: transparent;
   color: var(--color-brand);
   font: inherit;

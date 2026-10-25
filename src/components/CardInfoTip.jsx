@@ -101,7 +101,7 @@ function CardInfoTip({ label, children, icon = 'carbon:information', iconClassNa
           ref={bubbleRef}
           id={noteId}
           role="tooltip"
-          className={`pointer-events-none fixed z-[90] block rounded-[14px] border border-black/10 bg-black px-3 py-[8px] font-body text-[12px] font-medium leading-snug text-white shadow-[0_12px_32px_rgba(0,0,0,0.18)] transition-[opacity,transform] duration-180 ease-out dark:border-white/15 dark:bg-white dark:text-black ${
+          className={`pointer-events-none fixed z-[90] block corners-[14px] border border-black/10 bg-black px-3 py-[8px] font-body text-[12px] font-medium leading-snug text-white shadow-[0_12px_32px_rgba(0,0,0,0.18)] transition-[opacity,transform] duration-180 ease-out dark:border-white/15 dark:bg-white dark:text-black ${
             isShown ? 'visible translate-y-0 opacity-100' : 'invisible -translate-y-1 opacity-0'
           }`}
           style={{

@@ -2935,7 +2935,7 @@ function App() {
             ) : null}
             {sessionState.warning ? (
               <div className="px-6 pt-3 max-md:px-3 4xl:pt-5">
-                <div className="flex items-start gap-3 rounded-[20px] border border-[#f2cf8f] bg-[#fff7e8] px-4 py-3 text-text shadow-[0_10px_30px_rgba(0,0,0,0.05)] dark:border-[#6a4d15] dark:bg-[#2f2410]">
+                <div className="flex items-start gap-3 corners-[20px] border border-[#f2cf8f] bg-[#fff7e8] px-4 py-3 text-text shadow-[0_10px_30px_rgba(0,0,0,0.05)] dark:border-[#6a4d15] dark:bg-[#2f2410]">
                   <Icon icon="carbon:warning-filled" className="mt-0.5 h-[18px] w-[18px] shrink-0 text-[#b76e00]" aria-hidden="true" />
                   <p className="m-0 text-sm font-medium leading-[1.5] font-body">{sessionState.warning}</p>
                 </div>
@@ -3056,7 +3056,7 @@ function App() {
       />
 
       {DEBUG_MENU_ENABLED && debugOpen ? (
-        <aside className="fixed top-4 right-4 bottom-4 w-[min(720px,calc(100vw-2rem))] flex flex-col gap-3 p-4 bg-context-bg text-text border border-border rounded-[20px] shadow-[0_24px_80px_var(--color-shadow)] backdrop-blur-[10px] overflow-y-auto overflow-x-hidden overscroll-contain z-30 max-lg:top-3 max-lg:right-3 max-lg:left-3 max-lg:bottom-3 max-lg:w-auto" role="dialog" aria-modal="false" aria-label="Menu debug">
+        <aside className="fixed top-4 right-4 bottom-4 w-[min(720px,calc(100vw-2rem))] flex flex-col gap-3 p-4 bg-context-bg text-text border border-border corners-[20px] shadow-[0_24px_80px_var(--color-shadow)] backdrop-blur-[10px] overflow-y-auto overflow-x-hidden overscroll-contain z-30 max-lg:top-3 max-lg:right-3 max-lg:left-3 max-lg:bottom-3 max-lg:w-auto" role="dialog" aria-modal="false" aria-label="Menu debug">
           <header className="flex gap-4 justify-between items-center max-lg:flex-col max-lg:items-stretch">
             <div>
               <p className="m-0 mb-1 text-xs font-bold tracking-[0.08em] uppercase text-text-muted font-body">Mode debug</p>
@@ -3065,14 +3065,14 @@ function App() {
             </div>
             <button
               type="button"
-              className="appearance-none border border-border rounded-[12px] bg-bg text-text py-[0.7rem] px-[0.9rem] font-inherit font-semibold leading-[1.1] disabled:opacity-45 disabled:cursor-wait"
+              className="appearance-none border border-border corners-[12px] bg-bg text-text py-[0.7rem] px-[0.9rem] font-inherit font-semibold leading-[1.1] disabled:opacity-45 disabled:cursor-wait"
               onClick={() => setDebugOpen(false)}
             >
               Fermer
             </button>
           </header>
 
-          <section className="grid gap-3 p-4 border border-border rounded-2xl bg-bg-surface">
+          <section className="grid gap-3 p-4 border border-border corners-[16px] bg-bg-surface">
             <div className="flex gap-3 justify-between items-center max-lg:flex-col max-lg:items-stretch">
               <div className="min-w-0">
                 <p className="m-0 text-[0.85rem] font-semibold text-text-secondary font-body">Photo du bandeau</p>
@@ -3087,7 +3087,7 @@ function App() {
               <div className="flex gap-2">
                 <button
                   type="button"
-                  className="appearance-none border border-border rounded-[12px] bg-bg text-text py-[0.7rem] px-[0.9rem] font-inherit font-semibold leading-[1.1] disabled:opacity-45"
+                  className="appearance-none border border-border corners-[12px] bg-bg text-text py-[0.7rem] px-[0.9rem] font-inherit font-semibold leading-[1.1] disabled:opacity-45"
                   onClick={() => setHeroOffset((current) => current - 1)}
                   disabled={Boolean(customBackground) || heroImageCount < 2}
                 >
@@ -3095,7 +3095,7 @@ function App() {
                 </button>
                 <button
                   type="button"
-                  className="appearance-none border border-border rounded-[12px] bg-bg text-text py-[0.7rem] px-[0.9rem] font-inherit font-semibold leading-[1.1] disabled:opacity-45"
+                  className="appearance-none border border-border corners-[12px] bg-bg text-text py-[0.7rem] px-[0.9rem] font-inherit font-semibold leading-[1.1] disabled:opacity-45"
                   onClick={() => setHeroOffset((current) => current + 1)}
                   disabled={Boolean(customBackground) || heroImageCount < 2}
                 >
@@ -3107,7 +3107,7 @@ function App() {
 
           {/* The same setting as Réglages › Apparence, here too on the
               landing and login pages; not counted as a setting change. */}
-          <section className="grid gap-3 p-4 border border-border rounded-2xl bg-bg-surface">
+          <section className="grid gap-3 p-4 border border-border corners-[16px] bg-bg-surface">
             <div className="flex gap-3 justify-between items-center max-lg:flex-col max-lg:items-stretch">
               <p className="m-0 text-[0.85rem] font-semibold text-text-secondary font-body">Thème</p>
               <div className="flex gap-2">
@@ -3116,7 +3116,7 @@ function App() {
                     key={value}
                     type="button"
                     aria-pressed={theme === value}
-                    className={`appearance-none border border-border rounded-[12px] py-[0.7rem] px-[0.9rem] font-inherit font-semibold leading-[1.1] ${theme === value ? 'bg-brand text-bg' : 'bg-bg text-text'}`}
+                    className={`appearance-none border border-border corners-[12px] py-[0.7rem] px-[0.9rem] font-inherit font-semibold leading-[1.1] ${theme === value ? 'bg-brand text-bg' : 'bg-bg text-text'}`}
                     onClick={() => {
                       persistTheme(value)
                       setTheme(value)
@@ -3129,14 +3129,14 @@ function App() {
             </div>
           </section>
 
-          <section className="grid gap-3 p-4 border border-border rounded-2xl bg-bg-surface">
+          <section className="grid gap-3 p-4 border border-border corners-[16px] bg-bg-surface">
             <div className="flex gap-3 justify-between items-center max-lg:flex-col max-lg:items-stretch">
               <span className={`inline-flex items-center min-h-8 py-[0.35rem] px-3 rounded-full text-[0.92rem] font-semibold ${sessionState.authenticated ? 'bg-success-bg text-success-text' : 'bg-bg-subtle text-text-secondary'}`}>
                 {sessionLabel}
               </span>
               <button
                 type="button"
-                className="appearance-none border border-border rounded-[12px] bg-bg text-text py-[0.7rem] px-[0.9rem] font-inherit font-semibold leading-[1.1] disabled:opacity-45 disabled:cursor-wait"
+                className="appearance-none border border-border corners-[12px] bg-bg text-text py-[0.7rem] px-[0.9rem] font-inherit font-semibold leading-[1.1] disabled:opacity-45 disabled:cursor-wait"
                 onClick={() => void refreshSession({ exposeOutput: true })}
                 disabled={sessionState.checking}
               >
@@ -3153,7 +3153,7 @@ function App() {
                       ref={usernameInputRef}
                       autoComplete="username"
                       type="text"
-                      className="w-full min-w-0 py-3 px-[0.85rem] border border-border rounded-[12px] bg-bg text-text"
+                      className="w-full min-w-0 py-3 px-[0.85rem] border border-border corners-[12px] bg-bg text-text"
                       value={credentials.username}
                       onChange={(event) => setCredentials((current) => ({ ...current, username: event.target.value }))}
                     />
@@ -3164,7 +3164,7 @@ function App() {
                     <input
                       autoComplete="current-password"
                       type="password"
-                      className="w-full min-w-0 py-3 px-[0.85rem] border border-border rounded-[12px] bg-bg text-text"
+                      className="w-full min-w-0 py-3 px-[0.85rem] border border-border corners-[12px] bg-bg text-text"
                       value={credentials.password}
                       onChange={(event) => setCredentials((current) => ({ ...current, password: event.target.value }))}
                     />
@@ -3182,7 +3182,7 @@ function App() {
                 <p className="m-0 text-[0.9rem] text-text-muted font-body">Session active pour {sessionState.user ?? 'un utilisateur connecte'}.</p>
                 <button
                   type="button"
-                  className="appearance-none border border-border rounded-[12px] bg-bg text-text py-[0.7rem] px-[0.9rem] font-inherit font-semibold leading-[1.1] disabled:opacity-45 disabled:cursor-wait"
+                  className="appearance-none border border-border corners-[12px] bg-bg text-text py-[0.7rem] px-[0.9rem] font-inherit font-semibold leading-[1.1] disabled:opacity-45 disabled:cursor-wait"
                   onClick={() => void handleLogout()}
                   disabled={sessionState.checking}
                 >
@@ -3194,46 +3194,46 @@ function App() {
             {sessionState.error ? <p className="m-0 text-error font-body">{sessionState.error}</p> : null}
           </section>
 
-          <section className="grid gap-3 p-4 border border-border rounded-2xl bg-bg-surface">
+          <section className="grid gap-3 p-4 border border-border corners-[16px] bg-bg-surface">
             <div className="flex gap-3 flex-wrap max-lg:flex-col max-lg:items-stretch">
                 <button
                 type="button"
-                className="appearance-none border border-border rounded-[12px] bg-bg text-text py-[0.7rem] px-[0.9rem] font-inherit font-semibold leading-[1.1]"
+                className="appearance-none border border-border corners-[12px] bg-bg text-text py-[0.7rem] px-[0.9rem] font-inherit font-semibold leading-[1.1]"
                 onClick={showInstallPrompt}
               >
                 PWA Prompt
               </button>
               <button
                 type="button"
-                className="appearance-none border border-border rounded-[12px] bg-bg text-text py-[0.7rem] px-[0.9rem] font-inherit font-semibold leading-[1.1]"
+                className="appearance-none border border-border corners-[12px] bg-bg text-text py-[0.7rem] px-[0.9rem] font-inherit font-semibold leading-[1.1]"
                 onClick={() => { setForceIosPrompt(true); setTimeout(() => setForceIosPrompt(false), 100) }}
               >
                 PWA Prompt iOS
               </button>
               <button
                 type="button"
-                className="appearance-none border border-border rounded-[12px] bg-bg text-text py-[0.7rem] px-[0.9rem] font-inherit font-semibold leading-[1.1]"
+                className="appearance-none border border-border corners-[12px] bg-bg text-text py-[0.7rem] px-[0.9rem] font-inherit font-semibold leading-[1.1]"
                 onClick={() => setForceUpdatePrompt(true)}
               >
                 PWA Update Prompt
               </button>
               <button
                 type="button"
-                className="appearance-none border border-border rounded-[12px] bg-bg text-text py-[0.7rem] px-[0.9rem] font-inherit font-semibold leading-[1.1]"
+                className="appearance-none border border-border corners-[12px] bg-bg text-text py-[0.7rem] px-[0.9rem] font-inherit font-semibold leading-[1.1]"
                 onClick={() => setWelcomeFromLentOpen(true)}
               >
                 Arrivée depuis l'ent
               </button>
               <button
                 type="button"
-                className={`appearance-none border border-border rounded-[12px] py-[0.7rem] px-[0.9rem] font-inherit font-semibold leading-[1.1] ${hasPendingUpdate ? 'bg-brand text-bg' : 'bg-bg text-text'}`}
+                className={`appearance-none border border-border corners-[12px] py-[0.7rem] px-[0.9rem] font-inherit font-semibold leading-[1.1] ${hasPendingUpdate ? 'bg-brand text-bg' : 'bg-bg text-text'}`}
                 onClick={() => setHasPendingUpdate((current) => !current)}
               >
                 Sidebar update {hasPendingUpdate ? '✓' : ''}
               </button>
               <button
                 type="button"
-                className={`appearance-none border border-border rounded-[12px] py-[0.7rem] px-[0.9rem] font-inherit font-semibold leading-[1.1] ${debugNextClass ? 'bg-brand text-bg' : 'bg-bg text-text'}`}
+                className={`appearance-none border border-border corners-[12px] py-[0.7rem] px-[0.9rem] font-inherit font-semibold leading-[1.1] ${debugNextClass ? 'bg-brand text-bg' : 'bg-bg text-text'}`}
                 onClick={() => setDebugNextClass((c) => !c)}
               >
                 Prochain cours {debugNextClass ? '✓' : ''}
@@ -3242,7 +3242,7 @@ function App() {
                   this device (src/papillon.js); read at load, so it reloads. */}
               <button
                 type="button"
-                className={`appearance-none border border-border rounded-[12px] py-[0.7rem] px-[0.9rem] font-inherit font-semibold leading-[1.1] ${IS_PAPILLON_SHOWN ? 'bg-brand text-bg' : 'bg-bg text-text'}`}
+                className={`appearance-none border border-border corners-[12px] py-[0.7rem] px-[0.9rem] font-inherit font-semibold leading-[1.1] ${IS_PAPILLON_SHOWN ? 'bg-brand text-bg' : 'bg-bg text-text'}`}
                 onClick={() => {
                   try {
                     localStorage.setItem(PAPILLON_DEBUG_KEY, IS_PAPILLON_SHOWN ? 'off' : 'on')
@@ -3258,7 +3258,7 @@ function App() {
                   this device; read at load, so it reloads. */}
               <button
                 type="button"
-                className={`appearance-none border border-border rounded-[12px] py-[0.7rem] px-[0.9rem] font-inherit font-semibold leading-[1.1] ${IS_SERVICE_NOTICE_HIDDEN ? 'bg-brand text-bg' : 'bg-bg text-text'}`}
+                className={`appearance-none border border-border corners-[12px] py-[0.7rem] px-[0.9rem] font-inherit font-semibold leading-[1.1] ${IS_SERVICE_NOTICE_HIDDEN ? 'bg-brand text-bg' : 'bg-bg text-text'}`}
                 onClick={() => {
                   try {
                     if (IS_SERVICE_NOTICE_HIDDEN) localStorage.removeItem(SERVICE_NOTICE_DEBUG_KEY)
@@ -3276,7 +3276,7 @@ function App() {
                   only: signed in, the session's university wins. */}
               <button
                 type="button"
-                className="appearance-none border border-border rounded-[12px] bg-bg text-text py-[0.7rem] px-[0.9rem] font-inherit font-semibold leading-[1.1] disabled:opacity-45 disabled:cursor-not-allowed"
+                className="appearance-none border border-border corners-[12px] bg-bg text-text py-[0.7rem] px-[0.9rem] font-inherit font-semibold leading-[1.1] disabled:opacity-45 disabled:cursor-not-allowed"
                 onClick={() => {
                   writeUniversityChoice(null)
                   window.location.assign('/')
@@ -3288,7 +3288,7 @@ function App() {
               </button>
               <button
                 type="button"
-                className="appearance-none border border-border rounded-[12px] bg-bg text-text py-[0.7rem] px-[0.9rem] font-inherit font-semibold leading-[1.1] disabled:opacity-45 disabled:cursor-not-allowed"
+                className="appearance-none border border-border corners-[12px] bg-bg text-text py-[0.7rem] px-[0.9rem] font-inherit font-semibold leading-[1.1] disabled:opacity-45 disabled:cursor-not-allowed"
                 onClick={() => handleDebugRestartOnboarding()}
                 disabled={!sessionState.authenticated || sessionState.checking}
               >
@@ -3297,7 +3297,7 @@ function App() {
               {/* The TP step that students reach when their TP isn't found, even when it is. */}
               <button
                 type="button"
-                className="appearance-none border border-border rounded-[12px] bg-bg text-text py-[0.7rem] px-[0.9rem] font-inherit font-semibold leading-[1.1] disabled:opacity-45 disabled:cursor-not-allowed"
+                className="appearance-none border border-border corners-[12px] bg-bg text-text py-[0.7rem] px-[0.9rem] font-inherit font-semibold leading-[1.1] disabled:opacity-45 disabled:cursor-not-allowed"
                 onClick={() => handleDebugRestartOnboarding({ forceTpChoice: true })}
                 disabled={!sessionState.authenticated || sessionState.checking}
               >
@@ -3308,7 +3308,7 @@ function App() {
                   applies. */}
               <button
                 type="button"
-                className="appearance-none border border-border rounded-[12px] bg-bg text-text py-[0.7rem] px-[0.9rem] font-inherit font-semibold leading-[1.1] disabled:opacity-45 disabled:cursor-wait"
+                className="appearance-none border border-border corners-[12px] bg-bg text-text py-[0.7rem] px-[0.9rem] font-inherit font-semibold leading-[1.1] disabled:opacity-45 disabled:cursor-wait"
                 onClick={() => void runDebugAction('Nouveautés : rejouer « Mes notes »', () => (
                   replayChangelogEntry('mes-notes')
                     ? { replayed: true }
@@ -3321,7 +3321,7 @@ function App() {
               {/* Likewise for the Planning's launch. */}
               <button
                 type="button"
-                className="appearance-none border border-border rounded-[12px] bg-bg text-text py-[0.7rem] px-[0.9rem] font-inherit font-semibold leading-[1.1] disabled:opacity-45 disabled:cursor-wait"
+                className="appearance-none border border-border corners-[12px] bg-bg text-text py-[0.7rem] px-[0.9rem] font-inherit font-semibold leading-[1.1] disabled:opacity-45 disabled:cursor-wait"
                 onClick={() => void runDebugAction('Nouveautés : rejouer « Planning »', () => (
                   replayChangelogEntry('planning')
                     ? { replayed: true }
@@ -3333,7 +3333,7 @@ function App() {
               </button>
               <button
                 type="button"
-                className="appearance-none border border-border rounded-[12px] bg-[#5b1f1f] text-white py-[0.7rem] px-[0.9rem] font-inherit font-semibold leading-[1.1] disabled:opacity-45 disabled:cursor-wait"
+                className="appearance-none border border-border corners-[12px] bg-[#5b1f1f] text-white py-[0.7rem] px-[0.9rem] font-inherit font-semibold leading-[1.1] disabled:opacity-45 disabled:cursor-wait"
                 onClick={() => void handleDebugFullReset()}
                 disabled={debugState.loading || sessionState.checking}
               >
@@ -3341,7 +3341,7 @@ function App() {
               </button>
               <button
                 type="button"
-                className="appearance-none border border-border rounded-[12px] bg-bg text-text py-[0.7rem] px-[0.9rem] font-inherit font-semibold leading-[1.1] disabled:opacity-45 disabled:cursor-wait"
+                className="appearance-none border border-border corners-[12px] bg-bg text-text py-[0.7rem] px-[0.9rem] font-inherit font-semibold leading-[1.1] disabled:opacity-45 disabled:cursor-wait"
                 onClick={() => void handleDebugProfilePhoto()}
                 disabled={debugState.loading || !sessionState.authenticated}
               >
@@ -3351,7 +3351,7 @@ function App() {
                 <button
                   key={label}
                   type="button"
-                  className="appearance-none border border-border rounded-[12px] bg-bg text-text py-[0.7rem] px-[0.9rem] font-inherit font-semibold leading-[1.1] disabled:opacity-45 disabled:cursor-wait"
+                  className="appearance-none border border-border corners-[12px] bg-bg text-text py-[0.7rem] px-[0.9rem] font-inherit font-semibold leading-[1.1] disabled:opacity-45 disabled:cursor-wait"
                   onClick={() => void runDebugAction(label, () => {
                     const actions = { Account: getAccountInfo, Layout: getLayout, Planning: getPlanning, Marketplace: getMarketplaceEntries, Grades: getGrades, 'Latest Grade': getLatestGrade, 'Average Grade': getAverageGrade }
                     return actions[label]()
@@ -3370,7 +3370,7 @@ function App() {
                   <button
                     key={label}
                     type="button"
-                    className="appearance-none border border-border rounded-[12px] bg-bg text-text py-[0.7rem] px-[0.9rem] font-inherit font-semibold leading-[1.1] disabled:opacity-45 disabled:cursor-wait"
+                    className="appearance-none border border-border corners-[12px] bg-bg text-text py-[0.7rem] px-[0.9rem] font-inherit font-semibold leading-[1.1] disabled:opacity-45 disabled:cursor-wait"
                     onClick={() => void runDebugAction(label, () => {
                       const actions = {
                         'ADE Status': () => getAdeStatus(),
@@ -3397,7 +3397,7 @@ function App() {
                   <span className="text-[0.85rem] font-semibold text-text-secondary font-body">ADE Search</span>
                   <input
                     type="text"
-                    className="w-full min-w-0 py-3 px-[0.85rem] border border-border rounded-[12px] bg-bg text-text"
+                    className="w-full min-w-0 py-3 px-[0.85rem] border border-border corners-[12px] bg-bg text-text"
                     value={adeSearchQuery}
                     onChange={(event) => setAdeSearchQuery(event.target.value)}
                     placeholder="Cours, prof, groupe..."
@@ -3414,7 +3414,7 @@ function App() {
                 <span className="text-[0.85rem] font-semibold text-text-secondary font-body">Endpoint ENT</span>
                 <input
                   type="text"
-                  className="w-full min-w-0 py-3 px-[0.85rem] border border-border rounded-[12px] bg-bg text-text"
+                  className="w-full min-w-0 py-3 px-[0.85rem] border border-border corners-[12px] bg-bg text-text"
                   value={requestPath}
                   onChange={(event) => setRequestPath(event.target.value)}
                   placeholder="/api/v4-3/dlm/layout.json"
@@ -3426,7 +3426,7 @@ function App() {
             </form>
           </section>
 
-          <section className="flex-1 min-h-[320px] grid gap-3 p-4 border border-border rounded-2xl bg-bg-surface grid-rows-[auto_auto_minmax(0,1fr)] shrink-0">
+          <section className="flex-1 min-h-[320px] grid gap-3 p-4 border border-border corners-[16px] bg-bg-surface grid-rows-[auto_auto_minmax(0,1fr)] shrink-0">
             <div className="flex gap-3 justify-between items-center max-lg:flex-col max-lg:items-stretch">
               <div>
                 <div className="inline-flex items-center gap-1 rounded-full border border-border bg-bg p-1 mb-2">
@@ -3452,7 +3452,7 @@ function App() {
                 {debugOutputTab === 'api' && debugState.loading ? <span className="m-0 text-[0.9rem] text-text-muted font-body">Chargement...</span> : null}
                 <button
                   type="button"
-                  className="appearance-none border border-border rounded-[12px] bg-bg text-text py-[0.65rem] px-[0.85rem] font-inherit font-semibold leading-[1.1] disabled:opacity-45 disabled:cursor-not-allowed"
+                  className="appearance-none border border-border corners-[12px] bg-bg text-text py-[0.65rem] px-[0.85rem] font-inherit font-semibold leading-[1.1] disabled:opacity-45 disabled:cursor-not-allowed"
                   onClick={() => void handleCopyDebugOutput()}
                   disabled={!debugPanelOutput}
                 >
@@ -3463,7 +3463,7 @@ function App() {
 
             {debugOutputTab === 'api' && debugState.error ? <p className="m-0 text-error font-body">{debugState.error}</p> : null}
             {debugOutputTab === 'api' && resolvedDebugImagePreview ? (
-              <div className="rounded-[14px] border border-border bg-bg p-4 flex flex-col gap-3">
+              <div className="corners-[14px] border border-border bg-bg p-4 flex flex-col gap-3">
                 <div className="flex items-center gap-4">
                   <img
                     src={resolvedDebugImagePreview.src}
@@ -3482,7 +3482,7 @@ function App() {
                 </div>
               </div>
             ) : null}
-            <pre className="m-0 min-h-0 h-full overflow-auto p-4 rounded-[14px] border border-border bg-bg text-text text-[0.85rem] leading-[1.45] whitespace-pre-wrap break-words">{debugPanelOutput}</pre>
+            <pre className="m-0 min-h-0 h-full overflow-auto p-4 corners-[14px] border border-border bg-bg text-text text-[0.85rem] leading-[1.45] whitespace-pre-wrap break-words">{debugPanelOutput}</pre>
           </section>
         </aside>
       ) : null}

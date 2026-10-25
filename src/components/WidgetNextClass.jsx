@@ -772,7 +772,7 @@ function WidgetNextClass({
           <>
             <div className="flex items-center gap-2 flex-1 min-h-0 my-1.5 max-xs:my-1">
               <div className="flex self-stretch items-center">
-                <div className="planning-accent-fill w-[6px] h-full rounded-[25px] shrink-0" aria-hidden="true" />
+                <div className="planning-accent-fill w-[6px] h-full corners-[25px] shrink-0" aria-hidden="true" />
               </div>
               <div className="flex flex-col justify-center gap-[3px] min-w-0 flex-1">
                 <span ref={titleRef} className="block m-0 min-w-0 leading-[1.06] text-[15px] font-semibold overflow-hidden text-ellipsis whitespace-nowrap max-md:text-[14px] max-xs:whitespace-normal max-xs:line-clamp-2" title={nextClass.title}>{nextClass.title}</span>

@@ -6,6 +6,7 @@ import { formatScore, formatUeCode } from '../gradesSubjects'
 import { NewBadge, ScorePill, ScoreText } from './SubjectsList'
 import UeBadge from './UeBadge'
 import { useUeColor } from '../useUeColor'
+import CloseButton from './CloseButton'
 
 const FOCUSABLE_SELECTOR = 'button:not([disabled]), [href], [tabindex]:not([tabindex="-1"])'
 const PASS_MARK = 10
@@ -155,7 +156,7 @@ function FlowFigure({ ues, example }) {
       {subjects.map((subject, row) => (
         <div
           key={subject.code}
-          className="gx-rise gx-card absolute left-0 flex items-center justify-between gap-2 rounded-[14px] bg-widget-bg py-[6px] pr-[6px] pl-[10px] shadow-sm"
+          className="gx-rise gx-card absolute left-0 flex items-center justify-between gap-2 corners-[14px] bg-widget-bg py-[6px] pr-[6px] pl-[10px] shadow-sm"
           style={{ top: FLOW.chipTops[row], width: FLOW.chipRight, height: FLOW.chipHeight, '--d': `${row * 90}ms` }}
         >
           <span className="grid min-w-0 gap-[2px]">
@@ -170,7 +171,7 @@ function FlowFigure({ ues, example }) {
         return (
           <div
             key={ues[index].code}
-            className="gx-rise gx-card absolute grid gap-[6px] rounded-[16px] bg-widget-bg px-[10px] pt-[8px] pb-[11px] shadow-sm"
+            className="gx-rise gx-card absolute grid gap-[6px] corners-[16px] bg-widget-bg px-[10px] pt-[8px] pb-[11px] shadow-sm"
             style={{ left: FLOW.ueLeft, top: FLOW.ueTops[index], width: FLOW.width - FLOW.ueLeft, '--d': `${200 + index * 90}ms` }}
           >
             <UeBadge code={ues[index].code} color={ues[index].color} className="-ml-[6px] h-auto w-[78px]" />
@@ -278,7 +279,7 @@ function EctsFigure({ ues }) {
         {rows.map((row, index) => {
           const isValidated = row.average >= PASS_MARK
           return (
-            <li key={row.ue.code} className="gx-rise gx-card flex items-center gap-[10px] rounded-[14px] bg-widget-bg py-[8px] pr-[8px] pl-[12px] shadow-sm" style={{ '--d': `${index * 100}ms` }}>
+            <li key={row.ue.code} className="gx-rise gx-card flex items-center gap-[10px] corners-[14px] bg-widget-bg py-[8px] pr-[8px] pl-[12px] shadow-sm" style={{ '--d': `${index * 100}ms` }}>
               <span className="size-[10px] shrink-0 rounded-full" style={{ background: row.ue.color }} />
               <span className="font-body text-[13px] font-semibold leading-none text-text">{formatUeCode(row.ue.code)}</span>
               <span className="inline-flex items-end gap-[2px]">
@@ -349,7 +350,7 @@ function PageFigure({ ues, example }) {
 
   return (
     <div className="grid w-[340px] gap-[10px]">
-      <div className="gx-card relative isolate grid gap-[6px] overflow-hidden rounded-[18px] bg-widget-bg p-2 shadow-sm">
+      <div className="gx-card relative isolate grid gap-[6px] overflow-hidden corners-[18px] bg-widget-bg p-2 shadow-sm">
         <span className="latest-grade-wash" style={{ background: ue.color, height: '110px' }} />
         <span className="flex items-center gap-2 px-1 pt-1">
           <UeBadge code={ue.code} color={ue.color} className="h-auto w-[78px]" />
@@ -371,9 +372,9 @@ function PageFigure({ ues, example }) {
           <Icon icon="carbon:arrow-right" className="size-[13px] shrink-0 text-text-muted" aria-hidden="true" />
         </span>
       </div>
-      <div className="gx-card grid gap-[8px] rounded-[18px] bg-widget-bg p-[10px] shadow-sm">
+      <div className="gx-card grid gap-[8px] corners-[18px] bg-widget-bg p-[10px] shadow-sm">
         <span className="flex items-center gap-[10px]">
-          <span className="inline-flex size-8 shrink-0 items-center justify-center rounded-[10px] border border-border bg-bg-subtle">
+          <span className="inline-flex size-8 shrink-0 items-center justify-center corners-[10px] border border-border bg-bg-subtle">
             <Icon icon="carbon:book" className="size-4 text-text-secondary" aria-hidden="true" />
           </span>
           <span className="grid min-w-0 flex-1 gap-[3px]">
@@ -476,7 +477,7 @@ function buildSteps(ues, example) {
       body: (
         <ol className="gx-tips m-0 grid list-none gap-[2px] p-0">
           {PAGE_TIPS.map((tip, index) => (
-            <li key={index} className="gx-tip flex items-start gap-[10px] rounded-[12px] px-2 py-[7px]" style={{ '--i': index }}>
+            <li key={index} className="gx-tip flex items-start gap-[10px] corners-[12px] px-2 py-[7px]" style={{ '--i': index }}>
               <span className="gx-tip-number" aria-hidden="true">{index + 1}</span>
               <span>{tip}</span>
             </li>
@@ -574,7 +575,7 @@ function ExplainerDialog({ ues, onClose }) {
       <div className="weather-modal-backdrop absolute inset-0 bg-backdrop animate-modal-backdrop-in" onClick={onClose} aria-hidden="true" />
       <section
         ref={dialogRef}
-        className="gx-dialog relative flex h-[min(700px,calc(100dvh-40px))] w-[min(560px,100%)] flex-col overflow-hidden rounded-[22px] border border-border bg-bg text-text shadow-[0_24px_80px_var(--color-shadow)] outline-none animate-modal-card-in max-sm:h-[calc(100dvh-12px)] max-sm:rounded-b-none max-sm:border-b-0"
+        className="gx-dialog relative flex h-[min(700px,calc(100dvh-40px))] w-[min(560px,100%)] flex-col overflow-hidden corners-[22px] border border-border bg-bg text-text shadow-[0_24px_80px_var(--color-shadow)] outline-none animate-modal-card-in max-sm:h-[calc(100dvh-12px)] max-sm:rounded-b-none max-sm:border-b-0"
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}
@@ -585,21 +586,14 @@ function ExplainerDialog({ ues, onClose }) {
             <h2 id={titleId} className="m-0 text-[22px] font-bold leading-[1.1]">Comment lire tes notes</h2>
             <p className="m-0 font-body text-[13px] font-medium leading-none text-text-muted">Étape {stepIndex + 1} sur {steps.length}</p>
           </div>
-          <button
-            type="button"
-            className="inline-flex h-[34px] w-[34px] shrink-0 items-center justify-center rounded-full border border-[rgba(27,27,27,0.16)] bg-[#f3f1eb] p-0 text-text transition-colors duration-[120ms] hover:bg-[#edebe5] dark:border-border dark:bg-bg-muted dark:hover:bg-bg-subtle"
-            onClick={onClose}
-            aria-label="Fermer"
-          >
-            <Icon icon="carbon:close" className="h-4 w-4" aria-hidden="true" />
-          </button>
+          <CloseButton onClick={onClose} />
         </header>
 
         <div ref={bodyRef} className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden overscroll-contain px-6 pb-5 max-sm:px-4">
           <div className="grid gap-4" aria-labelledby={stepTitleId} role="group">
             {/* The stage stays (so does focus on « Rejouer »); its figure is
                 keyed by step and replay: remounting restarts the animations. */}
-            <div className="gx-stage relative flex min-h-[276px] items-center justify-center overflow-hidden rounded-[20px] border border-border px-2 pt-9 pb-6">
+            <div className="gx-stage relative flex min-h-[276px] items-center justify-center overflow-hidden corners-[20px] border border-border px-2 pt-9 pb-6">
               <div key={`${stepIndex}-${replay}`} className="gx-step gx-figure" role="img" aria-label={step.label}>
                 {step.figure}
               </div>

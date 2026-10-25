@@ -60,7 +60,7 @@ export default function WelcomeFromLent({ visible, importedKeys = [], signedIn =
         aria-modal="true"
         aria-labelledby="welcome-from-lent-title"
       >
-        <div className="max-w-[420px] mx-auto rounded-[20px] bg-widget-bg border border-border overflow-hidden shadow-[0_-8px_40px_var(--color-shadow)]">
+        <div className="max-w-[420px] mx-auto corners-[20px] bg-widget-bg border border-border overflow-hidden shadow-[0_-8px_40px_var(--color-shadow)]">
           <img
             src={transitionDoneImage}
             alt="Le logo Tafac avec une coche"
@@ -101,7 +101,7 @@ export default function WelcomeFromLent({ visible, importedKeys = [], signedIn =
               <button
                 type="button"
                 onClick={() => dismiss(onInstall)}
-                className="mt-1 flex w-full items-center gap-3 rounded-2xl border border-border bg-bg-subtle px-3.5 py-3 text-left text-text transition-colors hover:bg-bg cursor-pointer"
+                className="mt-1 flex w-full items-center gap-3 corners-[16px] border border-border bg-bg-subtle px-3.5 py-3 text-left text-text transition-colors hover:bg-bg cursor-pointer"
               >
                 <Icon icon="carbon:mobile-add" className="h-5 w-5 shrink-0 text-text-muted" aria-hidden="true" />
                 <span className="flex min-w-0 flex-1 flex-col gap-0.5 font-body leading-snug">

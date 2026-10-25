@@ -6,6 +6,7 @@ import { nextOccurrences } from '../planningEvents'
 import { accentStyle } from '../eventAccents'
 import { FULL_BLOCK_HEIGHT } from '../eventBlockLayout'
 import PlanningEventBlock from './PlanningEventBlock'
+import CloseButton from './CloseButton'
 
 // A row of the sheet's cards (the iOS GroupCard's rows, in the look of
 // the evaluation rows of Mes notes): an icon box, a line and a second one,
@@ -14,7 +15,7 @@ import PlanningEventBlock from './PlanningEventBlock'
 function SheetRow({ icon, title, detail, onClick }) {
   const content = (
     <>
-      <span className="inline-flex size-8 shrink-0 items-center justify-center rounded-[9px] bg-brand-subtle text-text-secondary" aria-hidden="true">
+      <span className="inline-flex size-8 shrink-0 items-center justify-center corners-[9px] bg-brand-subtle text-text-secondary" aria-hidden="true">
         <Icon icon={icon} className="size-[17px]" />
       </span>
       <span className="planning-row-text grid min-w-0 flex-1 content-center gap-[4px] self-stretch py-[17px] pr-4">
@@ -88,7 +89,7 @@ function PlanningEventSheet({ event, accent, events, todayKey, searching, onClos
       <div className="weather-modal-backdrop absolute inset-0 bg-backdrop animate-modal-backdrop-in" onClick={onClose} aria-hidden="true" />
       <section
         ref={dialogRef}
-        className="gd-dialog planning-sheet relative isolate flex max-h-[min(820px,calc(100dvh-40px))] w-[min(448px,100%)] flex-col rounded-[26px] border border-border bg-bg text-text shadow-[0_24px_80px_var(--color-shadow)] outline-none max-sm:max-h-[calc(100dvh-16px)] max-sm:rounded-b-none max-sm:border-b-0"
+        className="gd-dialog planning-sheet relative isolate flex max-h-[min(820px,calc(100dvh-40px))] w-[min(448px,100%)] flex-col corners-[26px] border border-border bg-bg text-text shadow-[0_24px_80px_var(--color-shadow)] outline-none max-sm:max-h-[calc(100dvh-16px)] max-sm:rounded-b-none max-sm:border-b-0"
         style={accentStyle(accent)}
         role="dialog"
         aria-modal="true"
@@ -105,14 +106,7 @@ function PlanningEventSheet({ event, accent, events, todayKey, searching, onClos
               </span>
               <span className="gd-grabber relative mx-auto hidden h-[4px] w-9 rounded-full bg-text-30 max-sm:block max-sm:translate-y-2" aria-hidden="true" />
               <div className="relative flex justify-end px-6 pt-4 pb-2 max-sm:px-4 max-sm:pt-[14px]">
-                <button
-                  type="button"
-                  className="glass-close-button inline-flex h-[34px] w-[34px] shrink-0 items-center justify-center rounded-full p-0 text-text"
-                  onClick={onClose}
-                  aria-label="Fermer"
-                >
-                  <Icon icon="carbon:close" className="h-4 w-4" aria-hidden="true" />
-                </button>
+                <CloseButton glass onClick={onClose} />
               </div>
             </header>
 

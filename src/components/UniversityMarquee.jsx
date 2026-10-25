@@ -28,7 +28,7 @@ function UniversityMarquee({ className = '' }) {
     <div className={`flex flex-col items-center gap-3 ${className}`}>
       <p className="m-0 text-sm font-medium text-text-muted font-body">{copyText(copy.hero.compatible)}</p>
       {universities.length === 1 ? (
-        <a href={universities[0].href} className="rounded-md">
+        <a href={universities[0].href} className="corners-[6px]">
           <img className={LOGO_CLASSES} src={universities[0].logo} alt={universities[0].name} draggable="false" />
         </a>
       ) : (
@@ -45,7 +45,7 @@ function UniversityMarquee({ className = '' }) {
                       href={entry.href}
                       aria-hidden={isListed ? undefined : true}
                       tabIndex={isListed ? undefined : -1}
-                      className="shrink-0 rounded-md"
+                      className="shrink-0 corners-[6px]"
                       draggable="false"
                     >
                       <img className={LOGO_CLASSES} src={entry.logo} alt={isListed ? entry.name : ''} draggable="false" />

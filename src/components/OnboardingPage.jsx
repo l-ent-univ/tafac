@@ -174,7 +174,7 @@ function OnboardingPage({
         type="button"
         className={isGroupCircleStep
           ? `onboarding-td-card onboarding-td-card-enter`
-          : 'onboarding-card app-card-enter flex min-h-[112px] flex-col items-start justify-between gap-4 rounded-[22px] border border-white bg-widget-bg p-4 text-left font-inherit transition-all duration-150 ease-in-out hover:scale-[1.02] active:scale-[0.98] focus-visible:outline-2 focus-visible:outline-brand focus-visible:outline-offset-2 disabled:cursor-wait disabled:opacity-60'}
+          : 'onboarding-card app-card-enter flex min-h-[112px] flex-col items-start justify-between gap-4 corners-[22px] border border-white bg-widget-bg p-4 text-left font-inherit transition-all duration-150 ease-in-out hover:scale-[1.02] active:scale-[0.98] focus-visible:outline-2 focus-visible:outline-brand focus-visible:outline-offset-2 disabled:cursor-wait disabled:opacity-60'}
         style={isGroupCircleStep
           ? {
               '--td-card-bg': specialStepCardStyle?.['--td-card-bg'] ?? tdPalette.background,
@@ -325,7 +325,7 @@ function OnboardingPage({
                 return (
                   <div
                     key={stepKey}
-                    className={`rounded-[22px] border p-4 transition-colors duration-300 ${isCurrent ? 'border-brand bg-widget-bg' : 'border-[color:var(--color-border)] bg-widget-bg'}`}
+                    className={`corners-[22px] border p-4 transition-colors duration-300 ${isCurrent ? 'border-brand bg-widget-bg' : 'border-[color:var(--color-border)] bg-widget-bg'}`}
                   >
                     <p className="m-0 text-xs font-bold uppercase tracking-[0.08em] text-text-muted font-body">
                       Étape {index + 1}
@@ -364,7 +364,7 @@ function OnboardingPage({
       {isTpStep && hasBack ? (
                 <button
                   type="button"
-                  className="inline-flex items-center justify-center rounded-[14px] border border-[color:var(--color-border)] bg-bg px-4 py-3 text-sm font-semibold text-text transition-transform duration-150 ease-in-out hover:scale-[1.01] active:scale-[0.99] focus-visible:outline-2 focus-visible:outline-brand focus-visible:outline-offset-2"
+                  className="inline-flex items-center justify-center corners-[14px] border border-[color:var(--color-border)] bg-bg px-4 py-3 text-sm font-semibold text-text transition-transform duration-150 ease-in-out hover:scale-[1.01] active:scale-[0.99] focus-visible:outline-2 focus-visible:outline-brand focus-visible:outline-offset-2"
                   onClick={onBack}
                   disabled={isLoading}
                 >
@@ -376,13 +376,13 @@ function OnboardingPage({
         )}
 
         {errorMessage ? (
-          <div className={`rounded-[22px] border border-[color:var(--color-border)] bg-widget-bg p-5 ${isGroupCircleStep ? 'w-full max-w-[720px]' : ''}`}>
+          <div className={`corners-[22px] border border-[color:var(--color-border)] bg-widget-bg p-5 ${isGroupCircleStep ? 'w-full max-w-[720px]' : ''}`}>
             <p className="m-0 text-base font-semibold text-text">Impossible de récupérer ce niveau de groupe pour le moment</p>
             <p className="m-0 mt-2 text-sm text-text-muted font-body">{errorMessage}</p>
             {hasRetry ? (
               <button
                 type="button"
-                className="mt-4 inline-flex items-center justify-center rounded-[14px] border border-[color:var(--color-border)] bg-bg px-4 py-3 text-sm font-semibold text-text transition-transform duration-150 ease-in-out hover:scale-[1.01] active:scale-[0.99] focus-visible:outline-2 focus-visible:outline-brand focus-visible:outline-offset-2"
+                className="mt-4 inline-flex items-center justify-center corners-[14px] border border-[color:var(--color-border)] bg-bg px-4 py-3 text-sm font-semibold text-text transition-transform duration-150 ease-in-out hover:scale-[1.01] active:scale-[0.99] focus-visible:outline-2 focus-visible:outline-brand focus-visible:outline-offset-2"
                 onClick={onRetry}
                 disabled={isLoading}
               >
@@ -427,7 +427,7 @@ function OnboardingPage({
             <LoadingDots label={loadingMessage || 'Chargement'} className="text-text-muted" />
           </div>
         ) : (
-          <div className={`rounded-[22px] border border-[color:var(--color-border)] bg-widget-bg p-5 ${isGroupCircleStep ? 'w-full max-w-[720px] text-center' : ''}`}>
+          <div className={`corners-[22px] border border-[color:var(--color-border)] bg-widget-bg p-5 ${isGroupCircleStep ? 'w-full max-w-[720px] text-center' : ''}`}>
             <p className="m-0 text-base font-semibold text-text">{emptyStateTitle || "Aucun choix n'a encore été trouvé pour cette étape"}</p>
             <div className="mt-3 min-h-[20px]">
               {isLoading ? (
@@ -438,7 +438,7 @@ function OnboardingPage({
                   {hasRetry ? (
                     <button
                       type="button"
-                      className="inline-flex items-center justify-center rounded-[14px] border border-[color:var(--color-border)] bg-bg px-4 py-3 text-sm font-semibold text-text transition-transform duration-150 ease-in-out hover:scale-[1.01] active:scale-[0.99] focus-visible:outline-2 focus-visible:outline-brand focus-visible:outline-offset-2"
+                      className="inline-flex items-center justify-center corners-[14px] border border-[color:var(--color-border)] bg-bg px-4 py-3 text-sm font-semibold text-text transition-transform duration-150 ease-in-out hover:scale-[1.01] active:scale-[0.99] focus-visible:outline-2 focus-visible:outline-brand focus-visible:outline-offset-2"
                       onClick={onRetry}
                       disabled={isLoading}
                     >

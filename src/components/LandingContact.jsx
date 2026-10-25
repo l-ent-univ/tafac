@@ -23,7 +23,7 @@ function LandingContact({ className = '' }) {
       <div
         ref={ref}
         data-revealed={isRevealed || undefined}
-        className="landing-contact flex w-full max-w-[720px] flex-col items-center gap-5 rounded-[32px] border border-white bg-white px-10 py-10 text-center shadow-[0_1px_3px_rgb(52_18_0/0.06),0_10px_28px_-14px_rgb(52_18_0/0.16)] dark:border-white/10 dark:bg-[#1c1c1c] max-md:rounded-[28px] max-md:px-5 max-md:py-8"
+        className="landing-contact flex w-full max-w-[720px] flex-col items-center gap-5 corners-[32px] border border-white bg-white px-10 py-10 text-center shadow-[0_1px_3px_rgb(52_18_0/0.06),0_10px_28px_-14px_rgb(52_18_0/0.16)] dark:border-white/10 dark:bg-[#1c1c1c] max-md:corners-[28px] max-md:px-5 max-md:py-8"
       >
         <span className="inline-flex items-center gap-1.5 rounded-full bg-success-bg px-3 py-1 text-[13px] font-bold uppercase tracking-[0.06em] text-success-text">
           <Icon icon="carbon:checkmark-outline" className="size-4" aria-hidden="true" />

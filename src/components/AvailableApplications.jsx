@@ -1866,11 +1866,11 @@ function AvailableApplications({
     ? 'flex flex-col gap-0.5 min-w-0'
     : 'flex flex-wrap gap-1.5 max-md:flex-nowrap max-md:gap-1 max-md:overflow-x-auto max-md:overflow-y-hidden max-md:-mx-3 max-md:px-3 favorites-scroll-hide'
   const favoriteItemClassName = isSidebarFavorites
-    ? 'flex items-center gap-2.5 w-full p-1 rounded-[13px]'
-    : 'inline-flex items-center gap-2.5 max-w-full p-[5px] pr-3.5 rounded-[14px] max-md:flex-col max-md:gap-1.5 max-md:w-[76px] max-md:p-1.5 max-md:rounded-[20px] max-md:shrink-0'
+    ? 'flex items-center gap-2.5 w-full p-1 corners-[13px]'
+    : 'inline-flex items-center gap-2.5 max-w-full p-[5px] pr-3.5 corners-[14px] max-md:flex-col max-md:gap-1.5 max-md:w-[76px] max-md:p-1.5 max-md:corners-[20px] max-md:shrink-0'
   const favoriteIconClassName = isSidebarFavorites
-    ? 'w-8 h-8 rounded-[9px]'
-    : 'w-8 h-8 rounded-[9px] max-md:w-[52px] max-md:h-[52px] max-md:rounded-[14px]'
+    ? 'w-8 h-8 corners-[9px]'
+    : 'w-8 h-8 corners-[9px] max-md:w-[52px] max-md:h-[52px] max-md:corners-[14px]'
   const favoriteTitleClassName = isSidebarFavorites
     ? 'flex-1 min-w-0 text-[14px] font-semibold leading-[1.2] whitespace-nowrap overflow-hidden text-ellipsis'
     : 'min-w-0 text-[14px] font-semibold leading-[1.2] whitespace-nowrap overflow-hidden text-ellipsis max-md:w-full max-md:text-[12px] max-md:text-center max-md:whitespace-normal max-md:line-clamp-2'
@@ -2050,7 +2050,7 @@ function AvailableApplications({
               return (
                 <a
                   key={service.id}
-                  className={`app-card app-card-enter group relative flex items-center gap-2.5 p-2 border rounded-[18px] text-inherit no-underline min-w-0 focus-visible:outline-none ${isBusy || isLaunching ? 'pointer-events-none opacity-70' : ''} ${isContextOpen ? 'app-card--active' : ''}`}
+                  className={`app-card app-card-enter group relative flex items-center gap-2.5 p-2 border corners-[18px] text-inherit no-underline min-w-0 focus-visible:outline-none ${isBusy || isLaunching ? 'pointer-events-none opacity-70' : ''} ${isContextOpen ? 'app-card--active' : ''}`}
                   style={{ animationDelay: `${Math.min(index, 24) * 20}ms` }}
                   href={href}
                   target={target || undefined}
@@ -2066,7 +2066,7 @@ function AvailableApplications({
                     title={service.title}
                     assignment={tileAssignments.get(applicationKey)}
                     isLaunching={isLaunching}
-                    className="w-10 h-10 rounded-[11px]"
+                    className="w-10 h-10 corners-[11px]"
                   />
                   <span className="flex flex-col gap-0.5 flex-1 min-w-0">
                     <span className="text-[15px] font-semibold leading-[1.2] whitespace-nowrap overflow-hidden text-ellipsis">{service.title}</span>
@@ -2112,7 +2112,7 @@ function AvailableApplications({
         return (
         <div
           ref={contextMenuRef}
-          className="favorites-context-menu fixed z-60 min-w-[252px] p-[6px] border border-border rounded-[18px] bg-context-bg shadow-[0_18px_40px_var(--color-shadow)] backdrop-blur-[12px] animate-context-menu-in max-md:min-w-[220px]"
+          className="favorites-context-menu fixed z-60 min-w-[252px] p-[6px] border border-border corners-[18px] bg-context-bg shadow-[0_18px_40px_var(--color-shadow)] backdrop-blur-[12px] animate-context-menu-in max-md:min-w-[220px]"
           role="menu"
           aria-label={`Actions pour ${targetApplication.title}`}
           style={{
@@ -2124,7 +2124,7 @@ function AvailableApplications({
         >
           <button
             type="button"
-            className="favorites-context-action w-full flex items-center gap-[10px] min-h-[44px] px-3 border-0 rounded-[12px] bg-transparent text-brand font-inherit text-[15px] font-semibold text-left animate-context-action-in hover:bg-context-hover focus-visible:bg-context-hover focus-visible:outline-none"
+            className="favorites-context-action w-full flex items-center gap-[10px] min-h-[44px] px-3 border-0 corners-[12px] bg-transparent text-brand font-inherit text-[15px] font-semibold text-left animate-context-action-in hover:bg-context-hover focus-visible:bg-context-hover focus-visible:outline-none"
             role="menuitem"
             onClick={() => void handleOpenApplicationInNewTab(targetApplication)}
           >
@@ -2133,7 +2133,7 @@ function AvailableApplications({
           </button>
           <button
             type="button"
-            className="favorites-context-action w-full flex items-center gap-[10px] min-h-[44px] px-3 border-0 rounded-[12px] bg-transparent text-brand font-inherit text-[15px] font-semibold text-left animate-context-action-in hover:bg-context-hover focus-visible:bg-context-hover focus-visible:outline-none"
+            className="favorites-context-action w-full flex items-center gap-[10px] min-h-[44px] px-3 border-0 corners-[12px] bg-transparent text-brand font-inherit text-[15px] font-semibold text-left animate-context-action-in hover:bg-context-hover focus-visible:bg-context-hover focus-visible:outline-none"
             role="menuitem"
             onClick={() => void handleCopyApplicationLink(targetApplication)}
           >
@@ -2144,7 +2144,7 @@ function AvailableApplications({
           {isAddMode ? (
             <button
               type="button"
-              className="favorites-context-action w-full flex items-center gap-[10px] min-h-[44px] px-3 border-0 rounded-[12px] bg-transparent text-brand font-inherit text-[15px] font-semibold text-left animate-context-action-in hover:bg-context-hover focus-visible:bg-context-hover focus-visible:outline-none"
+              className="favorites-context-action w-full flex items-center gap-[10px] min-h-[44px] px-3 border-0 corners-[12px] bg-transparent text-brand font-inherit text-[15px] font-semibold text-left animate-context-action-in hover:bg-context-hover focus-visible:bg-context-hover focus-visible:outline-none"
               role="menuitem"
               onClick={() => void handleAddFavorite(targetApplication)}
             >
@@ -2154,7 +2154,7 @@ function AvailableApplications({
           ) : (
             <button
               type="button"
-              className="favorites-context-action w-full flex items-center gap-[10px] min-h-[44px] px-3 border-0 rounded-[12px] bg-transparent text-brand font-inherit text-[15px] font-semibold text-left animate-context-action-in hover:bg-context-hover focus-visible:bg-context-hover focus-visible:outline-none"
+              className="favorites-context-action w-full flex items-center gap-[10px] min-h-[44px] px-3 border-0 corners-[12px] bg-transparent text-brand font-inherit text-[15px] font-semibold text-left animate-context-action-in hover:bg-context-hover focus-visible:bg-context-hover focus-visible:outline-none"
               role="menuitem"
               onClick={() => void handleUnfavorite(targetApplication)}
             >

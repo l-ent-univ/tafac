@@ -4,8 +4,8 @@ import { Icon } from '@iconify/react'
 
 // The rows and panel of the apps' context menu (AvailableApplications), so
 // every menu looks and opens the same way. Long lists scroll.
-const MENU_CLASSES = 'favorites-context-menu fixed z-[80] max-h-[min(340px,60vh)] overflow-y-auto p-[6px] border border-border rounded-[18px] bg-context-bg shadow-[0_18px_40px_var(--color-shadow)] backdrop-blur-[12px] animate-context-menu-in'
-const OPTION_CLASSES = 'favorites-context-action w-full flex items-center gap-[10px] min-h-[44px] px-3 border-0 rounded-[12px] bg-transparent text-brand font-inherit text-[15px] font-semibold text-left cursor-pointer animate-context-action-in hover:bg-context-hover focus-visible:bg-context-hover focus-visible:outline-none'
+const MENU_CLASSES = 'favorites-context-menu fixed z-[80] max-h-[min(340px,60vh)] overflow-y-auto p-[6px] border border-border corners-[18px] bg-context-bg shadow-[0_18px_40px_var(--color-shadow)] backdrop-blur-[12px] animate-context-menu-in'
+const OPTION_CLASSES = 'favorites-context-action w-full flex items-center gap-[10px] min-h-[44px] px-3 border-0 corners-[12px] bg-transparent text-brand font-inherit text-[15px] font-semibold text-left cursor-pointer animate-context-action-in hover:bg-context-hover focus-visible:bg-context-hover focus-visible:outline-none'
 const MENU_MIN_WIDTH = 220
 const MENU_GAP = 8
 const VIEWPORT_EDGE = 12

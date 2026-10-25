@@ -60,7 +60,7 @@ function PlanningMonthPicker({ selectedDay, todayKey, onPick, onClose }) {
   return (
     <div
       ref={panelRef}
-      className="favorites-context-menu absolute top-[calc(100%+8px)] left-0 z-30 w-[min(320px,calc(100vw-24px))] p-[10px] border border-border rounded-[18px] bg-context-bg shadow-[0_18px_40px_var(--color-shadow)] backdrop-blur-[12px] animate-context-menu-in"
+      className="favorites-context-menu absolute top-[calc(100%+8px)] left-0 z-30 w-[min(320px,calc(100vw-24px))] p-[10px] border border-border corners-[18px] bg-context-bg shadow-[0_18px_40px_var(--color-shadow)] backdrop-blur-[12px] animate-context-menu-in"
       role="dialog"
       aria-label="Choisir un jour"
     >

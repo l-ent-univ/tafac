@@ -37,7 +37,7 @@ function SidebarStatPocket({
         '--grade-gradient': gradient,
         '--grade-gradient-dark': gradientDark,
       }}
-      className={`sidebar-grade-pocket group relative flex flex-col items-start gap-[10px] flex-1 min-w-0 px-[14px] py-[12px] border rounded-[22px] shadow-[0_4px_6px_-1px_rgba(0,0,0,0.1),0_2px_4px_-2px_rgba(0,0,0,0.1)] transition-[transform,box-shadow] duration-150 ease-in-out ${disabled ? 'grade-feature-disabled' : 'border-white dark:border-[rgba(255,255,255,0.08)] text-text cursor-pointer hover:shadow-[0_6px_10px_-1px_rgba(0,0,0,0.12),0_3px_6px_-2px_rgba(0,0,0,0.12)]'}`}
+      className={`sidebar-grade-pocket group relative flex flex-col items-start gap-[10px] flex-1 min-w-0 px-[14px] py-[12px] border corners-[22px] shadow-[0_4px_6px_-1px_rgba(0,0,0,0.1),0_2px_4px_-2px_rgba(0,0,0,0.1)] transition-[transform,box-shadow] duration-150 ease-in-out ${disabled ? 'grade-feature-disabled' : 'border-white dark:border-[rgba(255,255,255,0.08)] text-text cursor-pointer hover:shadow-[0_6px_10px_-1px_rgba(0,0,0,0.12),0_3px_6px_-2px_rgba(0,0,0,0.12)]'}`}
       aria-label={ariaLabel}
       aria-disabled={disabled ? 'true' : undefined}
     >
@@ -63,7 +63,7 @@ function SidebarStatPocket({
       {hasTooltip ? (
         <span
           role="tooltip"
-          className="pointer-events-none absolute left-1/2 bottom-full z-20 mb-2 flex flex-col items-center gap-[2px] w-max max-w-[260px] -translate-x-1/2 translate-y-1 scale-95 whitespace-normal text-center rounded-[14px] border border-white/70 bg-[rgba(17,24,39,0.92)] px-3 py-[6px] text-[12px] font-medium leading-tight text-white opacity-0 shadow-[0_12px_32px_rgba(17,24,39,0.18)] transition-[opacity,transform] duration-180 ease-out invisible group-hover:visible group-hover:translate-y-0 group-hover:scale-100 group-hover:opacity-100 group-focus-visible:visible group-focus-visible:translate-y-0 group-focus-visible:scale-100 group-focus-visible:opacity-100"
+          className="pointer-events-none absolute left-1/2 bottom-full z-20 mb-2 flex flex-col items-center gap-[2px] w-max max-w-[260px] -translate-x-1/2 translate-y-1 scale-95 whitespace-normal text-center corners-[14px] border border-white/70 bg-[rgba(17,24,39,0.92)] px-3 py-[6px] text-[12px] font-medium leading-tight text-white opacity-0 shadow-[0_12px_32px_rgba(17,24,39,0.18)] transition-[opacity,transform] duration-180 ease-out invisible group-hover:visible group-hover:translate-y-0 group-hover:scale-100 group-hover:opacity-100 group-focus-visible:visible group-focus-visible:translate-y-0 group-focus-visible:scale-100 group-focus-visible:opacity-100"
         >
           {tooltipPrimary ? <span className="block font-semibold">{tooltipPrimary}</span> : null}
           {tooltipSecondary ? (

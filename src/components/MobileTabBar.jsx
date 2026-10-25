@@ -100,7 +100,7 @@ function MobileTabBar({ establishment, gradesSupported = true, activePage = 'das
       aria-label="Raccourcis"
     >
       {noticeItem ? (
-        <p className="mobile-tab-bar-notice m-0 max-w-[300px] rounded-[16px] bg-black px-3 py-2 text-center font-body text-[12px] font-medium leading-tight text-white shadow-[0_12px_32px_rgba(0,0,0,0.18)] animate-modal-card-in dark:bg-white dark:text-black" role="status">
+        <p className="mobile-tab-bar-notice m-0 max-w-[300px] corners-[16px] bg-black px-3 py-2 text-center font-body text-[12px] font-medium leading-tight text-white shadow-[0_12px_32px_rgba(0,0,0,0.18)] animate-modal-card-in dark:bg-white dark:text-black" role="status">
           <span className="block font-semibold">{noticeItem.disabledTitle}</span>
           {noticeItem.disabledDetail ? (
             <span className="block text-white/70 dark:text-black/60">{noticeItem.disabledDetail}</span>

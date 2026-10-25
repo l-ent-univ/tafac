@@ -5,6 +5,21 @@
    system, "Clair"/"Sombre" force it. */
 @custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
 
+/* Corners: corners-[12px] is the round corner rounded-[12px] (Safari,
+   Firefox) and, where the browser draws it (Chrome, Edge), the smooth curve
+   corner-shape: superellipse(1.3) at the radius that looks the same (÷ 0.853:
+   the two shapes are within a quarter of a pixel). Pills and circles keep
+   rounded-full: the curve would square them. The widgets' own sizes:
+   card-corners in overrides.css. */
+@utility corners-* {
+  border-radius: --value([length], [percentage]);
+
+  @supports (corner-shape: superellipse(1.3)) {
+    border-radius: calc(--value([length], [percentage]) / 0.853);
+    corner-shape: superellipse(1.3);
+  }
+}
+
 @theme {
   --color-bg: var(--color-bg);
   --color-bg-surface: var(--color-bg-surface);
