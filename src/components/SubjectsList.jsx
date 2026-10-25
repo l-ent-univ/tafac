@@ -17,7 +17,7 @@ const DAY_FORMAT = new Intl.DateTimeFormat('fr-FR', { day: 'numeric', month: 'sh
 // One card per group, stacked in a single column at every width (each card
 // is a query container for its own rows).
 const GROUPS_CLASSES = 'grid items-start gap-3 max-md:gap-2'
-const CARD_CLASSES = '@container widget-card widget-card-visible shadow-md border border-white rounded-[22px] bg-widget-bg text-text p-2 min-w-0 max-md:rounded-[20px]'
+const CARD_CLASSES = '@container widget-card widget-card-visible shadow-md border border-white card-corners bg-widget-bg text-text p-2 min-w-0'
 // The pills of the "Dernières notes" cards, a size down: neutral, the number
 // and "/20" trimmed to cap height so the padding is even.
 const PILL_CLASSES = 'inline-flex shrink-0 items-end gap-[2px] rounded-full border border-border bg-bg-subtle text-text'
@@ -156,7 +156,7 @@ export function EvaluationRow({ evaluation, moduleCode = null, showPromoStats, w
     <li className="subject-evaluation min-w-0" data-evaluation-id={evaluation.id}>
       <button
         type="button"
-        className="subject-evaluation-button flex w-full min-w-0 items-center gap-3 rounded-[15px] border-0 bg-transparent px-3 py-[10px] text-left text-text cursor-pointer"
+        className="subject-evaluation-button flex w-full min-w-0 items-center gap-3 corners-[15px] border-0 bg-transparent px-3 py-[10px] text-left text-text cursor-pointer"
         aria-haspopup="dialog"
         aria-label={`${spoken}. Voir le détail`}
         onClick={() => gradeDetail.open({ moduleCode, evaluationId: evaluation.id, isNew, from: openFrom })}
@@ -211,16 +211,16 @@ function SubjectRow({ module, isOpen, onToggle, icon, wash, ueTitles, showPromoS
   const Header = isEmpty ? 'div' : 'button'
 
   return (
-    <li className={`subject-row rounded-[16px] ${isOpen && !isEmpty ? 'subject-row--open' : ''}`}>
+    <li className={`subject-row corners-[16px] ${isOpen && !isEmpty ? 'subject-row--open' : ''}`}>
       <Header
         id={buttonId}
         {...(isEmpty
           ? { 'aria-label': `${module.title}, ${module.code}, ${progress}` }
           : { type: 'button', 'aria-expanded': isOpen, 'aria-controls': panelId, 'aria-label': `${module.title}, ${module.code}, ${progress}${average}`, onClick: onToggle })}
-        className={`${isEmpty ? '' : 'subject-row-toggle cursor-pointer '}flex w-full min-w-0 items-center gap-3 rounded-[16px] border-0 bg-transparent px-2 py-2 text-left text-text max-md:gap-[10px]`}
+        className={`${isEmpty ? '' : 'subject-row-toggle cursor-pointer '}flex w-full min-w-0 items-center gap-3 corners-[16px] border-0 bg-transparent px-2 py-2 text-left text-text max-md:gap-[10px]`}
       >
         {/* The wash of the UEs the subject feeds, as on the grade cards. */}
-        <span className="relative isolate inline-flex size-10 shrink-0 items-center justify-center overflow-hidden rounded-[12px] bg-brand-subtle max-md:size-9 max-md:rounded-[11px]" aria-hidden="true">
+        <span className="relative isolate inline-flex size-10 shrink-0 items-center justify-center overflow-hidden corners-[12px] bg-brand-subtle max-md:size-9 max-md:corners-[11px]" aria-hidden="true">
           {wash ? <span className="subject-tile-wash" style={{ background: wash }} /> : null}
           {icon ? <Icon icon={icon} className="size-5 text-text max-md:size-[18px]" /> : null}
         </span>

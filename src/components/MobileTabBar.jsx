@@ -100,16 +100,16 @@ function MobileTabBar({ establishment, gradesSupported = true, activePage = 'das
       aria-label="Raccourcis"
     >
       {noticeItem ? (
-        <p className="mobile-tab-bar-notice m-0 max-w-[300px] rounded-[16px] bg-black px-3 py-2 text-center font-body text-[12px] font-medium leading-tight text-white shadow-[0_12px_32px_rgba(0,0,0,0.18)] animate-modal-card-in dark:bg-white dark:text-black" role="status">
+        <p className="mobile-tab-bar-notice m-0 max-w-[300px] corners-[16px] bg-black px-3 py-2 text-center font-body text-[12px] font-medium leading-tight text-white shadow-[0_12px_32px_rgba(0,0,0,0.18)] animate-modal-card-in dark:bg-white dark:text-black" role="status">
           <span className="block font-semibold">{noticeItem.disabledTitle}</span>
           {noticeItem.disabledDetail ? (
             <span className="block text-white/70 dark:text-black/60">{noticeItem.disabledDetail}</span>
           ) : null}
         </p>
       ) : null}
-      <div className={`mobile-tab-bar pointer-events-auto flex items-center gap-1 rounded-full p-1.5 animate-modal-card-in ${items.length >= WIDE_BAR_MIN_TABS ? 'w-full max-w-[420px]' : 'max-w-full'}`}>
+      <div className={`mobile-tab-bar pointer-events-auto flex items-center gap-1 card-corners p-1.5 animate-modal-card-in ${items.length >= WIDE_BAR_MIN_TABS ? 'w-full max-w-[420px]' : 'max-w-full'}`}>
         {items.map((item) => {
-          const className = `mobile-tab-bar-item flex h-[54px] ${tabSizeClasses} flex-col items-center justify-center gap-[3px] rounded-full border-0 text-text no-underline cursor-pointer transition-[background-color,transform] duration-150 ease-out active:scale-[0.94] ${item.selected ? 'mobile-tab-bar-item--selected' : 'bg-transparent'} ${item.disabled ? 'opacity-45' : ''}`
+          const className = `mobile-tab-bar-item flex h-[54px] ${tabSizeClasses} flex-col items-center justify-center gap-[3px] card-corners-sm border-0 text-text no-underline cursor-pointer transition-[background-color,transform] duration-150 ease-out active:scale-[0.94] ${item.selected ? 'mobile-tab-bar-item--selected' : 'bg-transparent'} ${item.disabled ? 'opacity-45' : ''}`
           // Just launched (as in the sidebar): a blue dot on the icon, no
           // room for the word.
           const isNew = Boolean(item.announcedBy) && unseenIds.includes(item.announcedBy)

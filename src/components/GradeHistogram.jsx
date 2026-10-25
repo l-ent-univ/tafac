@@ -58,7 +58,7 @@ function HistogramUnavailable({ status, reason, isPending, onRetry }) {
   const notYet = isPending && !isError
   const tooFew = reason === 'too-few'
   return (
-    <Frame className="grid place-items-center rounded-[14px] border border-dashed border-border-input">
+    <Frame className="grid place-items-center corners-[14px] border border-dashed border-border-input">
       <div className="grid max-w-[260px] justify-items-center gap-[6px] px-4 text-center">
         <Icon icon="carbon:chart-histogram" className="size-5 text-text-muted" aria-hidden="true" />
         <p className="m-0 font-body text-[14px] font-semibold leading-[1.3] text-text">{notYet ? 'Pas encore de répartition' : tooFew ? 'Pas assez de notes' : 'Répartition indisponible'}</p>
@@ -134,7 +134,7 @@ function GradeHistogram({ state, studentBucket = null, isPending = false, onRetr
       <div>
         {/* The plot: one tab stop, the arrows walk the bars. */}
         <div
-          className="gh-plot relative rounded-[10px] outline-none"
+          className="gh-plot relative corners-[10px] outline-none"
           role="group"
           tabIndex={0}
           aria-label="Histogramme des notes de la promo. Flèches gauche et droite pour parcourir les tranches."
@@ -167,7 +167,7 @@ function GradeHistogram({ state, studentBucket = null, isPending = false, onRetr
             <span className="gh-baseline absolute inset-x-0 bottom-0 h-px" aria-hidden="true" />
             {active != null ? (
               <div
-                className="gh-tooltip pointer-events-none absolute z-10 grid gap-[3px] whitespace-nowrap rounded-[10px] px-[10px] py-[7px]"
+                className="gh-tooltip pointer-events-none absolute z-10 grid gap-[3px] whitespace-nowrap corners-[10px] px-[10px] py-[7px]"
                 style={{
                   left: `clamp(64px, ${((active + 0.5) / BUCKET_COUNT) * 100}%, calc(100% - 64px))`,
                   bottom: (counts[active] / max) * BAR_ZONE + 22,

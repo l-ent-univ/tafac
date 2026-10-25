@@ -10,6 +10,7 @@ import { CARD_CLASSES, MUTED_FILL_CLASSES, PRESSABLE_ROW_CLASSES, ROW_CLASSES } 
 import { PrivacyContent } from './PrivacyModal'
 import Dropdown from './Dropdown'
 import LoadingDots from './LoadingDots'
+import CloseButton from './CloseButton'
 
 function buildSelectOptions(options, selectedOption) {
   const normalizedOptions = Array.isArray(options) ? [...options] : []
@@ -239,7 +240,8 @@ function StepSlider({ options, value, onChange, ariaLabel, disabled = false }) {
 
 const SETTING_BUTTON_CLASSES = `inline-flex h-9 items-center justify-center gap-[6px] rounded-full border-0 ${MUTED_FILL_CLASSES} px-3 font-body text-[14px] font-medium text-[var(--color-text)] transition-colors duration-[120ms] ease-in-out hover:bg-[#edebe5] cursor-pointer disabled:cursor-wait disabled:opacity-60 dark:hover:bg-[var(--color-bg-subtle)]`
 
-function Switch({ checked, onChange }) {
+// Also the debug menu's toggles (src/components/debug/).
+export function Switch({ checked, onChange }) {
   return (
     <button
       type="button"
@@ -514,7 +516,7 @@ function WallpaperSetting({ previewSrc, hasCustom, enabled, onEnabledChange, onC
       {previewSrc ? (
         <div className="p-2">
           <div
-            className={`relative aspect-[16/6] w-full rounded-[14px] bg-cover bg-center transition-[opacity,filter] duration-200 ${enabled ? '' : 'opacity-35 grayscale'}`}
+            className={`relative aspect-[16/6] w-full corners-[14px] bg-cover bg-center transition-[opacity,filter] duration-200 ${enabled ? '' : 'opacity-35 grayscale'}`}
             style={{ backgroundImage: `url("${previewSrc}")` }}
             aria-hidden="true"
           >
@@ -896,7 +898,7 @@ function AccountModal({
       role="presentation"
     >
       <section
-        className="account-modal-card flex h-[600px] w-[min(780px,100%)] max-h-[calc(100vh-40px)] flex-col overflow-hidden rounded-[22px] border border-[var(--color-border)] bg-[var(--color-bg)] text-[var(--color-text)] animate-modal-card-in max-sm:h-[calc(100dvh-28px)] max-sm:max-h-none"
+        className="account-modal-card flex h-[600px] w-[min(780px,100%)] max-h-[calc(100vh-40px)] flex-col overflow-hidden corners-[22px] border border-[var(--color-border)] bg-[var(--color-bg)] text-[var(--color-text)] animate-modal-card-in max-sm:h-[calc(100dvh-28px)] max-sm:max-h-none"
         role="dialog"
         aria-modal="true"
         aria-labelledby="account-modal-title"
@@ -910,14 +912,7 @@ function AccountModal({
             Réglages
           </h2>
 
-          <button
-            type="button"
-            className="inline-flex h-[38px] w-[38px] items-center justify-center rounded-full border border-[rgba(27,27,27,0.16)] bg-[#f3f1eb] p-0 text-[var(--color-text)] transition-colors duration-[120ms] ease-in-out hover:bg-[#edebe5] dark:border-[var(--color-border)] dark:bg-[var(--color-bg-muted)] dark:hover:bg-[var(--color-bg-subtle)]"
-            onClick={onClose}
-            aria-label="Fermer les réglages"
-          >
-            <Icon icon="carbon:close" className="h-4 w-4" aria-hidden="true" />
-          </button>
+          <CloseButton large label="Fermer les réglages" onClick={onClose} />
         </div>
 
         <div className="flex min-h-0 flex-1 max-sm:flex-col">

@@ -7,7 +7,7 @@ export const id = 'univ-rennes'
 export const university = {
   name: 'Université de Rennes',
   shortName: 'Rennes',
-  // /rennes opens the login page of this university.
+  // /rennes: this university's landing page (its button to its login).
   slug: 'rennes',
 }
 
@@ -18,13 +18,16 @@ export const branding = {
   defaultTitle: "Tafac | Cours, notes et services de ton université",
   // Says what it is and that it isn't the university's (search results,
   // link previews, the installed app).
-  seoTitle: "Tafac – client non officiel de l'ENT de l'Université de Rennes",
+  seoTitle: "Tafac – Ton ENT de l'Université de Rennes en une app",
   seoDescription:
-    "Emploi du temps, notes ScoDoc, mails et rendus Moodle sur une seule page. Projet étudiant libre, non affilié à l'Université de Rennes. Testé à l'IUT de Lannion.",
+    "Emploi du temps ADE, notes ScoDoc, mails et rendus Moodle de l'Université de Rennes sur une seule page. Projet étudiant libre, non affilié à l'université.",
   pwaDescription:
     "Emploi du temps, notes ScoDoc, mails et rendus Moodle sur une seule page. Projet étudiant non affilié à l'Université de Rennes.",
   // Former names, for search engines (the site's name in results).
   alternateNames: ["l'ent"],
+  // How the landing's copy names the university mid-sentence ({university}
+  // in src/landingCopy.json; on tafac.fr/rennes).
+  nameInText: 'l’Université de Rennes',
   logoAlt: 'Université de Rennes',
   sidebarLogoAlt: "Tafac - Université de Rennes",
   loginFooterLine: "Projet étudiant non officiel, non affilié à l'Université de Rennes",

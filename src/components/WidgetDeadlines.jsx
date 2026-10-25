@@ -25,8 +25,8 @@ const URGENT_WINDOW_MS = 48 * HOUR_MS
 const MOODLE_HREF_KEY = 'l-ent:moodle-href'
 
 // Phones: 44px rows (touch targets), hence the taller card there.
-const CARD_CLASSES = 'moodle-deadlines-widget widget-card shadow-md flex-[0_1_360px] h-[140px] p-4 border border-white rounded-[22px] overflow-hidden bg-widget-bg text-base leading-6 min-w-0 max-2xl:flex-[1_1_calc(50%-6px)] max-2xl:min-w-0 max-md:h-[124px] max-md:p-3 max-md:rounded-[20px] max-xs:flex-[1_1_100%] max-xs:h-[140px] relative flex flex-col gap-[6px] text-text'
-const ROW_CLASSES = 'grid grid-cols-[14px_minmax(0,1fr)_auto] content-center items-center gap-x-[7px] gap-y-[3px] h-[38px] px-1.5 rounded-[10px] min-w-0 max-md:h-[36px] max-xs:h-11'
+const CARD_CLASSES = 'moodle-deadlines-widget widget-card shadow-md flex-[0_1_360px] h-[140px] p-4 border border-white card-corners overflow-hidden bg-widget-bg text-base leading-6 min-w-0 max-2xl:flex-[1_1_calc(50%-6px)] max-2xl:min-w-0 max-md:h-[124px] max-md:p-3 max-xs:flex-[1_1_100%] max-xs:h-[140px] relative flex flex-col gap-[6px] text-text'
+const ROW_CLASSES = 'grid grid-cols-[14px_minmax(0,1fr)_auto] content-center items-center gap-x-[7px] gap-y-[3px] h-[38px] px-1.5 corners-[10px] min-w-0 max-md:h-[36px] max-xs:h-11'
 
 const TYPE_ICONS = {
   assign: 'carbon:document',
@@ -137,7 +137,7 @@ function DeadlineRowsPlaceholder() {
     <div className="flex-1 flex flex-col gap-1 -mx-1.5" role="status" aria-label="Chargement des échéances">
       {[['w-[70%]', 'w-[46%]'], ['w-[56%]', 'w-[52%]']].map(([titleWidth, courseWidth]) => (
         <div key={titleWidth} className={ROW_CLASSES} aria-hidden="true">
-          <span className={`text-placeholder-shimmer block w-3 h-3 rounded-[4px] ${SHIMMER_CLASSES}`} />
+          <span className={`text-placeholder-shimmer block w-3 h-3 corners-[4px] ${SHIMMER_CLASSES}`} />
           <span className={`text-placeholder-shimmer block h-2.5 rounded-full ${titleWidth} ${SHIMMER_CLASSES}`} />
           <span className={`text-placeholder-shimmer block h-2.5 w-14 rounded-full ${SHIMMER_CLASSES}`} />
           <span />

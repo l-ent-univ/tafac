@@ -6,7 +6,7 @@ import CardInfoTip from './CardInfoTip'
 
 // Square, as tall as the average card beside it; on phones a card of the
 // overview's strip, last (after "UE validées").
-const CARD_CLASSES = 'ects-widget widget-card shadow-md size-[188px] shrink-0 p-4 border rounded-[22px] overflow-hidden text-base leading-6 border-white bg-widget-bg flex flex-col gap-[6px] text-text max-md:order-2 max-md:h-auto max-md:min-h-[160px] max-md:w-auto max-md:flex-[1_0_clamp(136px,40%,170px)] max-md:snap-start max-md:p-3 max-md:rounded-[20px] relative'
+const CARD_CLASSES = 'ects-widget widget-card shadow-md size-[188px] shrink-0 p-4 border card-corners overflow-hidden text-base leading-6 border-white bg-widget-bg flex flex-col gap-[6px] text-text max-md:order-2 max-md:h-auto max-md:min-h-[160px] max-md:w-auto max-md:flex-[1_0_clamp(136px,40%,170px)] max-md:snap-start max-md:p-3 relative'
 
 // The piles' drawing space (the card's width, its lower part) and a coin:
 // a face (an ellipse) on an edge `THICKNESS` deep, `STEP` apart in a pile.

@@ -30,6 +30,63 @@
   border-color: rgba(255, 255, 255, 0.08);
 }
 
+/* ── Widget corners ──
+   The cards' corners: a smooth curve (corner-shape: superellipse(1.3)) where
+   the browser draws it (Chrome, Edge), else the round corner closest to it
+   (0.85 × its radius: Safari, Firefox), the same shape within a quarter of a
+   pixel. card-corners for the widgets, card-corners-sm for the smaller cards
+   (app tiles, Planning's list, the grades' notice). Inner layers follow with
+   border-radius and corner-shape: inherit (rounded-[inherit] below). */
+
+.card-corners {
+  border-radius: 31px;
+}
+
+.card-corners-sm {
+  border-radius: 22px;
+}
+
+@media (width < 48rem) {
+  .card-corners {
+    border-radius: 27px;
+  }
+
+  .card-corners-sm {
+    border-radius: 20px;
+  }
+}
+
+@supports (corner-shape: superellipse(1.3)) {
+  .card-corners,
+  .card-corners-sm {
+    corner-shape: superellipse(1.3);
+  }
+
+  .card-corners {
+    border-radius: 36px;
+  }
+
+  .card-corners-sm {
+    border-radius: 26px;
+  }
+
+  @media (width < 48rem) {
+    .card-corners {
+      border-radius: 32px;
+    }
+
+    .card-corners-sm {
+      border-radius: 24px;
+    }
+  }
+}
+
+/* A layer that takes its parent's corners takes its curve too: corner-shape
+   isn't inherited by itself. */
+.rounded-\[inherit\] {
+  corner-shape: inherit;
+}
+
 /* ── Sidebar: floating frosted panel ── */
 
 .sidebar-panel {
@@ -160,8 +217,38 @@
 }
 
 /* A sheet's close button (a grade's, a class's), of the tab bar's glass. */
+/* ── Close button (CloseButton) ──
+   A soft tint of the text colour (plain) or frosted glass (below), the ×
+   a little muted until hovered; it gives a little when pressed. */
+
+.close-button {
+  transition: background-color 120ms ease, transform 100ms ease-out;
+}
+
+.close-button svg {
+  opacity: 0.72;
+  transition: opacity 120ms ease;
+}
+
+.close-button:active:not(:disabled) {
+  transform: scale(0.92);
+}
+
+.close-button--plain {
+  background-color: color-mix(in srgb, var(--color-text) 7%, transparent);
+}
+
+@media (hover: hover) {
+  .close-button:hover:not(:disabled) svg {
+    opacity: 1;
+  }
+
+  .close-button--plain:hover:not(:disabled) {
+    background-color: color-mix(in srgb, var(--color-text) 12%, transparent);
+  }
+}
+
 .glass-close-button {
-  border: 1px solid rgb(255 255 255 / 0.7);
   background-color: rgb(252 251 248 / 0.45);
   background-image: linear-gradient(180deg, rgb(255 255 255 / 0.45), rgb(255 255 255 / 0.08));
   -webkit-backdrop-filter: blur(22px) saturate(1.8);
@@ -171,13 +258,8 @@
     inset 0 -1px 0 rgb(52 18 0 / 0.04),
     0 6px 16px -6px rgb(52 18 0 / 0.22),
     0 1px 4px rgb(52 18 0 / 0.08);
-  cursor: pointer;
-  transition: background-color 120ms ease, transform 100ms ease-out;
 }
 
-.glass-close-button:active {
-  transform: scale(0.94);
-}
 
 @media (hover: hover) {
   .glass-close-button:hover {
@@ -186,7 +268,6 @@
 }
 
 :where([data-theme="dark"]) .glass-close-button {
-  border-color: rgb(255 255 255 / 0.12);
   background-color: rgb(28 28 28 / 0.45);
   background-image: linear-gradient(180deg, rgb(255 255 255 / 0.1), rgb(255 255 255 / 0.02));
   box-shadow:
@@ -251,52 +332,32 @@
   }
 }
 
-/* ── Primary button depth ── */
+/* ── Primary button (LentButton) ──
+   The brand colour, flat, on a soft shadow that deepens on hover; pressed,
+   it settles (and shrinks a little, in LentButton). */
 
 .lent-button {
-  background: linear-gradient(180deg, #2a2a2a 0%, #111111 100%);
-  box-shadow:
-    0 1px 0 0 rgba(255, 255, 255, 0.12) inset,
-    0 6px 16px -4px rgba(0, 0, 0, 0.35),
-    0 2px 6px -2px rgba(0, 0, 0, 0.2);
+  background-color: var(--color-brand);
+  color: var(--color-bg);
+  box-shadow: 0 1px 2px rgb(52 18 0 / 0.14), 0 6px 14px -6px rgb(52 18 0 / 0.4);
+  transition: background-color 150ms ease, box-shadow 150ms ease, transform 100ms ease-out, opacity 150ms ease;
 }
 
 .lent-button:hover:not(:disabled) {
-  background: linear-gradient(180deg, #333333 0%, #1a1a1a 100%);
-  box-shadow:
-    0 1px 0 0 rgba(255, 255, 255, 0.15) inset,
-    0 8px 20px -4px rgba(0, 0, 0, 0.4),
-    0 3px 8px -2px rgba(0, 0, 0, 0.25);
+  background-color: var(--color-brand-hover);
+  box-shadow: 0 1px 2px rgb(52 18 0 / 0.16), 0 10px 20px -8px rgb(52 18 0 / 0.45);
 }
 
 .lent-button:active:not(:disabled) {
-  box-shadow:
-    0 1px 0 0 rgba(255, 255, 255, 0.08) inset,
-    0 2px 6px -2px rgba(0, 0, 0, 0.2);
+  box-shadow: 0 1px 2px rgb(52 18 0 / 0.14);
 }
 
 :where([data-theme="dark"]) .lent-button {
-  background: linear-gradient(180deg, #e8e8e8 0%, #d0d0d0 100%);
-  color: #111;
-  box-shadow:
-    0 1px 0 0 rgba(255, 255, 255, 0.5) inset,
-    0 6px 16px -4px rgba(0, 0, 0, 0.5),
-    0 2px 6px -2px rgba(0, 0, 0, 0.3);
+  box-shadow: 0 1px 2px rgb(0 0 0 / 0.4), 0 6px 14px -6px rgb(0 0 0 / 0.6);
 }
 
 :where([data-theme="dark"]) .lent-button:hover:not(:disabled) {
-  background: linear-gradient(180deg, #f0f0f0 0%, #dcdcdc 100%);
-  box-shadow:
-    0 1px 0 0 rgba(255, 255, 255, 0.6) inset,
-    0 8px 20px -4px rgba(0, 0, 0, 0.55),
-    0 3px 8px -2px rgba(0, 0, 0, 0.35);
-}
-
-:where([data-theme="dark"]) .lent-button:active:not(:disabled) {
-  background: linear-gradient(180deg, #d4d4d4 0%, #c0c0c0 100%);
-  box-shadow:
-    0 1px 0 0 rgba(255, 255, 255, 0.3) inset,
-    0 2px 6px -2px rgba(0, 0, 0, 0.3);
+  box-shadow: 0 1px 2px rgb(0 0 0 / 0.45), 0 10px 20px -8px rgb(0 0 0 / 0.7);
 }
 
 /* ── Custom scrollbars ──
@@ -647,13 +708,11 @@
   from {
     opacity: 0;
     transform: translateY(12px);
-    filter: blur(8px);
   }
 
   to {
     opacity: 1;
     transform: translateY(0);
-    filter: blur(0);
   }
 }
 
@@ -1476,6 +1535,7 @@
   inset: -6px;
   z-index: -1;
   border-radius: inherit;
+  corner-shape: inherit;
   background: currentColor;
   opacity: 0;
 }
@@ -2631,26 +2691,81 @@
   background-color: color-mix(in srgb, var(--color-brand) 4%, var(--color-widget-bg));
 }
 
-/* Mes notes' "Simuler" button: a cream brown, warmer than the page's
-   beige, so it reads as the way into something to play with. */
+/* Mes notes' "Simuler" button: white like the cards, lifted by a shadow,
+   with the semester's UE colours washed softly up from its bottom edge and
+   drifting slowly back and forth (--simulate-wash, set by the button; the
+   brand's without UE colours), so it reads as the way into something to
+   play with. With a mouse, the wash also leans towards the pointer
+   (--simulate-shift, -1 to 1, set by the button). */
 .simulate-button {
-  border-color: #dcc5a6;
-  background-color: #ead8bf;
-  color: #4a2a12;
+  --simulate-wash: linear-gradient(100deg, var(--color-brand), #e9b44c, var(--color-brand));
+  border-color: #ffffff;
+  background-color: #ffffff;
+  color: var(--color-text);
+  box-shadow: 0 1px 3px rgb(52 18 0 / 0.08), 0 8px 20px -10px rgb(52 18 0 / 0.28);
+  transition: box-shadow 150ms ease, transform 100ms ease-out;
 }
 
-.simulate-button:hover {
-  background-color: #e3cdae;
+.simulate-button:active {
+  transform: scale(0.96);
+}
+
+/* Clips the wash, wider than the button so it has room to lean, and fades
+   it out towards the top: a tint rising from the bottom, not a fill. */
+.simulate-button-wash-frame {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  overflow: hidden;
+  opacity: 0.26;
+  -webkit-mask-image: linear-gradient(to top, #000 0%, transparent 95%);
+  mask-image: linear-gradient(to top, #000 0%, transparent 95%);
+  transition: opacity 150ms ease;
+}
+
+.simulate-button-wash {
+  position: absolute;
+  inset: 0 -30%;
+  background-image: var(--simulate-wash);
+  background-size: 300% 100%;
+  translate: calc(var(--simulate-shift, 0) * 18%) 0;
+  transition: translate 600ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .simulate-button-wash {
+    animation: simulate-wash-drift 9s ease-in-out infinite alternate;
+  }
+}
+
+@keyframes simulate-wash-drift {
+  from {
+    background-position: 0% 50%;
+  }
+
+  to {
+    background-position: 100% 50%;
+  }
+}
+
+@media (hover: hover) {
+  .simulate-button:hover {
+    box-shadow: 0 1px 3px rgb(52 18 0 / 0.1), 0 12px 26px -12px rgb(52 18 0 / 0.34);
+  }
+
+  .simulate-button:hover .simulate-button-wash-frame {
+    opacity: 0.38;
+  }
 }
 
 :where([data-theme="dark"]) .simulate-button {
-  border-color: #5c4630;
-  background-color: #4a3825;
-  color: #f1e2cc;
+  border-color: rgb(255 255 255 / 0.08);
+  background-color: #1c1c1c;
+  box-shadow: 0 1px 3px rgb(0 0 0 / 0.4), 0 8px 20px -10px rgb(0 0 0 / 0.7);
 }
 
-:where([data-theme="dark"]) .simulate-button:hover {
-  background-color: #56422c;
+:where([data-theme="dark"]) .simulate-button-wash-frame {
+  opacity: 0.34;
 }
 
 /* ── "Dernières notes" UE wash ──
@@ -2754,7 +2869,7 @@
    it half see-through mid-way, and their clip cut the shadow off). The
    snapshots are clipped to the card's corners, not the shadow. */
 ::view-transition-group(*.ue-card) {
-  border-radius: 24px;
+  border-radius: 31px;
   background: var(--color-widget-bg);
   box-shadow: 0 0 0 1px rgb(52 18 0 / 0.04), 0 1px 3px rgb(52 18 0 / 0.06), 0 10px 28px -14px rgb(52 18 0 / 0.16);
 }
@@ -2765,7 +2880,16 @@
 
 ::view-transition-image-pair(*.ue-card) {
   overflow: clip;
-  border-radius: 24px;
+  border-radius: 31px;
+}
+
+/* As the cards' (card-corners). */
+@supports (corner-shape: superellipse(1.3)) {
+  ::view-transition-group(*.ue-card),
+  ::view-transition-image-pair(*.ue-card) {
+    border-radius: 36px;
+    corner-shape: superellipse(1.3);
+  }
 }
 
 ::view-transition-old(*.ue-card),
@@ -3500,6 +3624,7 @@
     position: absolute;
     inset: 0;
     border-radius: inherit;
+    corner-shape: inherit;
     background: inherit;
     animation: nav-new-pulse 2.2s cubic-bezier(0.2, 0.8, 0.2, 1) 0.6s 6 backwards;
   }
@@ -3785,6 +3910,7 @@
   position: absolute;
   inset: 0;
   border-radius: inherit;
+  corner-shape: inherit;
   border: 1px solid transparent;
   background: linear-gradient(180deg, rgba(255, 255, 255, 0.9), transparent 70%) border-box;
   -webkit-mask:
@@ -4069,6 +4195,11 @@
   padding: 9px 11px;
   border: 1px solid rgba(255, 255, 255, 0.16);
   border-radius: 14px;
+
+  @supports (corner-shape: superellipse(1.3)) {
+    border-radius: calc(14px / 0.853);
+    corner-shape: superellipse(1.3);
+  }
   background: rgba(17, 17, 17, 0.94);
   color: #ffffff;
   box-shadow: 0 14px 30px rgba(17, 17, 17, 0.2);
@@ -4293,6 +4424,7 @@
   inset: 0;
   z-index: -1;
   border-radius: inherit;
+  corner-shape: inherit;
   opacity: 0.14;
   pointer-events: none;
   -webkit-mask-image: linear-gradient(to right, #000 0%, rgb(0 0 0 / 0.3) 100%);
@@ -4324,6 +4456,11 @@
 .subject-evaluation {
   border: 1px solid var(--color-border);
   border-radius: 16px;
+
+  @supports (corner-shape: superellipse(1.3)) {
+    border-radius: calc(16px / 0.853);
+    corner-shape: superellipse(1.3);
+  }
   background-color: var(--color-widget-bg);
   box-shadow: 0 6px 18px -8px var(--color-shadow);
   transition:
@@ -4864,6 +5001,11 @@
   padding: 0;
   border: 0;
   border-radius: 14px;
+
+  @supports (corner-shape: superellipse(1.3)) {
+    border-radius: calc(14px / 0.853);
+    corner-shape: superellipse(1.3);
+  }
   background: transparent;
   cursor: pointer;
 }
@@ -4935,6 +5077,11 @@
   height: 32px;
   border: 0;
   border-radius: 10px;
+
+  @supports (corner-shape: superellipse(1.3)) {
+    border-radius: calc(10px / 0.853);
+    corner-shape: superellipse(1.3);
+  }
   background: transparent;
   color: var(--color-brand);
   cursor: pointer;
@@ -5333,6 +5480,11 @@ li + li > .planning-row .planning-row-text {
   padding: 4px 6px;
   border: 0;
   border-radius: 8px;
+
+  @supports (corner-shape: superellipse(1.3)) {
+    border-radius: calc(8px / 0.853);
+    corner-shape: superellipse(1.3);
+  }
   background: transparent;
   color: var(--color-brand);
   font: inherit;

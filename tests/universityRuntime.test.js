@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { pickBootUniversity, readEntryPath } from '../src/universityRuntime.js'
+import { pickBootUniversity, readEntryPath, readSeoPage } from '../src/universityRuntime.js'
 import {
   STORAGE_UNIVERSITY_KEY,
   UNIVERSITY_SETTINGS_PREFIX,
@@ -114,4 +114,23 @@ test('switchUniversityStorage: no known owner keeps the data', () => {
   const storage = memoryStorage({ 'l-ent:student-tp': 'tp' })
   assert.equal(switchUniversityStorage('univ-exemple', { storage }), false)
   assert.equal(storage.getItem('l-ent:student-tp'), 'tp')
+})
+
+test('SEO page: a university\'s /<slug> has its own text and address, elsewhere Tafac\'s', () => {
+  const rennes = { seoTitle: 'Rennes' }
+  const neutral = { seoTitle: 'Tafac' }
+  const university = { id: 'univ-rennes', slug: 'rennes' }
+  const page = (pathname, overrides = {}) => readSeoPage({
+    pathname, multiUniversity: true, university, branding: rennes, neutral, ...overrides,
+  })
+
+  assert.deepEqual(page('/rennes'), { path: '/rennes', branding: rennes })
+  assert.deepEqual(page('/Rennes/'), { path: '/rennes', branding: rennes })
+  // Rennes picked, on another address: the neutral page's.
+  assert.deepEqual(page('/'), { path: '/', branding: neutral })
+  assert.deepEqual(page('/login'), { path: '/', branding: neutral })
+  // No university loaded (or a dev-only one, not listed).
+  assert.deepEqual(page('/rennes', { university: null }), { path: '/', branding: neutral })
+  // One university on the server: its own text, at /.
+  assert.deepEqual(page('/rennes', { multiUniversity: false }), { path: '/', branding: rennes })
 })

@@ -5,7 +5,8 @@ import landingCopy from './landingCopy.json'
 
 // Every string of the landing page, in landingCopy.json (edited by hand).
 // The strings are plain text with a little markup, read by renderCopy:
-// - {appName}, {year}: filled in here;
+// - {appName}, {year}, {university} (branding.nameInText: « votre
+//   université » on the neutral page): filled in here;
 // - **text**: put forward (the security section's green);
 // - [text](link): a link, `link` one of LINKS' names (without the repo,
 //   the text alone);
@@ -25,6 +26,7 @@ const LINKS = {
 const VARIABLES = {
   appName: universityConfig.branding.appName,
   year: String(new Date().getFullYear()),
+  university: universityConfig.branding.nameInText ?? 'votre université',
 }
 
 const DEFAULT_LINK_CLASSES = 'font-semibold text-text underline decoration-text-30 underline-offset-[3px] transition-colors hover:decoration-text'

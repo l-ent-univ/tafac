@@ -13,7 +13,7 @@ import PapillonBadge from './PapillonBadge'
 import RenameNotice from './RenameNotice'
 import ServiceNotice from './ServiceNotice'
 import { APP_NAME } from '../seo'
-import { getListedUniversities, getLoadedUniversityId } from '../universityRuntime'
+import { getListedUniversities, getLoadedUniversityId, writeUniversityChoice } from '../universityRuntime'
 
 const universityLogo = universityConfig.branding.logo
 const universityLogoAlt = universityConfig.branding.logoAlt ?? universityConfig.university?.name ?? ''
@@ -28,11 +28,10 @@ const PANEL_WIDTH = 'min(529px, 47vw)'
 // Pill fields like the rest of the app's inputs, in the widget colour so they
 // stand out on the page. Focus keeps the app-wide outline (index.css).
 const FIELD_CLASS = 'box-border w-full min-h-[52px] rounded-full border border-border-input bg-widget-bg px-[18px] py-[15px] text-base leading-none text-text font-body transition-[border-color,box-shadow] duration-150 hover:border-text-30 focus-visible:border-text-60'
-const LINK_CLASS = 'rounded-sm text-[14px] font-medium leading-[1.2] text-text-70 underline decoration-text-30 underline-offset-[3px] transition-colors duration-120 hover:text-text hover:decoration-current font-body'
+const LINK_CLASS = 'corners-[4px] text-[14px] font-medium leading-[1.2] text-text-70 underline decoration-text-30 underline-offset-[3px] transition-colors duration-120 hover:text-text hover:decoration-current font-body'
 
 // No university picked yet (tafac.fr serves them all): the page lists them
-// instead of the form. Each one is a link to /<slug>, which boots the page
-// for that university (src/universityBoot.js) and lands on its form.
+// instead of the form. Each one is a link to its form (openUniversityLogin).
 const isPicker = universityConfig.neutral === true
 // A university picked: the others the server lists, under the form (« aussi
 // disponible pour »), each to its own form. None on a single-university
@@ -40,6 +39,15 @@ const isPicker = universityConfig.neutral === true
 const otherUniversities = isPicker
   ? []
   : getListedUniversities().filter((entry) => entry.id !== getLoadedUniversityId())
+// A university's link: /<slug> (its landing page, for search engines and a
+// new tab), but a plain click goes straight to its form: picked, then the
+// page boots again for it (src/universityBoot.js) on the login page.
+function openUniversityLogin(event, entry) {
+  if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return
+  event.preventDefault()
+  writeUniversityChoice(entry.id)
+  window.location.assign('/login')
+}
 const issuesUrl = repoUrl ? `${repoUrl.replace(/\/$/, '')}/issues` : null
 // The guide to adding a university, in the repo.
 const addUniversityUrl = repoUrl ? `${repoUrl.replace(/\/$/, '')}/blob/main/docs/ADDING_A_UNIVERSITY.md` : null
@@ -79,6 +87,7 @@ function UniversityPicker() {
             key={entry.id}
             className="group box-border flex min-h-[76px] items-center gap-4 rounded-full border border-border-input bg-widget-bg py-3 pl-6 pr-5 text-left text-text no-underline transition-[border-color] duration-150 hover:border-text-30 focus-visible:border-text-60 max-md:gap-3 max-md:pl-5 max-md:pr-4"
             href={`/${entry.slug}`}
+            onClick={(event) => openUniversityLogin(event, entry)}
           >
             <span className="flex h-11 w-[120px] shrink-0 items-center justify-start max-md:w-[96px]">
               {entry.logoUrl ? (
@@ -331,7 +340,7 @@ function LoginPage({
                   <div className={`grid transition-[grid-template-rows] duration-200 ease-out ${errorMessage ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]'}`}>
                     <div className="overflow-hidden">
                       <div className="pt-4" role="alert">
-                        <div className={`flex items-start gap-[10px] rounded-[14px] border border-error/20 bg-error-bg px-4 py-3 text-error transition-opacity duration-200 ${errorMessage ? 'opacity-100' : 'opacity-0'}`}>
+                        <div className={`flex items-start gap-[10px] corners-[14px] border border-error/20 bg-error-bg px-4 py-3 text-error transition-opacity duration-200 ${errorMessage ? 'opacity-100' : 'opacity-0'}`}>
                           <Icon icon="carbon:warning-filled" className="mt-px h-4 w-4 shrink-0" aria-hidden="true" />
                           <p className="m-0 text-sm font-semibold leading-[1.3] font-body">{errorMessage}</p>
                         </div>
@@ -339,7 +348,7 @@ function LoginPage({
                     </div>
                   </div>
 
-                  <LentButton type="submit" className="mt-5 w-full font-bold!" loading={checking}>
+                  <LentButton type="submit" className="mt-5 min-h-[52px]! w-full text-[16px]!" loading={checking}>
                     Se connecter
                   </LentButton>
                 </form>
@@ -361,7 +370,7 @@ function LoginPage({
 
                 {/* What happens to the password. */}
                 {passwordNote ? (
-                  <p className="m-0 mt-5 box-border w-full rounded-[16px] border border-border bg-widget-bg px-4 py-3 text-[13px] font-medium leading-[1.4] text-text-muted font-body">
+                  <p className="m-0 mt-5 box-border w-full corners-[16px] border border-border bg-widget-bg px-4 py-3 text-[13px] font-medium leading-[1.4] text-text-muted font-body">
                     <Icon icon="carbon:locked" className="mr-[6px] inline-block h-[14px] w-[14px] align-[-2px]" aria-hidden="true" />
                     {passwordNote}
                   </p>
@@ -374,7 +383,7 @@ function LoginPage({
         </div>
 
         <div className="flex shrink-0 flex-col items-center gap-3 px-6 pb-5 text-center max-3xl:px-5 max-md:px-4">
-          {/* The other universities, to their own form (/<slug>). */}
+          {/* The other universities, to their own form. */}
           {otherUniversities.length > 0 ? (
             <div
               className="flex flex-wrap items-center justify-center gap-x-5 gap-y-3"
@@ -387,8 +396,9 @@ function LoginPage({
                 {otherUniversities.map((entry) => (
                   <a
                     key={entry.id}
-                    className="rounded-md opacity-40 transition-opacity duration-120 hover:opacity-75 focus-visible:opacity-75"
+                    className="corners-[6px] opacity-40 transition-opacity duration-120 hover:opacity-75 focus-visible:opacity-75"
                     href={`/${entry.slug}`}
+                    onClick={(event) => openUniversityLogin(event, entry)}
                     title={`Se connecter — ${entry.name}`}
                   >
                     {entry.logoUrl ? (

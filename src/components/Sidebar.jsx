@@ -162,7 +162,7 @@ function Sidebar({
   return (
     <>
       <aside
-        className="sidebar-panel hidden 4xl:flex flex-col justify-between p-5 w-[var(--sidebar-width,280px)] fixed top-3 left-3 bottom-3 z-30 rounded-[24px] border overflow-y-auto"
+        className="sidebar-panel hidden 4xl:flex flex-col justify-between p-5 w-[var(--sidebar-width,280px)] fixed top-3 left-3 bottom-3 z-30 card-corners border overflow-y-auto"
         aria-label="Navigation principale"
       >
         <div className="flex flex-col gap-6 w-full">
@@ -221,7 +221,7 @@ function Sidebar({
                   {item.disabled ? (
                     <span
                       role="tooltip"
-                      className="pointer-events-none absolute left-1/2 top-full z-30 mt-2 flex flex-col gap-[2px] w-max max-w-[260px] -translate-x-1/2 -translate-y-1 scale-95 whitespace-normal text-center rounded-[14px] border border-black/10 bg-black px-3 py-[6px] text-[12px] font-medium leading-tight text-white opacity-0 shadow-[0_12px_32px_rgba(0,0,0,0.18)] transition-[opacity,transform] duration-180 ease-out invisible group-hover:visible group-hover:translate-y-0 group-hover:scale-100 group-hover:opacity-100 group-focus-visible:visible group-focus-visible:translate-y-0 group-focus-visible:scale-100 group-focus-visible:opacity-100 dark:border-white/15 dark:bg-white dark:text-black"
+                      className="pointer-events-none absolute left-1/2 top-full z-30 mt-2 flex flex-col gap-[2px] w-max max-w-[260px] -translate-x-1/2 -translate-y-1 scale-95 whitespace-normal text-center corners-[14px] border border-black/10 bg-black px-3 py-[6px] text-[12px] font-medium leading-tight text-white opacity-0 shadow-[0_12px_32px_rgba(0,0,0,0.18)] transition-[opacity,transform] duration-180 ease-out invisible group-hover:visible group-hover:translate-y-0 group-hover:scale-100 group-hover:opacity-100 group-focus-visible:visible group-focus-visible:translate-y-0 group-focus-visible:scale-100 group-focus-visible:opacity-100 dark:border-white/15 dark:bg-white dark:text-black"
                     >
                       <span className="block font-semibold">{item.disabledTitle}</span>
                       {item.disabledDetail ? (

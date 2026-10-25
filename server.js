@@ -17,12 +17,13 @@ import { readFileSync } from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { shutdownAllAnalytics } from './server/analytics.js'
-import { fillBrandingPlaceholders, fillPublicOrigin } from './server/appShell.js'
+import { fillBrandingPlaceholders, fillPagePath, fillPublicOrigin } from './server/appShell.js'
 import { createUniversitiesApp } from './server/universitiesApp.js'
 import { branding as neutralBranding } from './universities/neutral.js'
 import {
   listServedUniversityIds,
   loadSharedConfig,
+  loadUniversityDirectoryEntry,
   resolveMultiUniversity,
   resolveUniversityId,
 } from './universities/index.js'
@@ -56,6 +57,21 @@ const universityIds = MULTI_UNIVERSITY ? listServedUniversityIds() : [defaultUni
 // SEO text of the page: Tafac's when every university is served, the
 // university's own when it's the only one.
 const pageBranding = MULTI_UNIVERSITY ? neutralBranding : (await loadSharedConfig(defaultUniversityId)).branding
+
+// Every university served (tafac.fr): each one's /<slug> is its own landing
+// page while signed out, with its SEO text, so it comes up when students
+// search for their university. Not the dev-only ones (the demo). By slug;
+// its id (with or without dashes) leads there too.
+const universityPages = new Map()
+if (MULTI_UNIVERSITY) {
+  for (const id of universityIds) {
+    const entry = await loadUniversityDirectoryEntry(id)
+    if (entry.devOnly) continue
+    const page = { id, path: `/${entry.slug}`, branding: (await loadSharedConfig(id)).branding }
+    for (const name of [entry.slug, id, id.replace(/-/g, '')]) universityPages.set(name, page)
+  }
+}
+const listedUniversityPages = [...new Set(universityPages.values())]
 
 // This is the production entry point: SESSION_SECRET is mandatory here and
 // the session cookie is Secure/__Host- (see server/sessionCookie.js).
@@ -93,13 +109,19 @@ app.get('/sitemap.xml', (req, res) => {
     <changefreq>weekly</changefreq>
     <priority>1.0</priority>
   </url>
-</urlset>`)
+${listedUniversityPages.map((page) => `  <url>
+    <loc>${origin}${page.path}</loc>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+  </url>
+`).join('')}</urlset>`)
 })
 
-// The landing page as static HTML, with its FAQ's structured data, rendered
-// at build time (scripts/prerender-landing.mjs). Every university: the
-// neutral landing tafac.fr shows. Absent (a build without it, or one
-// university only): the page goes without.
+// The landing pages as static HTML, with their FAQ's structured data,
+// rendered at build time (scripts/prerender-landing.mjs): `home`, the
+// neutral one tafac.fr shows at /, and `universities`, each university's own
+// (/<slug>) by id. Absent (a build without it, or one university only): the
+// pages go without.
 function readPrerenderedLanding() {
   if (!MULTI_UNIVERSITY) return null
   try {
@@ -138,18 +160,27 @@ function isClientPath(pathname) {
 // The built page, read and filled with the SEO text once; its
 // __PUBLIC_ORIGIN__ (canonical, link previews, structured data) becomes this
 // request's address, so link previews, which don't run the app, get absolute
-// URLs on every address. The home page, signed out: with the landing in it.
-let appShell = null
-let landingShell = null
+// URLs on every address. Signed out, the home page and each university's
+// page come with their landing in them.
+let shells = null
+function readShells() {
+  const template = readFileSync(path.join(DIST_DIR, 'index.html'), 'utf8')
+  const landing = readPrerenderedLanding()
+  const app = fillBrandingPlaceholders(template, pageBranding)
+  const universities = new Map()
+  for (const page of listedUniversityPages) {
+    const shell = fillPagePath(fillBrandingPlaceholders(template, page.branding), page.path)
+    const prerendered = landing?.universities?.[page.id]
+    universities.set(page.id, prerendered ? withPrerenderedLanding(shell, prerendered) : shell)
+  }
+  return { app, home: landing?.home ? withPrerenderedLanding(app, landing.home) : app, universities }
+}
+
 function sendAppShell(req, res, next) {
   const origin = getSafePublicOrigin(req)
 
   try {
-    if (!appShell) {
-      appShell = fillBrandingPlaceholders(readFileSync(path.join(DIST_DIR, 'index.html'), 'utf8'), pageBranding)
-      const landing = readPrerenderedLanding()
-      landingShell = landing ? withPrerenderedLanding(appShell, landing) : appShell
-    }
+    shells ??= readShells()
   } catch (error) {
     next(error)
     return
@@ -161,15 +192,27 @@ function sendAppShell(req, res, next) {
   } catch {
     // Malformed: matches no client path.
   }
+  // A university's page under another spelling (its id, a capital, a
+  // trailing slash): to its own address, the one search engines keep.
+  const universityPage = universityPages.get(pathname.replace(/\/+$/, '').slice(1).toLowerCase())
+  if (universityPage && pathname !== universityPage.path) {
+    const query = req.originalUrl.slice(req.path.length)
+    res.redirect(301, `${universityPage.path}${query}`)
+    return
+  }
+
   const isHome = pathname === '/'
   const isSignedOut = !SESSION_COOKIE_PATTERN.test(req.headers.cookie ?? '')
-  const shell = isHome && isSignedOut ? landingShell : appShell
+  const shownPage = isSignedOut ? universityPage : null
+  let shell = shells.app
+  if (isSignedOut && isHome) shell = shells.home
+  else if (shownPage) shell = shells.universities.get(shownPage.id)
 
   res.status(isClientPath(pathname) ? 200 : 404)
   res.setHeader('Content-Language', 'fr')
-  // Signed out or in, / is one address with two pages.
-  if (isHome) res.setHeader('Vary', 'Cookie')
-  if (origin) res.setHeader('Link', `<${origin}/>; rel="canonical"`)
+  // Signed out or in, one address with two pages.
+  if (isHome || universityPage) res.setHeader('Vary', 'Cookie')
+  if (origin) res.setHeader('Link', `<${origin}${shownPage?.path ?? '/'}>; rel="canonical"`)
   res.type('html').send(fillPublicOrigin(shell, origin))
 }
 

@@ -10,7 +10,7 @@ import PapillonBadge from './PapillonBadge'
 
 const repoUrl = universityConfig.branding.about?.repoUrl
 const LINK_CLASSES = 'inline-flex items-center gap-1.5 rounded-full px-3.5 py-2 border-0 bg-transparent text-[15px] font-semibold text-text no-underline transition-colors hover:bg-white/60 dark:hover:bg-white/10'
-const MENU_LINK_CLASSES = 'flex min-h-12 items-center gap-2 rounded-2xl px-4 text-[17px] font-semibold text-text no-underline transition-colors hover:bg-bg-subtle dark:hover:bg-white/10'
+const MENU_LINK_CLASSES = 'flex min-h-12 items-center gap-2 corners-[16px] px-4 text-[17px] font-semibold text-text no-underline transition-colors hover:bg-bg-subtle dark:hover:bg-white/10'
 
 // The page's sections, in the bar on wide screens and in the menu otherwise.
 const SECTIONS = [
@@ -172,7 +172,7 @@ function LandingHeader({ onLogin }) {
               aria-label="Menu"
               data-open={isMenuOpen || undefined}
               inert={!isMenuOpen}
-              className="landing-header-menu absolute inset-x-0 top-full mt-2 flex flex-col gap-1 rounded-[28px] border p-2 4xl:hidden"
+              className="landing-header-menu absolute inset-x-0 top-full mt-2 flex flex-col gap-1 corners-[28px] border p-2 4xl:hidden"
             >
               {SECTIONS.map(({ id, label }) => (
                 <a key={id} href={`#${id}`} className={MENU_LINK_CLASSES} onClick={(event) => goToSection(event, id)}>

@@ -9,7 +9,7 @@ import { NewBadge, TypeBadge } from './SubjectsList'
 const LIST_CLASSES = 'm-0 list-none flex gap-3 overflow-x-auto snap-x snap-mandatory -mx-6 px-6 scroll-px-6 pt-2 pb-7 -mt-2 -mb-7 favorites-scroll-hide max-md:gap-2 max-md:-mx-3 max-md:px-3 max-md:scroll-px-3'
 const ITEM_CLASSES = 'flex w-[236px] shrink-0 snap-start min-w-0 max-md:w-[224px]'
 // The card is a button: it opens the grade where it counts (onOpen).
-const CARD_CLASSES = 'latest-grade-card isolate relative widget-card widget-card-visible shadow-md w-full p-3 border border-white rounded-[22px] overflow-hidden bg-widget-bg text-left text-text flex flex-col gap-[6px] min-w-0 cursor-pointer max-md:rounded-[20px]'
+const CARD_CLASSES = 'latest-grade-card isolate relative widget-card widget-card-visible shadow-md w-full p-3 border border-white card-corners overflow-hidden bg-widget-bg text-left text-text flex flex-col gap-[6px] min-w-0 cursor-pointer'
 
 
 // One grade as a "Note" card's content, also the dashboard's "Dernière

@@ -57,11 +57,11 @@ function LaunchCard({ entryId, launch, stage, title, line, ctaLabel, closeLabel,
     <div className={`launch-card-slot ${isLeaving ? 'is-leaving' : ''}`}>
       <div className="min-h-0">
         <section
-          className="launch-card widget-card widget-card-visible flex items-center gap-4 rounded-[20px] border bg-widget-bg p-2 pr-3 text-text shadow-md max-md:gap-3 max-md:rounded-[18px]"
+          className="launch-card widget-card widget-card-visible flex items-center gap-4 card-corners-sm border bg-widget-bg p-2 pr-3 text-text shadow-md max-md:gap-3"
           aria-labelledby={titleId}
           inert={isLeaving}
         >
-          <div className="launch-card-stage flex h-[68px] w-[136px] shrink-0 items-end justify-center overflow-hidden rounded-[14px] max-md:h-auto max-md:min-h-[60px] max-md:w-[100px] max-md:self-stretch max-md:rounded-[12px]">
+          <div className="launch-card-stage flex h-[68px] w-[136px] shrink-0 items-end justify-center overflow-hidden corners-[14px] max-md:h-auto max-md:min-h-[60px] max-md:w-[100px] max-md:self-stretch max-md:corners-[12px]">
             <div className="relative aspect-[132/66] w-[124px] max-md:w-[92px]">
               {stage}
             </div>

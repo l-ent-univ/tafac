@@ -16,7 +16,7 @@ function UpdateNotice({ onUpdateClick, className = '' }) {
   }, [isApplying, onUpdateClick])
 
   return (
-    <div className={`flex items-center gap-2 px-3 py-2 rounded-2xl border border-border/70 bg-widget-bg/60 text-[13px] font-body leading-[1.3] ${className}`}>
+    <div className={`flex items-center gap-2 px-3 py-2 corners-[16px] border border-border/70 bg-widget-bg/60 text-[13px] font-body leading-[1.3] ${className}`}>
       <Icon icon="carbon:rocket" className="w-[14px] h-[14px] shrink-0 text-text-muted" aria-hidden="true" />
       <span
         className="bg-[linear-gradient(90deg,var(--color-text-muted)_0%,var(--color-text)_50%,var(--color-text-muted)_100%)] bg-[length:200%_100%] bg-clip-text text-transparent animate-shimmer"

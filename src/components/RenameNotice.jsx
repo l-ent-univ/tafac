@@ -33,7 +33,7 @@ export default function RenameNotice({ visible, onDismiss }) {
         aria-modal="true"
         aria-labelledby="rename-notice-title"
       >
-        <div className="max-w-[420px] mx-auto rounded-[20px] bg-widget-bg border border-border overflow-hidden shadow-[0_-8px_40px_var(--color-shadow)]">
+        <div className="max-w-[420px] mx-auto corners-[20px] bg-widget-bg border border-border overflow-hidden shadow-[0_-8px_40px_var(--color-shadow)]">
           <img
             src={renameNoticeImage}
             alt="Le logo l'ent devient le logo Tafac"
@@ -53,7 +53,7 @@ export default function RenameNotice({ visible, onDismiss }) {
             </p>
             <a
               href={`https://${NEW_ADDRESS}`}
-              className="mt-1 flex items-center gap-3 rounded-2xl border border-border bg-bg-subtle px-3.5 py-3 text-text no-underline transition-colors hover:bg-bg"
+              className="mt-1 flex items-center gap-3 corners-[16px] border border-border bg-bg-subtle px-3.5 py-3 text-text no-underline transition-colors hover:bg-bg"
             >
               <Icon icon="carbon:earth" className="h-5 w-5 shrink-0 text-text-muted" aria-hidden="true" />
               <span className="flex min-w-0 flex-col gap-0.5 font-body leading-snug">

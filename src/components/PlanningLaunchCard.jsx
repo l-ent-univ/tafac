@@ -46,7 +46,7 @@ function LaunchWeek() {
       {EXAMPLE_CLASSES.map((item, index) => (
         <span
           key={index}
-          className="planning-launch-block absolute isolate overflow-hidden rounded-[4px] border bg-widget-bg max-md:rounded-[3px]"
+          className="planning-launch-block absolute isolate overflow-hidden corners-[4px] border bg-widget-bg max-md:corners-[3px]"
           style={{
             left: x(DAY_X(item.day)),
             width: x(DAY_WIDTH),

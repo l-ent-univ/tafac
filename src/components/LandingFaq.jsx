@@ -56,7 +56,7 @@ function LandingFaq({ className = '' }) {
               key={id}
               hidden={hiddenCount > 0 && index >= FIRST_QUESTIONS}
               name="landing-faq"
-              className="group rounded-[20px] border border-border bg-white px-6 transition-shadow duration-300 hover:shadow-[0_6px_20px_-10px_rgb(52_18_0/0.25)] open:shadow-[0_6px_20px_-10px_rgb(52_18_0/0.25)] dark:border-white/10 dark:bg-[#1c1c1c] max-md:rounded-[18px] max-md:px-4"
+              className="group corners-[20px] border border-border bg-white px-6 transition-shadow duration-300 hover:shadow-[0_6px_20px_-10px_rgb(52_18_0/0.25)] open:shadow-[0_6px_20px_-10px_rgb(52_18_0/0.25)] dark:border-white/10 dark:bg-[#1c1c1c] max-md:corners-[18px] max-md:px-4"
             >
               <summary className="flex cursor-pointer list-none items-center gap-4 py-5 text-left text-[18px] font-bold leading-snug text-text max-md:gap-3 max-md:py-4 max-md:text-base [&::-webkit-details-marker]:hidden">
                 <span aria-hidden="true" className="w-7 shrink-0 text-center text-[24px] leading-none max-md:w-6 max-md:text-[20px]">{emoji}</span>

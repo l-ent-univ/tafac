@@ -744,7 +744,7 @@ function WidgetNextClass({
 
   return (
     <article
-      className={`next-class-widget widget-card relative z-0 hover:z-10 shadow-md flex-[0_1_190px] h-[140px] p-4 border border-white rounded-[22px] overflow-visible text-base leading-6 min-w-0 max-2xl:flex-[1_1_calc(50%-6px)] max-2xl:min-w-[min(320px,100%)] max-md:h-[132px] max-md:p-3 max-md:rounded-[20px] max-xs:h-[140px] max-xs:min-w-0 max-xs:@container flex flex-col gap-[6px] text-text ${preview ? '' : 'cursor-pointer'} ${isStatusWide ? 'max-xs:flex-[1_1_100%]' : 'max-xs:flex-[1_1_calc(50%-4px)]'} ${wide ? '2xl:flex-[0_1_380px]' : isStatusWide ? '2xl:flex-[0_1_300px]' : ''} ${visible ? 'widget-card-visible' : ''}`}
+      className={`next-class-widget widget-card relative z-0 hover:z-10 shadow-md flex-[0_1_190px] h-[140px] p-4 border border-white card-corners overflow-visible text-base leading-6 min-w-0 max-2xl:flex-[1_1_calc(50%-6px)] max-2xl:min-w-[min(320px,100%)] max-md:h-[132px] max-md:p-3 max-xs:h-[140px] max-xs:min-w-0 max-xs:@container flex flex-col gap-[6px] text-text ${preview ? '' : 'cursor-pointer'} ${isStatusWide ? 'max-xs:flex-[1_1_100%]' : 'max-xs:flex-[1_1_calc(50%-4px)]'} ${wide ? '2xl:flex-[0_1_380px]' : isStatusWide ? '2xl:flex-[0_1_300px]' : ''} ${visible ? 'widget-card-visible' : ''}`}
       style={showsClass ? accentStyle(accentFor(nextClass.title)) : undefined}
       aria-label={opensInApp ? 'Prochain cours, voir le planning' : 'Prochain cours ouvrir ADE'}
       onClick={preview ? undefined : openPlanning}
@@ -772,7 +772,7 @@ function WidgetNextClass({
           <>
             <div className="flex items-center gap-2 flex-1 min-h-0 my-1.5 max-xs:my-1">
               <div className="flex self-stretch items-center">
-                <div className="planning-accent-fill w-[6px] h-full rounded-[25px] shrink-0" aria-hidden="true" />
+                <div className="planning-accent-fill w-[6px] h-full corners-[25px] shrink-0" aria-hidden="true" />
               </div>
               <div className="flex flex-col justify-center gap-[3px] min-w-0 flex-1">
                 <span ref={titleRef} className="block m-0 min-w-0 leading-[1.06] text-[15px] font-semibold overflow-hidden text-ellipsis whitespace-nowrap max-md:text-[14px] max-xs:whitespace-normal max-xs:line-clamp-2" title={nextClass.title}>{nextClass.title}</span>

@@ -172,7 +172,7 @@ function LandingPage({ onLogin }) {
                   width="240"
                   height="240"
                   draggable="false"
-                  className="landing-app-icon block size-20 rounded-[22.5%] shadow-[0_2px_6px_rgb(52_18_0/0.12),0_14px_32px_-10px_rgb(52_18_0/0.35)] max-md:size-16"
+                  className="landing-app-icon block size-20 corners-[22.5%] shadow-[0_2px_6px_rgb(52_18_0/0.12),0_14px_32px_-10px_rgb(52_18_0/0.35)] max-md:size-16"
                 />
               </div>
               <h1 className="m-0 max-w-[24ch] text-balance text-center text-[clamp(36px,5vw,64px)] font-bold leading-[0.95] text-text">

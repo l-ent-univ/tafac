@@ -20,7 +20,7 @@ function MiniCard({ title, badge = null, className = '', style, children }) {
     <div ref={ref} className={`landing-drag pointer-events-auto absolute ${className}`}>
       <div
         style={style}
-        className="landing-float w-[176px] rounded-[18px] border border-white bg-white/95 p-3 text-left shadow-[0_2px_6px_rgb(52_18_0/0.08),0_18px_36px_-16px_rgb(52_18_0/0.3)] dark:border-white/10 dark:bg-[#1c1c1c]/95"
+        className="landing-float w-[176px] corners-[18px] border border-white bg-white/95 p-3 text-left shadow-[0_2px_6px_rgb(52_18_0/0.08),0_18px_36px_-16px_rgb(52_18_0/0.3)] dark:border-white/10 dark:bg-[#1c1c1c]/95"
       >
         <p className="m-0 flex items-center gap-1.5 text-[12px] font-medium leading-none text-text-secondary font-body">
           {title}

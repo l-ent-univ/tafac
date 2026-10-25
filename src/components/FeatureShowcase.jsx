@@ -56,7 +56,7 @@ function FeatureShowcase({ variant = 'main', className = '' }) {
           <li
             key={feature.icon + index}
             style={{ '--reveal-index': index }}
-            className="landing-feature flex items-center gap-3 rounded-full border border-white bg-white py-2 pl-2 pr-6 shadow-[0_1px_3px_rgb(52_18_0/0.06),0_10px_28px_-14px_rgb(52_18_0/0.16)] dark:border-white/10 dark:bg-[#1c1c1c] max-sm:rounded-[24px] max-sm:pr-4"
+            className="landing-feature flex items-center gap-3 rounded-full border border-white bg-white py-2 pl-2 pr-6 shadow-[0_1px_3px_rgb(52_18_0/0.06),0_10px_28px_-14px_rgb(52_18_0/0.16)] dark:border-white/10 dark:bg-[#1c1c1c] max-sm:corners-[24px] max-sm:pr-4"
           >
             <span className="inline-flex size-10 shrink-0 items-center justify-center rounded-full bg-bg-subtle text-text" aria-hidden="true">
               <Icon icon={feature.icon} className="size-[18px]" />

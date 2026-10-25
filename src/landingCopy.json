@@ -7,16 +7,16 @@
     "login": "Se connecter"
   },
   "hero": {
-    "title": "Cours, notes et services de votre université",
+    "title": "Cours, notes et services de {university}",
     "subtitle": "Emploi du temps, notes, mails et rendus Moodle sur une seule page",
     "cta": "Se connecter à mon ENT",
-    "disclaimer": "Projet étudiant indépendant, non officiel, non affilié à votre université",
+    "disclaimer": "Projet étudiant indépendant, non officiel, non affilié à {university}",
     "compatible": "Compatible avec :"
   },
   "features": {
     "main": {
       "title": "Ce que regroupe {appName}",
-      "intro": "{appName} se connecte aux services de votre université et rassemble votre emploi du temps, vos notes, vos rendus et mails sur une seule page, sur ordinateur comme sur téléphone",
+      "intro": "{appName} se connecte aux services de {university} et rassemble votre emploi du temps, vos notes, vos rendus et mails sur une seule page, sur ordinateur comme sur téléphone",
       "items": [
         {
           "title": "Emploi du temps",
@@ -88,7 +88,7 @@
   },
   "security": {
     "title": "Sécurisé et respectueux de votre vie privée",
-    "intro": "{appName} ne fait que relayer vos échanges avec votre université : votre mot de passe n’est jamais enregistré, et la session **reste chiffrée dans votre navigateur**",
+    "intro": "{appName} ne fait que relayer vos échanges avec {university} : votre mot de passe n’est jamais enregistré, et la session **reste chiffrée dans votre navigateur**",
     "points": {
       "noStorage": {
         "title": "Mot de passe jamais enregistré",
@@ -109,7 +109,7 @@
       }
     },
     "passwordTitle": "Votre mot de passe ne fait que passer",
-    "passwordIntro": "{appName} le transmet à votre université pour vous connecter, **sans l’enregistrer**. Ensuite, il utilise la session ouverte par l’université, gardée chiffrée dans un cookie de votre navigateur",
+    "passwordIntro": "{appName} le transmet à {university} pour vous connecter, **sans l’enregistrer**. Ensuite, il utilise la session ouverte par l’université, gardée chiffrée dans un cookie de votre navigateur",
     "stops": {
       "device": {
         "title": "Votre appareil",
@@ -136,7 +136,7 @@
       },
       "officiel": {
         "question": "{appName} est-il une application de mon université ?",
-        "answer": "Non. {appName} est un projet étudiant indépendant, non officiel et non affilié à votre université. Il affiche les données que publient les services de l’université (emploi du temps, notes, mails, Moodle) au même endroit"
+        "answer": "Non. {appName} est un projet étudiant indépendant, non officiel et non affilié à {university}. Il affiche les données que publient les services de l’université (emploi du temps, notes, mails, Moodle) au même endroit"
       },
       "appareils": {
         "question": "Sur quels appareils fonctionne {appName} ?",
@@ -148,7 +148,7 @@
       },
       "motDePasse": {
         "question": "Que devient mon mot de passe ?",
-        "answer": "{appName} transmet votre mot de passe à votre université pour vous connecter, sans jamais l’enregistrer. Seule la session créée par votre université est conservée dans votre navigateur, dans un cookie chiffré"
+        "answer": "{appName} transmet votre mot de passe à {university} pour vous connecter, sans jamais l’enregistrer. Seule la session créée par votre université est conservée dans votre navigateur, dans un cookie chiffré"
       },
       "donnees": {
         "question": "{appName} collecte-t-il mes données personnelles ?",
@@ -156,7 +156,7 @@
       },
       "session": {
         "question": "Combien de temps je reste connecté ?",
-        "answer": "Votre session reste active jusqu’à 30 jours. Passé ce délai, il suffit de vous reconnecter. Si vous vous déconnectez, votre session est immédiatement supprimée de votre navigateur et fermée auprès de votre université."
+        "answer": "Votre session reste active jusqu’à 30 jours. Passé ce délai, il suffit de vous reconnecter. Si vous vous déconnectez, votre session est immédiatement supprimée de votre navigateur et fermée auprès de {university}."
       },
       "installer": {
         "question": "Comment l’installer sur mon téléphone ?",
@@ -198,7 +198,7 @@
     "cta": "Nous écrire sur GitHub"
   },
   "footer": {
-    "tagline": "Projet étudiant indépendant, non officiel, non affilié à votre université",
+    "tagline": "Projet étudiant indépendant, non officiel, non affilié à {university}",
     "tafacColumn": "{appName}",
     "features": "Fonctionnalités",
     "privacy": "Confidentialité",

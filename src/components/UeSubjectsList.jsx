@@ -15,7 +15,7 @@ import { useUeColor } from '../useUeColor'
 // a shorter last row (5 UEs: 3 + 2) shares the full width too. A tile never
 // grows downward: it opens into the full-page view.
 const COLUMNS_CLASSES = 'flex flex-wrap gap-3 max-md:gap-2'
-const CARD_CLASSES = '@container isolate relative overflow-hidden widget-card widget-card-visible shadow-md border border-white rounded-[22px] bg-widget-bg text-text p-2 min-w-0 max-md:rounded-[20px]'
+const CARD_CLASSES = '@container isolate relative overflow-hidden widget-card widget-card-visible shadow-md border border-white card-corners bg-widget-bg text-text p-2 min-w-0'
 
 const STATE_LABELS = {
   validated: 'Validée',
@@ -294,17 +294,17 @@ function UeModuleRow({ rowId, ueCode, module, isOpen, onToggle, icon, showPromoS
   const spoken = `${hasNewGrade ? 'Nouvelle note, ' : ''}${module.title}, ${module.code}, coefficient ${module.coef ?? '—'} dans ${ueCode}${module.average != null ? `, moyenne ${formatScore(module.average)} sur 20 dans cette UE` : ''}`
 
   return (
-    <li id={rowId} className={`subject-row scroll-mt-24 rounded-[16px] ${isOpen ? 'subject-row--open' : ''}`}>
+    <li id={rowId} className={`subject-row scroll-mt-24 corners-[16px] ${isOpen ? 'subject-row--open' : ''}`}>
       <Header
         id={buttonId}
         {...(isEmpty
           ? { 'aria-label': `${spoken}, pas encore d’évaluation` }
           : { type: 'button', 'aria-expanded': isOpen, 'aria-controls': panelId, 'aria-label': spoken, onClick: onToggle })}
-        className={`${isEmpty ? '' : 'subject-row-toggle cursor-pointer '}flex w-full min-w-0 items-center gap-3 rounded-[16px] border-0 bg-transparent px-2 py-2 text-left text-text max-md:gap-[10px]`}
+        className={`${isEmpty ? '' : 'subject-row-toggle cursor-pointer '}flex w-full min-w-0 items-center gap-3 corners-[16px] border-0 bg-transparent px-2 py-2 text-left text-text max-md:gap-[10px]`}
       >
         {/* Neutral: the card already carries the UE's colour. Outlined so the
             tile still reads on the card's tinted top. */}
-        <span className="inline-flex size-9 shrink-0 items-center justify-center rounded-[11px] border border-border bg-bg-subtle" aria-hidden="true">
+        <span className="inline-flex size-9 shrink-0 items-center justify-center corners-[11px] border border-border bg-bg-subtle" aria-hidden="true">
           {icon ? <Icon icon={icon} className="size-[18px] text-text-secondary" /> : null}
         </span>
         <span className="grid min-w-0 flex-1 gap-[3px]">
@@ -642,7 +642,7 @@ function UeSubjectsList({ report, subjectIcon = () => null, newEvaluationIds = n
               {/* The whole header opens the view (the button is the keyboard's
                   way in; the warning keeps its own click). */}
               <header
-                className="ue-card-header grid cursor-pointer grid-cols-[auto_minmax(0,1fr)_auto_auto] items-center gap-x-3 gap-y-[10px] rounded-[16px] p-2 max-md:gap-x-[10px]"
+                className="ue-card-header grid cursor-pointer grid-cols-[auto_minmax(0,1fr)_auto_auto] items-center gap-x-3 gap-y-[10px] corners-[16px] p-2 max-md:gap-x-[10px]"
                 onClick={() => openFromTile(ue.code)}
               >
                 {/* Figma's skeuomorphic UE ribbon (UeBadge); ribbon and average
@@ -680,7 +680,7 @@ function UeSubjectsList({ report, subjectIcon = () => null, newEvaluationIds = n
                   <button
                     type="button"
                     onClick={() => openFromTile(ue.code, newsModules[0])}
-                    className="ue-card-news flex w-full min-w-0 items-center gap-2 rounded-[14px] border-0 bg-transparent px-2 py-[8px] text-left text-text-muted cursor-pointer"
+                    className="ue-card-news flex w-full min-w-0 items-center gap-2 corners-[14px] border-0 bg-transparent px-2 py-[8px] text-left text-text-muted cursor-pointer"
                   >
                     <span className="shrink-0 rounded-full bg-brand px-[7px] py-[3px] font-body text-[11px] font-semibold leading-none text-bg">
                       {newsCount} {newsCount > 1 ? 'nouvelles notes' : 'nouvelle note'}
@@ -710,7 +710,7 @@ function UeFullView({ id, ue, headingId, backButtonRef, onClose, onKeyDown, hasN
       aria-labelledby={titleId}
       aria-describedby={`${headingId}-${ue.code}-full-state`}
       onKeyDown={onKeyDown}
-      className="ue-full-view ue-vt-card relative isolate min-h-[calc(100dvh-24px)] scroll-mt-3 overflow-clip rounded-[28px] border border-white bg-widget-bg dark:border-white/[0.08] text-text shadow-md max-md:rounded-[22px]"
+      className="ue-full-view ue-vt-card relative isolate min-h-[calc(100dvh-24px)] scroll-mt-3 overflow-clip corners-[28px] border border-white bg-widget-bg dark:border-white/[0.08] text-text shadow-md max-md:corners-[22px]"
       style={morph('card', ue.code)}
     >
       {hasNews ? <span className="latest-grade-wash" style={{ background: color, height: '240px' }} aria-hidden="true" /> : null}

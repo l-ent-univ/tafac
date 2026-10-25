@@ -15,10 +15,11 @@ import GradeHistogram from './GradeHistogram'
 import UeShareRing from './UeShareRing'
 import { useUeColor } from '../useUeColor'
 import { NewBadge } from './SubjectsList'
+import CloseButton from './CloseButton'
 
 const FOCUSABLE_SELECTOR = 'button:not([disabled]), [href], [tabindex]:not([tabindex="-1"])'
 const DATE_FORMAT = new Intl.DateTimeFormat('fr-FR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })
-const CARD = 'gd-card gd-rise grid gap-4 rounded-[20px] border border-border bg-widget-bg p-4 max-sm:rounded-[18px] max-sm:p-[14px]'
+const CARD = 'gd-card gd-rise grid gap-4 corners-[20px] border border-border bg-widget-bg p-4 max-sm:corners-[18px] max-sm:p-[14px]'
 
 // What a grade that isn't a number means for the averages.
 const STATE_NOTES = {
@@ -129,7 +130,7 @@ function PromoScale({ evaluation }) {
       ) : null}
       <dl className="m-0 grid grid-cols-3 gap-2">
         {stats.map((stat) => (
-          <div key={stat.label} className="grid justify-items-center gap-[6px] rounded-[14px] bg-bg-subtle px-2 py-[10px] text-center dark:bg-white/[0.04]">
+          <div key={stat.label} className="grid justify-items-center gap-[6px] corners-[14px] bg-bg-subtle px-2 py-[10px] text-center dark:bg-white/[0.04]">
             <dt className="font-body text-[12px] font-medium leading-none text-text-muted">
               <span aria-hidden="true">{stat.label}</span>
               <span className="sr-only">{stat.spoken}</span>
@@ -176,7 +177,7 @@ function WeightCard({ report, module, evaluation, titleId }) {
         return (
           <li
             key={entry.ue}
-            className={`gd-share-row grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-x-3 rounded-[12px] px-2 py-[7px] ${ring && active === index ? 'is-active' : ''}`}
+            className={`gd-share-row grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-x-3 corners-[12px] px-2 py-[7px] ${ring && active === index ? 'is-active' : ''}`}
             onPointerEnter={ring && index >= 0 ? () => {
               setIsKeyboard(false)
               setActive(index)
@@ -215,7 +216,7 @@ function WeightCard({ report, module, evaluation, titleId }) {
         </div>
       ) : null}
       {typeNote ? (
-        <p className="m-0 flex items-start gap-2 rounded-[14px] bg-bg-subtle px-3 py-[10px] font-body text-[13px] font-medium leading-[1.4] text-text-secondary dark:bg-white/[0.04]">
+        <p className="m-0 flex items-start gap-2 corners-[14px] bg-bg-subtle px-3 py-[10px] font-body text-[13px] font-medium leading-[1.4] text-text-secondary dark:bg-white/[0.04]">
           <Icon icon="carbon:information" className="mt-[1px] size-[15px] shrink-0" aria-hidden="true" />
           {typeNote}
         </p>
@@ -380,7 +381,7 @@ function GradeDetailModal({ report, module, evaluation, semesterId, icon = null,
       <div className="weather-modal-backdrop absolute inset-0 bg-backdrop animate-modal-backdrop-in" onClick={onClose} aria-hidden="true" />
       <section
         ref={dialogRef}
-        className="gd-dialog relative isolate flex max-h-[min(820px,calc(100dvh-40px))] w-[min(540px,100%)] flex-col rounded-[26px] border border-border bg-bg text-text shadow-[0_24px_80px_var(--color-shadow)] outline-none max-sm:max-h-[calc(100dvh-16px)] max-sm:rounded-b-none max-sm:border-b-0"
+        className="gd-dialog relative isolate flex max-h-[min(820px,calc(100dvh-40px))] w-[min(540px,100%)] flex-col corners-[26px] border border-border bg-bg text-text shadow-[0_24px_80px_var(--color-shadow)] outline-none max-sm:max-h-[calc(100dvh-16px)] max-sm:rounded-b-none max-sm:border-b-0"
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}
@@ -404,7 +405,7 @@ function GradeDetailModal({ report, module, evaluation, semesterId, icon = null,
               </span>
               <span className="gd-grabber relative mx-auto hidden h-[4px] w-9 rounded-full bg-text-30 max-sm:block max-sm:translate-y-2" aria-hidden="true" />
               <div className="relative flex items-center gap-3 px-6 pt-5 pb-3 max-sm:px-4 max-sm:pt-[14px]">
-                <span className="inline-flex size-10 shrink-0 items-center justify-center rounded-[12px] border border-border bg-widget-bg/80" aria-hidden="true">
+                <span className="inline-flex size-10 shrink-0 items-center justify-center corners-[12px] border border-border bg-widget-bg/80" aria-hidden="true">
                   {icon ? <Icon icon={icon} className="size-5 text-text" /> : <Icon icon="carbon:book" className="size-5 text-text" />}
                 </span>
                 <span className="grid min-w-0 flex-1 gap-[4px]">
@@ -426,14 +427,7 @@ function GradeDetailModal({ report, module, evaluation, semesterId, icon = null,
                     </span>
                   </span>
                 </span>
-                <button
-                  type="button"
-                  className="glass-close-button inline-flex h-[34px] w-[34px] shrink-0 items-center justify-center rounded-full p-0 text-text"
-                  onClick={onClose}
-                  aria-label="Fermer"
-                >
-                  <Icon icon="carbon:close" className="h-4 w-4" aria-hidden="true" />
-                </button>
+                <CloseButton glass onClick={onClose} />
               </div>
             </header>
 

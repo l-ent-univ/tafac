@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Icon } from '@iconify/react'
 import universityConfig from '@university'
 import AvailableApplications from './AvailableApplications'
+import CloseButton from './CloseButton'
 import GradesLaunchCard from './GradesLaunchCard'
 import GreetingCard from './GreetingCard'
 import PlanningLaunchCard from './PlanningLaunchCard'
@@ -337,7 +338,7 @@ function WidgetContainer({
           role="presentation"
         >
           <div
-            className="weather-modal-card w-[min(440px,100%)] border border-border rounded-[22px] bg-bg shadow-none p-5 text-text animate-modal-card-in max-md:rounded-[20px] max-md:p-4"
+            className="weather-modal-card w-[min(440px,100%)] border border-border corners-[22px] bg-bg shadow-none p-5 text-text animate-modal-card-in max-md:corners-[20px] max-md:p-4"
             role="dialog"
             aria-modal="true"
             aria-label="Choisir le lieu de la météo"
@@ -345,15 +346,7 @@ function WidgetContainer({
           >
             <div className="flex items-center gap-3 mb-[14px]">
               <h3 className="m-0 text-[28px] font-bold leading-[0.95] tracking-[-0.01em] max-md:text-2xl">Choisir le lieu météo</h3>
-              <button
-                type="button"
-                className="ml-auto w-[38px] h-[38px] p-0 border border-border-input rounded-full bg-bg-input text-text inline-flex items-center justify-center transition-[background-color,opacity] duration-[120ms] ease-in-out hover:not-disabled:bg-bg-subtle disabled:opacity-60 disabled:cursor-wait"
-                onClick={handleCloseLocationPicker}
-                disabled={isLocationActionDisabled}
-                aria-label="Fermer la modale de lieu météo"
-              >
-                <Icon icon="carbon:close" className="w-4 h-4" aria-hidden="true" />
-              </button>
+              <CloseButton large label="Fermer la modale de lieu météo" className="ml-auto" onClick={handleCloseLocationPicker} disabled={isLocationActionDisabled} />
             </div>
 
             <form className="flex flex-col gap-[14px]" onSubmit={(event) => void handleSubmitLocation(event)}>
@@ -361,7 +354,7 @@ function WidgetContainer({
                 <span className="text-sm font-semibold leading-none text-text font-body">Ville ou code postal</span>
                 <input
                   type="text"
-                  className="w-full min-h-[48px] border border-border-input rounded-[53px] bg-bg-input text-text font-inherit text-base leading-none py-[13px] px-4 box-border placeholder:text-text-muted focus-visible:border-brand focus-visible:outline-none font-body"
+                  className="w-full min-h-[48px] border border-border-input corners-[53px] bg-bg-input text-text font-inherit text-base leading-none py-[13px] px-4 box-border placeholder:text-text-muted focus-visible:border-brand focus-visible:outline-none font-body"
                   value={locationQuery}
                   onChange={(event) => setLocationQuery(event.target.value)}
                   placeholder={`Ex: ${DEFAULT_WEATHER_CITY} ou 35000`}
@@ -372,14 +365,14 @@ function WidgetContainer({
               <div className="flex items-center gap-2 flex-wrap">
                 <button
                   type="submit"
-                  className="min-h-[42px] px-[18px] border-0 rounded-[53px] bg-brand text-bg font-inherit text-[15px] font-semibold leading-none transition-[background-color,opacity] duration-[120ms] ease-in-out hover:not-disabled:bg-brand-hover disabled:opacity-60 disabled:cursor-wait"
+                  className="min-h-[42px] px-[18px] border-0 corners-[53px] bg-brand text-bg font-inherit text-[15px] font-semibold leading-none transition-[background-color,opacity] duration-[120ms] ease-in-out hover:not-disabled:bg-brand-hover disabled:opacity-60 disabled:cursor-wait"
                   disabled={isLocationActionDisabled}
                 >
                   Appliquer
                 </button>
                 <button
                   type="button"
-                  className="min-h-[42px] px-[18px] border border-border-input rounded-[53px] bg-bg-input text-text font-inherit text-[15px] font-semibold leading-none transition-[background-color,opacity] duration-[120ms] ease-in-out hover:not-disabled:bg-bg-subtle disabled:opacity-60 disabled:cursor-wait"
+                  className="min-h-[42px] px-[18px] border border-border-input corners-[53px] bg-bg-input text-text font-inherit text-[15px] font-semibold leading-none transition-[background-color,opacity] duration-[120ms] ease-in-out hover:not-disabled:bg-bg-subtle disabled:opacity-60 disabled:cursor-wait"
                   onClick={() => void handleUseCurrentPosition()}
                   disabled={isLocationActionDisabled}
                 >

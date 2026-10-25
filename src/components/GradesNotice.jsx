@@ -28,7 +28,7 @@ export function GradesNotice({ icon = null, media = null, tint = null, label, ti
   }, [collapsible, expanded, children])
 
   return (
-    <div role="note" aria-label={label} className="grades-notice widget-card widget-card-visible relative isolate flex items-start gap-3 rounded-[18px] border bg-widget-bg p-3 text-text shadow-md max-md:gap-2.5">
+    <div role="note" aria-label={label} className="grades-notice widget-card widget-card-visible relative isolate flex items-start gap-3 card-corners-sm border bg-widget-bg p-3 text-text shadow-md max-md:gap-2.5">
       {tint ? <span className="grades-notice-tint" style={{ backgroundColor: tint }} aria-hidden="true" /> : null}
       {media ?? (
         <span className="inline-flex size-9 shrink-0 items-center justify-center rounded-full bg-brand-subtle text-text" aria-hidden="true">
@@ -61,7 +61,7 @@ export function GradesNotice({ icon = null, media = null, tint = null, label, ti
             }}
             aria-expanded={expanded}
             aria-controls={bodyId}
-            className="-mx-1 mt-0.5 cursor-pointer rounded-md border-0 bg-transparent px-1 py-0.5 text-text underline decoration-text-30 underline-offset-[3px] transition-colors hover:decoration-text max-md:relative max-md:after:absolute max-md:after:-inset-x-2 max-md:after:-inset-y-2.5"
+            className="-mx-1 mt-0.5 cursor-pointer corners-[6px] border-0 bg-transparent px-1 py-0.5 text-text underline decoration-text-30 underline-offset-[3px] transition-colors hover:decoration-text max-md:relative max-md:after:absolute max-md:after:-inset-x-2 max-md:after:-inset-y-2.5"
           >
             <span className="font-body text-[13px] font-semibold">{expanded ? 'Réduire' : 'Lire la suite'}</span>
           </button>

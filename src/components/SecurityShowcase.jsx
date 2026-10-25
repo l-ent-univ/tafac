@@ -210,7 +210,7 @@ function SecurityShowcase({ className = '' }) {
       className={`landing-security scroll-mt-8 flex justify-center px-6 max-md:px-4 ${className}`}
       aria-labelledby="confidentialite-title"
     >
-      <div className="flex w-full max-w-[1240px] justify-center rounded-[40px] bg-[var(--security-surface)] px-12 py-20 max-lg:px-6 max-md:rounded-[28px] max-md:px-5 max-md:py-12">
+      <div className="flex w-full max-w-[1240px] justify-center corners-[40px] bg-[var(--security-surface)] px-12 py-20 max-lg:px-6 max-md:corners-[28px] max-md:px-5 max-md:py-12">
         <div className="flex w-full max-w-[1080px] flex-col items-center text-center">
           <h2 id="confidentialite-title" className="m-0 max-w-[24ch] text-balance text-[clamp(28px,3.4vw,40px)] font-bold leading-[1.05] text-text">
             {copyText(copy.security.title)}

@@ -8,9 +8,10 @@ import { addCustomEvaluations } from '../gradeSimulation'
 import { readSemesterUes } from '../semesterUes'
 import { useUeColor } from '../useUeColor'
 import { buildSegmentPath, pointAt } from '../ueRingGeometry'
-import LentButton from './LentButton'
 import GradeSimulatorReveal from './GradeSimulatorReveal'
 import GradeSimulatorUe from './GradeSimulatorUe'
+import LentButton from './LentButton'
+import CloseButton from './CloseButton'
 
 const FOCUSABLE_SELECTOR = 'button:not([disabled]), input:not([disabled]), [href], [tabindex]:not([tabindex="-1"])'
 
@@ -431,7 +432,7 @@ function GradeSimulatorModal({ report = null, releve = null, config = null, seme
       <div className="weather-modal-backdrop absolute inset-0 bg-backdrop animate-modal-backdrop-in" onClick={onClose} aria-hidden="true" />
       <section
         ref={dialogRef}
-        className="gd-dialog relative isolate flex max-h-[min(860px,calc(100dvh-40px))] w-[min(600px,100%)] flex-col rounded-[26px] border border-border bg-bg text-text shadow-[0_24px_80px_var(--color-shadow)] outline-none max-sm:max-h-[calc(100dvh-16px)] max-sm:rounded-b-none max-sm:border-b-0"
+        className="gd-dialog relative isolate flex max-h-[min(860px,calc(100dvh-40px))] w-[min(600px,100%)] flex-col corners-[26px] border border-border bg-bg text-text shadow-[0_24px_80px_var(--color-shadow)] outline-none max-sm:max-h-[calc(100dvh-16px)] max-sm:rounded-b-none max-sm:border-b-0"
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}
@@ -448,14 +449,7 @@ function GradeSimulatorModal({ report = null, releve = null, config = null, seme
                 <span className="truncate font-body text-[12.5px] font-medium leading-none text-text-muted">{semesterLabel}</span>
               ) : null}
             </span>
-            <button
-              type="button"
-              className="inline-flex h-[34px] w-[34px] shrink-0 items-center justify-center rounded-full border border-[rgba(27,27,27,0.16)] bg-[#f3f1eb]/90 p-0 text-text transition-colors duration-[120ms] hover:bg-[#edebe5] dark:border-border dark:bg-bg-muted dark:hover:bg-bg-subtle"
-              onClick={onClose}
-              aria-label="Fermer"
-            >
-              <Icon icon="carbon:close" className="h-4 w-4" aria-hidden="true" />
-            </button>
+            <CloseButton onClick={onClose} />
           </div>
         </header>
         {picked ? (
@@ -482,9 +476,9 @@ function GradeSimulatorModal({ report = null, releve = null, config = null, seme
             <span className={`min-w-0 flex-1 truncate font-body text-[14px] font-medium ${hasInvalid ? 'text-error' : 'text-text-secondary'}`} aria-live="polite">
               {hasInvalid ? 'Une note n’est pas valide' : `${editCount} ${editCount > 1 ? 'notes modifiées' : 'note modifiée'}`}
             </span>
-            <LentButton className="min-h-[44px] px-5 py-[11px] text-[16px]" disabled={hasInvalid} onClick={showReveal}>
+            <LentButton disabled={hasInvalid} onClick={showReveal}>
               Suivant
-              <Icon icon="carbon:arrow-right" className="ml-2 inline-block size-[18px] align-[-4px]" aria-hidden="true" />
+              <Icon icon="carbon:arrow-right" className="size-4" aria-hidden="true" />
             </LentButton>
           </footer>
         ) : null}
@@ -513,9 +507,9 @@ function GradeSimulatorModal({ report = null, releve = null, config = null, seme
                 {activeUe ? activeUe.title || formatUeCode(activeUe.code) : 'Aucune UE'}
               </p>
             </div>
-            <LentButton className="min-h-[46px] px-6 py-3 text-[16px]" disabled={!activeUe} onClick={goToUe}>
+            <LentButton disabled={!activeUe} onClick={goToUe}>
               Suivant
-              <Icon icon="carbon:arrow-right" className="ml-2 inline-block size-[18px] align-[-4px]" aria-hidden="true" />
+              <Icon icon="carbon:arrow-right" className="size-4" aria-hidden="true" />
             </LentButton>
           </div>
         )}
