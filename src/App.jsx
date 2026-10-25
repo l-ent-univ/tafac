@@ -1452,7 +1452,7 @@ function App() {
 
   useEffect(() => {
     syncRuntimeSeo({ authenticated: sessionState.authenticated })
-  }, [sessionState.authenticated])
+  }, [sessionState.authenticated, pathname])
 
   useEffect(() => {
     if (!DEBUG_MENU_ENABLED || !debugOpen || sessionState.authenticated) {

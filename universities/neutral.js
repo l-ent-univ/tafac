@@ -13,13 +13,16 @@ export const university = {
 export const branding = {
   appName: 'Tafac',
   defaultTitle: 'Tafac | Cours, notes et services de ton université',
-  seoTitle: "Tafac – client non officiel de l'ENT de votre université",
+  seoTitle: 'Tafac – Tout ton ENT en une seule app',
   seoDescription:
     "Emploi du temps, notes, mails et rendus Moodle sur une seule page. Projet étudiant libre, non affilié aux universités.",
   pwaDescription:
     "Emploi du temps, notes, mails et rendus Moodle sur une seule page. Projet étudiant non affilié aux universités.",
   // Former names, for search engines (the site's name in results).
   alternateNames: ["l'ent"],
+  // How the landing's copy names the university mid-sentence ({university}
+  // in src/landingCopy.json).
+  nameInText: 'votre université',
   logoAlt: 'Tafac',
   sidebarLogoAlt: 'Tafac',
   loginFooterLine: 'Projet étudiant non officiel, non affilié aux universités',

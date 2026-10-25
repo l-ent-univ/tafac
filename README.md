@@ -86,7 +86,7 @@ Pour sélectionner explicitement plusieurs configurations :
 MULTI_UNIVERSITY=1 UNIVERSITIES=univ-rennes,univ-exemple npm run dev
 ```
 
-Les liens `/rennes` et `/exemple` ouvrent directement la connexion de l’université correspondante, si celle-ci est servie.
+Les liens `/rennes` et `/exemple` ouvrent la page d’accueil de l’université correspondante, si celle-ci est servie, d’où son bouton mène à sa connexion. Ces pages sont pré-rendues pour les moteurs de recherche et listées dans le sitemap (sauf les universités `devOnly`).
 
 **Un seul build frontend contient les configurations clientes de toutes les universités.** Le navigateur télécharge celle qui lui est attribuée au démarrage. Il n’est pas nécessaire de construire un `dist/` par université ; `build:all` est actuellement un alias de `build`.
 

@@ -32,15 +32,17 @@ async function fetchUniversityDirectory() {
   }
 }
 
-// /<slug> and the picker's address are entry points to signing in: once
-// read, the address becomes the login page's (App's LOGIN_PATH; / is the
-// landing page when signed out, and signed in the app leaves /login for /).
+// The picker's address is an entry point to signing in: once read, the
+// address becomes the login page's (App's LOGIN_PATH). A university's
+// /<slug> is its landing page while signed out (search engines index it), and
+// signed in the app's home page (/): the session's university, whatever the
+// address.
 const LOGIN_ENTRY_PATH = '/login'
 
-function clearEntryPath() {
+function replacePath(path) {
   try {
     const { search, hash } = window.location
-    window.history.replaceState(window.history.state, '', `${LOGIN_ENTRY_PATH}${search}${hash}`)
+    window.history.replaceState(window.history.state, '', `${path}${search}${hash}`)
   } catch {
     // Sandboxed frame: the address stays.
   }
@@ -51,7 +53,8 @@ export async function bootUniversity() {
   setUniversityDirectory(info)
 
   const entry = readEntryPath(window.location.pathname, info?.universities ?? [])
-  if (entry) clearEntryPath()
+  if (entry?.kind === 'picker') replacePath(LOGIN_ENTRY_PATH)
+  else if (entry && info?.session) replacePath('/')
 
   const id = pickBootUniversity({ info, entry, storedChoice: readUniversityChoice() })
   let config = null

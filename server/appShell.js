@@ -21,3 +21,12 @@ export function fillBrandingPlaceholders(html, branding) {
 export function fillPublicOrigin(html, origin) {
   return html.replaceAll('__PUBLIC_ORIGIN__', origin)
 }
+
+// The page's own address in its canonical link and link previews (og:url,
+// twitter:url), `path` like '/rennes'; the site's address in the structured
+// data stays the home page. Before fillPublicOrigin.
+export function fillPagePath(html, path) {
+  return html
+    .replaceAll('href="__PUBLIC_ORIGIN__/"', `href="__PUBLIC_ORIGIN__${path}"`)
+    .replaceAll('content="__PUBLIC_ORIGIN__/"', `content="__PUBLIC_ORIGIN__${path}"`)
+}
