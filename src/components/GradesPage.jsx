@@ -23,6 +23,7 @@ import LoadingDots from './LoadingDots'
 import PageEmptyState from './PageEmptyState'
 import SemesterSelect from './SemesterSelect'
 import SubjectsList from './SubjectsList'
+import ServiceNotice from './ServiceNotice'
 import UeSubjectsList from './UeSubjectsList'
 import WidgetAverageGrade from './WidgetAverageGrade'
 import WidgetEcts from './WidgetEcts'
@@ -359,6 +360,8 @@ function GradesPage({ user = null, arrivalSource = 'other', initialGradeRequest 
           open full page, where it holds only the hidden title. On a phone it
           tops the screen (no app top bar here), a little more room above. */}
       <div className={ueFocused ? 'contents' : 'page-top-band grid gap-5 -mx-6 -mt-4 px-6 pt-4 pb-6 4xl:-mt-5 4xl:pt-5 max-md:-mx-3 max-md:-mt-3 max-md:gap-4 max-md:px-3 max-md:pt-5 max-md:pb-4'}>
+        {/* The university's outage notice, as on every tab. */}
+        <ServiceNotice />
         {/* On a phone, one row: the title, then the semester chip ("S2"),
             Simuler and the PDF at its end, so nothing wraps. */}
         <div className={`flex flex-wrap items-baseline gap-x-3 gap-y-2 max-md:flex-nowrap max-md:items-center max-md:gap-x-2 ${ueFocused ? 'sr-only' : ''}`}>

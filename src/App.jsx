@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Icon } from '@iconify/react'
 import universityConfig from '@university'
 import { getPapillonUrl, PAPILLON_DEBUG_KEY, readPapillonDebugOverride } from './papillon'
+import { isServiceNoticeHiddenByDebug, SERVICE_NOTICE_DEBUG_KEY } from './serviceNoticeDebug'
 import { getLoadedUniversityId, writeUniversityChoice } from './universityRuntime'
 import favicon from './assets/favicon.png'
 import AppHeader from './components/AppHeader'
@@ -103,6 +104,8 @@ const DEBUG_MENU_ENABLED = import.meta.env.DEV
 // Whether the Papillon mentions show on this page load (the debug panel's
 // override included), for its toggle.
 const IS_PAPILLON_SHOWN = getPapillonUrl(universityConfig.branding, readPapillonDebugOverride()) !== null
+// Whether the debug panel hides the outage notice on this page load.
+const IS_SERVICE_NOTICE_HIDDEN = isServiceNoticeHiddenByDebug()
 const ACCOUNT_MODAL_PROFILE_PHOTO_TIMEOUT_MS = 3000
 const ONBOARDING_COMPLETION_SCREEN_MS = 1000
 const LEGACY_SESSION_CACHE_KEY = 'l-ent:session-cache'
@@ -3250,6 +3253,23 @@ function App() {
                 }}
               >
                 Papillon {IS_PAPILLON_SHOWN ? '✓' : ''}
+              </button>
+              {/* The university's outage notice (ServiceNotice), hidden on
+                  this device; read at load, so it reloads. */}
+              <button
+                type="button"
+                className={`appearance-none border border-border rounded-[12px] py-[0.7rem] px-[0.9rem] font-inherit font-semibold leading-[1.1] ${IS_SERVICE_NOTICE_HIDDEN ? 'bg-brand text-bg' : 'bg-bg text-text'}`}
+                onClick={() => {
+                  try {
+                    if (IS_SERVICE_NOTICE_HIDDEN) localStorage.removeItem(SERVICE_NOTICE_DEBUG_KEY)
+                    else localStorage.setItem(SERVICE_NOTICE_DEBUG_KEY, '1')
+                  } catch {
+                    return
+                  }
+                  window.location.reload()
+                }}
+              >
+                Masquer l'avis {IS_SERVICE_NOTICE_HIDDEN ? '✓' : ''}
               </button>
               {/* Forgets the university picked on this device and reloads on
                   the neutral page (src/universityRuntime.js). Signed out
