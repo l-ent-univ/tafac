@@ -239,7 +239,8 @@ function StepSlider({ options, value, onChange, ariaLabel, disabled = false }) {
 
 const SETTING_BUTTON_CLASSES = `inline-flex h-9 items-center justify-center gap-[6px] rounded-full border-0 ${MUTED_FILL_CLASSES} px-3 font-body text-[14px] font-medium text-[var(--color-text)] transition-colors duration-[120ms] ease-in-out hover:bg-[#edebe5] cursor-pointer disabled:cursor-wait disabled:opacity-60 dark:hover:bg-[var(--color-bg-subtle)]`
 
-function Switch({ checked, onChange }) {
+// Also the debug menu's toggles (src/components/debug/).
+export function Switch({ checked, onChange }) {
   return (
     <button
       type="button"
