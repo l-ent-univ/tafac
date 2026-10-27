@@ -10,6 +10,18 @@ function text(value) {
   return trimmed || null
 }
 
+function webLink(value) {
+  const link = text(value)
+  return link && /^https?:\/\//i.test(link) ? link : null
+}
+
+// "VOTRE PLANNING" reads as "Votre planning"; a lone acronym ("BU") stays.
+function softenCapitals(label) {
+  return label && label === label.toLocaleUpperCase('fr') && /\p{L}{2,}\s+\p{L}{2,}/u.test(label)
+    ? label.charAt(0) + label.slice(1).toLocaleLowerCase('fr')
+    : label
+}
+
 export function toPlanningEvent(raw) {
   const start = Number.isFinite(raw?.startMs) ? raw.startMs : Date.parse(raw?.start)
   const parsedEnd = Number.isFinite(raw?.endMs) ? raw.endMs : Date.parse(raw?.end)
@@ -29,6 +41,11 @@ export function toPlanningEvent(raw) {
     location: text(raw.location),
     teacher: text(raw.teacher),
     group: text(raw.groupsLabel) ?? text(groups.join(', ')),
+    // A note on the class and a link, when the planning gives them (TEMPO's
+    // info line and url).
+    notes: text(raw.notes),
+    link: webLink(raw.link),
+    linkLabel: webLink(raw.link) ? softenCapitals(text(raw.linkLabel)) : null,
   }
 }
 

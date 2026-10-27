@@ -205,6 +205,45 @@ function saveLocalPins(pins) {
   }
 }
 
+// A portal that can't store favourites (services.localFavorites: Drupal at
+// Rennes 2) keeps them in this browser instead: the keys of the starred apps,
+// in the order they were starred. The row then works as with the ENT's
+// favourites (star, exit animation, drag order), only without the portal.
+const LOCAL_FAVORITES = universityConfig.services?.localFavorites === true
+const LOCAL_FAVORITES_KEY = 'l-ent:local-favorites'
+
+function loadLocalFavorites() {
+  try {
+    const stored = JSON.parse(localStorage.getItem(LOCAL_FAVORITES_KEY) || 'null')
+    return Array.isArray(stored) ? stored.filter((key) => typeof key === 'string') : []
+  } catch {
+    return []
+  }
+}
+
+function saveLocalFavorites(keys) {
+  try {
+    localStorage.setItem(LOCAL_FAVORITES_KEY, JSON.stringify(keys))
+  } catch {
+    // Storage unavailable
+  }
+}
+
+// The favourites section built from the stored keys, as
+// normalizeBootstrapSections builds it from the portal. Apps the portal no
+// longer lists are left out.
+function buildLocalFavoriteSections(services, keys) {
+  const servicesByKey = new Map(services.map((service) => [getApplicationKey(service), service]))
+  const applications = [...new Set(keys)].map((key) => servicesByKey.get(key)).filter(Boolean)
+  return {
+    source: 'local-favorites',
+    rawCount: applications.length,
+    sections: applications.length > 0
+      ? [{ id: 'ent-favorites', title: 'Favoris', subtitle: '', applications }]
+      : [],
+  }
+}
+
 function isLocalService(application) {
   return !application?.portalNodeId
 }
@@ -1199,8 +1238,10 @@ function AvailableApplications({
           return
         }
 
-        const sections = normalizeBootstrapSections(bootstrap)
         const services = normalizeAllServices(bootstrap, loadAppsOrder())
+        const sections = LOCAL_FAVORITES
+          ? buildLocalFavoriteSections(services, loadLocalFavorites())
+          : normalizeBootstrapSections(bootstrap)
         saveAppsOrder(services)
 
         // Tile icons come in the background: the grid never waits for them.
@@ -1654,19 +1695,23 @@ function AvailableApplications({
   // before a fast reply drops it from the list.
   async function sendFavoriteRemoval(application, exitAnimation = Promise.resolve()) {
     const applicationKey = getApplicationKey(application)
-    const requestPath = buildRemoveFavoriteRequestPath(application)
 
     try {
-      if (!requestPath) {
-        throw new Error('Impossible de retirer ce favori pour le moment')
-      }
-      const response = await postFavoriteLayoutChange(requestPath)
-      if (!response.ok) {
-        throw new Error(
-          (typeof response.data === 'object' ? response.data?.error : '')
-          || response.text
-          || 'Impossible de retirer ce favori pour le moment',
-        )
+      if (LOCAL_FAVORITES) {
+        saveLocalFavorites(loadLocalFavorites().filter((key) => key !== applicationKey))
+      } else {
+        const requestPath = buildRemoveFavoriteRequestPath(application)
+        if (!requestPath) {
+          throw new Error('Impossible de retirer ce favori pour le moment')
+        }
+        const response = await postFavoriteLayoutChange(requestPath)
+        if (!response.ok) {
+          throw new Error(
+            (typeof response.data === 'object' ? response.data?.error : '')
+            || response.text
+            || 'Impossible de retirer ce favori pour le moment',
+          )
+        }
       }
       await exitAnimation
       if (!isMountedRef.current) return
@@ -1741,6 +1786,23 @@ function AvailableApplications({
     // Undo of a removal that hasn't gone out yet: just show it again.
     if (deferredRemovalsRef.current.has(applicationKey)) {
       cancelFavoriteRemoval(applicationKey)
+      return
+    }
+
+    // Stored in this browser: the favourite is confirmed at once.
+    if (LOCAL_FAVORITES) {
+      setFavoriteActionState({ removingKey: '', error: '' })
+      cancelFavoriteRemoval(applicationKey)
+      const keys = loadLocalFavorites()
+      const nextKeys = keys.includes(applicationKey) ? keys : [...keys, applicationKey]
+      saveLocalFavorites(nextKeys)
+      const local = buildLocalFavoriteSections(allServices, nextKeys)
+      setViewState((current) => ({
+        ...current,
+        ...local,
+        status: local.sections.length > 0 ? 'ready' : 'empty',
+        error: '',
+      }))
       return
     }
 

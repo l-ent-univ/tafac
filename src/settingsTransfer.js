@@ -22,6 +22,7 @@ export const TRANSFERABLE_KEYS = [
   'l-ent:anonymous-analytics',
   'l-ent:favorites-order',
   'l-ent:local-pins',
+  'l-ent:local-favorites',
   'l-ent:weather-city',
   'l-ent:grade-colors',
   'l-ent:class-colors',

@@ -27,8 +27,8 @@ export function usePlanningWeeks({ selection, user }) {
     weeks.set(key, { ...entry, status: 'loading' })
     setVersion((value) => value + 1)
     fetchUpcomingEvents({ selection, startDate: monday, lookaheadDays: 7 })
-      .then(({ events }) => {
-        weeks.set(key, { status: 'loaded', events: mergeEvents(events.map(toPlanningEvent)) })
+      .then(({ events, noTimetable }) => {
+        weeks.set(key, { status: 'loaded', events: mergeEvents(events.map(toPlanningEvent)), noTimetable })
       })
       .catch((error) => {
         weeks.set(key, entry?.events
@@ -49,12 +49,13 @@ export function usePlanningWeeks({ selection, user }) {
   }, [scope, version])
 
   // A day's state: 'loaded' (its week answered), 'loading' (on its way, or
-  // not asked yet), 'unavailable' (it failed), 'unconfigured' (no group).
+  // not asked yet), 'unavailable' (it failed), 'unconfigured' (no group),
+  // 'no-timetable' (the planning service has none for this account: TEMPO).
   const statusOn = useCallback((day) => {
     void version
     if (!selection) return 'unconfigured'
     const entry = weeks.get(`${scope}::${startOfWeek(day)}`)
-    if (entry?.events) return 'loaded'
+    if (entry?.events) return entry.noTimetable ? 'no-timetable' : 'loaded'
     return entry?.status === 'unavailable' ? 'unavailable' : 'loading'
   }, [scope, selection, version])
 

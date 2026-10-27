@@ -20,6 +20,7 @@ const NEXT_CLASS_TICK_MS = 30 * 1000
 const NEXT_CLASS_REFRESH_MS = 5 * 60 * 1000
 const NEXT_CLASS_LOGIN_QUIET_MS = 90 * 1000
 const PLANNING_SERVICE_URL = universityConfig.planning?.serviceUrl ?? null
+const PLANNING_PROVIDER = universityConfig.planning?.providerName ?? 'ADE'
 const ADE_HREF = PLANNING_SERVICE_URL
   ? `${ENT_AUTH_PREFIX}/launch?url=${encodeURIComponent(PLANNING_SERVICE_URL)}`
   : null
@@ -31,6 +32,8 @@ function createWidgetState(overrides = {}) {
     errorMessage: '',
     errorKind: null,
     complete: true,
+    // 'empty' because the planning service has no timetable for the account.
+    noTimetable: false,
     ...overrides,
   }
 }
@@ -281,6 +284,15 @@ function getStatusCopy(widgetState, lookaheadDays = NEXT_CLASS_LOOKAHEAD_DAYS, {
         action,
       }
     case 'empty':
+      // The planning service has no timetable at all for the account (TEMPO).
+      if (widgetState.noTimetable) {
+        return {
+          title: 'Pas d’emploi du temps',
+          body: `${PLANNING_PROVIDER} n’a encore aucun cours pour toi cette année`,
+          icon: 'carbon:calendar',
+          action,
+        }
+      }
       return {
         title: 'Aucun cours à venir',
         body: `Rien de prévu dans les ${lookaheadDays} prochains jours`,
@@ -308,6 +320,7 @@ async function loadUpcomingClasses(options) {
 
   return {
     complete: data.complete,
+    noTimetable: data.noTimetable,
     events,
     nextClass: findNextClass(events),
   }
@@ -362,6 +375,7 @@ function WidgetNextClass({
   const visibleRef = useRef(visible)
   const loadedEventsRef = useRef([])
   const loadedCompleteRef = useRef(true)
+  const loadedNoTimetableRef = useRef(false)
   const lastRefreshAtRef = useRef(0)
   const quietUntilRef = useRef(0)
   const loadingRef = useRef(false)
@@ -417,13 +431,14 @@ function WidgetNextClass({
 
       if (loadedEventsRef.current.length === 0) {
         const nextStatus = loadedCompleteRef.current ? 'empty' : 'limited'
-        if (current.status === nextStatus) {
+        if (current.status === nextStatus && current.noTimetable === loadedNoTimetableRef.current) {
           return current
         }
 
         return createWidgetState({
           status: nextStatus,
           complete: loadedCompleteRef.current,
+          noTimetable: loadedNoTimetableRef.current,
         })
       }
 
@@ -490,6 +505,7 @@ function WidgetNextClass({
 
       loadedEventsRef.current = result.events
       loadedCompleteRef.current = result.complete
+      loadedNoTimetableRef.current = result.noTimetable === true
       lastRefreshAtRef.current = Date.now()
       persistNextClassCache(cacheKey, result)
       publishBriefingSource('classes', { cacheKey, loadedAt: lastRefreshAtRef.current })
@@ -506,6 +522,7 @@ function WidgetNextClass({
       setWidgetState(createWidgetState({
         status: result.complete ? 'empty' : 'limited',
         complete: result.complete,
+        noTimetable: result.noTimetable === true,
       }))
     } catch (error) {
       if (controller.signal.aborted || error?.name === 'AbortError') {
@@ -566,6 +583,7 @@ function WidgetNextClass({
     if (cachedResult) {
       loadedEventsRef.current = cachedResult.events
       loadedCompleteRef.current = cachedResult.complete
+      loadedNoTimetableRef.current = cachedResult.noTimetable === true
       lastRefreshAtRef.current = cachedResult.cachedAt
 
       const nextClass = findNextClass(cachedResult.events)
@@ -579,6 +597,7 @@ function WidgetNextClass({
         setWidgetState(createWidgetState({
           status: cachedResult.complete ? 'empty' : 'limited',
           complete: cachedResult.complete,
+          noTimetable: cachedResult.noTimetable === true,
         }))
       }
     } else if (!hasResources) {

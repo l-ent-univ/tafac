@@ -44,6 +44,20 @@ function PersonRow({ login, name, detail }) {
   )
 }
 
+// « Aide »: write to the team (branding.about.contactEmail), the address
+// shown under the button. Hidden without an address.
+export function AboutHelp() {
+  if (!about.contactEmail) return null
+  return (
+    <SettingsGroup title="Aide">
+      <a href={`mailto:${about.contactEmail}`} className={`${PRESSABLE_ROW_CLASSES} no-underline`}>
+        <RowText icon="carbon:email" label="Contacter l’équipe" description={about.contactEmail} />
+        <Icon icon="carbon:arrow-up-right" className="h-4 w-4 shrink-0 text-text-50" aria-hidden="true" />
+      </a>
+    </SettingsGroup>
+  )
+}
+
 // « Équipe » and « Contributeurs », in the Réglages style and apart from the
 // À propos text (their own cards, under it). The team is the university's
 // list; the contributors come from the repo on GitHub, everyone who has
@@ -206,6 +220,7 @@ function AboutModal({
           </div>
 
           <AboutContent demoLinkLabel={demoLinkLabel} onDemoLinkClick={onDemoLinkClick}>
+            <AboutHelp />
             <AboutTeam />
           </AboutContent>
         </div>

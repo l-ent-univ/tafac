@@ -42,8 +42,16 @@ import {
 } from './sessionCookie.js'
 import { createLaunchTargetPolicy } from './launchTargets.js'
 import { createPlanningPortalApiClient } from '../planningPortalApi.js'
+import {
+  buildDrupalLayout,
+  isDrupalSignedInPage,
+  parseDrupalProfileName,
+  parseDrupalToolCatalogue,
+  resolvePortalKind,
+} from './portalSession.js'
 import { SchoolCertificateUnavailableError, buildDemoCertificatePdf, openCertificateDownload } from './schoolCertificate.js'
 import { createPlanningRpcClient } from '../planningRpc.js'
+import { createTempoApiClient } from '../tempoApi.js'
 import {
   DEMO_ACCOUNT,
   DEMO_GRADES_DEPARTMENT_MESSAGE,
@@ -176,10 +184,25 @@ const ENT_HOST = new URL(ENT_ORIGIN).hostname
 const CAS_HOST = new URL(CAS_ORIGIN).hostname
 const MOODLE_HOST = MOODLE_ORIGIN ? new URL(MOODLE_ORIGIN).hostname : null
 const PLANNING_HOST = PLANNING_ORIGIN ? new URL(PLANNING_ORIGIN).hostname : null
-const USE_PLANNING_PORTAL_REST = universityConfig.planning?.api === 'portal-rest'
+// planning.api: 'portal-rest' (ADE's REST portal, planningPortalApi.js) and
+// 'tempo' (tempoApi.js) are both clients with the portal interface, served
+// by the same routes; without one, the GWT planning (planningRpc.js).
+const PLANNING_API = universityConfig.planning?.api ?? null
+const USE_PLANNING_PORTAL_REST = PLANNING_API === 'portal-rest' || PLANNING_API === 'tempo'
 
 const PORTAL_ENTRY_URL = `${ENT_ORIGIN}${universityConfig.auth.portalEntryPath}`
-const MOODLE_SHIBBOLETH_LOGIN_URL = MOODLE_ORIGIN
+// Portal software behind ENT_ORIGIN (server/portalSession.js): only uPortal
+// has the layout and userinfo APIs.
+const PORTAL_KIND = resolvePortalKind(universityConfig.auth)
+// Drupal portal: page listing the tools, read for the applications grid.
+const PORTAL_CATALOG_URL = universityConfig.catalog?.path ? `${ENT_ORIGIN}${universityConfig.catalog.path}` : null
+// Moodle signs in either through its own CAS login (moodle.casLoginPath,
+// Rennes 2: '/login/index.php?authCAS=CAS', which goes straight to the CAS
+// and back with a ticket) or through Shibboleth (the default).
+const MOODLE_CAS_LOGIN_URL = MOODLE_ORIGIN && universityConfig.moodle?.casLoginPath
+  ? `${MOODLE_ORIGIN}${universityConfig.moodle.casLoginPath}`
+  : null
+const MOODLE_SHIBBOLETH_LOGIN_URL = MOODLE_ORIGIN && !MOODLE_CAS_LOGIN_URL
   ? `${MOODLE_ORIGIN}${universityConfig.moodle?.shibbolethLoginPath ?? '/auth/shibboleth/index.php'}`
   : null
 
@@ -276,6 +299,9 @@ const runtimeMailCache = new Map()
 // Kept runtime-only (never persisted in the session cookie) so the IdP/SP/
 // webmail cookies don't bloat the 4 KB session cookie.
 const runtimeMailContexts = new Map()
+// The account's mail address read from the webmail, by session (or null when
+// it couldn't be read), for portals that don't give it (Drupal).
+const runtimeMailAddresses = new Map()
 // sessionId → { cachedAt, data }: short-lived Moodle deadlines snapshot.
 const runtimeMoodleDeadlinesCache = new Map()
 // sessionId → { createdAt, jar, sesskey }: signed-in Moodle context, runtime-only
@@ -659,6 +685,7 @@ function dropRuntimeSession(sessionId) {
   runtimeGradesDistributionCache.delete(sessionId)
   runtimeMailCache.delete(sessionId)
   runtimeMailContexts.delete(sessionId)
+  runtimeMailAddresses.delete(sessionId)
   runtimeMoodleDeadlinesCache.delete(sessionId)
   runtimeMoodleContexts.delete(sessionId)
 }
@@ -871,6 +898,8 @@ function isRedirectStatus(statusCode) {
   return [301, 302, 303, 307, 308].includes(statusCode)
 }
 
+// Keep one User-Agent for every CAS request of a session: the Rennes 2 CAS
+// binds the TGC to it and deletes the TGC when another one shows it.
 async function fetchWithJar(url, jar, options = {}) {
   const headers = new Headers(options.headers ?? {})
   const cookieHeader = jar.getCookieHeader(url)
@@ -1069,15 +1098,16 @@ async function performEntLogin({ username, password }) {
     },
   })
 
-  const layout = await fetchEntLayout(jar)
+  const portal = await fetchPortalSession(jar)
 
-  if (!layout.ok || !layout.data || String(layout.data.authenticated) !== 'true') {
+  if (!portal.authenticated) {
     throw new Error('CAS login completed, but the portal session was not established.')
   }
 
   return {
     jar,
-    layout: layout.data,
+    // A portal without its own user id (Drupal) keys the profile on the login.
+    user: portal.user ?? normalizeLoginIdentifier(username),
     redirectChain: [...loginPageResult.chain, ...portalRedirectResult.chain],
   }
 }
@@ -1086,12 +1116,28 @@ function isAuthenticatedLayout(layout) {
   return Boolean(layout?.ok && layout.data && String(layout.data.authenticated) === 'true')
 }
 
+// Signed-in state of the portal session held by the jar: { authenticated,
+// user }, `user` being the portal's own user id, or null when it has none.
+async function fetchPortalSession(jar) {
+  if (PORTAL_KIND === 'drupal') {
+    const response = await fetchWithJar(PORTAL_ENTRY_URL, jar, {
+      headers: { Accept: HTML_ACCEPT_HEADER },
+    })
+    const html = await response.text()
+    return { authenticated: isDrupalSignedInPage(response.status, html), user: null }
+  }
+
+  const layout = await fetchEntLayout(jar)
+  return { authenticated: isAuthenticatedLayout(layout), user: layout.data?.user ?? null }
+}
+
 // Silent re-login: when the portal session lapsed (idle timeout, server
 // restart) but the jar still holds the CAS TGC, replay the login-time entry
 // (portal → CAS → portal with a service ticket) without any credentials. The
 // stale portal cookies are dropped first so the entry behaves exactly as at
-// login. Resolves to the authenticated layout, or null when the CAS no longer
-// honors the TGC (TGT expired, or killed by a logout).
+// login. Resolves to the signed-in portal session (fetchPortalSession), or
+// null when the CAS no longer honors the TGC (TGT expired, or killed by a
+// logout).
 async function reestablishEntSession(session) {
   if (!session.jar.hasCookie(CAS_HOST, 'TGC')) {
     return null
@@ -1108,8 +1154,8 @@ async function reestablishEntSession(session) {
     return null
   }
 
-  const layout = await fetchEntLayout(session.jar)
-  return isAuthenticatedLayout(layout) ? layout : null
+  const portal = await fetchPortalSession(session.jar)
+  return portal.authenticated ? portal : null
 }
 
 // One re-login at a time per session: parallel requests from the same browser
@@ -1582,7 +1628,7 @@ async function previewServerLaunch(targetUrl, session) {
         finalUrl: targetUrl,
         chain: [],
         useServerLaunch: true,
-        reason: 'server-saml-relay',
+        reason: MOODLE_CAS_LOGIN_URL ? 'moodle-cas-relay' : 'server-saml-relay',
         ...launchCapabilities,
       }
     }
@@ -2082,14 +2128,21 @@ const {
   gwtClientId: universityConfig.planning?.gwtClientId,
 })
 
-const portalClient = USE_PLANNING_PORTAL_REST
-  ? createPlanningPortalApiClient({
+const portalClient = PLANNING_API === 'tempo'
+  ? createTempoApiClient({
       casOrigin: CAS_ORIGIN,
-      planningOrigin: PLANNING_ORIGIN,
+      tempoOrigin: PLANNING_ORIGIN,
+      timeZone: universityConfig.planning?.timeZone,
       fetchWithJar,
-      followRedirectChain,
     })
-  : null
+  : PLANNING_API === 'portal-rest'
+    ? createPlanningPortalApiClient({
+        casOrigin: CAS_ORIGIN,
+        planningOrigin: PLANNING_ORIGIN,
+        fetchWithJar,
+        followRedirectChain,
+      })
+    : null
 
 const {
   clearPortalCaches = () => {},
@@ -2233,14 +2286,14 @@ app.get('/__ent_auth/session', async (req, res) => {
       })
     }
 
-    let layout = await fetchEntLayout(session.jar)
+    let portal = await fetchPortalSession(session.jar)
 
     // Portal session lapsed: sign in again silently with the CAS TGC.
-    if (!isAuthenticatedLayout(layout)) {
-      layout = await reestablishEntSessionOnce(session)
+    if (!portal.authenticated) {
+      portal = await reestablishEntSessionOnce(session)
     }
 
-    if (!layout) {
+    if (!portal) {
       dropRuntimeSession(session.id)
       clearSensitiveSessionCaches(session)
       clearSessionCookies(res)
@@ -2257,13 +2310,13 @@ app.get('/__ent_auth/session', async (req, res) => {
       })
     }
 
-    session.user = layout.data.user
+    session.user = portal.user ?? session.user
     setSessionCookie(res, session)
     const launchCapabilities = getSessionLaunchCapabilities(session)
 
     res.status(200).json({
       authenticated: true,
-      user: layout.data.user,
+      user: session.user,
       sessionMode: session.mode ?? null,
       sessionSource: session.sessionSource ?? null,
       cookieNames: session.jar.getCookieNamesForHost(ENT_HOST),
@@ -2318,7 +2371,7 @@ app.post('/__ent_auth/login', async (req, res) => {
     // which signs in to every service (ENT, ADE, Moodle, webmail…) on its own.
     const session = {
       id: randomUUID(),
-      user: result.layout.user,
+      user: result.user,
       jar: result.jar,
       createdAt: Date.now(),
       lastSeenAt: Date.now(),
@@ -2326,19 +2379,21 @@ app.post('/__ent_auth/login', async (req, res) => {
 
     // Prime the ADE session cache while the credentials are still in hand
     // (later refreshes go through the CAS with the TGC).
-    try {
-      await authenticateToAde(result.jar, { username, password }, {
-        cacheScope: getPlanningCacheScope(session),
-      })
-    } catch (adeError) {
-      console.warn('ADE session bootstrap failed during login:', adeError)
+    if (FEATURES.ade && ADE_ORIGIN) {
+      try {
+        await authenticateToAde(result.jar, { username, password }, {
+          cacheScope: getPlanningCacheScope(session),
+        })
+      } catch (adeError) {
+        console.warn('ADE session bootstrap failed during login:', adeError)
+      }
     }
 
     setSessionCookie(res, session)
 
     res.status(200).json({
       authenticated: true,
-      user: result.layout.user,
+      user: result.user,
       sessionMode: session.mode ?? null,
       university: UNIVERSITY_ID,
     })
@@ -2377,6 +2432,23 @@ app.get('/__ent_auth/account', async (req, res) => {
         authenticated: true,
         account: DEMO_ACCOUNT,
         sessionMode: DEMO_SESSION_MODE,
+      })
+    }
+
+    // Drupal has no userinfo API: the name comes from the profile page.
+    if (PORTAL_KIND === 'drupal') {
+      const profile = await followRedirectChain(`${ENT_ORIGIN}/user`, session.jar, {
+        headers: { Accept: HTML_ACCEPT_HEADER },
+      })
+      const html = await profile.response.text()
+      const signedIn = getHostnameFromUrl(profile.finalUrl) === ENT_HOST && isDrupalSignedInPage(profile.response.status, html)
+      // The portal has no address: the webmail's (Partage), when there is one.
+      const email = signedIn ? await fetchMailAddress(session) : null
+      setSessionCookie(res, session)
+      return res.status(200).json({
+        authenticated: true,
+        account: signedIn ? { ...parseDrupalProfileName(html), email } : null,
+        sessionMode: session.mode ?? null,
       })
     }
 
@@ -2480,7 +2552,7 @@ app.get('/__ent_auth/planning', async (req, res) => {
         outOfRange: false,
         debug: {
           source: PLANNING_HOST,
-          api: 'portal-rest',
+          api: PLANNING_API,
           projectId: portalResult.projectId,
           resourceIds: portalResult.resourceIds,
           cache: portalResult.cache,
@@ -2555,7 +2627,12 @@ app.get('/__ent_auth/launch', async (req, res) => {
     return res.redirect(targetUrl)
   }
 
-  if (isMoodleLaunchTarget(targetUrl)) {
+  // Moodle behind its CAS login: the plain CAS relay below, started from that
+  // login (an activity page would answer Moodle's multi-login page, not the
+  // CAS), so the student lands on Moodle signed in.
+  const relayUrl = MOODLE_CAS_LOGIN_URL && isMoodleLaunchTarget(targetUrl) ? MOODLE_CAS_LOGIN_URL : targetUrl
+
+  if (isMoodleLaunchTarget(targetUrl) && !MOODLE_CAS_LOGIN_URL) {
     try {
       const relay = await prepareMoodleLaunchRelay(session, targetUrl)
 
@@ -2612,10 +2689,10 @@ app.get('/__ent_auth/launch', async (req, res) => {
   }
 
   const chain = []
-  const targetHost = new URL(targetUrl).hostname
+  const targetHost = new URL(relayUrl).hostname
 
   try {
-    let currentUrl = targetUrl
+    let currentUrl = relayUrl
 
     for (let attempt = 0; attempt < 15; attempt += 1) {
       const response = await fetchWithJar(currentUrl, session.jar, {
@@ -3165,7 +3242,8 @@ async function establishZimbraContext(session) {
   throw new Error('Too many redirects while signing in to the webmail.')
 }
 
-async function zimbraSoapRequest(context, requestName, requestBody) {
+// `namespace`: urn:zimbraMail (mail requests) or urn:zimbraAccount (GetInfo…).
+async function zimbraSoapRequest(context, requestName, requestBody, namespace = 'urn:zimbraMail') {
   const headers = {
     Accept: 'application/json',
     'Content-Type': 'application/json; charset=utf-8',
@@ -3183,7 +3261,7 @@ async function zimbraSoapRequest(context, requestName, requestBody) {
     headers,
     body: JSON.stringify({
       Header: { context: soapContext },
-      Body: { [requestName]: { _jsns: 'urn:zimbraMail', ...requestBody } },
+      Body: { [requestName]: { _jsns: namespace, ...requestBody } },
     }),
   })
   const payload = await response.json().catch(() => null)
@@ -3297,6 +3375,30 @@ async function getZimbraContext(session, { fresh = false } = {}) {
     runtimeMailContexts.set(session.id, context)
   }
   return context
+}
+
+// The mail address of the account, as the webmail knows it (Zimbra
+// GetInfo's account name). Null when there's no Zimbra webmail or it can't
+// be read; read once per session.
+async function fetchMailAddress(session) {
+  if (!FEATURES.mail || MAIL_PROVIDER !== 'zimbra') {
+    return null
+  }
+  if (runtimeMailAddresses.has(session.id)) {
+    return runtimeMailAddresses.get(session.id)
+  }
+
+  let address = null
+  try {
+    const context = await getZimbraContext(session)
+    const info = await zimbraSoapRequest(context, 'GetInfoRequest', { sections: 'mbox' }, 'urn:zimbraAccount')
+    const name = String(info?.name ?? '').trim()
+    address = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(name) ? name : null
+  } catch {
+    address = null
+  }
+  runtimeMailAddresses.set(session.id, address)
+  return address
 }
 
 async function fetchZimbraRecentMail(session, options) {
@@ -3492,7 +3594,8 @@ function readSignedInMoodlePage(html, url) {
 }
 
 async function establishMoodleContext(session) {
-  if (!MOODLE_SHIBBOLETH_LOGIN_URL) {
+  const loginUrl = MOODLE_CAS_LOGIN_URL ?? MOODLE_SHIBBOLETH_LOGIN_URL
+  if (!loginUrl) {
     throw new Error('Moodle is not configured for this university.')
   }
 
@@ -3501,7 +3604,7 @@ async function establishMoodleContext(session) {
   }
 
   const jar = CookieJar.fromSerialized(session.jar.serialize())
-  let currentUrl = MOODLE_SHIBBOLETH_LOGIN_URL
+  let currentUrl = loginUrl
   let currentMethod = 'GET'
   let currentBody
   let currentHeaders = { Accept: MOODLE_ACCEPT_HTML }
@@ -4097,7 +4200,7 @@ app.get('/__ent_auth/ade/status', async (req, res) => {
         ok: result.ok,
         status: result.status,
         data: result.data,
-        api: 'portal-rest',
+        api: PLANNING_API,
       })
     }
 
@@ -4153,7 +4256,7 @@ app.get('/__ent_auth/ade/calendar', async (req, res) => {
         },
         debug: {
           source: PLANNING_HOST,
-          api: 'portal-rest',
+          api: PLANNING_API,
           projectId: portalResult.projectId,
           cache: portalResult.cache,
         },
@@ -4206,7 +4309,11 @@ app.get('/__ent_auth/ade/tree', async (req, res) => {
     const requestedTreeId = String(req.query.etabsVets ?? '')
 
     if (isDemoSession(entSession)) {
-      const tree = buildDemoAdeTreePayload(requestedTreeId)
+      // A personal timetable (TEMPO) has no group to pick: the demo adopts
+      // its single group, as a real account does (no network call).
+      const tree = PLANNING_API === 'tempo'
+        ? await fetchPortalTree(entSession.jar, {})
+        : buildDemoAdeTreePayload(requestedTreeId)
       setSessionCookie(res, entSession)
       return res.status(200).json({
         authenticated: true,
@@ -4241,7 +4348,7 @@ app.get('/__ent_auth/ade/tree', async (req, res) => {
         },
         debug: {
           source: PLANNING_HOST,
-          api: 'portal-rest',
+          api: PLANNING_API,
           projectId: tree.projectId,
           cache: tree.cache,
           authCache: tree.authCache,
@@ -4308,7 +4415,7 @@ app.get('/__ent_auth/ade/search', async (req, res) => {
         results: searchResult.results,
         debug: {
           source: PLANNING_HOST,
-          api: 'portal-rest',
+          api: PLANNING_API,
           projectId: searchResult.projectId,
           cache: searchResult.cache,
         },
@@ -4388,7 +4495,7 @@ app.get('/__ent_auth/ade/timetable', async (req, res) => {
         },
         debug: {
           source: PLANNING_HOST,
-          api: 'portal-rest',
+          api: PLANNING_API,
           projectId: portalResult.projectId,
           resourceIds: portalResult.resourceIds,
           cache: portalResult.cache,
@@ -4498,6 +4605,8 @@ app.post('/__ent_auth/ade/upcoming', async (req, res) => {
           date: requestedDate,
           lookaheadDays,
           complete: portalResult.complete,
+          // TEMPO: the account has no timetable there (tempoApi.js).
+          noTimetable: portalResult.noTimetable === true,
           resourceIds: portalResult.resourceIds,
           selectionLabels,
           events: portalResult.events,
@@ -4505,7 +4614,7 @@ app.post('/__ent_auth/ade/upcoming', async (req, res) => {
         },
         debug: {
           source: PLANNING_HOST,
-          api: 'portal-rest',
+          api: PLANNING_API,
           projectId: portalResult.projectId,
           cache: portalResult.cache,
         },
@@ -4584,7 +4693,7 @@ app.get('/__ent_auth/ade/alerts', async (req, res) => {
         alerts,
         debug: {
           source: PLANNING_HOST,
-          api: 'portal-rest',
+          api: PLANNING_API,
           projectId: portalResult.projectId,
           cache: portalResult.cache,
         },
@@ -4644,6 +4753,49 @@ app.all('/__ent_auth/demo/request', express.text({ type: '*/*' }), (req, res) =>
   res.setHeader('Content-Type', payload.contentType)
   return res.send(payload.body)
 })
+
+// Drupal portal: no uPortal APIs. The applications grid asks the proxy for the
+// layout, layoutDoc and marketplace: the layout is built from the catalogue
+// page (catalog.path), the other two are empty.
+async function fetchDrupalCatalogPage(session) {
+  const page = await followRedirectChain(PORTAL_CATALOG_URL, session.jar, {
+    headers: { Accept: HTML_ACCEPT_HEADER },
+  })
+  const html = await page.response.text()
+  const signedIn = getHostnameFromUrl(page.finalUrl) === ENT_HOST && isDrupalSignedInPage(page.response.status, html)
+  return signedIn ? html : null
+}
+
+if (PORTAL_KIND === 'drupal') {
+  app.get('/__ent_proxy/api/v4-3/dlm/layout.json', async (req, res) => {
+    res.setHeader('Cache-Control', 'no-store')
+    try {
+      const session = getSessionFromRequest(req)
+      if (!session || isDemoSession(session)) {
+        return res.status(401).json({ error: 'Not signed in.' })
+      }
+
+      let html = PORTAL_CATALOG_URL ? await fetchDrupalCatalogPage(session) : ''
+      // Portal session lapsed: sign in again silently with the CAS TGC.
+      if (html === null && await reestablishEntSessionOnce(session)) {
+        html = await fetchDrupalCatalogPage(session)
+      }
+      if (html === null) {
+        return res.status(401).json({ error: 'The portal session has expired.' })
+      }
+
+      setSessionCookie(res, session)
+      res.json(buildDrupalLayout(parseDrupalToolCatalogue(html, ENT_ORIGIN), session.user ?? null))
+    } catch (error) {
+      res.status(502).json({ error: error instanceof Error ? error.message : String(error) })
+    }
+  })
+
+  app.get(['/__ent_proxy/api/layoutDoc', '/__ent_proxy/api/marketplace/entries.json'], (req, res) => {
+    res.setHeader('Cache-Control', 'no-store')
+    res.json([])
+  })
+}
 
 // ============================================================================
 // PROXY MIDDLEWARE

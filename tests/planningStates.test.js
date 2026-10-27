@@ -33,3 +33,9 @@ test('a page retries each of its failed weeks once', () => {
   assert.deepEqual(failedWeeks(['2026-10-18', '2026-10-19', '2026-10-20', '2026-10-26'], statusOn), ['2026-10-19', '2026-10-26'])
   assert.deepEqual(failedWeeks(['2026-10-18'], statusOn), [])
 })
+
+test('a planning service without any timetable for the account is a page state of its own', () => {
+  assert.equal(pageStatus(['no-timetable', 'no-timetable']), 'no-timetable')
+  assert.equal(pageStatus(['no-timetable', 'loading']), 'loading')
+  assert.equal(pageStatus(['no-timetable', 'unavailable']), 'unavailable')
+})

@@ -119,3 +119,7 @@ test('another kind of step ends the burst, and flush sends what is open', () => 
   clock.advance(5000)
   assert.equal(sent.length, 3)
 })
+
+test('no timetable at all is reported as an empty week', () => {
+  assert.deepEqual(describePlanningLoad({ status: 'no-timetable' }), { status: 'empty' })
+})

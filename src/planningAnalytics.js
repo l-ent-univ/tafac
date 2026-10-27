@@ -36,6 +36,8 @@ const ERROR_KINDS = ['http_4xx', 'http_5xx', 'network', 'timeout', 'other']
 // (getRequestErrorKind); `hasClasses`: the week has at least one class.
 export function describePlanningLoad({ status, errorKind = null, hasClasses = false } = {}) {
   if (status === 'unconfigured') return { status: 'unconfigured' }
+  // No timetable at all (TEMPO): reported as an empty week.
+  if (status === 'no-timetable') return { status: 'empty' }
   if (status === 'unavailable') {
     return { status: 'unavailable', errorKind: ERROR_KINDS.includes(errorKind) ? errorKind : 'other' }
   }

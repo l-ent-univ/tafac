@@ -4,6 +4,8 @@
 // browser (src/neutralUniversity.js). Not a university: it has no directory,
 // so listUniversityIds() never lists it.
 
+import { TAFAC_CONTACT_EMAIL, TAFAC_TEAM } from './tafac.js'
+
 export const university = {
   name: 'Tafac',
   shortName: 'Tafac',
@@ -32,10 +34,9 @@ export const branding = {
     disclaimer:
       'Tafac est un projet étudiant indépendant, non officiel et non affilié aux universités. Tes identifiants servent uniquement à te connecter et ne sont jamais stockés.',
     repoUrl: 'https://github.com/l-ent-univ/tafac',
-    team: [
-      { name: 'Tom', login: 'tom-things' },
-      { name: 'Lucas Lavajo', login: 'tryon-dev' },
-    ],
+    team: TAFAC_TEAM,
+    // À propos › Aide: the button to write to the team.
+    contactEmail: TAFAC_CONTACT_EMAIL,
   },
   // Tafac is part of Papillon, made by the same team.
   papillon: { url: 'https://papillon.bzh' },

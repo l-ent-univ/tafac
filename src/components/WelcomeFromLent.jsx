@@ -15,6 +15,7 @@ const SETTING_LABELS = {
   'l-ent:anonymous-analytics': 'Confidentialité',
   'l-ent:favorites-order': 'Favoris',
   'l-ent:local-pins': 'Favoris',
+  'l-ent:local-favorites': 'Favoris',
   'l-ent:grade-colors': 'Couleurs',
   'l-ent:class-colors': 'Couleurs',
 }

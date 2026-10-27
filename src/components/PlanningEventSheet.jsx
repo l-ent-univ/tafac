@@ -13,7 +13,9 @@ import CloseButton from './CloseButton'
 // a line and a second one, parted from the next row by a hairline from the
 // text's edge to as far from the card's right edge. A button with a chevron when it leads somewhere, its hover a
 // rounded fill inside the card, concentric with it (.modal-nested-corners).
-function SheetRow({ icon, title, detail, onClick }) {
+// `href`: an outside link, opened in a new tab. `wrap`: a title that may run
+// over several lines (a note).
+function SheetRow({ icon, title, detail, onClick, href, wrap = false }) {
   const content = (
     <>
       {icon ? (
@@ -22,16 +24,28 @@ function SheetRow({ icon, title, detail, onClick }) {
         </span>
       ) : null}
       <span className="planning-row-text grid min-w-0 flex-1 content-center gap-[4px] self-stretch mr-3 py-[12px]">
-        <span className="truncate font-body text-[14px] font-semibold leading-[1.2] text-text">{title}</span>
+        <span className={`${wrap ? 'whitespace-pre-line break-words' : 'truncate'} font-body text-[14px] font-semibold leading-[1.2] text-text`}>{title}</span>
         {detail ? <span className="truncate font-body text-[12.5px] font-medium leading-none text-text-muted">{detail}</span> : null}
       </span>
       {onClick ? <Icon icon="carbon:chevron-right" className="-ml-1 mr-3 size-[14px] shrink-0 text-text-30" aria-hidden="true" /> : null}
+      {href ? <Icon icon="carbon:launch" className="-ml-1 mr-3 size-[14px] shrink-0 text-text-30" aria-hidden="true" /> : null}
     </>
   )
   const className = 'planning-row modal-nested-corners flex min-h-11 w-full min-w-0 items-center gap-3 pl-3 text-left text-text'
+  if (href) {
+    return <li><a className={`${className} is-link no-underline`} href={href} target="_blank" rel="noopener noreferrer">{content}</a></li>
+  }
   return onClick
     ? <li><button type="button" className={`${className} is-link cursor-pointer border-0 bg-transparent p-0 pl-3`} onClick={onClick}>{content}</button></li>
     : <li className={className}>{content}</li>
+}
+
+function linkHost(href) {
+  try {
+    return new URL(href).hostname
+  } catch {
+    return null
+  }
 }
 
 const CARD_CLASSES = 'widget-card widget-card-visible m-0 list-none overflow-hidden border bg-widget-bg p-1 [--modal-nested-inset:4px] modal-inner-corners'
@@ -123,6 +137,10 @@ function PlanningEventSheet({ event, accent, events, todayKey, searching, onClos
                   <SheetRow icon="carbon:time" title={`De ${formatTime(event.start)} à ${formatTime(event.end)}`} />
                   <SheetRow icon="carbon:calendar" title={`${dayText(event.day)} · ${durationText(event.start, event.end)}`} />
                   {event.group ? <SheetRow icon="carbon:events" title={event.group} /> : null}
+                  {event.notes ? <SheetRow icon="carbon:information" title={event.notes} wrap /> : null}
+                  {event.link ? (
+                    <SheetRow icon="carbon:link" title={event.linkLabel ?? 'Lien'} detail={linkHost(event.link)} href={event.link} />
+                  ) : null}
                 </ul>
               </div>
               {/* Titled like the sections of Mes notes. */}

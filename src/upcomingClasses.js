@@ -77,6 +77,7 @@ export function readNextClassCache(cacheKey) {
     return {
       events: parsedValue.events,
       complete: parsedValue.complete !== false,
+      noTimetable: parsedValue.noTimetable === true,
       cachedAt: Number(parsedValue.cachedAt ?? 0),
     }
   } catch {
@@ -93,6 +94,7 @@ export function persistNextClassCache(cacheKey, result) {
     localStorage.setItem(NEXT_CLASS_CACHE_KEY, JSON.stringify({
       cacheKey,
       complete: result.complete !== false,
+      noTimetable: result.noTimetable === true,
       events: result.events,
       cachedAt: Date.now(),
     }))
@@ -122,5 +124,7 @@ export async function fetchUpcomingEvents({
   return {
     complete: data?.upcoming?.complete !== false,
     events: Array.isArray(data?.upcoming?.events) ? data.upcoming.events : [],
+    // The planning service has no timetable at all for this account (TEMPO).
+    noTimetable: data?.upcoming?.noTimetable === true,
   }
 }

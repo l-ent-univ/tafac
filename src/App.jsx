@@ -83,10 +83,14 @@ import {
   getStudentProfilePictureMeta,
   loginToEnt,
   logoutFromEnt,
+  preloadSchoolCertificateStatus,
 } from './entApi'
 
 // How far the hero photo extends below the widget row before fully fading.
 const HERO_FADE_OVERHANG_PX = 80
+
+// The planning is the student's own (TEMPO): no group to choose in Mon compte.
+const HAS_PERSONAL_PLANNING = universityConfig.planning?.personal === true
 
 const DEBUG_MENU_ENABLED = import.meta.env.DEV
 // Dev only: a constant false in production builds, so the menu's chunk is
@@ -1627,8 +1631,20 @@ function App() {
     }
   }, [sessionState.authenticated, sessionState.account])
 
+  // The school certificate's status, asked in the background a moment after
+  // sign-in (the dashboard's own data first): Réglages shows it at once.
   useEffect(() => {
-    if (!isAccountModalOpen || !sessionState.authenticated) {
+    if (!sessionState.authenticated || sessionState.checking) {
+      return undefined
+    }
+
+    const timeoutId = window.setTimeout(preloadSchoolCertificateStatus, 2000)
+    return () => window.clearTimeout(timeoutId)
+  }, [sessionState.authenticated, sessionState.checking])
+
+  useEffect(() => {
+    // A personal timetable has no group to choose (planning.personal).
+    if (!isAccountModalOpen || !sessionState.authenticated || HAS_PERSONAL_PLANNING) {
       return undefined
     }
 
@@ -1686,7 +1702,7 @@ function App() {
   const handleCloseAccountModal = useCallback(() => {
     setIsAccountModalOpen(false)
 
-    if (!sessionState.user) {
+    if (!sessionState.user || HAS_PERSONAL_PLANNING) {
       return
     }
 
@@ -2422,7 +2438,7 @@ function App() {
               sessionState.account?.given_name,
               sessionState.account?.family_name,
             ].filter(Boolean).join(' ') || sessionState.account?.name || sessionState.givenName || sessionState.user}
-            userSubtitle={selectedTp?.label ?? selectedTp?.tpLabel ?? selectedTp?.tdLabel ?? selectedTp?.yearLabel ?? null}
+            userSubtitle={HAS_PERSONAL_PLANNING ? null : selectedTp?.label ?? selectedTp?.tpLabel ?? selectedTp?.tdLabel ?? selectedTp?.yearLabel ?? null}
             profilePhotoSrc={accountModalPhoto}
             onLogout={handleHeaderAction}
             onAccountClick={handleOpenAccountModal}

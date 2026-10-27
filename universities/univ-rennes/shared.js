@@ -2,6 +2,8 @@
 // Pure data only: this file is imported by Node at runtime, so it must not
 // import assets (images, CSS) or browser-only modules.
 
+import { TAFAC_CONTACT_EMAIL, TAFAC_TEAM } from '../tafac.js'
+
 export const id = 'univ-rennes'
 
 export const university = {
@@ -39,11 +41,10 @@ export const branding = {
     disclaimer:
       "Tafac est un projet étudiant indépendant, non officiel et non affilié à l'Université de Rennes. Tes identifiants servent uniquement à te connecter et ne sont jamais stockés.",
     repoUrl: 'https://github.com/l-ent-univ/tafac',
-    // « Équipe » in À propos: a name and a GitHub login each.
-    team: [
-      { name: 'Tom', login: 'tom-things' },
-      { name: 'Lucas Lavajo', login: 'tryon-dev' },
-    ],
+    // « Équipe » in À propos: the same Tafac team for every university.
+    team: TAFAC_TEAM,
+    // À propos › Aide: the button to write to the team.
+    contactEmail: TAFAC_CONTACT_EMAIL,
   },
   // Tafac is part of Papillon (same team). The one switch for every mention
   // of it (src/papillon.js): delete the block and they all go. Branding

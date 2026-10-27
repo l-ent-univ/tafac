@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Icon } from '@iconify/react'
+import universityConfig from '@university'
 import { openChangelog, useChangelog } from '../changelogStore'
 import { getPillIds } from '../changelogState'
 import { downloadSchoolCertificate, getCachedSchoolCertificateStatus, getSchoolCertificateStatus } from '../entApi'
 import { usePlanningExport } from '../usePlanningExport'
-import { AboutContent, AboutTeam } from './AboutModal'
+import { AboutContent, AboutHelp, AboutTeam } from './AboutModal'
 import SettingsGroup, { RowText } from './SettingsGroup'
 import { CARD_CLASSES, MUTED_FILL_CLASSES, PRESSABLE_ROW_CLASSES, ROW_CLASSES } from '../settingsStyles'
 import { PrivacyContent } from './PrivacyModal'
@@ -270,6 +271,46 @@ function SwitchRow({ icon, label, description, checked, onChange }) {
 
 // A setting row with the app's dropdown on the right (the menu opens under
 // the pill, aligned on its right edge).
+// The address under the name, copied in a tap: the icon turns to a check
+// for a moment, and the screen reader hears it.
+function CopyableEmail({ email }) {
+  const [copied, setCopied] = useState(false)
+  const timeoutRef = useRef(null)
+  useEffect(() => () => window.clearTimeout(timeoutRef.current), [])
+
+  const copy = async () => {
+    try {
+      await navigator.clipboard.writeText(email)
+    } catch {
+      return
+    }
+    setCopied(true)
+    window.clearTimeout(timeoutRef.current)
+    timeoutRef.current = window.setTimeout(() => setCopied(false), 1500)
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={copy}
+      className="group -mx-1 flex min-w-0 max-w-full cursor-pointer items-center gap-[6px] corners-[6px] border-0 bg-transparent px-1 py-0 text-left font-body text-[14px] font-medium leading-[1.3] text-text-60 transition-colors hover:text-text"
+      aria-label={copied ? 'Adresse copiée' : `Copier l’adresse ${email}`}
+      title={copied ? 'Copiée' : 'Copier l’adresse'}
+    >
+      <span className="truncate">{email}</span>
+      <Icon
+        icon={copied ? 'carbon:checkmark' : 'carbon:copy'}
+        className={`size-[14px] shrink-0 transition-opacity ${copied ? 'text-brand opacity-100' : 'opacity-60 group-hover:opacity-100'}`}
+        aria-hidden="true"
+      />
+      <span className="sr-only" aria-live="polite">{copied ? 'Copiée' : ''}</span>
+    </button>
+  )
+}
+
+// A personal timetable (planning.personal, TEMPO) has no group to choose.
+const HAS_GROUP_CHOICE = universityConfig.planning?.personal !== true
+
 function PlanningSelect({ label, value, options, placeholder, disabled, onChange }) {
   return (
     <div className={ROW_CLASSES}>
@@ -782,9 +823,8 @@ function AccountModal({
                 <p className="m-0 truncate font-body text-[19px] font-semibold leading-[1.2] tracking-[-0.3125px]">
                   {[displayInfo.firstName, displayInfo.lastName].filter(Boolean).join(' ') || '—'}
                 </p>
-                <p className="m-0 truncate font-body text-[14px] font-medium leading-[1.3] text-text-60">
-                  {displayInfo.email || '—'}
-                </p>
+                {/* No line without an address (none from the portal nor the webmail). */}
+                {displayInfo.email ? <CopyableEmail email={displayInfo.email} /> : null}
               </div>
             </div>
 
@@ -804,45 +844,47 @@ function AccountModal({
       case 'planning':
         return (
           <>
-            <SettingsGroup
-              title="Mon groupe"
-              footer="Sert à trouver tes cours. Le changement s’applique quand tu fermes les réglages."
-            >
-              {shouldShowPlanningLoader ? (
-                <div className="flex h-[162px] w-full items-center justify-center">
-                  <AccountModalLoadingDots label={planningState.loadingMessage || 'Chargement...'} />
-                </div>
-              ) : (
-                <>
-                  <PlanningSelect
-                    label={fieldLabels.year}
-                    value={planningState.draftYear?.resourceId ?? ''}
-                    options={yearOptions}
-                    placeholder={loadingPlaceholder}
-                    disabled={isPlanningBusy || yearOptions.length === 0}
-                    onChange={onYearChange}
-                  />
-                  <PlanningSelect
-                    label={fieldLabels.td}
-                    value={planningState.draftTd?.resourceId ?? ''}
-                    options={tdOptions}
-                    placeholder={loadingPlaceholder}
-                    disabled={isPlanningBusy || !planningState.draftYear}
-                    onChange={onTdChange}
-                  />
-                  <PlanningSelect
-                    label={fieldLabels.tp}
-                    value={planningState.draftTp?.resourceId ?? ''}
-                    options={tpOptions}
-                    placeholder={loadingPlaceholder}
-                    disabled={isPlanningBusy || !planningState.draftTd}
-                    onChange={onTpChange}
-                  />
-                </>
-              )}
-            </SettingsGroup>
+            {HAS_GROUP_CHOICE ? (
+              <SettingsGroup
+                title="Mon groupe"
+                footer="Sert à trouver tes cours. Le changement s’applique quand tu fermes les réglages."
+              >
+                {shouldShowPlanningLoader ? (
+                  <div className="flex h-[162px] w-full items-center justify-center">
+                    <AccountModalLoadingDots label={planningState.loadingMessage || 'Chargement...'} />
+                  </div>
+                ) : (
+                  <>
+                    <PlanningSelect
+                      label={fieldLabels.year}
+                      value={planningState.draftYear?.resourceId ?? ''}
+                      options={yearOptions}
+                      placeholder={loadingPlaceholder}
+                      disabled={isPlanningBusy || yearOptions.length === 0}
+                      onChange={onYearChange}
+                    />
+                    <PlanningSelect
+                      label={fieldLabels.td}
+                      value={planningState.draftTd?.resourceId ?? ''}
+                      options={tdOptions}
+                      placeholder={loadingPlaceholder}
+                      disabled={isPlanningBusy || !planningState.draftYear}
+                      onChange={onTdChange}
+                    />
+                    <PlanningSelect
+                      label={fieldLabels.tp}
+                      value={planningState.draftTp?.resourceId ?? ''}
+                      options={tpOptions}
+                      placeholder={loadingPlaceholder}
+                      disabled={isPlanningBusy || !planningState.draftTd}
+                      onChange={onTpChange}
+                    />
+                  </>
+                )}
+              </SettingsGroup>
+            ) : null}
 
-            {planningState.errorMessage ? (
+            {HAS_GROUP_CHOICE && planningState.errorMessage ? (
               <p className="m-0 px-1 font-body text-[13px] font-semibold leading-[1.2] text-[#b91c1c] dark:text-[var(--color-error)]" role="alert">
                 {planningState.errorMessage}
               </p>
@@ -969,6 +1011,7 @@ function AccountModal({
             <div className={`${CARD_CLASSES} p-[18px]`}>
               <AboutContent onPrivacyClick={hasPrivacy ? () => selectSection('privacy') : null} />
             </div>
+            <AboutHelp />
             <AboutTeam />
           </>
         )

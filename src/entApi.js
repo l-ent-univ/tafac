@@ -290,6 +290,8 @@ export async function loginToEnt({ username, password }) {
 
 export async function logoutFromEnt() {
   clearGradesCache()
+  // Another account may sign in on this page.
+  forgetSchoolCertificateStatus()
   localStorage.removeItem(ADE_TIMETABLE_CACHE_KEY)
   clearRecentLoginMarker()
 
@@ -354,29 +356,50 @@ export async function getPlanning() {
 //   500 { error }
 // Normalized here to { status: 'ok' | 'disabled' | 'unauthenticated' | 'error', ... }.
 // Certificat de scolarité (features.schoolCertificate). Kept for the page's
-// lifetime: the server checks MonDossierWeb, which takes a moment.
+// lifetime: the server checks MonDossierWeb, which takes a moment. Asked
+// once after sign-in (preloadSchoolCertificateStatus) so Réglages shows it at
+// once; asks under way are shared.
 let schoolCertificateStatus = null
+let schoolCertificateRequest = null
 
 export function getCachedSchoolCertificateStatus() {
   return schoolCertificateStatus
 }
 
 // { available: boolean, schoolYear?: '2026-2027' }. Never throws.
-export async function getSchoolCertificateStatus() {
+export function getSchoolCertificateStatus() {
   if (!universityConfig.features?.schoolCertificate) {
-    return { available: false }
+    return Promise.resolve({ available: false })
   }
 
-  try {
-    const response = await fetch(`${ENT_AUTH_PREFIX}/documents/school-certificate/status`, { credentials: 'same-origin' })
-    const payload = await response.json().catch(() => null)
-    schoolCertificateStatus = response.ok && payload?.available
-      ? { available: true, schoolYear: payload.schoolYear ?? null }
-      : { available: false }
-  } catch {
-    schoolCertificateStatus = { available: false }
+  schoolCertificateRequest ??= (async () => {
+    try {
+      const response = await fetch(`${ENT_AUTH_PREFIX}/documents/school-certificate/status`, { credentials: 'same-origin' })
+      const payload = await response.json().catch(() => null)
+      schoolCertificateStatus = response.ok && payload?.available
+        ? { available: true, schoolYear: payload.schoolYear ?? null }
+        : { available: false }
+    } catch {
+      schoolCertificateStatus = { available: false }
+    }
+    return schoolCertificateStatus
+  })().finally(() => {
+    schoolCertificateRequest = null
+  })
+  return schoolCertificateRequest
+}
+
+// Right after sign-in, in the background: the status is ready when Réglages
+// opens. Once per page (a known status isn't asked again).
+export function preloadSchoolCertificateStatus() {
+  if (schoolCertificateStatus || !universityConfig.features?.schoolCertificate) {
+    return
   }
-  return schoolCertificateStatus
+  void getSchoolCertificateStatus()
+}
+
+function forgetSchoolCertificateStatus() {
+  schoolCertificateStatus = null
 }
 
 function getAttachmentFilename(contentDisposition, fallback) {

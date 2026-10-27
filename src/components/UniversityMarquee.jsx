@@ -6,7 +6,7 @@ import { getListedUniversities } from '../universityRuntime'
 // to its own landing page (/<slug>), which search engines then find.
 const universities = getListedUniversities()
   .filter((entry) => entry.logoUrl)
-  .map((entry) => ({ id: entry.id, name: entry.name, logo: entry.logoUrl, href: `/${entry.slug}` }))
+  .map((entry) => ({ id: entry.id, name: entry.name, logo: entry.logoUrl, square: entry.logoShape === 'square', href: `/${entry.slug}` }))
 // Logos per half of the track: the list repeated so one half is wider than
 // the strip, whatever the number of universities.
 const MIN_LOGOS_PER_HALF = 8
@@ -15,7 +15,8 @@ const half = Array.from(
   () => universities,
 ).flat()
 
-const LOGO_CLASSES = 'block h-8 w-auto max-w-[160px] object-contain opacity-50 grayscale dark:invert'
+// A square badge (logoShape) shows taller, to read at a wordmark's size.
+const logoClasses = (entry) => `block w-auto max-w-[160px] object-contain opacity-50 grayscale dark:invert ${entry.square ? 'h-14' : 'h-8'}`
 
 // "Compatible avec :" and the universities' logos scrolling sideways. The
 // track holds the logos twice and slides by one half, so the loop is seamless
@@ -29,7 +30,7 @@ function UniversityMarquee({ className = '' }) {
       <p className="m-0 text-sm font-medium text-text-muted font-body">{copyText(copy.hero.compatible)}</p>
       {universities.length === 1 ? (
         <a href={universities[0].href} className="corners-[6px]">
-          <img className={LOGO_CLASSES} src={universities[0].logo} alt={universities[0].name} draggable="false" />
+          <img className={logoClasses(universities[0])} src={universities[0].logo} alt={universities[0].name} draggable="false" />
         </a>
       ) : (
         <nav className="landing-marquee w-full overflow-hidden" aria-label="Universités compatibles">
@@ -48,7 +49,7 @@ function UniversityMarquee({ className = '' }) {
                       className="shrink-0 corners-[6px]"
                       draggable="false"
                     >
-                      <img className={LOGO_CLASSES} src={entry.logo} alt={isListed ? entry.name : ''} draggable="false" />
+                      <img className={logoClasses(entry)} src={entry.logo} alt={isListed ? entry.name : ''} draggable="false" />
                     </a>
                   )
                 })}

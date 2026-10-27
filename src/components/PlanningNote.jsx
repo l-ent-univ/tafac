@@ -1,8 +1,14 @@
 import { Icon } from '@iconify/react'
+import universityConfig from '@university'
 import { useRef } from 'react'
 import { trackPlanningAction } from '../analytics'
 import { SECONDARY_BUTTON } from '../scodocPageUtils'
 import LoadingDots from './LoadingDots'
+
+// The planning service's name (planning.providerName), ADE by default.
+const PROVIDER = universityConfig.planning?.providerName ?? 'ADE'
+// Where else a student without a timetable there can look (planning.otherTimetables).
+const OTHER_TIMETABLES = universityConfig.planning?.otherTimetables ?? []
 
 // What a day without classes says, by its state (usePlanningWeeks'
 // statusOn): its icon and title, and in full why and what to do about it.
@@ -12,7 +18,12 @@ const NOTES = {
   unavailable: {
     icon: 'carbon:cloud-offline',
     title: 'Planning indisponible',
-    detail: 'ADE n’a pas répondu. Vérifie ta connexion, puis réessaie.',
+    detail: `${PROVIDER} n’a pas répondu. Vérifie ta connexion, puis réessaie.`,
+  },
+  'no-timetable': {
+    icon: 'carbon:calendar',
+    title: 'Pas d’emploi du temps',
+    detail: `${PROVIDER} n’a encore aucun cours pour toi cette année. Ton emploi du temps est peut-être ailleurs`,
   },
   unconfigured: {
     icon: 'carbon:events',
@@ -80,6 +91,16 @@ function PlanningNote({ kind, text = null, compact = false, stacked = false, onR
           <Icon icon={action.icon} className="size-4 shrink-0" aria-hidden="true" />
           {action.label}
         </button>
+      ) : null}
+      {kind === 'no-timetable' && OTHER_TIMETABLES.length > 0 ? (
+        <div className="mt-1 flex flex-wrap justify-center gap-2">
+          {OTHER_TIMETABLES.map((link) => (
+            <a key={link.href} className={`${SECONDARY_BUTTON} planning-note-action no-underline`} href={link.href} target="_blank" rel="noopener noreferrer">
+              <Icon icon="carbon:launch" className="size-4 shrink-0" aria-hidden="true" />
+              {link.label}
+            </a>
+          ))}
+        </div>
       ) : null}
     </div>
   )
