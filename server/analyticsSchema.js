@@ -105,7 +105,7 @@ export const ANALYTICS_EVENTS = {
   },
   setting_changed: {
     properties: {
-      setting: oneOf('widget_visibility', 'app_descriptions', 'custom_background', 'wallpaper', 'theme', 'analytics'),
+      setting: oneOf('widget_visibility', 'app_descriptions', 'custom_background', 'wallpaper', 'university_logo', 'theme', 'analytics'),
       value: oneOf('on', 'off', 'auto', 'light', 'dark'),
       widget: oneOf(...WIDGET_IDS),
     },

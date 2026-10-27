@@ -339,13 +339,15 @@ export async function getPlanning() {
   return parseJsonPayload(response)
 }
 
-// Recent inbox messages for the "Mails récents" widget.
-// Server contract (GET /__ent_auth/mail/recent):
+// Recent inbox messages for the "Mails récents" widget and the mail page.
+// Server contract (GET /__ent_auth/mail/recent[?offset=N], N: the page start,
+// newest first):
 //   200 { authenticated: true, sessionMode, mail: {
-//          unreadCount: number | null,
+//          unreadCount: number | null,   (null past the first page)
 //          webmailHref: string | null,
 //          messages: [{ id, from: { name, email }, subject, snippet,
 //                       receivedAt (ISO 8601), unread: boolean, href: string | null }],
+//          hasMore: boolean,             (older messages follow)
 //        } }
 //   200 { authenticated: false, mail: null }   no session
 //   404 { ok: false, disabled: true, feature: 'mail' }   feature off for this university
@@ -409,13 +411,13 @@ export async function downloadSchoolCertificate() {
   window.setTimeout(() => URL.revokeObjectURL(url), 10_000)
 }
 
-export async function getRecentMail() {
+export async function getRecentMail({ offset = 0 } = {}) {
   if (!universityConfig.features?.mail) {
     return { status: 'disabled', unreadCount: null, webmailHref: null, messages: [] }
   }
 
   try {
-    const response = await fetch(`${ENT_AUTH_PREFIX}/mail/recent`, {
+    const response = await fetch(`${ENT_AUTH_PREFIX}/mail/recent${offset > 0 ? `?offset=${offset}` : ''}`, {
       credentials: 'same-origin',
     })
     const payload = await response.json().catch(() => null)
@@ -437,6 +439,7 @@ export async function getRecentMail() {
       unreadCount: Number.isFinite(payload.mail.unreadCount) ? payload.mail.unreadCount : null,
       webmailHref: payload.mail.webmailHref ?? null,
       messages: Array.isArray(payload.mail.messages) ? payload.mail.messages : [],
+      hasMore: payload.mail.hasMore === true,
     }
   } catch (error) {
     return {

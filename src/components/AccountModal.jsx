@@ -483,6 +483,63 @@ function ThemeSetting({ value, onChange }) {
   )
 }
 
+const LOGO_SOURCE_CHOICES = [
+  { id: 'establishment', label: 'Composante' },
+  { id: 'university', label: 'Université' },
+]
+
+// The logo next to Tafac's (sidebar, header): shown or not, and, when the
+// student's establishment has its own (`establishmentLabel`), whose: the
+// establishment's or the university's, in a pill like the theme's. That row
+// unfolds and folds with the switch (its grid row from 0fr to 1fr, no height
+// to measure); folded, it's inert.
+function LogoSetting({ shown, onShownChange, establishmentLabel, source, onSourceChange }) {
+  return (
+    <SettingsGroup title="Logo">
+      <SwitchRow
+        icon="carbon:building"
+        label="Logo de l’université"
+        description="Afficher le logo de ton établissement dans la barre latérale"
+        checked={shown}
+        onChange={onShownChange}
+      />
+      {establishmentLabel && typeof onSourceChange === 'function' ? (
+        <div
+          className={`grid transition-[grid-template-rows] duration-300 ease-[cubic-bezier(0.2,0.8,0.2,1)] motion-reduce:transition-none ${shown ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]'}`}
+          inert={!shown}
+        >
+          <div className="min-h-0 overflow-hidden">
+            <div className={`${ROW_CLASSES} border-t border-[var(--color-border)]`}>
+              <span className="min-w-0 font-body text-[16px] font-medium leading-[1.2] tracking-[-0.3125px] text-[var(--color-text)]">Afficher</span>
+              <div className={`flex shrink-0 gap-1 rounded-full ${MUTED_FILL_CLASSES} p-1`} role="group" aria-label="Logo affiché">
+                {LOGO_SOURCE_CHOICES.map((choice) => {
+                  const isActive = choice.id === source
+                  return (
+                    <button
+                      key={choice.id}
+                      type="button"
+                      aria-pressed={isActive}
+                      title={choice.id === 'establishment' ? establishmentLabel : undefined}
+                      onClick={() => onSourceChange(choice.id)}
+                      className={`inline-flex h-8 items-center justify-center rounded-full border px-3 font-body text-[14px] font-medium text-[var(--color-text)] cursor-pointer transition-[background-color,box-shadow,border-color] duration-150 ease-in-out ${
+                        isActive
+                          ? 'bg-widget-bg border-white dark:border-[rgba(255,255,255,0.08)] shadow-[0_1px_3px_rgba(0,0,0,0.06)]'
+                          : 'bg-transparent border-transparent hover:bg-brand-subtle'
+                      }`}
+                    >
+                      {choice.label}
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+          </div>
+        </div>
+      ) : null}
+    </SettingsGroup>
+  )
+}
+
 // Dashboard background: large preview, an on/off switch, and (when on) pick
 // an image or go back to the default photo.
 function WallpaperSetting({ previewSrc, hasCustom, enabled, onEnabledChange, onChange, onReset }) {
@@ -579,6 +636,11 @@ function AccountModal({
   backgroundPreviewSrc = null,
   showWallpaper = true,
   onShowWallpaperChange,
+  showUniversityLogo = true,
+  onShowUniversityLogoChange = null,
+  establishmentLogoLabel = null,
+  logoSource = 'establishment',
+  onLogoSourceChange = null,
   theme = 'auto',
   onThemeChange,
   hasCustomBackground = false,
@@ -586,6 +648,8 @@ function AccountModal({
   onCustomBackgroundReset,
   showAppDescriptions = false,
   onShowAppDescriptionsChange,
+  sidebarCompact = false,
+  onSidebarCompactChange = null,
   showPlanningWeekend = false,
   onShowPlanningWeekendChange = null,
   planningSelection = null,
@@ -843,6 +907,15 @@ function AccountModal({
                 onReset={onCustomBackgroundReset}
               />
             ) : null}
+            {typeof onShowUniversityLogoChange === 'function' ? (
+              <LogoSetting
+                shown={showUniversityLogo}
+                onShownChange={onShowUniversityLogoChange}
+                establishmentLabel={establishmentLogoLabel}
+                source={logoSource}
+                onSourceChange={onLogoSourceChange}
+              />
+            ) : null}
             {typeof onShowAppDescriptionsChange === 'function' ? (
               <SettingsGroup title="Applications">
                 <SwitchRow
@@ -853,6 +926,20 @@ function AccountModal({
                   onChange={onShowAppDescriptionsChange}
                 />
               </SettingsGroup>
+            ) : null}
+            {/* The sidebar only shows on large screens (4xl), the setting too. */}
+            {typeof onSidebarCompactChange === 'function' ? (
+              <div className="hidden 4xl:block">
+                <SettingsGroup title="Barre latérale" footer="La barre latérale peut également se replier en maintenant le curseur et en glissant vers la gauche">
+                  <SwitchRow
+                    icon="carbon:side-panel-close"
+                    label="Barre latérale compacte"
+                    description="Afficher les icônes sans les libellés"
+                    checked={sidebarCompact}
+                    onChange={(compact) => onSidebarCompactChange(compact)}
+                  />
+                </SettingsGroup>
+              </div>
             ) : null}
           </>
         )
@@ -898,7 +985,7 @@ function AccountModal({
       role="presentation"
     >
       <section
-        className="account-modal-card flex h-[600px] w-[min(780px,100%)] max-h-[calc(100vh-40px)] flex-col overflow-hidden corners-[22px] border border-[var(--color-border)] bg-[var(--color-bg)] text-[var(--color-text)] animate-modal-card-in max-sm:h-[calc(100dvh-28px)] max-sm:max-h-none"
+        className="account-modal-card flex h-[600px] w-[min(780px,100%)] max-h-[calc(100vh-40px)] flex-col overflow-hidden modal-corners [--modal-inset:21px] [--modal-inner-radius:20px] max-sm:[--modal-inset:14px] border border-[var(--color-border)] bg-[var(--color-bg)] text-[var(--color-text)] animate-modal-card-in max-sm:h-[calc(100dvh-28px)] max-sm:max-h-none"
         role="dialog"
         aria-modal="true"
         aria-labelledby="account-modal-title"

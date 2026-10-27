@@ -191,7 +191,7 @@ function AboutModal({
       role="presentation"
     >
       <section
-        className="w-[min(440px,100%)] max-h-[calc(100dvh-40px)] overflow-y-auto overscroll-contain corners-[22px] border border-[var(--color-border)] bg-[var(--color-bg)] text-[var(--color-text)] animate-modal-card-in max-sm:max-h-[calc(100dvh-28px)]"
+        className="w-[min(440px,100%)] max-h-[calc(100dvh-40px)] overflow-y-auto overscroll-contain modal-corners [--modal-inset:21px] [--modal-inner-radius:20px] border border-[var(--color-border)] bg-[var(--color-bg)] text-[var(--color-text)] animate-modal-card-in max-sm:max-h-[calc(100dvh-28px)]"
         role="dialog"
         aria-modal="true"
         aria-labelledby="about-modal-title"

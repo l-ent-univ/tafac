@@ -149,6 +149,8 @@ const MAIL_PROVIDER = universityConfig.mail?.provider ?? null
 const MAIL_ORIGIN = universityConfig.mail?.origin ?? null
 const MAIL_WEBMAIL_URL = universityConfig.mail?.webmailUrl ?? MAIL_ORIGIN
 const MAIL_MAX_MESSAGES = Math.min(Math.max(Number(universityConfig.mail?.maxMessages) || 5, 1), 20)
+// The mail page's endless list asks for the next page by offset, up to this.
+const MAIL_MAX_OFFSET = 5000
 // Domains the webmail sign-in chain may visit (webmail, SAML SP, IdP, CAS).
 // Anything else — or any non-HTTPS URL — aborts the chain.
 function buildSignInDomains(extraDomains, urls) {
@@ -3198,8 +3200,8 @@ async function zimbraSoapRequest(context, requestName, requestBody) {
   return payload.Body[requestName.replace(/Request$/, 'Response')] ?? {}
 }
 
-async function zimbraRestInbox(context) {
-  const url = `${context.origin}/service/home/~/inbox?fmt=json&limit=${MAIL_MAX_MESSAGES}`
+async function zimbraRestInbox(context, limit) {
+  const url = `${context.origin}/service/home/~/inbox?fmt=json&limit=${limit}`
   const response = await fetchWithJar(url, context.jar, {
     headers: { Accept: 'application/json', Referer: `${context.origin}/` },
   })
@@ -3239,29 +3241,40 @@ function normalizeZimbraMessage(message) {
   }
 }
 
-async function queryZimbraInbox(context) {
+// `offset`: where the page starts, newest first. The unread count only comes
+// with the first page.
+async function queryZimbraInbox(context, { offset = 0 } = {}) {
   const [searchResult, folderResult] = await Promise.allSettled([
     zimbraSoapRequest(context, 'SearchRequest', {
       types: 'message',
       query: 'in:inbox',
       sortBy: 'dateDesc',
       limit: MAIL_MAX_MESSAGES,
-      offset: 0,
+      offset,
     }),
     // Folder id 2 is the Inbox in every Zimbra mailbox.
-    zimbraSoapRequest(context, 'GetFolderRequest', { folder: { l: '2' }, depth: 0 }),
+    offset === 0
+      ? zimbraSoapRequest(context, 'GetFolderRequest', { folder: { l: '2' }, depth: 0 })
+      : Promise.resolve(null),
   ])
 
   let rawMessages
+  let hasMore
+  // Where the page starts in rawMessages: the REST API has no offset.
+  let pageStart = 0
   if (searchResult.status === 'fulfilled') {
     rawMessages = Array.isArray(searchResult.value?.m) ? searchResult.value.m : []
+    hasMore = searchResult.value?.more === true
   } else {
     // SOAP can be refused for CSRF reasons; the REST API has no CSRF check.
-    rawMessages = await zimbraRestInbox(context)
+    // Everything up to the page, and one more to know if others follow.
+    rawMessages = await zimbraRestInbox(context, offset + MAIL_MAX_MESSAGES + 1)
+    hasMore = rawMessages.length > offset + MAIL_MAX_MESSAGES
+    pageStart = offset
   }
 
   let unreadCount = null
-  if (folderResult.status === 'fulfilled') {
+  if (folderResult.status === 'fulfilled' && folderResult.value) {
     const folder = Array.isArray(folderResult.value?.folder) ? folderResult.value.folder[0] : folderResult.value?.folder
     if (folder && typeof folder === 'object') {
       unreadCount = Number.isFinite(Number(folder.u)) ? Number(folder.u) : 0
@@ -3272,9 +3285,9 @@ async function queryZimbraInbox(context) {
     .map((message) => normalizeZimbraMessage(message))
     .filter((message) => message.id)
     .sort((left, right) => String(right.receivedAt ?? '').localeCompare(String(left.receivedAt ?? '')))
-    .slice(0, MAIL_MAX_MESSAGES)
+    .slice(pageStart, pageStart + MAIL_MAX_MESSAGES)
 
-  return { unreadCount, webmailHref: getMailWebmailHref(), messages }
+  return { unreadCount, webmailHref: getMailWebmailHref(), messages, hasMore }
 }
 
 async function getZimbraContext(session, { fresh = false } = {}) {
@@ -3286,7 +3299,7 @@ async function getZimbraContext(session, { fresh = false } = {}) {
   return context
 }
 
-async function fetchZimbraRecentMail(session) {
+async function fetchZimbraRecentMail(session, options) {
   for (let attempt = 0; attempt < 2; attempt += 1) {
     let context = attempt === 0 ? runtimeMailContexts.get(session.id) : null
 
@@ -3296,7 +3309,7 @@ async function fetchZimbraRecentMail(session) {
     }
 
     try {
-      return await queryZimbraInbox(context)
+      return await queryZimbraInbox(context, options)
     } catch (error) {
       runtimeMailContexts.delete(session.id)
       if (!(error instanceof MailAuthError) || attempt > 0) {
@@ -3312,13 +3325,14 @@ const MAIL_PROVIDERS = {
   zimbra: fetchZimbraRecentMail,
 }
 
-async function fetchRecentMail(session) {
+// `options.offset`: the page to read (0, the newest, by default).
+async function fetchRecentMail(session, options) {
   const provider = MAIL_PROVIDERS[MAIL_PROVIDER]
   if (!provider) {
     throw new Error('Mail provider not configured')
   }
 
-  return provider(session)
+  return provider(session, options)
 }
 
 // 6c. Open the webmail already signed in. Zimbra's /service/preauth accepts
@@ -3358,11 +3372,13 @@ app.get('/__ent_auth/mail/open', async (req, res) => {
   }
 })
 
-// 6b. Recent mail endpoint
+// 6b. Recent mail endpoint. ?offset=N: the next page of the mail page's
+// endless list (not cached, the first page is).
 app.get('/__ent_auth/mail/recent', async (req, res) => {
   try {
     res.setHeader('Cache-Control', 'no-store')
     const session = getSessionFromRequest(req)
+    const offset = Math.min(Math.max(Number.parseInt(String(req.query.offset ?? ''), 10) || 0, 0), MAIL_MAX_OFFSET)
 
     if (!session) {
       return res.status(200).json({ authenticated: false, mail: null })
@@ -3370,10 +3386,21 @@ app.get('/__ent_auth/mail/recent', async (req, res) => {
 
     if (isDemoSession(session)) {
       setSessionCookie(res, session)
+      const demoMail = buildDemoMailPayload()
       return res.status(200).json({
         authenticated: true,
         sessionMode: DEMO_SESSION_MODE,
-        mail: buildDemoMailPayload(),
+        mail: offset === 0 ? demoMail : { ...demoMail, unreadCount: null, messages: [], hasMore: false },
+      })
+    }
+
+    if (offset > 0) {
+      const mail = await fetchRecentMail(session, { offset })
+      setSessionCookie(res, session)
+      return res.status(200).json({
+        authenticated: true,
+        sessionMode: session.mode ?? null,
+        mail,
       })
     }
 

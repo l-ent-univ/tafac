@@ -51,9 +51,27 @@ async function mountEntAuthApp(server) {
   })
 }
 
+// Dev only: the branch checked out right now, next to "dev" in the footer
+// (src/useDevBranch.js). Read on each request, so a branch switch shows on
+// the next reload, no restart.
+function serveGitBranch(server) {
+  server.middlewares.use('/__dev/git-branch', (req, res) => {
+    let branch = null
+    try {
+      branch = execSync('git rev-parse --abbrev-ref HEAD', { cwd: server.config.root }).toString().trim()
+    } catch {
+      // Not a git checkout
+    }
+    res.setHeader('Content-Type', 'application/json')
+    res.setHeader('Cache-Control', 'no-store')
+    res.end(JSON.stringify({ branch }))
+  })
+}
+
 const entDevAuthPlugin = {
   name: 'ent-dev-auth',
   configureServer(server) {
+    serveGitBranch(server)
     return mountEntAuthApp(server)
   },
   async configurePreviewServer(server) {

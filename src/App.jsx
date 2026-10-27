@@ -33,6 +33,8 @@ import {
   getStoredHiddenWidgets,
   getStoredShowAppDescriptions,
   getStoredShowPlanningWeekend,
+  getStoredLogoSource,
+  getStoredShowUniversityLogo,
   getStoredShowWallpaper,
   getStoredTpSelection,
   persistAdeLookaheadDays,
@@ -41,12 +43,16 @@ import {
   persistHiddenWidgets,
   persistShowAppDescriptions,
   persistShowPlanningWeekend,
+  persistLogoSource,
+  persistShowUniversityLogo,
   persistShowWallpaper,
   persistTpSelection,
 } from './profileStorage'
+import { getStoredSidebarCompact, persistSidebarCompact } from './sidebarWidth'
 import WidgetContainer from './components/WidgetContainer'
 import GradesPage from './components/GradesPage'
 import PlanningPage from './components/PlanningPage'
+import MailPage from './components/MailPage'
 import LoadingDots from './components/LoadingDots'
 import { resolveHeroImage } from './heroImage'
 import { getStoredTheme, persistTheme, watchTheme } from './theme'
@@ -894,6 +900,8 @@ function App() {
   const [hiddenWidgets, setHiddenWidgets] = useState(() => getStoredHiddenWidgets())
   const [customBackground, setCustomBackground] = useState(() => getStoredCustomBackground())
   const [showWallpaper, setShowWallpaper] = useState(() => getStoredShowWallpaper())
+  const [showUniversityLogo, setShowUniversityLogo] = useState(() => getStoredShowUniversityLogo())
+  const [logoSource, setLogoSource] = useState(() => getStoredLogoSource())
   // Page shown next to the sidebar: 'dashboard' or 'grades'. Each switch is
   // a history entry (see appHistory.js): back and forward move between
   // pages, and a reload stays on the page.
@@ -908,6 +916,9 @@ function App() {
   const [hasSwitchedPage, setHasSwitchedPage] = useState(false)
   const [theme, setTheme] = useState(() => getStoredTheme())
   const [showAppDescriptions, setShowAppDescriptions] = useState(() => getStoredShowAppDescriptions())
+  // Compact sidebar (icons alone): kept for the device, like its width.
+  // Toggled from the sidebar's handle and the settings.
+  const [sidebarCompact, setSidebarCompact] = useState(getStoredSidebarCompact)
   const [showPlanningWeekend, setShowPlanningWeekend] = useState(() => getStoredShowPlanningWeekend())
   const [anonymousAnalytics, setAnonymousAnalytics] = useState(() => getStoredAnonymousAnalytics())
   const isAnalyticsAvailable = useAnalyticsAvailable()
@@ -1199,6 +1210,8 @@ function App() {
     setHiddenWidgets(getStoredHiddenWidgets(sessionState.user))
     setCustomBackground(getStoredCustomBackground(sessionState.user))
     setShowWallpaper(getStoredShowWallpaper(sessionState.user))
+    setShowUniversityLogo(getStoredShowUniversityLogo(sessionState.user))
+    setLogoSource(getStoredLogoSource(sessionState.user))
     setShowAppDescriptions(getStoredShowAppDescriptions(sessionState.user))
     setShowPlanningWeekend(getStoredShowPlanningWeekend(sessionState.user))
     // Applied to the analytics module right away (not in an effect) so the
@@ -1761,8 +1774,13 @@ function App() {
     () => activePage === 'planning' && getMobileTabItems(establishment, { gradesSupported }).some((item) => item.page === 'planning'),
     [activePage, establishment, gradesSupported],
   )
+  // Likewise for the mail page (features.mail).
+  const isMailPage = useMemo(
+    () => activePage === 'mail' && getMobileTabItems(establishment, { gradesSupported }).some((item) => item.page === 'mail'),
+    [activePage, establishment, gradesSupported],
+  )
   // The page the sidebar and the tab bar show as selected.
-  const shownPage = isGradesPage ? 'grades' : isPlanningPage ? 'planning' : 'dashboard'
+  const shownPage = isGradesPage ? 'grades' : isPlanningPage ? 'planning' : isMailPage ? 'mail' : 'dashboard'
   // Being on « Mes notes » is having seen its launch, however the student
   // got there (tab, card, "Dernière note", app list, a reload on the page):
   // the dashboard card and the tab's « Nouveau » go. After the audience
@@ -1802,6 +1820,15 @@ function App() {
     persistShowWallpaper(show, sessionState.user)
     setShowWallpaper(show)
     track('setting_changed', { setting: 'wallpaper', value: show ? 'on' : 'off' })
+  }, [sessionState.user])
+  const handleShowUniversityLogoChange = useCallback((show) => {
+    persistShowUniversityLogo(show, sessionState.user)
+    setShowUniversityLogo(show)
+    track('setting_changed', { setting: 'university_logo', value: show ? 'on' : 'off' })
+  }, [sessionState.user])
+  const handleLogoSourceChange = useCallback((source) => {
+    persistLogoSource(source, sessionState.user)
+    setLogoSource(source)
   }, [sessionState.user])
   const [heroHeight, setHeroHeight] = useState(null)
   const heroObserverRef = useRef(null)
@@ -1922,6 +1949,12 @@ function App() {
     persistShowPlanningWeekend(show, sessionState.user)
     setShowPlanningWeekend(show)
   }, [sessionState.user])
+
+  // `persist` false: live under the pointer, stored on release.
+  const handleSidebarCompactChange = useCallback((compact, { persist = true } = {}) => {
+    setSidebarCompact(compact)
+    if (persist) persistSidebarCompact(compact)
+  }, [])
 
   const handleShowAppDescriptionsChange = useCallback((show) => {
     persistShowAppDescriptions(show, sessionState.user)
@@ -2398,10 +2431,14 @@ function App() {
             onUpdateClick={handleApplyUpdate}
             showChangelogPill={showChangelogPill}
             establishment={establishment}
+            showUniversityLogo={showUniversityLogo}
+            logoSource={logoSource}
             gradesSupported={gradesSupported}
             activePage={shownPage}
             onNavigatePage={handleNavigatePage}
             onOpenLatestGrade={universityConfig.features?.sidebarLatestGrade === true && sessionState.authenticated && hasGradesPage ? handleOpenSidebarGrade : null}
+            compact={sidebarCompact}
+            onCompactChange={handleSidebarCompactChange}
           />
           <div ref={dashboardColumnRef} className={`app-column relative isolate flex flex-col flex-1 min-w-0 4xl:h-screen 4xl:overflow-y-auto 4xl:pl-[calc(var(--sidebar-width,280px)+12px)] ${hasMobileTabBar ? 'max-4xl:pb-[calc(env(safe-area-inset-bottom)+84px)]' : ''}`}>
             {/* Hero image behind the header and widget cards, fading into the solid background. */}
@@ -2422,6 +2459,9 @@ function App() {
               <AppHeader
                 authenticated={sessionState.authenticated}
                 checking={sessionState.checking}
+                establishment={establishment}
+                showUniversityLogo={showUniversityLogo}
+                logoSource={logoSource}
                 onPrimaryAction={handleHeaderAction}
                 onAccountAction={handleOpenAccountModal}
               />
@@ -2477,6 +2517,11 @@ function App() {
                 <PlanningPage selection={selectedTp} user={sessionState.user} showWeekend={showPlanningWeekend} onOpenAccount={handleOpenAccountModal} initialDay={pendingPlanningDay} onInitialDayHandled={clearPendingPlanningDay} arrivalSource={planningArrivalSource} />
               </div>
             ) : null}
+            {isMailPage ? (
+              <div className="page-enter flex-1 min-h-0 4xl:flex-none 4xl:min-h-0">
+                <MailPage />
+              </div>
+            ) : null}
             <div className="4xl:mt-auto">
               <AppFooter heroCredit={isWallpaperShown ? heroImage.credit : null} />
             </div>
@@ -2524,6 +2569,11 @@ function App() {
         backgroundPreviewSrc={heroImage.src}
         showWallpaper={showWallpaper}
         onShowWallpaperChange={handleShowWallpaperChange}
+        showUniversityLogo={showUniversityLogo}
+        onShowUniversityLogoChange={handleShowUniversityLogoChange}
+        establishmentLogoLabel={universityConfig.establishments?.byId?.[establishment]?.logo ? universityConfig.establishments.byId[establishment].label : null}
+        logoSource={logoSource}
+        onLogoSourceChange={handleLogoSourceChange}
         theme={theme}
         onThemeChange={handleThemeChange}
         hasCustomBackground={Boolean(customBackground)}
@@ -2531,6 +2581,8 @@ function App() {
         onCustomBackgroundReset={handleCustomBackgroundReset}
         showAppDescriptions={showAppDescriptions}
         onShowAppDescriptionsChange={handleShowAppDescriptionsChange}
+        sidebarCompact={sidebarCompact}
+        onSidebarCompactChange={handleSidebarCompactChange}
         showPlanningWeekend={showPlanningWeekend}
         onShowPlanningWeekendChange={handleShowPlanningWeekendChange}
         planningSelection={selectedTp}

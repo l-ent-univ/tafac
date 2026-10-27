@@ -39,3 +39,29 @@ export function persistSidebarWidth(width) {
 export function applySidebarWidth(width) {
   document.documentElement.style.setProperty('--sidebar-width', `${width}px`)
 }
+
+// Compact sidebar: the nav's icons alone, in a narrow strip. Stored for the
+// device too; while on, --sidebar-width is this width (the dragged one comes
+// back on expanding).
+export const SIDEBAR_COMPACT_KEY = 'l-ent:sidebar-compact'
+export const COMPACT_SIDEBAR_WIDTH = 72
+
+export function getStoredSidebarCompact() {
+  try {
+    return localStorage.getItem(SIDEBAR_COMPACT_KEY) === '1'
+  } catch {
+    return false
+  }
+}
+
+export function persistSidebarCompact(compact) {
+  try {
+    if (compact) {
+      localStorage.setItem(SIDEBAR_COMPACT_KEY, '1')
+    } else {
+      localStorage.removeItem(SIDEBAR_COMPACT_KEY)
+    }
+  } catch {
+    // Storage unavailable
+  }
+}

@@ -67,14 +67,16 @@ export default {
     origin: gradesOrigin,
   },
 
-  // "Mails récents" widget (features.mail). The server signs in to the
-  // webmail with the user's CAS session and reads the inbox via the
-  // provider API. Only 'zimbra' is implemented (see server/entAuthApp.js).
+  // "Mails récents" widget and the mail page (features.mail). The server
+  // signs in to the webmail with the user's CAS session and reads the inbox
+  // via the provider API. Only 'zimbra' is implemented (see
+  // server/entAuthApp.js). maxMessages: the mail page's list (the widget
+  // shows the first two).
   mail: {
     provider: 'zimbra',
     origin: 'https://partage.univ-rennes.fr',
     webmailUrl: mailWebmailUrl,
-    maxMessages: 5,
+    maxMessages: 20,
     // Hosts the SAML sign-in chain may visit, besides the webmail and CAS
     // hosts (RENATER's Partage SP and the university IdP).
     signInDomains: ['partage.renater.fr', 'univ-rennes1.fr', 'univ-rennes.fr'],

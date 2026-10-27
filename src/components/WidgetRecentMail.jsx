@@ -6,8 +6,8 @@ import { getRecentMail } from '../entApi'
 import WidgetListStatus from './WidgetListStatus'
 import {
   SHIMMER_CLASSES,
-  calendarDayDiff,
-  formatClockTime,
+  formatReceivedAt,
+  getSenderLabel,
   openInNewTab,
   parseDate,
   readStoredHref,
@@ -24,8 +24,6 @@ const WEBMAIL_HREF_KEY = 'l-ent:webmail-href'
 const CARD_CLASSES = 'recent-mail-widget widget-card shadow-md flex-[0_1_360px] h-[140px] p-4 border border-white card-corners overflow-hidden bg-widget-bg text-base leading-6 min-w-0 max-2xl:flex-[1_1_calc(50%-6px)] max-2xl:min-w-0 max-md:h-[124px] max-md:p-3 max-xs:flex-[1_1_100%] max-xs:h-[140px] relative flex flex-col gap-[6px] text-text'
 const ROW_CLASSES = 'grid grid-cols-[6px_minmax(0,1fr)_auto] content-center items-center gap-x-[7px] gap-y-[3px] h-[38px] px-1.5 corners-[10px] min-w-0 max-md:h-[36px] max-xs:h-11'
 
-const weekdayFormatter = new Intl.DateTimeFormat('fr-FR', { weekday: 'short' })
-const dayMonthFormatter = new Intl.DateTimeFormat('fr-FR', { day: 'numeric', month: 'short' })
 const fullDateFormatter = new Intl.DateTimeFormat('fr-FR', { dateStyle: 'full', timeStyle: 'short' })
 
 // Outcome of the first load, for anonymous analytics (widget_loaded).
@@ -34,21 +32,6 @@ function getLoadOutcome(state) {
   if (state.status === 'error') return { status: 'error', errorKind: state.errorKind }
   if (state.status === 'unauthenticated') return { status: 'error', errorKind: 'other' }
   return null
-}
-
-// Mail-client style timestamp, matching the "15h15" notation used by the
-// next-class card: "14h32" today, "hier", "lun." this week, "12 sept." older.
-function formatReceivedAt(date, now = new Date()) {
-  if (!date) return ''
-  const dayDiff = -calendarDayDiff(date, now)
-  if (dayDiff <= 0) return formatClockTime(date)
-  if (dayDiff === 1) return 'hier'
-  if (dayDiff < 7) return weekdayFormatter.format(date)
-  return dayMonthFormatter.format(date)
-}
-
-function getSenderLabel(from) {
-  return from?.name?.trim() || from?.email?.trim() || 'Expéditeur inconnu'
 }
 
 function MailHeader({ unreadCount = 0 }) {

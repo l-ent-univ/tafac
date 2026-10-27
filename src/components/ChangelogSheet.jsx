@@ -79,7 +79,7 @@ function ChangelogSheet() {
       <div className="changelog-backdrop absolute inset-0 bg-backdrop animate-[pwa-backdrop-in_280ms_ease-out]" onClick={closeChangelog} aria-hidden="true" />
       <section
         ref={dialogRef}
-        className="changelog-sheet relative flex w-[min(440px,100%)] max-h-[min(640px,calc(100dvh-40px))] flex-col overflow-hidden corners-[22px] border border-border bg-bg text-text shadow-[0_24px_80px_var(--color-shadow)] outline-none animate-modal-card-in max-sm:max-h-full max-sm:corners-[20px] max-sm:animate-[pwa-slide-in_350ms_cubic-bezier(0.16,1,0.3,1)]"
+        className="changelog-sheet relative flex w-[min(440px,100%)] max-h-[min(640px,calc(100dvh-40px))] flex-col overflow-hidden modal-corners [--modal-inset:21px] [--modal-inner-radius:20px] border border-border bg-bg text-text shadow-[0_24px_80px_var(--color-shadow)] outline-none animate-modal-card-in max-sm:max-h-full max-sm:corners-[20px] max-sm:animate-[pwa-slide-in_350ms_cubic-bezier(0.16,1,0.3,1)]"
         role="dialog"
         aria-modal="true"
         aria-labelledby="changelog-title"
@@ -111,7 +111,7 @@ function ChangelogSheet() {
               <h3 id={`changelog-date-${group.date}`} className="m-0 px-1 font-body text-[13px] font-semibold leading-none text-text-60">
                 {formatEntryDate(group.date)}
               </h3>
-              <ul className="m-0 list-none p-0 overflow-hidden corners-[20px] border border-white bg-white shadow-[0_1px_3px_rgba(0,0,0,0.06)] divide-y divide-border dark:border-border dark:bg-bg-surface dark:shadow-[0_1px_3px_rgba(0,0,0,0.3)]">
+              <ul className="m-0 list-none p-0 overflow-hidden modal-inner-corners border border-white bg-white shadow-[0_1px_3px_rgba(0,0,0,0.06)] divide-y divide-border dark:border-border dark:bg-bg-surface dark:shadow-[0_1px_3px_rgba(0,0,0,0.3)]">
                 {group.entries.map((entry) => {
                   const isNew = highlighted.has(entry.id)
                   return (

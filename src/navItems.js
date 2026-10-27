@@ -14,9 +14,6 @@ const MOODLE_ORIGIN = universityConfig.origins?.moodle ?? null
 const MOODLE_HREF = universityConfig.features?.moodle && MOODLE_ORIGIN
   ? `${ENT_AUTH_PREFIX}/launch?url=${encodeURIComponent(`${MOODLE_ORIGIN.replace(/\/$/, '')}/my/`)}`
   : null
-// Same link as the "Mails récents" card: the server opens the webmail
-// already signed in (or falls back to its launch URL).
-const MAIL_HREF = universityConfig.features?.mail ? `${ENT_AUTH_PREFIX}/mail/open` : null
 
 // "Mes notes" follows the tri-state grades feature: the in-app grades page
 // when live, a greyed-out item with the unavailability notice when
@@ -63,9 +60,10 @@ export function buildNavItems(establishment, { gradesSupported = true } = {}) {
     ...(universityConfig.features?.planning
       ? [{ id: 'planning', label: 'Planning', icon: 'carbon:calendar', page: 'planning', announcedBy: 'planning' }]
       : []),
-    // shortLabel: the tab bar's narrower tabs.
-    ...(MAIL_HREF
-      ? [{ id: 'mail', label: 'Messagerie', shortLabel: 'Mail', icon: 'carbon:email', href: MAIL_HREF, target: '_blank' }]
+    // The in-app mail page (MailPage). shortLabel: the tab bar's narrower
+    // tabs.
+    ...(universityConfig.features?.mail
+      ? [{ id: 'mail', label: 'Messagerie', shortLabel: 'Mail', icon: 'carbon:email', page: 'mail' }]
       : []),
     ...(MOODLE_HREF
       ? [{ id: 'moodle', label: 'Moodle', icon: 'devicon-plain:moodle', href: MOODLE_HREF, target: '_blank' }]

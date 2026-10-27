@@ -100,11 +100,24 @@ Un feature à `false` : le serveur répond `{ disabled: true }` sur les endpoint
         gradeWidgets: true,       // widgets de notes
         nextClassWidget: true,    // widget prochain cours
         extraServices: [{ id: '…', title: '…', href: '…', target: '_blank' }],
+        logo: iutLannionLogo,     // optionnel, à la place du logo de l'université
+        logoDark: iutLannionLogoDark,
+        logoShape: 'square',
       },
     },
   }
   ```
   Omettez le bloc entier si votre université n'a qu'un seul « établissement ».
+
+  **Logo d'un établissement** (optionnel, `client.js` uniquement) — une composante sur son propre site (un IUT délocalisé, une antenne) peut avoir son logo : il remplace celui de l'université à côté du logo Tafac, dans la sidebar et le header, pour les étudiants détectés dans cet établissement. Un établissement sans `logo` garde celui de l'université, de même que les étudiants sans établissement détecté (`fallbackId`). Avec un `lockup`, l'établissement qui a un logo passe à la composition automatique « Tafac + logo ».
+  - `logo` — l'image (import d'un fichier dans `assets/`, par exemple `assets/establishments/<id>.svg`).
+  - `logoDark` (optionnel) — sa version pour le mode sombre. Sans elle, le logo est inversé en mode sombre : bien pour un logo d'une couleur, pas pour un logo en couleurs.
+  - `logoAlt` (optionnel) — son texte alternatif ; par défaut, le `label` de l'établissement.
+  - `logoShape` (optionnel) — `'wide'` (par défaut, un logo en longueur) ou `'square'` (un logo carré ou presque, affiché plus haut pour se lire comme un logo en longueur).
+
+  Les mêmes `logoDark` et `logoShape` s'appliquent au `logo` de `branding`.
+
+  Chaque étudiant peut masquer ce logo, ou afficher celui de l'université à la place de celui de sa composante, dans Réglages › Apparence › Logo.
 - `services.getAppIcon(title)` — retourne une icône faite main pour une application ENT à partir de son titre (voir `universities/univ-rennes/app-icons/`). Retournez `null` pour laisser l'icône automatique (voir [Icônes des applications](#icônes-des-applications)).
 - `services.categories` — mots-clés → catégories de la grille d'applications.
 - `services.titleOverrides` — (optionnel) renomme des applications ENT : `{ 'titre ent en minuscules': 'Titre affiché' }`.

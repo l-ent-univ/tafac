@@ -17,6 +17,8 @@ export const TRANSFERABLE_KEYS = [
   'l-ent:hidden-widgets',
   'l-ent:show-app-descriptions',
   'l-ent:planning-weekend',
+  'l-ent:show-university-logo',
+  'l-ent:logo-source',
   'l-ent:anonymous-analytics',
   'l-ent:favorites-order',
   'l-ent:local-pins',

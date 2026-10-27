@@ -9,29 +9,32 @@ import PlanningEventBlock from './PlanningEventBlock'
 import CloseButton from './CloseButton'
 
 // A row of the sheet's cards (the iOS GroupCard's rows, in the look of
-// the evaluation rows of Mes notes): an icon box, a line and a second one,
-// parted from the next row by a hairline from the text's edge. A button with
-// a chevron when it leads somewhere.
+// the evaluation rows of Mes notes): an icon box (none for the occurrences),
+// a line and a second one, parted from the next row by a hairline from the
+// text's edge to as far from the card's right edge. A button with a chevron when it leads somewhere, its hover a
+// rounded fill inside the card, concentric with it (.modal-nested-corners).
 function SheetRow({ icon, title, detail, onClick }) {
   const content = (
     <>
-      <span className="inline-flex size-8 shrink-0 items-center justify-center corners-[9px] bg-brand-subtle text-text-secondary" aria-hidden="true">
-        <Icon icon={icon} className="size-[17px]" />
-      </span>
-      <span className="planning-row-text grid min-w-0 flex-1 content-center gap-[4px] self-stretch py-[17px] pr-4">
+      {icon ? (
+        <span className="inline-flex size-7 shrink-0 items-center justify-center corners-[8px] bg-brand-subtle text-text-secondary" aria-hidden="true">
+          <Icon icon={icon} className="size-[15px]" />
+        </span>
+      ) : null}
+      <span className="planning-row-text grid min-w-0 flex-1 content-center gap-[4px] self-stretch mr-3 py-[12px]">
         <span className="truncate font-body text-[14px] font-semibold leading-[1.2] text-text">{title}</span>
         {detail ? <span className="truncate font-body text-[12.5px] font-medium leading-none text-text-muted">{detail}</span> : null}
       </span>
-      {onClick ? <Icon icon="carbon:chevron-right" className="-ml-1 mr-4 size-[14px] shrink-0 text-text-30" aria-hidden="true" /> : null}
+      {onClick ? <Icon icon="carbon:chevron-right" className="-ml-1 mr-3 size-[14px] shrink-0 text-text-30" aria-hidden="true" /> : null}
     </>
   )
-  const className = 'planning-row flex w-full min-w-0 items-center gap-3.5 pl-4 text-left text-text'
+  const className = 'planning-row modal-nested-corners flex min-h-11 w-full min-w-0 items-center gap-3 pl-3 text-left text-text'
   return onClick
-    ? <li><button type="button" className={`${className} is-link cursor-pointer border-0 bg-transparent p-0 pl-4`} onClick={onClick}>{content}</button></li>
+    ? <li><button type="button" className={`${className} is-link cursor-pointer border-0 bg-transparent p-0 pl-3`} onClick={onClick}>{content}</button></li>
     : <li className={className}>{content}</li>
 }
 
-const CARD_CLASSES = 'widget-card widget-card-visible m-0 list-none overflow-hidden border bg-widget-bg px-0 py-1 card-corners'
+const CARD_CLASSES = 'widget-card widget-card-visible m-0 list-none overflow-hidden border bg-widget-bg p-1 [--modal-nested-inset:4px] modal-inner-corners'
 
 // A class's sheet, laid out as the iOS app's (EventDetailViewController)
 // and drawn as a grade's (GradeDetailModal): the course's colour washing
@@ -89,7 +92,7 @@ function PlanningEventSheet({ event, accent, events, todayKey, searching, onClos
       <div className="weather-modal-backdrop absolute inset-0 bg-backdrop animate-modal-backdrop-in" onClick={onClose} aria-hidden="true" />
       <section
         ref={dialogRef}
-        className="gd-dialog planning-sheet relative isolate flex max-h-[min(820px,calc(100dvh-40px))] w-[min(448px,100%)] flex-col corners-[26px] border border-border bg-bg text-text shadow-[0_24px_80px_var(--color-shadow)] outline-none max-sm:max-h-[calc(100dvh-16px)] max-sm:rounded-b-none max-sm:border-b-0"
+        className="gd-dialog planning-sheet relative isolate flex max-h-[min(820px,calc(100dvh-40px))] w-[min(448px,100%)] flex-col modal-corners [--modal-inset:24px] [--modal-inner-radius:20px] max-sm:[--modal-inset:16px] max-sm:[--modal-inner-radius:18px] border border-border bg-bg text-text shadow-[0_24px_80px_var(--color-shadow)] outline-none max-sm:max-h-[calc(100dvh-16px)] max-sm:rounded-b-none max-sm:border-b-0"
         style={accentStyle(accent)}
         role="dialog"
         aria-modal="true"
@@ -134,7 +137,6 @@ function PlanningEventSheet({ event, accent, events, todayKey, searching, onClos
                     {occurrences.map((occurrence) => (
                       <SheetRow
                         key={occurrence.id}
-                        icon="carbon:calendar"
                         title={relativeDayText(occurrence.day, todayKey)}
                         detail={[`${formatTime(occurrence.start)} – ${formatTime(occurrence.end)}`, occurrence.location].filter(Boolean).join(' · ')}
                         onClick={() => onPickDay(occurrence.day)}

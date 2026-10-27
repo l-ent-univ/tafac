@@ -937,6 +937,7 @@ export function buildDemoMailPayload({ now = Date.now(), webmailHref = DEMO_WEBM
     unreadCount: 7,
     webmailHref,
     messages,
+    hasMore: false,
   }
 }
 

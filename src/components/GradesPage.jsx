@@ -358,7 +358,7 @@ function GradesPage({ user = null, arrivalSource = 'other', initialGradeRequest 
   ) : null
 
   return (
-    <section className="w-full grid gap-4 pt-4 px-6 pb-6 4xl:pt-5 max-md:px-3 max-md:pt-3 max-md:pb-5 max-md:gap-3" aria-labelledby="grades-page-title">
+    <section className="grades-page w-full grid gap-4 pt-4 px-6 pb-6 4xl:pt-5 max-md:px-3 max-md:pt-3 max-md:pb-5 max-md:gap-3" aria-labelledby="grades-page-title">
       {/* The page's top, tinted apart from the detail below: title, the
           semester's overview and its notices. Plain (no box) while a UE is
           open full page, where it holds only the hidden title. On a phone it
