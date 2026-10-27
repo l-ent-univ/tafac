@@ -20,6 +20,7 @@ import GradeSimulatorModal from './GradeSimulatorModal'
 import GradesNotices from './GradesNotice'
 import LatestGradesList from './LatestGradesList'
 import LoadingDots from './LoadingDots'
+import Material from './Material'
 import PageEmptyState from './PageEmptyState'
 import SemesterSelect from './SemesterSelect'
 import SubjectsList from './SubjectsList'
@@ -100,44 +101,22 @@ function ReportPdfButton({ semesterId, semester, releveType }) {
   )
 }
 
-// Next to the PDF, tinted: opens the simulation sheet (GradeSimulatorModal).
-// On a phone an icon in a round button like the PDF's (touch area 44px).
-// `colors`: the semester's UE colours, washed softly up from the bottom of
-// the button and drifting (.simulate-button-wash in overrides.css); none,
-// the brand's. With a mouse, the wash leans towards the pointer: its offset
-// from the middle, -1 to 1, as --simulate-shift (set on the element, no
-// re-render).
-function followPointer(event) {
-  const rect = event.currentTarget.getBoundingClientRect()
-  const shift = ((event.clientX - rect.left) / rect.width) * 2 - 1
-  event.currentTarget.style.setProperty('--simulate-shift', Math.max(-1, Math.min(1, shift)).toFixed(3))
-}
-
-function releasePointer(event) {
-  event.currentTarget.style.removeProperty('--simulate-shift')
-}
-
+// Next to the PDF, in the same material with the semester's UE colours as
+// its rainbow (none: the brand's): opens the simulation sheet
+// (GradeSimulatorModal). On a phone an icon in a round button like the
+// PDF's (touch area 44px).
 function SimulateButton({ onClick, colors = [] }) {
-  const wash = colors.length > 0
-    ? `linear-gradient(100deg, ${[...colors, colors[0]].join(', ')})`
-    : null
   return (
-    <button
-      type="button"
+    <Material
+      rainbow={colors}
       onClick={onClick}
       aria-haspopup="dialog"
       aria-label="Simuler mes notes"
-      className="simulate-button relative isolate inline-flex items-center gap-1.5 rounded-full border px-3.5 py-2 font-body text-[14px] font-semibold cursor-pointer focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand max-md:size-10 max-md:justify-center max-md:p-0 max-md:after:absolute max-md:after:-inset-[3px]"
-      style={wash ? { '--simulate-wash': wash } : undefined}
-      onPointerMove={followPointer}
-      onPointerLeave={releasePointer}
+      className="inline-flex items-center gap-1.5 rounded-full px-3.5 py-2 font-body text-[14px] font-semibold cursor-pointer focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand max-md:size-10 max-md:justify-center max-md:p-0 max-md:after:absolute max-md:after:-inset-[3px]"
     >
-      <span className="simulate-button-wash-frame rounded-[inherit]" aria-hidden="true">
-        <span className="simulate-button-wash" />
-      </span>
       <Icon icon="carbon:calculator" className="size-4 max-md:size-[18px]" aria-hidden="true" />
       <span className="max-md:hidden">Simuler</span>
-    </button>
+    </Material>
   )
 }
 

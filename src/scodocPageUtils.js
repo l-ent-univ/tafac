@@ -4,7 +4,9 @@ import { getRequestErrorKind } from './entApi'
 // Shared by the ScoDoc pages ("Mes notes", "Absences").
 
 export const CARD_CLASSES = 'widget-card widget-card-visible border bg-widget-bg card-corners'
-export const SECONDARY_BUTTON = 'inline-flex items-center gap-1.5 rounded-full border border-border bg-widget-bg px-3.5 py-2 font-body text-[14px] font-semibold text-text no-underline transition-colors duration-150 hover:bg-bg-subtle'
+// In the Simuler button's material (.material, without its rainbow: see
+// components/Material.jsx).
+export const SECONDARY_BUTTON = 'material inline-flex items-center gap-1.5 rounded-full px-3.5 py-2 font-body text-[14px] font-semibold text-text no-underline'
 export const HELP_TOUR_BUTTON = 'size-9 p-0 inline-flex items-center justify-center rounded-full border border-border/80 bg-widget-bg text-text shadow-xs backdrop-blur-md transition-all duration-150 hover:bg-bg-subtle hover:text-brand hover:border-brand/40 hover:scale-105 active:scale-95 cursor-pointer'
 
 // Cards rise in one after another on arrival, like the dashboard widgets

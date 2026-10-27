@@ -2691,28 +2691,31 @@
   background-color: color-mix(in srgb, var(--color-brand) 4%, var(--color-widget-bg));
 }
 
-/* Mes notes' "Simuler" button: white like the cards, lifted by a shadow,
-   with the semester's UE colours washed softly up from its bottom edge and
-   drifting slowly back and forth (--simulate-wash, set by the button; the
-   brand's without UE colours), so it reads as the way into something to
-   play with. With a mouse, the wash also leans towards the pointer
-   (--simulate-shift, -1 to 1, set by the button). */
-.simulate-button {
-  --simulate-wash: linear-gradient(100deg, var(--color-brand), #e9b44c, var(--color-brand));
-  border-color: #ffffff;
+/* ── Material ──
+   The surface of Mes notes' "Simuler" button, for the app's secondary
+   buttons (SECONDARY_BUTTON) and Material.jsx: white like the cards, lifted
+   by a shadow that deepens on hover, pressed in on a tap. Optionally a
+   rainbow (Material's `rainbow`): colours washed softly up from the bottom
+   edge and drifting slowly back and forth (--material-wash, set by
+   Material; the brand's by default), so it reads as the way into something
+   to play with. With a mouse, the wash also leans towards the pointer
+   (--material-shift, -1 to 1, set by Material). */
+.material {
+  --material-wash: linear-gradient(100deg, var(--color-brand), #e9b44c, var(--color-brand));
+  border: 1px solid #ffffff;
   background-color: #ffffff;
   color: var(--color-text);
   box-shadow: 0 1px 3px rgb(52 18 0 / 0.08), 0 8px 20px -10px rgb(52 18 0 / 0.28);
   transition: box-shadow 150ms ease, transform 100ms ease-out;
 }
 
-.simulate-button:active {
+.material:active:not(:disabled) {
   transform: scale(0.96);
 }
 
-/* Clips the wash, wider than the button so it has room to lean, and fades
+/* Clips the wash, wider than the surface so it has room to lean, and fades
    it out towards the top: a tint rising from the bottom, not a fill. */
-.simulate-button-wash-frame {
+.material-wash-frame {
   position: absolute;
   inset: 0;
   z-index: -1;
@@ -2723,22 +2726,22 @@
   transition: opacity 150ms ease;
 }
 
-.simulate-button-wash {
+.material-wash {
   position: absolute;
   inset: 0 -30%;
-  background-image: var(--simulate-wash);
+  background-image: var(--material-wash);
   background-size: 300% 100%;
-  translate: calc(var(--simulate-shift, 0) * 18%) 0;
+  translate: calc(var(--material-shift, 0) * 18%) 0;
   transition: translate 600ms cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 
 @media (prefers-reduced-motion: no-preference) {
-  .simulate-button-wash {
-    animation: simulate-wash-drift 9s ease-in-out infinite alternate;
+  .material-wash {
+    animation: material-wash-drift 9s ease-in-out infinite alternate;
   }
 }
 
-@keyframes simulate-wash-drift {
+@keyframes material-wash-drift {
   from {
     background-position: 0% 50%;
   }
@@ -2749,22 +2752,22 @@
 }
 
 @media (hover: hover) {
-  .simulate-button:hover {
+  .material:hover:not(:disabled) {
     box-shadow: 0 1px 3px rgb(52 18 0 / 0.1), 0 12px 26px -12px rgb(52 18 0 / 0.34);
   }
 
-  .simulate-button:hover .simulate-button-wash-frame {
+  .material:hover .material-wash-frame {
     opacity: 0.38;
   }
 }
 
-:where([data-theme="dark"]) .simulate-button {
+:where([data-theme="dark"]) .material {
   border-color: rgb(255 255 255 / 0.08);
   background-color: #1c1c1c;
   box-shadow: 0 1px 3px rgb(0 0 0 / 0.4), 0 8px 20px -10px rgb(0 0 0 / 0.7);
 }
 
-:where([data-theme="dark"]) .simulate-button-wash-frame {
+:where([data-theme="dark"]) .material-wash-frame {
   opacity: 0.34;
 }
 
