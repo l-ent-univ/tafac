@@ -406,7 +406,10 @@ export function buildGradesReport(releve, { config = null } = {}) {
     },
     publishedAt: releve.date ?? null,
     average: semesterAverage,
-    showPromoStats: readOption(options, 'show_minmax') || readOption(options, 'show_moypromo'),
+    // ScoDoc sends the promo stats even when show_minmax/show_moypromo hide
+    // them from the passerelle's page: shown whenever they're there.
+    showPromoStats: [...resources, ...saes].some((module) => module.evaluations
+      .some((evaluation) => ['min', 'moy', 'max'].some((key) => evaluation.promo[key] != null))),
     rank: showRanks ? readRank(semestre.rang?.value, semestre.rang?.total) : null,
     groupRanks: showRanks ? readGroupRanks(semestre.rang?.groupes) : [],
     ects: readOption(options, 'show_ects') ? readEcts(semestre.ECTS) : null,
@@ -545,16 +548,35 @@ export function projectAverages(releve, overrides) {
   return { ues, general: { official: officialGeneral, projected: general } }
 }
 
+function estimatePromoAverage(releve, projectedUes) {
+  let weighted = 0
+  let weightSum = 0
+
+  for (const [ueCode, ue] of Object.entries(releve?.ues ?? {})) {
+    const promo = parseGradeNumber(ue?.moyenne?.moy)
+    if (promo == null || projectedUes[ueCode]?.projected == null) continue
+    const weight = parseGradeNumber(ue?.ECTS?.total) || 1
+    weighted += promo * weight
+    weightSum += weight
+  }
+
+  return weightSum > 0 ? weighted / weightSum : null
+}
+
 // "Moyenne Générale" card. ScoDoc's semester average when the relevé
 // carries it; when the department blocks it (or it isn't computed yet), the
 // UE averages weighted by their ECTS, like ScoDoc does. The promo average
-// only when the department shows it.
+// the same way: ScoDoc's when it sends the student's (show_moypromo only
+// hides it from the passerelle's page), else the UEs' promo averages
+// weighted by their ECTS, over the UEs the student's average counts (a
+// blocked general average comes with a placeholder promo one).
 export function computeGeneralAverage(releve) {
   const official = parseGradeNumber(releve?.semestre?.notes?.value)
-  const average = official ?? projectAverages(releve, {}).general.projected
-  const promoAverage = readOption(releve?.options, 'show_moypromo')
+  const projection = projectAverages(releve, {})
+  const average = official ?? projection.general.projected
+  const promoAverage = official != null
     ? parseGradeNumber(releve?.semestre?.notes?.moy)
-    : null
+    : estimatePromoAverage(releve, projection.ues)
 
   return { average, promoAverage, source: official != null ? 'semestre.notes' : 'ues-ects' }
 }

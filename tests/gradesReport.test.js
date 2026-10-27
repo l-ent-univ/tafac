@@ -133,6 +133,17 @@ test('buildGradesReport honours ScoDoc display options and publication', () => {
   assert.equal(hidden.ects, null)
   assert.ok(hidden.ues.every((ue) => ue.rank === null))
 
+  // The promo stats are in the relevé whatever show_minmax says.
+  const noMinmax = buildGradesReport({ ...releve, options: { show_minmax: false, show_moypromo: false } })
+  assert.equal(noMinmax.showPromoStats, true)
+  const withoutStats = structuredClone(releve)
+  for (const section of [withoutStats.ressources, withoutStats.saes]) {
+    for (const module of Object.values(section)) {
+      for (const evaluation of module.evaluations) evaluation.note = { value: evaluation.note.value }
+    }
+  }
+  assert.equal(buildGradesReport(withoutStats).showPromoStats, false)
+
   assert.deepEqual(
     buildGradesReport({ publie: false, message: '<b>Relevé</b> bloqué' }),
     { status: 'unpublished', message: 'Relevé bloqué' },
@@ -360,6 +371,9 @@ test('computeGeneralAverage uses ScoDoc’s average, else the UEs weighted by EC
   assert.equal(official.source, 'semestre.notes')
   assert.equal(official.average, 14.5)
   assert.equal(official.promoAverage, 12.44)
+  // show_moypromo only hides it from the passerelle's page.
+  const hiddenPromo = computeGeneralAverage({ ...buildDemoGradesPayload()['relevé'], options: { show_moypromo: false } })
+  assert.equal(hiddenPromo.promoAverage, 12.44)
 
   // A department that blocks the general average and the promo one: ScoDoc
   // sends "~" (and a placeholder promo average), the UE averages stay.
@@ -367,17 +381,24 @@ test('computeGeneralAverage uses ScoDoc’s average, else the UEs weighted by EC
     options: { block_moyenne_generale: true, show_moypromo: false },
     semestre: { notes: { value: '~', min: '12.78', moy: '12.78', max: '12.78' } },
     ues: {
-      'UE 1': { moyenne: { value: '13.50' }, ECTS: { total: 4 } },
-      'UE 2': { moyenne: { value: '12.00' }, ECTS: { total: 4 } },
-      'UE 3': { moyenne: { value: '~' }, ECTS: { total: 8 } },
-      'UE 4': { moyenne: { value: '15.00' }, ECTS: { total: 6 } },
+      'UE 1': { moyenne: { value: '13.50', moy: '11.00' }, ECTS: { total: 4 } },
+      'UE 2': { moyenne: { value: '12.00', moy: '12.50' }, ECTS: { total: 4 } },
+      'UE 3': { moyenne: { value: '~', moy: '10.00' }, ECTS: { total: 8 } },
+      'UE 4': { moyenne: { value: '15.00', moy: '13.00' }, ECTS: { total: 6 } },
     },
   })
   assert.equal(blocked.source, 'ues-ects')
   assert.deepEqual(computeAverageHistory({ ues: {} }), [])
   // (13.5 × 4 + 12 × 4 + 15 × 6) / 14; UE 3 has no average yet.
   assert.equal(blocked.average, 192 / 14)
-  assert.equal(blocked.promoAverage, null)
+  // The promo's, over the same UEs: (11 × 4 + 12.5 × 4 + 13 × 6) / 14.
+  assert.equal(blocked.promoAverage, 172 / 14)
+
+  const noPromoStats = computeGeneralAverage({
+    semestre: { notes: { value: '~' } },
+    ues: { 'UE 1': { moyenne: { value: '13.50' }, ECTS: { total: 4 } } },
+  })
+  assert.equal(noPromoStats.promoAverage, null)
 })
 
 test('findNewGrades only flags grades unseen in a semester already visited', () => {
