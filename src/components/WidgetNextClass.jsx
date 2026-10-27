@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { Icon } from '@iconify/react'
 import universityConfig from '@university'
 import { useWidgetLoadReport } from '../analytics'
@@ -356,7 +356,8 @@ function WidgetNextClass({
       : createWidgetState({ status: hasResources ? (autoLoad ? 'loading' : 'paused') : 'unconfigured' })
   ))
   const [timeLabel, setTimeLabel] = useState('')
-  const [wide, setWide] = useState(false)
+  // The class (event key) whose lines overflowed the narrow card.
+  const [wideKey, setWideKey] = useState(null)
   useWidgetLoadReport('nextClass', getLoadOutcome(widgetState, isStatic))
   const visibleRef = useRef(visible)
   const loadedEventsRef = useRef([])
@@ -376,6 +377,10 @@ function WidgetNextClass({
   const nextClassKey = nextClass ? getEventKey(nextClass) : ''
   const displayTimeRange = simplifyTimeLabel(nextClass?.timeLabel)
   const firstGroup = nextClass?.groups?.[0] || ''
+  // Wide (2xl) for the class that overflowed, and only that one: a refresh
+  // bringing the same class back keeps the card wide, another class starts
+  // narrow and is measured again.
+  const wide = widgetState.status === 'ready' && Boolean(nextClass) && wideKey === nextClassKey
 
   const measureWideLayout = useCallback(() => {
     const shouldExpand = [
@@ -388,9 +393,9 @@ function WidgetNextClass({
     ].some(isElementOverflowing)
 
     if (shouldExpand) {
-      setWide(true)
+      setWideKey(nextClassKey)
     }
-  }, [])
+  }, [nextClassKey])
 
   const syncNextClassFromLoadedEvents = useCallback(() => {
     const nextClass = findNextClass(loadedEventsRef.current)
@@ -670,16 +675,10 @@ function WidgetNextClass({
     }
   }, [autoLoad, isStatic, hasResources, loadNextClass, syncNextClassFromLoadedEvents])
 
-  useEffect(() => {
-    if (widgetState.status !== 'ready' || !nextClass) {
-      setWide(false)
-      return
-    }
-
-    setWide(false)
-  }, [nextClassKey, widgetState.status, nextClass])
-
-  useEffect(() => {
+  // Measured in a layout effect, on the card as this render laid it out: a
+  // frame later, a pending re-render could have changed its width (a refresh
+  // used to reset it narrow after the measure, leaving the lines cut off).
+  useLayoutEffect(() => {
     if (widgetState.status !== 'ready' || !nextClass) {
       return undefined
     }
@@ -687,19 +686,17 @@ function WidgetNextClass({
     let frameId = 0
     const measure = () => {
       window.cancelAnimationFrame(frameId)
-      frameId = window.requestAnimationFrame(() => {
-        measureWideLayout()
-      })
+      frameId = window.requestAnimationFrame(measureWideLayout)
     }
 
-    measure()
+    measureWideLayout()
     window.addEventListener('resize', measure)
 
     return () => {
       window.removeEventListener('resize', measure)
       window.cancelAnimationFrame(frameId)
     }
-  }, [displayTimeRange, firstGroup, measureWideLayout, nextClass, nextClassKey, timeLabel, widgetState.status])
+  }, [displayTimeRange, firstGroup, measureWideLayout, nextClass, timeLabel, widgetState.status])
 
   // The course's colour as the planning gives it (the same one on its
   // page: eventAccents, handed out in the order the courses are seen).
