@@ -7,6 +7,8 @@ import { advanceSimulatorReach, describeGradesLoad, toGradesPageSource } from '.
 import { buildGradesReport, canDownloadReportPdf, summarizeAverage } from '../gradesReport'
 import { hasSimulatableEvaluation } from '../gradeSimulation'
 import { findNewEvaluationIds, formatReportUpdate, listGradedEvaluationIds } from '../gradesSubjects'
+import { findEvaluation } from '../gradeDetail'
+import { prepareGradeMail } from '../gradeMail'
 import { readSeenEvaluationIds, writeSeenEvaluationIds } from '../seenGrades'
 import { SECONDARY_BUTTON } from '../scodocPageUtils'
 import { assignSubjectIcons } from '../subjectIcons'
@@ -151,7 +153,10 @@ function OpenGradeDetail({ request, onHandled }) {
 // "Dernière note"), handed back with onInitialGradeRequestHandled once taken.
 // `arrivalSource`: how the student got here, for the anonymous analytics
 // (src/gradesAnalytics.js); the page mounts once per arrival.
-function GradesPage({ user = null, arrivalSource = 'other', initialGradeRequest = null, onInitialGradeRequestHandled = () => {} }) {
+// `onComposeMail(request)`: App's, the mail page opened on a prefilled
+// composer (« Écrire au sujet de cette note »); null without the in-app
+// mail page, and the action isn't offered.
+function GradesPage({ user = null, arrivalSource = 'other', initialGradeRequest = null, onInitialGradeRequestHandled = () => {}, onComposeMail = null }) {
   const { base, semesters, activeId, activeSemester, selectSemester, entry, releve, config, department, departmentMessage } = useScodocReleve()
   const status = base.status === 'error' ? base : entry
   const empty = useMemo(() => (status.status === 'ok' ? readEmptyReason(releve, config) : null), [status.status, releve, config])
@@ -229,6 +234,21 @@ function GradesPage({ user = null, arrivalSource = 'other', initialGradeRequest 
     const timer = window.setTimeout(() => setGradeRequest(null), 0)
     return () => window.clearTimeout(timer)
   }, [gradeRequest])
+  // « Écrire au sujet de cette note »: the mail made from the grade (its
+  // image drawn first, src/gradeMail.js), then the mail page. Once at a
+  // time: a second press while the image is drawn does nothing.
+  const absences = entry.payload?.absences ?? null
+  const composingRef = useRef(false)
+  const writeAboutGrade = useMemo(() => (onComposeMail && report ? async ({ moduleCode, evaluationId }) => {
+    const found = findEvaluation(report, moduleCode, evaluationId)
+    if (!found || composingRef.current) return
+    composingRef.current = true
+    try {
+      onComposeMail(await prepareGradeMail({ report, module: found.module, evaluation: found.evaluation, absences }))
+    } finally {
+      composingRef.current = false
+    }
+  } : null), [onComposeMail, report, absences])
   const latestGrades = report?.latest ?? []
   // UE code → ScoDoc colour (as painted: lifted on the dark theme), to tint
   // each grade with the UEs it counts for.
@@ -300,7 +320,7 @@ function GradesPage({ user = null, arrivalSource = 'other', initialGradeRequest 
       // While a UE is open full page, everything else steps aside (null
       // slots, so the list keeps its place in the tree and its state).
       // Any evaluation row opens its grade's detail sheet.
-      <GradeDetailProvider report={report} semesterId={activeId} subjectIcon={subjectIcon}>
+      <GradeDetailProvider report={report} semesterId={activeId} subjectIcon={subjectIcon} onWrite={writeAboutGrade}>
         <OpenGradeDetail request={detailRequest} onHandled={() => setDetailRequest(null)} />
         <div key={activeId} className="semester-fade grid gap-8 max-md:gap-6">
           {/* Titled like the dashboard's sections. */}

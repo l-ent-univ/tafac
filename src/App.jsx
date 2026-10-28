@@ -1958,6 +1958,15 @@ function App() {
     }
     handleNavigatePage('mail', 'dashboard_card')
   }, [showPage, handleNavigatePage])
+  // « Écrire au sujet de cette note » (« Mes notes »): the mail page, its
+  // composer open on that mail (`request`: the composer's `restore`, see
+  // MailComposer), taken once by the page as it mounts.
+  const [pendingMailCompose, setPendingMailCompose] = useState(null)
+  const handleComposeMail = useCallback((request) => {
+    setPendingMailCompose(request)
+    handleNavigatePage('mail', 'grades')
+  }, [handleNavigatePage])
+  const clearPendingMailCompose = useCallback(() => setPendingMailCompose(null), [])
 
   // The current entry says which page it is (the first one included); the
   // app sets scroll positions itself. Back and forward show the entry's page
@@ -2641,7 +2650,7 @@ function App() {
             </div>
             {isGradesPage ? (
               <div className="page-enter flex-1 min-h-0 4xl:flex-none 4xl:min-h-0">
-                <GradesPage user={sessionState.user} arrivalSource={gradesArrivalSource} initialGradeRequest={pendingGradeRequest} onInitialGradeRequestHandled={clearPendingGradeRequest} />
+                <GradesPage user={sessionState.user} arrivalSource={gradesArrivalSource} initialGradeRequest={pendingGradeRequest} onInitialGradeRequestHandled={clearPendingGradeRequest} onComposeMail={hasMailPage ? handleComposeMail : null} />
               </div>
             ) : null}
             {isPlanningPage ? (
@@ -2651,7 +2660,7 @@ function App() {
             ) : null}
             {isMailPage ? (
               <div className="page-enter flex-1 min-h-0 4xl:flex-none 4xl:min-h-0">
-                <MailPage onReaderOpenChange={handleMailReaderOpenChange} onSignInAgain={() => void handleSignInAgain()} sender={mailSender} />
+                <MailPage onReaderOpenChange={handleMailReaderOpenChange} onSignInAgain={() => void handleSignInAgain()} sender={mailSender} composeRequest={pendingMailCompose} onComposeRequestHandled={clearPendingMailCompose} />
               </div>
             ) : null}
             <div className="4xl:mt-auto">

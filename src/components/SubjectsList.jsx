@@ -124,10 +124,11 @@ export function EvaluationRow({ evaluation, moduleCode = null, showPromoStats, w
   ].filter(Boolean).join(', ')
   const canOpen = Boolean(gradeDetail && moduleCode != null)
   const open = () => gradeDetail.open({ moduleCode, evaluationId: evaluation.id, isNew, from: openFrom })
-  // Its right-click menu (a long press): the detail sheet, the grade as
-  // text.
+  // Its right-click menu (a long press): the detail sheet, a mail about it,
+  // the grade as text.
   const menuProps = useContextMenu(() => [
     canOpen ? { id: 'open', label: 'Voir la note', icon: 'carbon:view', onSelect: open } : null,
+    canOpen && gradeDetail.write ? { id: 'write', label: 'Écrire au sujet de cette note', icon: 'carbon:email', onSelect: () => void gradeDetail.write({ moduleCode, evaluationId: evaluation.id }) } : null,
     {
       id: 'copy',
       label: 'Copier',

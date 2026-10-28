@@ -2,6 +2,7 @@ import { Icon } from '@iconify/react'
 import { buildUeWash, formatGradeDay as formatDay } from '../gradesSubjects'
 import { gradeCopyText } from '../contextMenuItems'
 import { copyToClipboard, useContextMenu } from '../useContextMenu'
+import { useGradeDetail } from '../gradeDetailContext'
 import { NewBadge, TypeBadge } from './SubjectsList'
 
 // Always one row, scrolling sideways when the cards don't fit (snap, no
@@ -81,13 +82,16 @@ export function LatestGradeCardBody({ moduleTitle, moduleCode, day, title, value
 // subject's icon (src/subjectIcons.js) leads its name. A card opens the
 // grade itself (onOpen): GradesPage takes it to its UE and subject.
 function LatestGradesList({ grades, ueColors = {}, subjectIcon = () => null, onOpen = null }) {
+  // A mail about a grade, under « Mes notes »'s sheet provider.
+  const write = useGradeDetail()?.write ?? null
   // A card's right-click menu (a long press; `key`: its index): the grade
-  // opened, and as text.
+  // opened, a mail about it, and as text.
   const menuProps = useContextMenu((key) => {
     const grade = grades[Number(key)]
     if (!grade) return null
     return [
       onOpen ? { id: 'open', label: 'Voir la note', icon: 'carbon:view', onSelect: () => onOpen(grade) } : null,
+      write ? { id: 'write', label: 'Écrire au sujet de cette note', icon: 'carbon:email', onSelect: () => void write({ moduleCode: grade.moduleCode, evaluationId: grade.id }) } : null,
       {
         id: 'copy',
         label: 'Copier',

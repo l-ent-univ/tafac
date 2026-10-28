@@ -16,6 +16,7 @@ import UeShareRing from './UeShareRing'
 import { useUeColor } from '../useUeColor'
 import { NewBadge } from './SubjectsList'
 import CloseButton from './CloseButton'
+import { SECONDARY_BUTTON } from '../scodocPageUtils'
 
 const FOCUSABLE_SELECTOR = 'button:not([disabled]), [href], [tabindex]:not([tabindex="-1"])'
 const DATE_FORMAT = new Intl.DateTimeFormat('fr-FR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })
@@ -288,7 +289,9 @@ function PromoCard({ evaluation, semesterId, showPromoStats, titleId }) {
 // department shows promo stats) and what it counts for in each UE.
 // Centred card on wide screens, bottom sheet on phones; focus kept inside,
 // Escape and the backdrop close it, focus goes back to the row.
-function GradeDetailModal({ report, module, evaluation, semesterId, icon = null, isNew = false, onClose }) {
+// `onWrite`: « Écrire au sujet de cette note » (a mail about it, in the
+// Messagerie), null without the in-app mail page.
+function GradeDetailModal({ report, module, evaluation, semesterId, icon = null, isNew = false, onWrite = null, onClose }) {
   const dialogRef = useRef(null)
   const titleId = useId()
   const summaryId = useId()
@@ -450,6 +453,14 @@ function GradeDetailModal({ report, module, evaluation, semesterId, icon = null,
               <div ref={heroRef}>
                 <Hero evaluation={evaluation} gap={gap} summaryId={summaryId} />
               </div>
+              {onWrite ? (
+                <div className="gd-rise -mt-1" style={{ '--d': '80ms' }}>
+                  <button type="button" onClick={onWrite} className={`${SECONDARY_BUTTON} cursor-pointer focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-text`}>
+                    <Icon icon="carbon:email" className="size-4 shrink-0" aria-hidden="true" />
+                    <span className="font-body text-[14px] font-semibold leading-none text-text">Écrire au sujet de cette note</span>
+                  </button>
+                </div>
+              ) : null}
               <div className="grid gap-3">
                 <PromoCard evaluation={evaluation} semesterId={semesterId} showPromoStats={showPromoStats} titleId={promoTitleId} />
                 <WeightCard report={report} module={module} evaluation={evaluation} titleId={weightTitleId} />

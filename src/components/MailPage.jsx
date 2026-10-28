@@ -783,8 +783,10 @@ function MailListItem({ message, fallbackHref, now, onOpen, onContextMenu, onHov
 // `onSignInAgain`: the « Se reconnecter » of an expired session (App's
 // sign-out, then its login page).
 // `sender`: the student's { name, email } (App's account), the composer's
-// « De : ».
-function MailPage({ onReaderOpenChange, onSignInAgain, sender = null }) {
+// « De : ». `composeRequest`: a mail another page asks to write (App's,
+// « Écrire au sujet de cette note » in « Mes notes »: the composer's
+// `restore`), opened once, then handed back (onComposeRequestHandled).
+function MailPage({ onReaderOpenChange, onSignInAgain, sender = null, composeRequest = null, onComposeRequestHandled = () => {} }) {
   // nextOffset: where the next page starts on the server.
   // `folder`: the folder the list is of (the one shown until another's
   // first page arrives).
@@ -1396,6 +1398,18 @@ function MailPage({ onReaderOpenChange, onSignInAgain, sender = null }) {
       },
     },
   })
+
+  // A mail another page asked for: a new one, prefilled, asking first if a
+  // changed one is open (showComposer).
+  // Once each (StrictMode runs an effect twice).
+  const handledComposeRef = useRef(null)
+  useEffect(() => {
+    if (!composeRequest || handledComposeRef.current === composeRequest) return
+    handledComposeRef.current = composeRequest
+    showComposer({ key: Date.now(), kind: 'new', message: null, saver: newDraftSaver(), restore: composeRequest })
+    onComposeRequestHandled()
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [composeRequest])
 
   // A draft (a row of Brouillons) opens in the composer, not the reader:
   // its fields, its text and its files as saved, saved over from there.
