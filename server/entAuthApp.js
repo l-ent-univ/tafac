@@ -12,6 +12,7 @@ import express from 'express'
 import cookieParser from 'cookie-parser'
 import { createProxyMiddleware } from 'http-proxy-middleware'
 import { randomUUID } from 'node:crypto'
+import { Readable } from 'node:stream'
 import {
   createAdeApiClient,
   getAdeSelectionLabels,
@@ -41,6 +42,25 @@ import {
   unpackJarCookies,
 } from './sessionCookie.js'
 import { createLaunchTargetPolicy } from './launchTargets.js'
+import {
+  buildMailMessage,
+  getMailPartDisposition,
+  isValidDemoMailMessageId,
+  isValidMailMessageId,
+  isValidMailPartId,
+  mailTextToHtml,
+  readContentDispositionFilename,
+} from './mailMessage.js'
+import { isEmptiableMailFolder, normalizeZimbraFolderTree, parseZimbraMarkReadPref } from './mailFolders.js'
+import { buildZimbraAutoCompleteRequest, normalizeZimbraAutoComplete, searchDemoMailContacts } from './mailAutocomplete.js'
+import {
+  UploadIdleError,
+  UploadTooLargeError,
+  createUploadByteCounter,
+  createUploadLimiter,
+  readContentLength,
+  sendToZimbraUpload,
+} from './mailUpload.js'
 import { createPlanningPortalApiClient } from '../planningPortalApi.js'
 import {
   buildDrupalLayout,
@@ -79,6 +99,9 @@ import {
   searchDemoAdeTree,
 } from '../src/demoAccount.js'
 import { findReleveEvaluation, normalizeDistributionAnswer } from '../src/evaluationDistribution.js'
+import { buildZimbraSearchQuery, foldMailSearchText, parseMailSearchWords } from '../src/mailSearch.js'
+import { RECIPIENT_QUERY_MIN_LENGTH, normalizeRecipientQuery } from '../src/mailCompose.js'
+import { HARD_ATTACHMENT_LIMIT_BYTES, deriveAttachmentLimits, normalizeAttachmentType, sanitizeAttachmentName } from '../src/mailAttachments.js'
 
 const DEFAULT_TRUST_PROXY = 'loopback, linklocal, uniquelocal'
 
@@ -159,6 +182,39 @@ const MAIL_WEBMAIL_URL = universityConfig.mail?.webmailUrl ?? MAIL_ORIGIN
 const MAIL_MAX_MESSAGES = Math.min(Math.max(Number(universityConfig.mail?.maxMessages) || 5, 1), 20)
 // The mail page's endless list asks for the next page by offset, up to this.
 const MAIL_MAX_OFFSET = 5000
+// The reader: each body part is cut past this (Zimbra's GetMsg `max`), and
+// an attachment over this isn't relayed.
+const MAIL_MESSAGE_MAX_BYTES = 1_000_000
+const MAIL_PART_MAX_BYTES = 50 * 1024 * 1024
+// Every request to the webmail has a deadline: a Partage that hangs must not
+// pile up open requests (and students waiting) behind it. Each step of the
+// webmail sign-in, each SOAP or REST call: the whole answer within this.
+const ZIMBRA_REQUEST_TIMEOUT_MS = 15_000
+// A part (attachment, inline image) streams for as long as it takes, but its
+// headers come within ZIMBRA_REQUEST_TIMEOUT_MS and then no gap between two
+// chunks may pass this (a stalled upstream, or a client gone quiet: the pipe
+// waits on it).
+const MAIL_PART_IDLE_TIMEOUT_MS = 60_000
+// Ending the webmail session at logout: best effort, never a long wait.
+const ZIMBRA_LOGOUT_TIMEOUT_MS = 4000
+// Mail routes, per session: a token bucket. All students reach Partage from
+// this server's one address, so one session hammering the routes (a script,
+// a stuck loop) could get that address throttled for everyone. Normal use
+// stays far below: the 45 s check of the inbox, a thread and its bodies on
+// each opening, a row's hover prefetch (the thread list only), a mail's
+// inline images (one request each), marking read. 60 in a burst covers an
+// image-heavy mail opened right after another; 5 a second sustained is
+// several openings a second. Past it: 429 with Retry-After, which the page
+// takes as any failure (its list stays, « Réessayer » in the reader).
+const MAIL_RATE_LIMIT_BURST = 60
+const MAIL_RATE_LIMIT_PER_SECOND = 5
+// The composer's uploads (POST /__ent_auth/mail/upload), per session, apart
+// from the bucket above (an upload is one request however long it runs):
+// a few files picked at once, a mail's worth of them several times over in
+// an hour, MAIL_UPLOAD_CONCURRENT streams open at once (the page sends two).
+const MAIL_UPLOAD_PER_MINUTE = 20
+const MAIL_UPLOAD_BYTES_PER_HOUR = 300 * 1024 * 1024
+const MAIL_UPLOAD_CONCURRENT = 3
 // Domains the webmail sign-in chain may visit (webmail, SAML SP, IdP, CAS).
 // Anything else — or any non-HTTPS URL — aborts the chain.
 function buildSignInDomains(extraDomains, urls) {
@@ -309,6 +365,16 @@ const runtimeMoodleDeadlinesCache = new Map()
 const runtimeMoodleContexts = new Map()
 const loginRateLimitByIp = new Map()
 const loginRateLimitByUsername = new Map()
+// sessionId → { tokens, updatedAt }: the mail routes' token buckets
+// (takeMailRateLimitToken).
+const mailRateLimitBuckets = new Map()
+let mailRateLimitPrunedAt = 0
+// The uploads' own limits (MAIL_UPLOAD_*, createUploadLimiter).
+const mailUploadLimiter = createUploadLimiter({
+  perMinute: MAIL_UPLOAD_PER_MINUTE,
+  bytesPerHour: MAIL_UPLOAD_BYTES_PER_HOUR,
+  concurrent: MAIL_UPLOAD_CONCURRENT,
+})
 
 // Utility functions
 function escapeRegExp(value) {
@@ -1950,6 +2016,30 @@ function clearRateLimitEntry(store, key) {
   store.delete(key)
 }
 
+// One mail request for this session: 0 when it may go, otherwise the
+// seconds until a token is back (Retry-After). A bucket refills to full in
+// BURST / PER_SECOND seconds; one idle longer is the same as none, so those
+// are dropped (looked over once a minute at most).
+function takeMailRateLimitToken(sessionId, now = Date.now()) {
+  const fullAfterMs = (MAIL_RATE_LIMIT_BURST / MAIL_RATE_LIMIT_PER_SECOND) * 1000
+  if (now - mailRateLimitPrunedAt > 60_000) {
+    mailRateLimitPrunedAt = now
+    for (const [key, entry] of mailRateLimitBuckets) {
+      if (now - entry.updatedAt > fullAfterMs) mailRateLimitBuckets.delete(key)
+    }
+  }
+  const entry = mailRateLimitBuckets.get(sessionId)
+  const tokens = entry
+    ? Math.min(MAIL_RATE_LIMIT_BURST, entry.tokens + ((now - entry.updatedAt) / 1000) * MAIL_RATE_LIMIT_PER_SECOND)
+    : MAIL_RATE_LIMIT_BURST
+  if (tokens < 1) {
+    mailRateLimitBuckets.set(sessionId, { tokens, updatedAt: now })
+    return Math.max(1, Math.ceil((1 - tokens) / MAIL_RATE_LIMIT_PER_SECOND))
+  }
+  mailRateLimitBuckets.set(sessionId, { tokens: tokens - 1, updatedAt: now })
+  return 0
+}
+
 function getActiveLoginRateLimit(req, username) {
   const ipKey = getLoginRequesterIp(req)
   const usernameKey = normalizeLoginIdentifier(username)
@@ -2223,6 +2313,159 @@ app.post('/__ent_auth/analytics', (req, res) => {
   })
 })
 
+// 6j. A file for the composer (src/components/MailComposer.jsx), relayed to
+// Partage's upload servlet as it comes: the request's body is piped into the
+// upstream request, never written to disk nor held whole in memory, and
+// Partage's answer is cut down to { aid, name, size, contentType } (its
+// attachment id, which a send will one day name in SendMsgRequest's
+// <attach aid>). The file is the raw body: Content-Type its type,
+// Content-Disposition its name (RFC 5987), Content-Length required.
+//
+// Registered before express.json(), which would otherwise read (and buffer)
+// a file sent as application/json, and apart from the mail routes' reading
+// bucket: the uploads have their own limits (mailUploadLimiter), so the
+// feature gate is checked here too. Refused before a byte of the body is
+// read: past one file's limit (the account's, from GetInfo's attSizeLimit,
+// deriveAttachmentLimits), cross-site, without a session, too many. Then
+// the bytes are counted as they pass (never more than declared), and a
+// client gone quiet for MAIL_PART_IDLE_TIMEOUT_MS ends it. Neither the file
+// nor its name is ever logged. A demo session's file is read and dropped:
+// the same checks, a made-up aid.
+//   200 { attachment: { aid, name, size, contentType } },
+//   400 empty, 401 no session, 403 cross-site, 404 no mail, 408 idle,
+//   411 no length, 413 { error, maxBytes } too large, 429 too many
+//   (Retry-After), 502 { error: 'mail_upload_retry' } Partage refused the
+//   session (signed in again on the next try), 500 { error } otherwise.
+app.post('/__ent_auth/mail/upload', async (req, res) => {
+  res.setHeader('Cache-Control', 'no-store')
+  res.setHeader('X-Robots-Tag', 'noindex, nofollow, noarchive')
+  // An answer before the body is read closes the connection: Node would
+  // otherwise read the rest of the body to discard it, the very traffic
+  // the refusal is there to spare.
+  const refuse = (status, error, extra = null) => {
+    res.setHeader('Connection', 'close')
+    return res.status(status).json({ error, ...extra })
+  }
+  if (!FEATURES.mail) {
+    res.setHeader('Connection', 'close')
+    return res.status(404).json({ ok: false, disabled: true, feature: 'mail' })
+  }
+  const fetchSite = req.headers['sec-fetch-site']
+  if (fetchSite && fetchSite !== 'same-origin') return refuse(403, 'Cross-site request.')
+  const session = getSessionFromRequest(req)
+  if (!session) return refuse(401, 'Authentication required.')
+  const demo = isDemoSession(session)
+  if (!demo && MAIL_PROVIDER !== 'zimbra') return refuse(404, 'Upload unavailable.')
+  const length = req.headers['transfer-encoding'] ? null : readContentLength(req.headers['content-length'])
+  if (length === null) return refuse(411, 'mail_upload_length_required')
+  if (length === 0) return refuse(400, 'mail_upload_empty')
+  if (length > HARD_ATTACHMENT_LIMIT_BYTES) return refuse(413, 'mail_upload_too_large', { maxBytes: HARD_ATTACHMENT_LIMIT_BYTES })
+
+  const slot = mailUploadLimiter.take(session.id, length)
+  if (!slot.ok) {
+    res.setHeader('Retry-After', String(slot.retryAfter))
+    return refuse(429, 'mail_upload_rate_limited')
+  }
+  const name = sanitizeAttachmentName(readContentDispositionFilename(req.headers['content-disposition']))
+  const contentType = normalizeAttachmentType(req.headers['content-type'])
+
+  // The upstream request's end: a client gone quiet (no chunk for
+  // MAIL_PART_IDLE_TIMEOUT_MS), Partage slow to answer once the file is in
+  // (ZIMBRA_REQUEST_TIMEOUT_MS), the student's side closed (the upload
+  // cancelled, the composer closed, the tab gone).
+  const controller = new AbortController()
+  let deadline = null
+  let received = 0
+  const abortAfter = (ms, error) => {
+    clearTimeout(deadline)
+    deadline = setTimeout(() => controller.abort(error), ms)
+  }
+  res.on('close', () => {
+    clearTimeout(deadline)
+    slot.settle(received)
+    if (!res.writableFinished) controller.abort()
+  })
+  const countedBody = (maxBytes) => Readable.toWeb(req).pipeThrough(createUploadByteCounter(maxBytes, (total) => {
+    received = total
+    abortAfter(total < length ? MAIL_PART_IDLE_TIMEOUT_MS : ZIMBRA_REQUEST_TIMEOUT_MS, total < length
+      ? new UploadIdleError('Upload went idle.')
+      : new Error('Zimbra upload timed out.'))
+  }))
+
+  try {
+    if (demo) {
+      const limits = deriveAttachmentLimits(null)
+      if (length > limits.maxFileBytes) {
+        slot.settle(0)
+        return refuse(413, 'mail_upload_too_large', { maxBytes: limits.maxFileBytes })
+      }
+      abortAfter(MAIL_PART_IDLE_TIMEOUT_MS, new UploadIdleError('Upload went idle.'))
+      const reader = countedBody(length).getReader()
+      controller.signal.addEventListener('abort', () => reader.cancel().catch(() => {}), { once: true })
+      while (!(await reader.read()).done) {
+        // Read and dropped.
+      }
+      clearTimeout(deadline)
+      if (controller.signal.aborted) throw controller.signal.reason ?? new UploadIdleError('Upload ended early.')
+      setSessionCookie(res, session)
+      return res.status(200).json({ attachment: { aid: `demo-upload-${randomUUID()}`, name, size: received, contentType } })
+    }
+
+    // The account's limit (one GetInfo per webmail sign-in, often read
+    // already by /mail/prefs), and a context known to work: signing in
+    // again is only possible before the body starts going.
+    const { context, limits } = await withZimbraContext(session, async (current) => ({
+      context: current,
+      limits: await readZimbraAttachmentLimits(current),
+    }))
+    if (length > limits.maxFileBytes) {
+      slot.settle(0)
+      return refuse(413, 'mail_upload_too_large', { maxBytes: limits.maxFileBytes })
+    }
+
+    abortAfter(MAIL_PART_IDLE_TIMEOUT_MS, new UploadIdleError('Upload went idle.'))
+    const { httpStatus, parsed } = await sendToZimbraUpload({
+      send: (url, init) => fetchWithJar(url, context.jar, init),
+      origin: context.origin,
+      csrfToken: context.csrfToken,
+      body: countedBody(length),
+      length,
+      name,
+      contentType,
+      signal: controller.signal,
+    })
+    clearTimeout(deadline)
+    // Partage (or a proxy before it) may answer before it has the whole
+    // file: whatever the page still sends isn't read on a failure.
+    if (httpStatus !== 200 || parsed?.status !== 200) res.setHeader('Connection', 'close')
+    if (httpStatus === 401 || httpStatus === 403 || isRedirectStatus(httpStatus) || parsed?.status === 401) {
+      // A lapsed webmail session (or a CSRF refusal): signed in again on the
+      // page's next try. The body is gone, so not retried here.
+      runtimeMailContexts.delete(session.id)
+      console.error(`[mail] upload failed: Zimbra rejected the session (HTTP ${httpStatus}, ${parsed?.status ?? 'no status'}${context.csrfToken ? '' : ', no CSRF token'})`)
+      return res.status(502).json({ error: 'mail_upload_retry' })
+    }
+    if (parsed?.status === 413) return res.status(413).json({ error: 'mail_upload_too_large', maxBytes: limits.maxFileBytes })
+    if (httpStatus < 200 || httpStatus > 299 || parsed?.status !== 200 || parsed.uploads.length !== 1) {
+      throw new Error(`Zimbra upload failed (HTTP ${httpStatus}, ${parsed ? `status ${parsed.status}` : 'unreadable answer'}).`)
+    }
+    const [upload] = parsed.uploads
+    setSessionCookie(res, session)
+    return res.status(200).json({
+      attachment: { aid: upload.aid, name, size: upload.size ?? received, contentType: upload.contentType || contentType },
+    })
+  } catch (error) {
+    clearTimeout(deadline)
+    if (res.writableEnded || res.destroyed) return undefined
+    const reason = controller.signal.aborted ? controller.signal.reason : null
+    const cause = [error, error?.cause, reason]
+    if (!res.headersSent) res.setHeader('Connection', 'close')
+    if (cause.some((entry) => entry instanceof UploadTooLargeError)) return res.status(413).json({ error: 'mail_upload_too_large' })
+    if (cause.some((entry) => entry instanceof UploadIdleError)) return res.status(408).json({ error: 'mail_upload_idle' })
+    return sendMailRouteError(res, 'upload', error)
+  }
+})
+
 app.use('/__ent_auth', express.json()) // Automatically parse incoming JSON requests for auth endpoints
 
 app.use((req, res, next) => {
@@ -2251,6 +2494,19 @@ app.use((req, res, next) => {
   }
 
   next()
+})
+
+// The mail routes' limit, per session (MAIL_RATE_LIMIT_*). Keyed by the
+// session cookie's id; a request without one goes on to its route's 401,
+// which reaches nothing upstream.
+app.use('/__ent_auth/mail', (req, res, next) => {
+  const sessionId = readSessionCookie(req)?.data?.id
+  if (typeof sessionId !== 'string' || !sessionId) return next()
+  const retryAfterSeconds = takeMailRateLimitToken(sessionId)
+  if (!retryAfterSeconds) return next()
+  res.setHeader('Cache-Control', 'no-store')
+  res.setHeader('Retry-After', String(retryAfterSeconds))
+  return res.status(429).json({ error: 'mail_rate_limited' })
 })
 
 // 1. Auth Status Endpoint
@@ -3176,6 +3432,7 @@ async function establishZimbraContext(session) {
       body: currentBody,
       headers: currentHeaders,
       redirect: 'manual',
+      signal: AbortSignal.timeout(ZIMBRA_REQUEST_TIMEOUT_MS),
     })
     const location = response.headers.get('location')
 
@@ -3243,7 +3500,8 @@ async function establishZimbraContext(session) {
 }
 
 // `namespace`: urn:zimbraMail (mail requests) or urn:zimbraAccount (GetInfo…).
-async function zimbraSoapRequest(context, requestName, requestBody, namespace = 'urn:zimbraMail') {
+// `timeoutMs`: the whole answer's deadline (ZIMBRA_REQUEST_TIMEOUT_MS).
+async function zimbraSoapRequest(context, requestName, requestBody, namespace = 'urn:zimbraMail', { timeoutMs = ZIMBRA_REQUEST_TIMEOUT_MS } = {}) {
   const headers = {
     Accept: 'application/json',
     'Content-Type': 'application/json; charset=utf-8',
@@ -3259,6 +3517,7 @@ async function zimbraSoapRequest(context, requestName, requestBody, namespace = 
   const response = await fetchWithJar(`${context.origin}/service/soap/${requestName}`, context.jar, {
     method: 'POST',
     headers,
+    signal: AbortSignal.timeout(timeoutMs),
     body: JSON.stringify({
       Header: { context: soapContext },
       Body: { [requestName]: { _jsns: namespace, ...requestBody } },
@@ -3282,6 +3541,7 @@ async function zimbraRestInbox(context, limit) {
   const url = `${context.origin}/service/home/~/inbox?fmt=json&limit=${limit}`
   const response = await fetchWithJar(url, context.jar, {
     headers: { Accept: 'application/json', Referer: `${context.origin}/` },
+    signal: AbortSignal.timeout(ZIMBRA_REQUEST_TIMEOUT_MS),
   })
 
   if (response.status === 401 || response.status === 403 || isRedirectStatus(response.status)) {
@@ -3300,6 +3560,9 @@ function normalizeZimbraMessage(message) {
   const addresses = Array.isArray(message?.e) ? message.e : []
   const sender = addresses.find((address) => address?.t === 'f') ?? null
   const email = typeof sender?.a === 'string' && sender.a ? sender.a : null
+  // The first recipient: who a sent mail or a draft is for.
+  const recipient = addresses.find((address) => address?.t === 't') ?? null
+  const recipientEmail = typeof recipient?.a === 'string' && recipient.a ? recipient.a : null
   const timestamp = Number(message?.d)
   const id = String(message?.id ?? '')
 
@@ -3309,30 +3572,112 @@ function normalizeZimbraMessage(message) {
       name: sender?.p || sender?.d || email || '',
       email,
     },
+    to: recipient ? { name: recipient.p || recipient.d || recipientEmail || '', email: recipientEmail } : null,
     subject: typeof message?.su === 'string' ? message.su : '',
     snippet: typeof message?.fr === 'string' ? message.fr.replace(/\s+/g, ' ').trim().slice(0, 280) : '',
     receivedAt: Number.isFinite(timestamp) && timestamp > 0 ? new Date(timestamp).toISOString() : null,
     unread: typeof message?.f === 'string' && message.f.includes('u'),
+    flagged: typeof message?.f === 'string' && message.f.includes('f'),
+    // A row is a thread (normalizeZimbraConversation); a lone message (the
+    // REST fallback's) is one of one.
+    messageIds: id ? [id] : [],
+    count: 1,
     // Unverified deep link format for the Zimbra Ajax client.
     // Partage can't deep-link through the sign-in handoff: rows open the inbox.
     href: getMailWebmailHref(),
   }
 }
 
+// A thread of the list (SearchRequest types=conversation): as a message row
+// (normalizeZimbraMessage's shape), its newest mail's sender, subject,
+// preview and date; `messageIds`, its mails the search found (those in the
+// folder: what the row's actions act on); `count`, all its mails. A lone
+// mail's thread has a virtual id, « -<its id> ».
+function normalizeZimbraConversation(conversation) {
+  const id = String(conversation?.id ?? '')
+  const hits = (Array.isArray(conversation?.m) ? conversation.m : [])
+    .map((message) => String(message?.id ?? ''))
+    .filter(Boolean)
+  const messageIds = hits.length ? hits : (id.startsWith('-') ? [id.slice(1)] : [])
+  const base = normalizeZimbraMessage({ ...conversation, id })
+  const flags = typeof conversation?.f === 'string' ? conversation.f : ''
+  return {
+    ...base,
+    unread: flags.includes('u') || Number(conversation?.u) > 0,
+    flagged: flags.includes('f'),
+    messageIds,
+    count: Math.max(Number(conversation?.n) || 1, messageIds.length, 1),
+  }
+}
+
+// One thread for the reader (GetConvRequest): its mails, oldest first, as
+// list rows. Those in the trash or the junk folder are left out unless the
+// thread is read from there (`folder`). A lone mail's virtual thread that
+// Zimbra won't give is that mail alone.
+async function queryZimbraThread(context, id, folder) {
+  let result = null
+  try {
+    result = await zimbraSoapRequest(context, 'GetConvRequest', { c: { id } })
+  } catch (error) {
+    if (!id.startsWith('-')) throw error
+  }
+  const conversation = Array.isArray(result?.c) ? result.c[0] : result?.c
+  const messages = (Array.isArray(conversation?.m) ? conversation.m : [])
+    .filter((message) => {
+      const location = String(message?.l ?? '')
+      return location === folder || !['3', '4'].includes(location)
+    })
+    .map((message) => ({ ...normalizeZimbraMessage(message), folder: String(message?.l ?? '') }))
+    .filter((message) => message.id)
+    .sort((left, right) => String(left.receivedAt ?? '').localeCompare(String(right.receivedAt ?? '')))
+  if (messages.length) return messages
+  return id.startsWith('-') ? [{ id: id.slice(1), messageIds: [id.slice(1)], count: 1, folder }] : []
+}
+
 // `offset`: where the page starts, newest first. The unread count only comes
 // with the first page.
-async function queryZimbraInbox(context, { offset = 0 } = {}) {
+// Zimbra's system folders have the same ids in every mailbox; the whole
+// tree (sub-folders included) is read by normalizeZimbraFolderTree
+// (server/mailFolders.js). Folder id 2 is the Inbox.
+const MAIL_INBOX_FOLDER = '2'
+
+function isValidMailFolderId(value) {
+  return typeof value === 'string' && /^\d{1,9}$/.test(value)
+}
+
+// The demo account's tree: the system folders and one empty sub-folder of
+// the inbox, so the « Dossiers » menu has something to show.
+const DEMO_MAIL_FOLDERS = [
+  { id: '2', kind: 'inbox', name: 'Inbox', unread: 7, count: 5, parentId: null, path: 'Inbox', depth: 0 },
+  { id: '300', kind: 'folder', name: 'Moodle', unread: 0, count: 0, parentId: '2', path: 'Inbox/Moodle', depth: 1 },
+  { id: '5', kind: 'sent', name: 'Sent', unread: 0, count: 0, parentId: null, path: 'Sent', depth: 0 },
+  { id: '6', kind: 'drafts', name: 'Drafts', unread: 0, count: 0, parentId: null, path: 'Drafts', depth: 0 },
+  { id: '4', kind: 'junk', name: 'Junk', unread: 0, count: 0, parentId: null, path: 'Junk', depth: 0 },
+  { id: '3', kind: 'trash', name: 'Trash', unread: 0, count: 0, parentId: null, path: 'Trash', depth: 0 },
+]
+
+// The mail page's search (parseMailSearchWords, buildZimbraSearchQuery):
+// src/mailSearch.js, shared with the page, which asks the server only when
+// a search word is left.
+
+// `words`: a search (parseMailSearchWords) instead of the whole folder; no
+// unread count then. `folder`: a folder id (the inbox by default). Only the
+// inbox, unsearched, has the REST fallback (its URL names the inbox).
+async function queryZimbraInbox(context, { offset = 0, words = [], folder = MAIL_INBOX_FOLDER } = {}) {
+  const searching = words.length > 0
+  const restFallback = !searching && folder === MAIL_INBOX_FOLDER
   const [searchResult, folderResult] = await Promise.allSettled([
     zimbraSoapRequest(context, 'SearchRequest', {
-      types: 'message',
-      query: 'in:inbox',
+      // Threads, as Apple Mail lists them (normalizeZimbraConversation).
+      types: 'conversation',
+      query: searching ? buildZimbraSearchQuery(words, folder) : `inid:${folder}`,
       sortBy: 'dateDesc',
       limit: MAIL_MAX_MESSAGES,
       offset,
     }),
     // Folder id 2 is the Inbox in every Zimbra mailbox.
-    offset === 0
-      ? zimbraSoapRequest(context, 'GetFolderRequest', { folder: { l: '2' }, depth: 0 })
+    offset === 0 && !searching
+      ? zimbraSoapRequest(context, 'GetFolderRequest', { folder: { l: folder }, depth: 0 })
       : Promise.resolve(null),
   ])
 
@@ -3340,9 +3685,13 @@ async function queryZimbraInbox(context, { offset = 0 } = {}) {
   let hasMore
   // Where the page starts in rawMessages: the REST API has no offset.
   let pageStart = 0
+  let threads = false
   if (searchResult.status === 'fulfilled') {
-    rawMessages = Array.isArray(searchResult.value?.m) ? searchResult.value.m : []
+    rawMessages = Array.isArray(searchResult.value?.c) ? searchResult.value.c : []
+    threads = true
     hasMore = searchResult.value?.more === true
+  } else if (!restFallback) {
+    throw searchResult.reason
   } else {
     // SOAP can be refused for CSRF reasons; the REST API has no CSRF check.
     // Everything up to the page, and one more to know if others follow.
@@ -3360,12 +3709,23 @@ async function queryZimbraInbox(context, { offset = 0 } = {}) {
   }
 
   const messages = rawMessages
-    .map((message) => normalizeZimbraMessage(message))
+    .map((message) => (threads ? normalizeZimbraConversation(message) : normalizeZimbraMessage(message)))
     .filter((message) => message.id)
     .sort((left, right) => String(right.receivedAt ?? '').localeCompare(String(left.receivedAt ?? '')))
     .slice(pageStart, pageStart + MAIL_MAX_MESSAGES)
 
   return { unreadCount, webmailHref: getMailWebmailHref(), messages, hasMore }
+}
+
+// The demo account's search: its mails holding every word (accents, case
+// and apostrophe styles aside, as the page's local filter), one page.
+function searchDemoMail(payload, words, offset) {
+  const folded = words.map(foldMailSearchText)
+  const messages = offset > 0 ? [] : payload.messages.filter((message) => {
+    const text = foldMailSearchText([message.from?.name, message.from?.email, message.subject, message.snippet].join(' '))
+    return folded.every((word) => text.includes(word))
+  })
+  return { ...payload, messages, hasMore: false }
 }
 
 async function getZimbraContext(session, { fresh = false } = {}) {
@@ -3392,6 +3752,8 @@ async function fetchMailAddress(session) {
   try {
     const context = await getZimbraContext(session)
     const info = await zimbraSoapRequest(context, 'GetInfoRequest', { sections: 'mbox' }, 'urn:zimbraAccount')
+    // The same answer gives the attachment limits (readZimbraAttachmentLimits).
+    context.attachmentLimits ??= deriveAttachmentLimits(info?.attSizeLimit)
     const name = String(info?.name ?? '').trim()
     address = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(name) ? name : null
   } catch {
@@ -3474,16 +3836,586 @@ app.get('/__ent_auth/mail/open', async (req, res) => {
   }
 })
 
+// Runs `fn(context)` with the session's Zimbra context; a rejected session is
+// signed in again once.
+async function withZimbraContext(session, fn) {
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    const context = await getZimbraContext(session, { fresh: attempt > 0 })
+    try {
+      return await fn(context)
+    } catch (error) {
+      runtimeMailContexts.delete(session.id)
+      if (!(error instanceof MailAuthError) || attempt > 0) throw error
+    }
+  }
+  throw new Error('Unable to reach the webmail.')
+}
+
+class MailNotFoundError extends Error {}
+
+// Logout ends the webmail session too. /__ent_auth/mail/open hands this
+// session's Zimbra auth token to the browser (preauth), so a webmail tab
+// opened from here holds the same token: dropping our copy alone would leave
+// it valid upstream until it expires. EndSessionRequest with logoff asks
+// Zimbra to invalidate the auth token itself, not only the SOAP session.
+// Unverified on Partage (RENATER may run it with token invalidation off, or
+// accept the request without revoking the token): best effort, a short
+// deadline, any failure ignored, never in the way of the logout.
+async function endZimbraSession(context) {
+  if (!context) return
+  try {
+    await zimbraSoapRequest(context, 'EndSessionRequest', { logoff: '1' }, 'urn:zimbraAccount', { timeoutMs: ZIMBRA_LOGOUT_TIMEOUT_MS })
+  } catch {
+    // Timeout, network error or a fault: the token lapses on its own.
+  }
+}
+
+// A mail route's 500 when the webmail failed: a fixed code for the page, the
+// details for the server log only. The errors thrown on the way name Zimbra
+// requests, SOAP fault codes, hosts and HTTP statuses: nothing the student
+// can act on, and a map of the upstream for anyone probing the proxy. The
+// page tells a failure from a success by the status alone (src/entApi.js:
+// getRecentMail, getMailMessage, getMailThread, getMailFolders, mailAction).
+// One case keeps a code of its own: the webmail sign-in found the CAS
+// session lapsed (establishZimbraContext), which a new sign-in fixes and
+// « Réessayer » doesn't. The 401 « no session » answers and /recent's
+// { authenticated: false } are left as they are, before any of this.
+// Logged: the error's class and message, never a mail, a cookie or a token
+// (none is ever put in these messages).
+const MAIL_CAS_EXPIRED_PATTERN = /^CAS session (expired|unavailable)\b/
+
+function sendMailRouteError(res, route, error) {
+  const name = error instanceof Error ? error.name : 'Error'
+  const message = error instanceof Error ? error.message : String(error)
+  const cause = error instanceof Error && error.cause?.code ? ` (${error.cause.code})` : ''
+  console.error(`[mail] ${route} failed: ${name}: ${message.slice(0, 300)}${cause}`)
+  const code = MAIL_CAS_EXPIRED_PATTERN.test(message) ? 'mail_session_expired' : 'mail_unavailable'
+  return res.headersSent ? res.end() : res.status(500).json({ error: code })
+}
+
+// One message, cleaned for the reader (server/mailMessage.js). neuter: 0
+// gives the HTML as sent (mailMessage.js holds the remote images back
+// itself); not marked read here (POST /__ent_auth/mail/action).
+async function fetchZimbraMessage(session, id) {
+  return withZimbraContext(session, async (context) => {
+    let result
+    try {
+      result = await zimbraSoapRequest(context, 'GetMsgRequest', {
+        m: { id, html: 1, neuter: 0, needExp: 1, max: MAIL_MESSAGE_MAX_BYTES },
+      })
+    } catch (error) {
+      if (/NO_SUCH_(MSG|ITEM)/.test(error.message)) throw new MailNotFoundError('No such message.')
+      throw error
+    }
+    const message = Array.isArray(result.m) ? result.m[0] : result.m
+    if (!message) throw new MailNotFoundError('No such message.')
+    return buildMailMessage(message, id)
+  })
+}
+
+// The demo account's attachments, by message (what a real mail's are,
+// buildMailMessage's, without the download link: the part route doesn't
+// serve the demo).
+const DEMO_MAIL_ATTACHMENTS = {
+  'demo-mail-1': [
+    { part: '2', name: 'Consignes TP4 – composants et état.pdf', type: 'application/pdf', size: 248_312, href: null },
+    { part: '3', name: 'maquette-composants.png', type: 'image/png', size: 612_480, href: null },
+  ],
+}
+
+// A demo account's message: its preview, as a plain text mail.
+function buildDemoMailMessage(id) {
+  const message = buildDemoMailPayload().messages.find((entry) => entry.id === id)
+  if (!message) return null
+  return {
+    id,
+    subject: message.subject,
+    from: message.from,
+    replyTo: null,
+    to: [],
+    cc: [],
+    receivedAt: message.receivedAt,
+    unread: Boolean(message.unread),
+    format: 'text',
+    html: mailTextToHtml(message.snippet),
+    remoteImages: 0,
+    truncated: false,
+    // Sample files for a forward to carry (nothing behind them: no link).
+    attachments: DEMO_MAIL_ATTACHMENTS[id] ?? [],
+  }
+}
+
+function getMailMessageSession(req, res) {
+  const session = getSessionFromRequest(req)
+  if (!session) {
+    res.status(401).json({ error: 'Authentication required.' })
+    return null
+  }
+  if (!isDemoSession(session) && MAIL_PROVIDER !== 'zimbra') {
+    res.status(404).json({ error: 'Message unavailable.' })
+    return null
+  }
+  return session
+}
+
+// The ids a session's mail routes take: Zimbra's numeric ones for a real
+// session, the sample ones for the demo account (whose routes never reach
+// Zimbra). Each kind is refused for the other session.
+function isValidSessionMailId(session, id) {
+  return isDemoSession(session) ? isValidDemoMailMessageId(id) : isValidMailMessageId(id)
+}
+
+// 6d. One message for the mail page's reader. The HTML is already cleaned;
+// the page still shows it in a sandboxed iframe (src/components/MailReader.jsx).
+app.get('/__ent_auth/mail/message', async (req, res) => {
+  res.setHeader('Cache-Control', 'no-store')
+  const session = getMailMessageSession(req, res)
+  if (!session) return undefined
+  const id = String(req.query.id ?? '')
+  if (!isValidSessionMailId(session, id)) {
+    return res.status(400).json({ error: 'Invalid message id.' })
+  }
+
+  try {
+    const message = isDemoSession(session) ? buildDemoMailMessage(id) : await fetchZimbraMessage(session, id)
+    if (!message) throw new MailNotFoundError('No such message.')
+    setSessionCookie(res, session)
+    return res.status(200).json({ message })
+  } catch (error) {
+    if (error instanceof MailNotFoundError) return res.status(404).json({ error: 'No such message.' })
+    return sendMailRouteError(res, 'message', error)
+  }
+})
+
+// 6e. What the reader does to a message, as Zimbra's MsgActionRequest ops:
+// read (when it opens an unread one), unread, flag and unflag, trash and
+// spam (both reversible: `inbox` moves it back, the reader's « Annuler »),
+// on one message or a selection (`ids`, in one request: Zimbra takes them
+// comma-separated). Folder id 2 is the Inbox in every Zimbra mailbox.
+const MAIL_ACTIONS = {
+  read: { op: 'read' },
+  unread: { op: '!read' },
+  flag: { op: 'flag' },
+  unflag: { op: '!flag' },
+  trash: { op: 'trash' },
+  spam: { op: 'spam' },
+  inbox: { op: 'move', l: '2' },
+  // To `folder` (the body's): « Annuler » back to where the mail was, a
+  // trashed mail restored, a mail filed in another folder.
+  move: { op: 'move' },
+  // Gone for good (« Supprimer définitivement », offered in the trash and the
+  // junk folder only). `tcon` (Zimbra's target constraint) makes the server
+  // hold to that too: only mails lying in the trash (t) or the junk folder
+  // (j) are deleted, any other id in the list is left alone.
+  delete: { op: 'delete', tcon: 'tj' },
+}
+// A selection is the loaded list at most (pages of MAIL_MAX_MESSAGES).
+const MAIL_ACTION_MAX_IDS = 500
+
+// The mailbox's folders (normalizeZimbraFolderTree), kept on the session's
+// Zimbra context: read by /mail/folders for the page's pills and menu, and
+// by a `move` to check its target is one of them. The page only ever moves
+// a mail to a folder it got from that list (« Annuler » back to the one it
+// showed it in, a restore, a mail filed elsewhere), so anything else is
+// refused: a folder shared by someone else (a mountpoint, never listed), a
+// calendar or contacts folder, an id made up. Kept with the context, it
+// goes with it (a new sign-in, a logout) and is read again then.
+async function readZimbraMailFolders(context, { fresh = false } = {}) {
+  if (!fresh && Array.isArray(context.mailFolders)) return context.mailFolders
+  // The root (USER_ROOT, id 1) and everything under it, however deep.
+  const result = await zimbraSoapRequest(context, 'GetFolderRequest', { folder: { l: '1' } })
+  const folders = normalizeZimbraFolderTree(Array.isArray(result?.folder) ? result.folder[0] : result?.folder)
+  context.mailFolders = folders
+  return folders
+}
+
+// The account's attachment limits (deriveAttachmentLimits) from Zimbra
+// GetInfo's attSizeLimit (zimbraMtaMaxMessageSize), kept on the context:
+// read once per webmail sign-in (by /mail/prefs, /mail/upload or
+// fetchMailAddress, whichever comes first). A GetInfo that fails for
+// another reason than the session leaves the fallback limits.
+async function readZimbraAttachmentLimits(context) {
+  if (context.attachmentLimits) return context.attachmentLimits
+  let messageLimit = null
+  try {
+    const info = await zimbraSoapRequest(context, 'GetInfoRequest', { sections: 'mbox' }, 'urn:zimbraAccount')
+    messageLimit = info?.attSizeLimit
+  } catch (error) {
+    if (error instanceof MailAuthError) throw error
+  }
+  context.attachmentLimits = deriveAttachmentLimits(messageLimit)
+  return context.attachmentLimits
+}
+
+// Same-origin only; the session cookie is SameSite=Lax as well.
+app.post('/__ent_auth/mail/action', async (req, res) => {
+  res.setHeader('Cache-Control', 'no-store')
+  const fetchSite = req.headers['sec-fetch-site']
+  if (fetchSite && fetchSite !== 'same-origin') {
+    return res.status(403).json({ error: 'Cross-site request.' })
+  }
+  const session = getMailMessageSession(req, res)
+  if (!session) return undefined
+  const ids = Array.isArray(req.body?.ids) ? req.body.ids.map(String) : []
+  if (!ids.length || ids.length > MAIL_ACTION_MAX_IDS || !ids.every((id) => isValidSessionMailId(session, id))) {
+    return res.status(400).json({ error: 'Invalid message ids.' })
+  }
+  const action = Object.hasOwn(MAIL_ACTIONS, req.body?.action) ? MAIL_ACTIONS[req.body.action] : null
+  if (!action) {
+    return res.status(400).json({ error: 'Invalid action.' })
+  }
+
+  const move = req.body.action === 'move'
+  const folder = String(req.body?.folder ?? '')
+  if (move && !isValidMailFolderId(folder)) {
+    return res.status(400).json({ error: 'Invalid folder.' })
+  }
+
+  try {
+    if (isDemoSession(session)) {
+      // Nothing moves in the demo, but the same rule: one of its folders.
+      if (move && !DEMO_MAIL_FOLDERS.some((entry) => entry.id === folder)) {
+        return res.status(400).json({ error: 'Invalid folder.' })
+      }
+    } else {
+      if (move) {
+        // One of the mailbox's own folders (readZimbraMailFolders). Listed
+        // again once when it isn't in the kept list: a folder made in the
+        // webmail since, or a list read on another context.
+        const listed = (folders) => folders.some((entry) => entry.id === folder)
+        let folders = await withZimbraContext(session, (context) => readZimbraMailFolders(context))
+        if (!listed(folders)) {
+          folders = await withZimbraContext(session, (context) => readZimbraMailFolders(context, { fresh: true }))
+        }
+        if (!listed(folders)) {
+          return res.status(400).json({ error: 'Invalid folder.' })
+        }
+      }
+      await withZimbraContext(session, (context) => zimbraSoapRequest(context, 'MsgActionRequest', {
+        action: { ...action, ...(move ? { l: folder } : null), id: ids.join(',') },
+      }))
+      // The cached first page would show the message as it was.
+      runtimeMailCache.delete(session.id)
+    }
+    setSessionCookie(res, session)
+    return res.status(200).json({ ok: true })
+  } catch (error) {
+    return sendMailRouteError(res, 'action', error)
+  }
+})
+
+// 6f. One part of a message: the inline images the reader shows, the
+// attachments it offers. Streamed from Zimbra's REST servlet; anything but a
+// plain raster image downloads, and the response can't run anything if
+// opened (CSP sandbox, nosniff).
+app.get('/__ent_auth/mail/part', async (req, res) => {
+  res.setHeader('Cache-Control', 'no-store')
+  res.setHeader('X-Content-Type-Options', 'nosniff')
+  res.setHeader('Content-Security-Policy', "default-src 'none'; sandbox")
+  res.setHeader('Referrer-Policy', 'no-referrer')
+  const session = getSessionFromRequest(req)
+  const id = String(req.query.id ?? '')
+  const part = String(req.query.part ?? '')
+
+  if (!session || isDemoSession(session) || MAIL_PROVIDER !== 'zimbra') {
+    return res.status(404).end()
+  }
+  if (!isValidMailMessageId(id) || !isValidMailPartId(part)) {
+    return res.status(400).end()
+  }
+
+  // The upstream request's deadlines (ZIMBRA_REQUEST_TIMEOUT_MS for its
+  // headers, then MAIL_PART_IDLE_TIMEOUT_MS between chunks), and its end
+  // when the student's side closes first (a download cancelled, the reader
+  // closed on a loading image).
+  const upstreamController = new AbortController()
+  let upstreamDeadline = null
+  const abortUpstreamAfter = (ms) => {
+    clearTimeout(upstreamDeadline)
+    upstreamDeadline = setTimeout(() => upstreamController.abort(new Error('Mail part request timed out.')), ms)
+  }
+  res.on('close', () => {
+    clearTimeout(upstreamDeadline)
+    upstreamController.abort()
+  })
+
+  try {
+    const upstream = await withZimbraContext(session, async (context) => {
+      const url = new URL('/service/home/~/', context.origin)
+      url.searchParams.set('auth', 'co')
+      url.searchParams.set('id', id)
+      url.searchParams.set('part', part)
+      abortUpstreamAfter(ZIMBRA_REQUEST_TIMEOUT_MS)
+      const response = await fetchWithJar(url.toString(), context.jar, {
+        headers: { Referer: `${context.origin}/` },
+        signal: upstreamController.signal,
+      })
+      if (response.status === 401 || response.status === 403 || isRedirectStatus(response.status)) {
+        await response.body?.cancel()
+        throw new MailAuthError(`Zimbra REST rejected the session (HTTP ${response.status}).`)
+      }
+      return response
+    })
+
+    if (!upstream.ok || !upstream.body) {
+      await upstream.body?.cancel()
+      return res.status(upstream.status === 404 ? 404 : 502).end()
+    }
+    const length = Number(upstream.headers.get('content-length'))
+    if (Number.isFinite(length) && length > MAIL_PART_MAX_BYTES) {
+      await upstream.body.cancel()
+      return res.status(413).end()
+    }
+
+    const { contentType, disposition } = getMailPartDisposition({
+      contentType: upstream.headers.get('content-type'),
+      filename: readContentDispositionFilename(upstream.headers.get('content-disposition')),
+      download: req.query.download === '1',
+    })
+    res.setHeader('Cache-Control', 'private, max-age=600')
+    res.setHeader('Content-Type', contentType)
+    res.setHeader('Content-Disposition', disposition)
+    if (Number.isFinite(length) && length > 0) res.setHeader('Content-Length', String(length))
+    setSessionCookie(res, session)
+
+    const body = Readable.fromWeb(upstream.body)
+    abortUpstreamAfter(MAIL_PART_IDLE_TIMEOUT_MS)
+    body.on('data', () => abortUpstreamAfter(MAIL_PART_IDLE_TIMEOUT_MS))
+    body.on('end', () => clearTimeout(upstreamDeadline))
+    body.on('error', () => res.destroy())
+    body.pipe(res)
+    return undefined
+  } catch {
+    return res.headersSent ? res.destroy() : res.status(502).end()
+  }
+})
+
 // 6b. Recent mail endpoint. ?offset=N: the next page of the mail page's
 // endless list (not cached, the first page is).
+// One thread for the reader (queryZimbraThread), `folder` the one it's read
+// from: 200 { messages: [list rows, oldest first, with their folder] }.
+app.get('/__ent_auth/mail/thread', async (req, res) => {
+  res.setHeader('Cache-Control', 'no-store')
+  const session = getMailMessageSession(req, res)
+  if (!session) return undefined
+  const id = String(req.query.id ?? '')
+  if (!isValidSessionMailId(session, id)) {
+    return res.status(400).json({ error: 'Invalid thread id.' })
+  }
+  const folder = isValidMailFolderId(String(req.query.folder ?? '')) ? String(req.query.folder) : MAIL_INBOX_FOLDER
+  try {
+    const messages = isDemoSession(session)
+      ? buildDemoMailPayload().messages.filter((message) => message.id === id).map((message) => ({ ...message, messageIds: [message.id], count: 1, folder }))
+      : await withZimbraContext(session, (context) => queryZimbraThread(context, id, folder))
+    setSessionCookie(res, session)
+    return res.status(200).json({ messages })
+  } catch (error) {
+    return sendMailRouteError(res, 'thread', error)
+  }
+})
+
+// The mailbox's folders for the mail page's pills and its « Dossiers » menu
+// (normalizeZimbraFolderTree, server/mailFolders.js):
+//   200 { folders: [{ id, kind, name, unread, count, parentId, path, depth }] }
+//   (parents before their children), 401 no session.
+app.get('/__ent_auth/mail/folders', async (req, res) => {
+  res.setHeader('Cache-Control', 'no-store')
+  const session = getMailMessageSession(req, res)
+  if (!session) return undefined
+  try {
+    const folders = isDemoSession(session)
+      ? DEMO_MAIL_FOLDERS
+      // The root (USER_ROOT, id 1) and everything under it, however deep:
+      // sub-folders of the inbox (a « Moodle » filter's) included. The
+      // calendars, contacts and the like come along and are dropped there.
+      // Always read afresh here, and kept for the `move` check
+      // (readZimbraMailFolders): what the page offers is what it may move to.
+      : await withZimbraContext(session, (context) => readZimbraMailFolders(context, { fresh: true }))
+    setSessionCookie(res, session)
+    return res.status(200).json({ folders })
+  } catch (error) {
+    return sendMailRouteError(res, 'folders', error)
+  }
+})
+
+// 6g. What the mail page does to a whole folder, as Zimbra's
+// FolderActionRequest ops: `read` marks every mail in it read (« Tout
+// marquer comme lu », any mail folder), `empty` deletes all it holds for
+// good (« Vider la corbeille », « Vider les indésirables »: the trash and the
+// junk folder only, refused for any other). Same-origin only, as
+// /mail/action. A demo account's folders don't change: a no-op.
+//   POST { folder, action: 'read' | 'empty' } → 200 { ok: true },
+//   400 a bad folder or action, 401 no session, 403 cross-site.
+const MAIL_FOLDER_ACTIONS = new Set(['read', 'empty'])
+
+app.post('/__ent_auth/mail/folder-action', async (req, res) => {
+  res.setHeader('Cache-Control', 'no-store')
+  const fetchSite = req.headers['sec-fetch-site']
+  if (fetchSite && fetchSite !== 'same-origin') {
+    return res.status(403).json({ error: 'Cross-site request.' })
+  }
+  const session = getMailMessageSession(req, res)
+  if (!session) return undefined
+  const action = typeof req.body?.action === 'string' && MAIL_FOLDER_ACTIONS.has(req.body.action) ? req.body.action : null
+  if (!action) {
+    return res.status(400).json({ error: 'Invalid action.' })
+  }
+  const folder = String(req.body?.folder ?? '')
+  // The root (1) and Zimbra's other low ids aren't mail folders to act on;
+  // emptying is held to the trash and the junk folder whatever is asked.
+  if (!isValidMailFolderId(folder) || Number(folder) < 2 || (action === 'empty' && !isEmptiableMailFolder(folder))) {
+    return res.status(400).json({ error: 'Invalid folder.' })
+  }
+
+  try {
+    if (isDemoSession(session)) {
+      // Nothing changes in the demo, but the same rule: one of its folders.
+      if (!DEMO_MAIL_FOLDERS.some((entry) => entry.id === folder)) {
+        return res.status(400).json({ error: 'Invalid folder.' })
+      }
+    } else {
+      // One of the mailbox's own folders (readZimbraMailFolders), as for a
+      // `move`: listed again once when it isn't in the kept list (a folder
+      // made in the webmail since). A shared folder (a mountpoint), a
+      // calendar or a made-up id is refused before Zimbra is asked.
+      const listed = (folders) => folders.some((entry) => entry.id === folder)
+      let folders = await withZimbraContext(session, (context) => readZimbraMailFolders(context))
+      if (!listed(folders)) {
+        folders = await withZimbraContext(session, (context) => readZimbraMailFolders(context, { fresh: true }))
+      }
+      if (!listed(folders)) {
+        return res.status(400).json({ error: 'Invalid folder.' })
+      }
+      await withZimbraContext(session, (context) => zimbraSoapRequest(context, 'FolderActionRequest', {
+        // Emptying the trash takes the folders deleted into it along, as the
+        // webmail's « Vider la corbeille » does; the junk folder keeps any
+        // sub-folder a filter made there.
+        action: action === 'empty'
+          ? { op: 'empty', id: folder, recursive: folder === '3' }
+          : { op: 'read', id: folder },
+      }))
+      // The cached first page would show the folder as it was.
+      runtimeMailCache.delete(session.id)
+    }
+    setSessionCookie(res, session)
+    return res.status(200).json({ ok: true })
+  } catch (error) {
+    return sendMailRouteError(res, 'folder-action', error)
+  }
+})
+
+// 6h. The account's webmail preferences the mail page follows:
+// zimbraPrefMarkMsgRead (parseZimbraMarkReadPref), how many seconds an open
+// mail waits before it's marked read, -1 never, 0 at once; and the
+// composer's attachment limits (readZimbraAttachmentLimits), for it to
+// refuse a file too large before a byte of it is sent. Read once per
+// webmail sign-in (kept on its context, which goes with the session); the
+// demo account marks at once and has the fallback limits.
+//   200 { markRead: number, attachments: { maxFileBytes, maxTotalBytes } },
+//   401 no session.
+app.get('/__ent_auth/mail/prefs', async (req, res) => {
+  res.setHeader('Cache-Control', 'no-store')
+  const session = getMailMessageSession(req, res)
+  if (!session) return undefined
+  try {
+    const { markRead, limits } = isDemoSession(session)
+      ? { markRead: 0, limits: deriveAttachmentLimits(null) }
+      : await withZimbraContext(session, async (context) => {
+        const [markReadDelay, attachmentLimits] = await Promise.all([
+          context.markReadDelay === undefined
+            ? zimbraSoapRequest(context, 'GetPrefsRequest', { pref: [{ name: 'zimbraPrefMarkMsgRead' }] }, 'urn:zimbraAccount').then(parseZimbraMarkReadPref)
+            : context.markReadDelay,
+          readZimbraAttachmentLimits(context),
+        ])
+        context.markReadDelay = markReadDelay
+        return { markRead: markReadDelay, limits: attachmentLimits }
+      })
+    setSessionCookie(res, session)
+    return res.status(200).json({
+      markRead,
+      attachments: { maxFileBytes: limits.maxFileBytes, maxTotalBytes: limits.maxTotalBytes },
+    })
+  } catch (error) {
+    return sendMailRouteError(res, 'prefs', error)
+  }
+})
+
+// 6i. Recipient suggestions for the composer's À, Cc and Cci
+// (server/mailAutocomplete.js): the student's contacts, past correspondents
+// and the institution's directory, as Zimbra's AutoCompleteRequest finds
+// them. The text searched is the only thing taken from the request, cleaned
+// first (normalizeRecipientQuery: letters, digits and @ . _ + ' -, 64
+// characters at most); too short, nothing is asked. Same-origin only. Under
+// the mail routes' per-session limit like the others (the composer waits for
+// a pause in the typing and drops what it no longer needs). The query is
+// never logged, nor the answer kept.
+//   GET ?q=… → 200 { suggestions: [{ name, email, kind }] } (12 at most),
+//   401 no session, 403 cross-site, 429 too many, 500 { error }.
+const MAIL_AUTOCOMPLETE_TIMEOUT_MS = 6000
+
+app.get('/__ent_auth/mail/autocomplete', async (req, res) => {
+  res.setHeader('Cache-Control', 'no-store')
+  const fetchSite = req.headers['sec-fetch-site']
+  if (fetchSite && fetchSite !== 'same-origin') {
+    return res.status(403).json({ error: 'Cross-site request.' })
+  }
+  const session = getMailMessageSession(req, res)
+  if (!session) return undefined
+  const query = normalizeRecipientQuery(req.query.q)
+  if (query.length < RECIPIENT_QUERY_MIN_LENGTH) {
+    return res.status(200).json({ suggestions: [] })
+  }
+
+  try {
+    const suggestions = isDemoSession(session)
+      ? searchDemoMailContacts(query)
+      : await withZimbraContext(session, async (context) => normalizeZimbraAutoComplete(
+        await zimbraSoapRequest(context, 'AutoCompleteRequest', buildZimbraAutoCompleteRequest(query), 'urn:zimbraMail', { timeoutMs: MAIL_AUTOCOMPLETE_TIMEOUT_MS }),
+      ))
+    setSessionCookie(res, session)
+    return res.status(200).json({ suggestions })
+  } catch (error) {
+    return sendMailRouteError(res, 'autocomplete', error)
+  }
+})
+
 app.get('/__ent_auth/mail/recent', async (req, res) => {
   try {
     res.setHeader('Cache-Control', 'no-store')
     const session = getSessionFromRequest(req)
     const offset = Math.min(Math.max(Number.parseInt(String(req.query.offset ?? ''), 10) || 0, 0), MAIL_MAX_OFFSET)
+    // The mail page's search (`q`) and folder (`folder`, an id: Envoyé,
+    // Corbeille…). Only the inbox's first page is cached.
+    const words = parseMailSearchWords(req.query.q)
+    const folder = isValidMailFolderId(String(req.query.folder ?? '')) ? String(req.query.folder) : MAIL_INBOX_FOLDER
 
     if (!session) {
       return res.status(200).json({ authenticated: false, mail: null })
+    }
+
+    if (folder !== MAIL_INBOX_FOLDER) {
+      // The demo account has nothing but its inbox.
+      const mail = isDemoSession(session)
+        ? { ...buildDemoMailPayload(), unreadCount: 0, messages: [], hasMore: false }
+        : await fetchRecentMail(session, { offset, words, folder })
+      setSessionCookie(res, session)
+      return res.status(200).json({
+        authenticated: true,
+        sessionMode: session.mode ?? null,
+        mail: words.length ? { ...mail, unreadCount: null } : mail,
+      })
+    }
+
+    if (words.length) {
+      const mail = isDemoSession(session)
+        ? searchDemoMail(buildDemoMailPayload(), words, offset)
+        : await fetchRecentMail(session, { offset, words })
+      setSessionCookie(res, session)
+      return res.status(200).json({
+        authenticated: true,
+        sessionMode: session.mode ?? null,
+        mail: { ...mail, unreadCount: null },
+      })
     }
 
     if (isDemoSession(session)) {
@@ -3506,7 +4438,9 @@ app.get('/__ent_auth/mail/recent', async (req, res) => {
       })
     }
 
-    const cachedMail = getCachedMail(session.id)
+    // `fresh=1`: the mail page's refresh (its button, a new mail seen), past
+    // the cache.
+    const cachedMail = req.query.fresh === '1' ? null : getCachedMail(session.id)
     if (cachedMail) {
       setSessionCookie(res, session)
       return res.status(200).json({
@@ -3525,11 +4459,8 @@ app.get('/__ent_auth/mail/recent', async (req, res) => {
       mail,
     })
   } catch (error) {
-    // Messages above are built from status codes/hostnames only — never from
-    // cookies, tokens or upstream bodies.
-    return res.status(500).json({
-      error: error instanceof Error ? error.message : String(error),
-    })
+    // The details go to the server log only (sendMailRouteError).
+    return sendMailRouteError(res, 'recent', error)
   }
 })
 
@@ -4717,15 +5648,18 @@ app.get('/__ent_auth/ade/alerts', async (req, res) => {
 })
 
 // 14. Logout Endpoint — also ends the CAS single sign-on session (best effort,
-// short timeout) so the TGC that travelled in the cookie is dead upstream.
+// short timeout) so the TGC that travelled in the cookie is dead upstream,
+// and the webmail session if one was opened (endZimbraSession).
 app.post('/__ent_auth/logout', async (req, res) => {
   const session = getSessionFromRequest(req)
   if (session?.id) {
+    // Read before the runtime state goes: the webmail session it signs.
+    const mailContext = runtimeMailContexts.get(session.id) ?? null
     dropRuntimeSession(session.id)
     clearSensitiveSessionCaches(session)
 
     if (!isDemoSession(session)) {
-      await terminateCasSession(session.jar)
+      await Promise.all([terminateCasSession(session.jar), endZimbraSession(mailContext)])
     }
   }
 
