@@ -72,6 +72,8 @@ function WidgetContainer({
   onOpenGradesPage = null,
   onOpenPlanningPage = null,
   onOpenPlanningDay = null,
+  onOpenMail = null,
+  onOpenMailPage = null,
 }) {
   const displayName = userName?.trim() || ' '
   const [, setWeatherState] = useState(INITIAL_WEATHER_STATE)
@@ -236,7 +238,7 @@ function WidgetContainer({
   // moves the cards instead of remounting (and refetching) them.
   const listCardsFirst = useListCardOrder()
   const listCards = [
-    { label: 'Mails récents', card: <WidgetRecentMail key="mail" visible={areWidgetsVisible} /> },
+    { label: 'Mails récents', card: <WidgetRecentMail key="mail" visible={areWidgetsVisible} onOpenMail={onOpenMail} /> },
     { label: 'Échéances', card: <WidgetDeadlines key="deadlines" visible={areWidgetsVisible} /> },
   ]
   if (listCardsFirst === 'deadlines') listCards.reverse()
@@ -306,7 +308,7 @@ function WidgetContainer({
               </WidgetListStrip>
             ) : (
               <>
-                {showMailWidget ? <WidgetRecentMail visible={areWidgetsVisible} /> : null}
+                {showMailWidget ? <WidgetRecentMail visible={areWidgetsVisible} onOpenMail={onOpenMail} /> : null}
                 {showDeadlinesWidget ? <WidgetDeadlines visible={areWidgetsVisible} /> : null}
               </>
             )}
@@ -330,6 +332,7 @@ function WidgetContainer({
             showDescriptions={showAppDescriptions}
             onOpenGradesPage={onOpenGradesPage}
             onOpenPlanningPage={onOpenPlanningPage}
+            onOpenMailPage={onOpenMailPage}
           />
         </div>
       </div>

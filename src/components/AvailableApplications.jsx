@@ -5,9 +5,10 @@ import universityConfig from '@university'
 import { toAppSlug, track } from '../analytics'
 import { fetchAppIcons, getCachedAppIcons } from '../appIcons'
 import { scoreAppSearch, searchApps } from '../appSearch'
-import { DEMO_PLANNING_APP_FNAME } from '../demoAccount'
+import { DEMO_MAIL_APP_FNAME, DEMO_PLANNING_APP_FNAME } from '../demoAccount'
 import { getGradesOrigin, opensGradesPageInApp } from '../gradesPortalApp'
 import { getPlanningOrigin, opensPlanningPageInApp } from '../planningPortalApp'
+import { getMailOrigins, opensMailPageInApp } from '../mailPortalApp'
 import ContextMenu from './ContextMenu'
 import LoadingDots from './LoadingDots'
 import {
@@ -936,10 +937,19 @@ const PLANNING_PORTAL_OPTIONS = {
   casOrigin: universityConfig.origins?.cas ?? '',
 }
 
+// And for the webmail's app (« Messagerie », see mailPortalApp.js).
+const MAIL_PORTAL_OPTIONS = {
+  mailOrigins: getMailOrigins(universityConfig.mail?.webmailUrls),
+  appKeys: [DEMO_MAIL_APP_FNAME],
+  launchPath: `${ENT_AUTH_PREFIX}/launch`,
+  casOrigin: universityConfig.origins?.cas ?? '',
+}
+
 // What an in-app tile says it opens (aria-description).
 const IN_APP_PAGE_DESCRIPTIONS = {
   grades: 'Ouvre Mes notes',
   planning: 'Ouvre le planning',
+  mail: 'Ouvre la messagerie',
 }
 
 // `onOpenGradesPage`: the app's own grades page, passed only while the
@@ -948,6 +958,7 @@ const IN_APP_PAGE_DESCRIPTIONS = {
 // nouvel onglet » still open ScoDoc, its link stays on the tile for that.
 // `onOpenPlanningPage`: the same for the planning service's app and the
 // in-app Planning page, passed only while the student has it.
+// `onOpenMailPage`: and for the webmail's app and the in-app mail page.
 function AvailableApplications({
   establishment = null,
   canUseServerLaunch = true,
@@ -955,6 +966,7 @@ function AvailableApplications({
   showDescriptions = false,
   onOpenGradesPage = null,
   onOpenPlanningPage = null,
+  onOpenMailPage = null,
 }) {
   const [viewState, setViewState] = useState({
     status: 'loading',
@@ -1771,10 +1783,21 @@ function AvailableApplications({
     })
   }
 
+  // The webmail's app while the student has the mail page, likewise.
+  function opensMailPage(application) {
+    return opensMailPageInApp(application, {
+      ...MAIL_PORTAL_OPTIONS,
+      hasMailPage: Boolean(onOpenMailPage),
+      resolvedHref: launchTargets[getApplicationKey(application)]?.href,
+      base: window.location.href,
+    })
+  }
+
   // The app's own page a tile opens instead of its site, or null.
   function getInAppPage(application) {
     if (opensGradesPage(application)) return 'grades'
     if (opensPlanningPage(application)) return 'planning'
+    if (opensMailPage(application)) return 'mail'
     return null
   }
 
@@ -1794,6 +1817,8 @@ function AvailableApplications({
       event.preventDefault()
       if (inAppPage === 'grades') {
         onOpenGradesPage('tile')
+      } else if (inAppPage === 'mail') {
+        onOpenMailPage('tile')
       } else {
         onOpenPlanningPage('tile')
       }

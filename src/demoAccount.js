@@ -5,6 +5,11 @@ export const DEMO_CREDENTIALS = Object.freeze({
   password: 'tafac-demo',
 })
 
+// The CAS login the demo's automatic signature shows where the university
+// names it (mail.signature.showLogin): its username is an address, which
+// the signature never shows.
+export const DEMO_SIGNATURE_LOGIN = 'demo'
+
 const DEMO_DEFAULT_FAVORITE_IDS = [
   'demo-mail',
   'demo-planning',
@@ -178,11 +183,13 @@ const DEMO_SCHEDULE_TEMPLATES = [
 // The demo's « Emplois du temps »: a public calendar for its link, it opens
 // the in-app Planning page all the same (planningPortalApp.js's `appKeys`).
 export const DEMO_PLANNING_APP_FNAME = 'demo-emploi-du-temps'
+// The demo's webmail app: the mail page opens in its place (mailPortalApp.js).
+export const DEMO_MAIL_APP_FNAME = 'demo-messagerie'
 
 const DEMO_APPLICATIONS = Object.freeze([
   {
     id: 'demo-mail',
-    fname: 'demo-messagerie',
+    fname: DEMO_MAIL_APP_FNAME,
     title: 'Messagerie',
     description: 'Consulter un webmail de démonstration.',
     href: 'https://outlook.office.com/mail/',
