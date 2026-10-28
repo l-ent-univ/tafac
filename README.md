@@ -171,6 +171,8 @@ Après connexion, Tafac conserve les cookies nécessaires aux services universit
 
 Il n’y a pas de base de données applicative à installer. Les sessions actives et les caches des services sont en mémoire serveur ; les choix d’icônes des applications sont persistés dans `DATA_DIR`. Le navigateur conserve des préférences et certains caches locaux. Les réglages liés à l’université sont séparés lors d’un changement d’établissement.
 
+La messagerie passe par le serveur Tafac, qui relaie chaque requête au webmail de l’université (Zimbra) avec la session de l’étudiant : rien n’est écrit sur disque, les pièces jointes sont transmises en flux. La connexion au webmail et la dernière liste de mails restent en mémoire pour la session et sont effacées à la déconnexion. Les brouillons et la signature personnalisée sont enregistrés dans le compte de messagerie, pas par Tafac.
+
 Sans secret en développement, une clé temporaire est créée : redémarrer le serveur invalide les sessions. En production, conserver un secret stable. Pour le renouveler sans déconnecter immédiatement les sessions existantes, placer l’ancien dans `SESSION_SECRET_PREVIOUS`.
 
 ### Statistiques et services externes

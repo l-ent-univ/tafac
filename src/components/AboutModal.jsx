@@ -13,6 +13,8 @@ import CloseButton from './CloseButton'
 /* global __BUILD_HASH__ */
 
 const about = universityConfig.branding.about ?? {}
+// The in-app Messagerie (features.mail, without mail.page: false).
+const HAS_MAIL_PAGE = Boolean(universityConfig.features?.mail) && universityConfig.mail?.page !== false
 const papillonUrl = getPapillonUrl(universityConfig.branding, readPapillonDebugOverride())
 
 // One person, a Réglages row: their GitHub avatar, a name, a line under it,
@@ -126,9 +128,16 @@ export function AboutContent({ demoLinkLabel = '', onDemoLinkClick = null, onPri
           {about.disclaimer}
         </p>
       ) : null}
+      {/* Where the university has the in-app Messagerie (server/entAuthApp.js's
+          mail routes: relayed, in memory only, dropped at logout). */}
+      {HAS_MAIL_PAGE ? (
+        <p className="m-0 text-text-secondary">
+          Tes mails passent par le serveur de {universityConfig.branding.appName} jusqu’au webmail de l’université, sans être écrits sur disque
+        </p>
+      ) : null}
       {isAnalyticsAvailable ? (
         <p className="m-0 text-text-secondary">
-          L'audience est mesurée de façon anonyme et sans cookie, et dans l'UE. Aucune note, aucun mail et aucun identifiant n’est collecté. Cette analyse peut être désactivée à tout moment{' '}
+          L’audience est mesurée de façon anonyme, sans cookie et dans l’UE. Elle ne contient aucune note, aucun mail ni identifiant et peut être désactivée à tout moment{' '}
           <button type="button" className="p-0 border-0 bg-transparent font-inherit text-[inherit] text-text underline underline-offset-2 cursor-pointer" onClick={() => (typeof onPrivacyClick === 'function' ? onPrivacyClick() : setPrivacyOpen(true))}>
             En savoir plus
           </button>

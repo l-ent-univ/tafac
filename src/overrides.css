@@ -2254,6 +2254,19 @@
   }
 }
 
+/* The security section's mails part (SecurityShowcase): its points come in
+   one by one once the card is on screen. */
+@media (prefers-reduced-motion: no-preference) {
+  .security-mail-point {
+    opacity: 0;
+    translate: 0 16px;
+  }
+
+  .security-mail[data-revealed] .security-mail-point {
+    animation: landing-feature-in 600ms cubic-bezier(0.16, 1, 0.3, 1) calc(var(--reveal-index) * 90ms + 150ms) both;
+  }
+}
+
 /* The landing's last card (free, the team, the contact) rises in once on
    screen (LandingContact: data-revealed). */
 @media (prefers-reduced-motion: no-preference) {

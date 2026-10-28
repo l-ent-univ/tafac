@@ -109,9 +109,27 @@ const getSections = (embedded) => [
   },
 ]
 
-// Illustration, promise and the four points. `control` (the analytics
-// switch, when embedded) sits between the promise and the points; `actions`
-// sits above the link to the full list.
+// What becomes of the mails, where the university has the in-app
+// Messagerie (and on Tafac's neutral page, which speaks for all of them).
+// Each line says only what the server does: the mail routes of
+// server/entAuthApp.js relay each request to the webmail, keep its sign-in
+// and the inbox's last list in memory only and drop them at logout; drafts
+// and the custom signature are saved in the webmail account; the
+// statistics never carry a mail (docs/ANALYTICS.md). Check it again before
+// changing a word.
+const HAS_MAIL_PAGE = Boolean(universityConfig.neutral)
+  || (Boolean(universityConfig.features?.mail) && universityConfig.mail?.page !== false)
+
+const MAIL_LINES = [
+  `La Messagerie les lit et les envoie dans le webmail de ton université, en passant par le serveur de ${APP_NAME}`,
+  'Rien n’est écrit sur disque\u202f: la connexion au webmail et la dernière liste de mails restent en mémoire, le temps de ta session, et s’effacent à la déconnexion',
+  'Brouillons et signature sont enregistrés dans ton compte de messagerie de l’université',
+  'Les statistiques ne contiennent jamais leur objet, leurs adresses ni leur contenu',
+]
+
+// Illustration, promise and the four points, then the mails' part.
+// `control` (the analytics switch, when embedded) sits between the promise
+// and the points; `actions` sits above the link to the full list.
 export function PrivacyContent({ embedded = false, control = null, actions = null }) {
   return (
     <>
@@ -149,6 +167,28 @@ export function PrivacyContent({ embedded = false, control = null, actions = nul
             </div>
           ))}
         </div>
+
+        {HAS_MAIL_PAGE ? (
+          <section className="flex w-full flex-col gap-3 corners-[20px] border border-[var(--color-border)] bg-white/60 px-5 py-5 text-left dark:bg-white/[0.04] max-sm:px-4" aria-labelledby={embedded ? undefined : 'privacy-mail-title'}>
+            <p
+              id={embedded ? undefined : 'privacy-mail-title'}
+              role="heading"
+              aria-level={embedded ? 5 : 3}
+              className="m-0 flex items-center gap-2.5 font-display text-[19px] font-bold leading-[1.1] tracking-[-0.01em]"
+            >
+              <span className="privacy-modal-emoji text-[28px] leading-none" aria-hidden="true">📬</span>
+              Tes mails
+            </p>
+            <ul className="m-0 flex list-none flex-col gap-2 p-0">
+              {MAIL_LINES.map((line) => (
+                <li key={line} className="flex items-start gap-2 text-[14px] font-medium leading-[1.35] opacity-80">
+                  <Icon icon="carbon:checkmark" className="mt-[2px] size-[14px] shrink-0" aria-hidden="true" />
+                  <span>{line}</span>
+                </li>
+              ))}
+            </ul>
+          </section>
+        ) : null}
 
         {actions || ANALYTICS_DOC_URL ? (
           <div className="flex flex-col items-center gap-3">

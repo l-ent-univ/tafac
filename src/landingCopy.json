@@ -215,6 +215,30 @@
         "body": "Vérifie le mot de passe et ouvre la session"
       }
     },
+    "mailTitle": "Tes mails ne font que passer",
+    "mailIntro": "La Messagerie lit et envoie tes mails dans le webmail de {university}, en passant par le serveur de {appName}. **Rien n’est écrit sur disque**",
+    "mailPoints": {
+      "relay": {
+        "title": "Relayés, pas copiés",
+        "body": "Chaque demande va au webmail et sa réponse revient à ton navigateur, pièces jointes comprises"
+      },
+      "memory": {
+        "title": "En mémoire, le temps de ta session",
+        "body": "La connexion au webmail et la dernière liste de mails, effacées à la déconnexion"
+      },
+      "account": {
+        "title": "Brouillons et signature",
+        "body": "Enregistrés dans ton compte de messagerie de l’université, pas chez {appName}"
+      },
+      "images": {
+        "title": "Images externes masquées",
+        "body": "Les images d’un mail venues d’ailleurs ne se chargent que si tu le demandes"
+      },
+      "stats": {
+        "title": "Hors des statistiques",
+        "body": "Ni objet, ni adresse, ni contenu, ni pièce jointe dans la mesure d’audience"
+      }
+    },
     "disclaimer": ""
   },
   "faq": {
@@ -240,6 +264,14 @@
       "motDePasse": {
         "question": "Que devient mon mot de passe ?",
         "answer": "{appName} transmet ton mot de passe à {university} pour te connecter, sans jamais l’enregistrer. Seule la session ouverte par l’université est gardée dans ton navigateur, dans un cookie chiffré"
+      },
+      "mails": {
+        "question": "{appName} garde-t-il mes mails ?",
+        "answer": "Non. La Messagerie lit et envoie tes mails dans le webmail de {university}, en passant par le serveur de {appName}, sans rien écrire sur disque. La connexion au webmail et la dernière liste de mails restent en mémoire le temps de ta session et s’effacent à la déconnexion. Brouillons et signature sont enregistrés dans ton compte de messagerie de l’université"
+      },
+      "envoi": {
+        "question": "Les mails envoyés depuis {appName} partent-ils de mon adresse ?",
+        "answer": "Oui. Ils partent de ton adresse de l’université, par le webmail de l’université, comme si tu les écrivais là-bas"
       },
       "donnees": {
         "question": "{appName} collecte-t-il mes données personnelles ?",
