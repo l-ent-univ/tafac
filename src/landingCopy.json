@@ -178,20 +178,20 @@
     }
   },
   "security": {
-    "title": "Sécurisé et respectueux de votre vie privée",
-    "intro": "{appName} ne fait que relayer vos échanges avec {university} : votre mot de passe n’est jamais enregistré, et la session **reste chiffrée dans votre navigateur**",
+    "title": "Sécurisé et respectueux de ta vie privée",
+    "intro": "{appName} ne fait que relayer tes échanges avec {university} : ton mot de passe n’est jamais enregistré, et la session **reste chiffrée dans ton navigateur**",
     "points": {
       "noStorage": {
         "title": "Mot de passe jamais enregistré",
-        "body": "Votre mot de passe n'est transmis que lors de la connexion. Aucune base de donnée ni journal n'est utilisé"
+        "body": "Il n’est transmis qu’à la connexion. Aucune base de données ni journal ne le garde"
       },
       "session": {
         "title": "Session chiffrée",
-        "body": "Tafac sécurise votre session grâce à un cookie chiffré en AES-256, inaccessible aux scripts de la page et valable jusqu’à 30 jours."
+        "body": "Un cookie chiffré en AES-256, inaccessible aux scripts de la page et valable jusqu’à 30 jours"
       },
       "stats": {
         "title": "Statistiques anonymes",
-        "body": "Tafac compte uniquement les visites, sans données personnelles ni cookies de suivi. Ces statistiques sont hébergées dans l’Union européenne et peuvent être désactivées à tout moment dans les réglages."
+        "body": "Les visites seulement, sans données personnelles ni cookie de suivi, hébergées dans l’Union européenne et désactivables dans les réglages"
       },
       "source": {
         "title": "Code source ouvert",
@@ -199,11 +199,11 @@
         "link": "Voir le code sur GitHub"
       }
     },
-    "passwordTitle": "Votre mot de passe ne fait que passer",
-    "passwordIntro": "{appName} le transmet à {university} pour vous connecter, **sans l’enregistrer**. Ensuite, il utilise la session ouverte par l’université, gardée chiffrée dans un cookie de votre navigateur",
+    "passwordTitle": "Ton mot de passe ne fait que passer",
+    "passwordIntro": "{appName} le transmet à {university} pour te connecter, **sans l’enregistrer**. Ensuite, il utilise la session ouverte par l’université, gardée chiffrée dans un cookie de ton navigateur",
     "stops": {
       "device": {
-        "title": "Votre appareil",
+        "title": "Ton appareil",
         "body": "Garde la session dans un cookie chiffré"
       },
       "relay": {
@@ -211,7 +211,7 @@
         "body": "Transmet le mot de passe sans l’enregistrer"
       },
       "university": {
-        "title": "Votre université",
+        "title": "Ton université",
         "body": "Vérifie le mot de passe et ouvre la session"
       }
     },
@@ -227,39 +227,39 @@
       },
       "officiel": {
         "question": "{appName} est-il une application de mon université ?",
-        "answer": "Non. {appName} est un projet étudiant indépendant, non officiel et non affilié à {university}. Il affiche les données que publient les services de l’université (emploi du temps, notes, mails, Moodle) au même endroit"
+        "answer": "Non. {appName} est un projet étudiant indépendant, non officiel et non affilié à {university}. Il rassemble les services de l’université (emploi du temps, notes, messagerie, Moodle) dans une seule app"
       },
       "appareils": {
         "question": "Sur quels appareils fonctionne {appName} ?",
-        "answer": "Tafac fonctionne sur téléphone, tablette et ordinateur, depuis un navigateur récent, sans téléchargement. Sur téléphone, vous pouvez aussi l’ajouter à votre écran d’accueil pour y accéder plus facilement."
+        "answer": "Sur téléphone, tablette et ordinateur, depuis un navigateur récent, sans téléchargement. Sur téléphone, tu peux aussi l’ajouter à ton écran d’accueil"
       },
       "identifiants": {
         "question": "Avec quels identifiants se connecter ?",
-        "answer": "Ceux de votre ENT, comme sur le site de l’université. Pas de compte à créer"
+        "answer": "Ceux de ton ENT, comme sur le site de l’université. Pas de compte à créer"
       },
       "motDePasse": {
         "question": "Que devient mon mot de passe ?",
-        "answer": "{appName} transmet votre mot de passe à {university} pour vous connecter, sans jamais l’enregistrer. Seule la session créée par votre université est conservée dans votre navigateur, dans un cookie chiffré"
+        "answer": "{appName} transmet ton mot de passe à {university} pour te connecter, sans jamais l’enregistrer. Seule la session ouverte par l’université est gardée dans ton navigateur, dans un cookie chiffré"
       },
       "donnees": {
         "question": "{appName} collecte-t-il mes données personnelles ?",
-        "answer": "Non. {appName} ne collecte ni vos notes, ni vos mails, ni vos identifiants. Seules les visites sont comptées de façon anonyme, sans cookie de suivi. Ces statistiques sont hébergées dans l’Union européenne et peuvent être désactivées dans les réglages, sous « Statistiques anonymes »"
+        "answer": "Non. {appName} ne collecte ni tes notes, ni tes mails, ni tes identifiants. Seules les visites sont comptées, de façon anonyme et sans cookie de suivi. Ces statistiques sont hébergées dans l’Union européenne et se désactivent dans les réglages, sous « Statistiques anonymes »"
       },
       "session": {
         "question": "Combien de temps je reste connecté ?",
-        "answer": "Votre session reste active jusqu’à 30 jours. Passé ce délai, il suffit de vous reconnecter. Si vous vous déconnectez, votre session est immédiatement supprimée de votre navigateur et fermée auprès de {university}."
+        "answer": "Jusqu’à 30 jours. Ensuite, il suffit de te reconnecter. Te déconnecter supprime la session de ton navigateur et la ferme auprès de {university}"
       },
       "installer": {
         "question": "Comment l’installer sur mon téléphone ?",
-        "answer": "Vous pouvez ajouter {appName} à votre écran d’accueil directement depuis votre navigateur.\n\nSur iPhone, ouvrez {appName} dans Safari, touchez « Partager », puis « Sur l’écran d’accueil ». Sur Android, ouvrez {appName} dans Chrome, puis sélectionnez « Installer l’application » ou « Ajouter à l’écran d’accueil » dans le menu.\n\n{appName} s’ouvre ensuite en plein écran, comme une application"
+        "answer": "Tu peux ajouter {appName} à ton écran d’accueil depuis ton navigateur.\n\nSur iPhone, ouvre {appName} dans Safari, touche « Partager », puis « Sur l’écran d’accueil ». Sur Android, ouvre {appName} dans Chrome, puis choisis « Installer l’application » ou « Ajouter à l’écran d’accueil » dans le menu.\n\n{appName} s’ouvre ensuite en plein écran, comme une application"
       },
       "notes": {
         "question": "Pourquoi je ne vois pas mes notes ou mon prochain cours ?",
-        "answer": "Les données accessibles dans {appName} varient selon votre université et les services compatibles. Vous souhaitez ajouter des fonctionnalités pour votre université ? N’hésitez pas à contribuer au projet sur [GitHub](issues) !"
+        "answer": "Ce que {appName} affiche dépend de {university} et des services pris en charge : « Mes notes » demande un relevé ScoDoc de BUT. Pour ajouter un service à ton université, tu peux contribuer au projet sur [GitHub](issues)"
       },
       "universite": {
         "question": "Mon université n’est pas dans la liste, que faire ?",
-        "answer": "Elle n’est pas encore prise en charge. Le code étant ouvert, n’importe qui peut l’ajouter : contribuez sur [GitHub](issues)"
+        "answer": "Elle n’est pas encore prise en charge. Le code étant ouvert, n’importe qui peut l’ajouter : contribue sur [GitHub](issues)"
       },
       "contribuer": {
         "question": "Puis-je contribuer à {appName} ?",
@@ -267,19 +267,19 @@
       },
       "contact": {
         "question": "Un bug, une idée, une question ?",
-        "answer": "Écrivez à l’équipe sur [GitHub](issues)"
+        "answer": "Écris à l’équipe sur [GitHub](issues)"
       }
     }
   },
   "beta": {
     "title": "Juste pour préciser, Tafac est encore en bêta !",
-    "body": "Avec l’équipe, nous travaillons à améliorer Tafac chaque jour. Le projet est encore jeune : vous pourrez rencontrer des bugs ou des fonctionnalités incomplètes. Vos retours et vos contributions nous aident à le faire progresser !",
+    "body": "Avec l’équipe, nous travaillons à améliorer Tafac chaque jour. Le projet est encore jeune : tu pourras rencontrer des bugs ou des fonctionnalités incomplètes. Tes retours et tes contributions nous aident à le faire progresser !",
     "photoCaption": "Tom"
   },
   "papillon": {
     "partOf": "fait partie de",
     "title": "Fait par la même équipe que Papillon",
-    "body": "Papillon, c’est l’application libre et open source créée par des étudiants pour simplifier la vie scolaire. Avec Tafac, Tom et Lucas, membres de l’association Papillon, prolongent cette ambition à l’université : rendre vos outils du quotidien plus simples et plus agréables à utiliser.",
+    "body": "Papillon, c’est l’application libre et open source créée par des étudiants pour simplifier la vie scolaire. Avec Tafac, Tom et Lucas, membres de l’association Papillon, prolongent cette ambition à l’université : rendre tes outils du quotidien plus simples et plus agréables à utiliser.",
     "cta": "Découvrir l’association Papillon"
   },
   "contact": {

@@ -24,7 +24,7 @@ export const branding = {
   alternateNames: ["l'ent"],
   // How the landing's copy names the university mid-sentence ({university}
   // in src/landingCopy.json).
-  nameInText: 'votre université',
+  nameInText: 'ton université',
   logoAlt: 'Tafac',
   sidebarLogoAlt: 'Tafac',
   loginFooterLine: 'Projet étudiant non officiel, non affilié aux universités',
