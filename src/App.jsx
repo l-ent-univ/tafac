@@ -62,6 +62,8 @@ import { getMobileTabItems } from './navItems'
 import { getAvailableWidgets } from './dashboardWidgets'
 import { bindHistorySession, readHistoryNav, writeHistoryNav } from './appHistory'
 import { clearMailReadCache } from './mailReadCache'
+import { clearMailSignatures } from './mailSignatureStore'
+import { clearMailSends, flushMailSends } from './useMailSend'
 import useGradesFormation from './useGradesFormation'
 import { clearStoredCustomBackground, getStoredCustomBackground, saveCustomBackground } from './customBackground'
 import {
@@ -111,6 +113,16 @@ function clearLegacySensitiveClientCaches() {
 
   clearGradesCache()
   clearAdeTimetableCache()
+}
+
+// What the mail page keeps at the module's level for the signed-in student:
+// the mails read, their webmail signatures, a send waiting or held. Logging
+// out doesn't reload the page, so it goes on logout and whenever the
+// signed-in user changes.
+function forgetMailAccount() {
+  clearMailReadCache()
+  clearMailSignatures()
+  clearMailSends()
 }
 
 // Signed in to another university than the one the page runs for (the demo
@@ -2352,12 +2364,25 @@ function App() {
     }))
     startDebugState('Deconnexion')
 
+    // A mail sent within its « Annuler » time goes now, while the session
+    // still can send it (src/mailSendQueue.js). One that fails stops the
+    // logout: the mail page shows the composer again with why, rather than
+    // the mail being dropped with the session.
+    const unsent = await flushMailSends()
+    if (unsent) {
+      setSessionState((current) => ({ ...current, checking: false }))
+      commitDebugState('Deconnexion', null, 'Un mail n’a pas pu partir')
+      handleNavigatePage('mail')
+      return
+    }
+
     try {
       const result = await logoutFromEnt()
       clearLegacySensitiveClientCaches()
-      // No reload follows: the mails read and the history's mail entries
-      // must not carry over to whoever signs in next in this tab.
-      clearMailReadCache()
+      // No reload follows: the mails read, the signatures, any send and the
+      // history's mail entries must not carry over to whoever signs in
+      // next in this tab.
+      forgetMailAccount()
       bindHistorySession(null)
       setActivePage('dashboard')
       writeHistoryNav({ page: 'dashboard' }, { replace: true })
@@ -2432,11 +2457,12 @@ function App() {
     setDebugOpen(false)
   }, [sessionState.authenticated, sessionState.user])
 
-  // The signed-in student owns the mail page's history entries and read
-  // cache (see appHistory.js, mailReadCache.js). Done while rendering, not in
+  // The signed-in student owns the mail page's history entries, read cache,
+  // signatures and sends (see appHistory.js, mailReadCache.js,
+  // mailSignatureStore.js, mailSendQueue.js). Done while rendering, not in
   // an effect: the mail page reads its entry and the cache in its own first
   // render, which comes before any effect of this one. Idempotent.
-  if (sessionState.authenticated && sessionState.user && bindHistorySession(sessionState.user)) clearMailReadCache()
+  if (sessionState.authenticated && sessionState.user && bindHistorySession(sessionState.user)) forgetMailAccount()
 
   const shouldHoldInitialRender = !hasCheckedInitialSession && sessionState.checking
   const isProfileSwitching = sessionState.authenticated && profileUser !== sessionState.user

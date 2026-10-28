@@ -68,6 +68,9 @@ export function useMailSignaturePrefs() {
 let remote = { status: 'idle', data: null }
 let pending = null
 const remoteListeners = new Set()
+// Bumped by clearMailSignatures: an answer asked for before it doesn't
+// fill the emptied store when it lands.
+let generation = 0
 
 function setRemote(next) {
   remote = next
@@ -79,14 +82,27 @@ function subscribeRemote(listener) {
   return () => remoteListeners.delete(listener)
 }
 
+// Logging out doesn't reload the page: the previous student's signatures
+// (their name, their webmail's) must not show to whoever signs in next, nor
+// stand in for theirs when their first request fails. Called on logout and
+// whenever the signed-in user changes (App), as clearMailReadCache.
+export function clearMailSignatures() {
+  generation += 1
+  pending = null
+  if (remote.status !== 'idle' || remote.data) setRemote({ status: 'idle', data: null })
+}
+
 export function refreshMailSignatures({ fresh = false } = {}) {
   if (pending) return pending
   if (!remote.data) setRemote({ status: 'loading', data: null })
-  pending = getMailSignatures({ fresh }).then((result) => {
+  const sentIn = generation
+  const request = getMailSignatures({ fresh }).then((result) => {
+    if (sentIn !== generation) return
     pending = null
     setRemote(result.status === 'ok' ? { status: 'ready', data: result.data } : { status: remote.data ? 'ready' : 'error', data: remote.data })
   })
-  return pending
+  pending = request
+  return request
 }
 
 // The signatures, asked for again when the caller mounts (`enabled`).
@@ -100,7 +116,8 @@ export function useMailSignatures({ enabled = true, fresh = false } = {}) {
 // The custom signature written: the list as the server has it afterwards.
 // → saveMailSignature's result.
 export async function writeCustomMailSignature(text) {
+  const sentIn = generation
   const result = await saveMailSignature(text)
-  if (result.status === 'ok') setRemote({ status: 'ready', data: result.data })
+  if (result.status === 'ok' && sentIn === generation) setRemote({ status: 'ready', data: result.data })
   return result
 }

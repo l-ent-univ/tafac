@@ -1342,10 +1342,11 @@ function MailPage({ onReaderOpenChange, onSignInAgain, sender = null }) {
   }, [pendingCompose])
   const cancelPendingCompose = useCallback(() => setPendingCompose(null), [])
 
-  // Sending (src/useMailSend.js): the composer closes at once, the notice
-  // counts down « Annuler », then the mail goes. Taken back or failed, the
-  // composer opens again as it was (asking first if another is open and
-  // changed). Once sent, the original shows as answered and the open
+  // Sending (src/useMailSend.js, src/mailSendQueue.js): the composer closes
+  // at once, the notice counts down « Annuler », then the mail goes. Taken
+  // back or failed, the composer opens again as it was (asking first if
+  // another is open and changed), a failure while the page was left once
+  // it's back. Once sent, the original shows as answered and the open
   // folder's list is read again (Envoyés, Brouillons).
   const notifySend = useCallback((text, { onUndo = null, ...options } = {}) => {
     if (text === null) {
