@@ -66,15 +66,20 @@ export function gradeImageAlt(module, evaluation) {
   return shorten(`Note de ${evaluation?.description ?? 'l’évaluation'} (${module?.code ?? module?.title ?? ''})`.replace(/ \(\)$/, ''), 160)
 }
 
+// The line saying which grade the mail is about: « Je vous écris au sujet
+// de ma note de TP1 en Anglais. » (also the landing's preview of it).
+export function describeGradeMailAbout(module, evaluation) {
+  const subject = String(module?.title ?? module?.code ?? '').trim()
+  const name = String(evaluation?.description ?? '').trim()
+  return name ? `Je vous écris au sujet de ma note de ${name}${subject ? ` en ${subject}` : ''}.` : `Je vous écris au sujet de ma note${subject ? ` en ${subject}` : ''}.`
+}
+
 // The editor's HTML (what MailComposer's `restore.html` takes): the
 // greeting, the line about the grade, an empty line for the student
 // (`focusBlock`, the caret's), the summary box, the image (`image`: { cid,
 // alt, width, height } or null). → { html, focusBlock }.
 export function buildGradeMailHtml(module, evaluation, rows, image = null) {
-  const subject = String(module?.title ?? module?.code ?? '').trim()
-  const name = String(evaluation?.description ?? '').trim()
-  const about = name ? `Je vous écris au sujet de ma note de ${name}${subject ? ` en ${subject}` : ''}.` : `Je vous écris au sujet de ma note${subject ? ` en ${subject}` : ''}.`
-  return buildAboutMailHtml({ about, rows, image })
+  return buildAboutMailHtml({ about: describeGradeMailAbout(module, evaluation), rows, image })
 }
 
 // The subject's teacher, as the relevé's absences name them (the
