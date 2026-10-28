@@ -11,8 +11,9 @@ import { NewBadge, TypeBadge } from './SubjectsList'
 // leaves room for the cards' shadow: 0 10px 28px -14px reaches 24px below.
 const LIST_CLASSES = 'm-0 list-none flex gap-3 overflow-x-auto snap-x snap-mandatory -mx-6 px-6 scroll-px-6 pt-2 pb-7 -mt-2 -mb-7 favorites-scroll-hide max-md:gap-2 max-md:-mx-3 max-md:px-3 max-md:scroll-px-3'
 const ITEM_CLASSES = 'flex w-[236px] shrink-0 snap-start min-w-0 max-md:w-[224px]'
-// The card is a button: it opens the grade where it counts (onOpen).
-const CARD_CLASSES = 'latest-grade-card isolate relative widget-card widget-card-visible shadow-md w-full p-3 border border-white card-corners overflow-hidden bg-widget-bg text-left text-text flex flex-col gap-[6px] min-w-0 cursor-pointer'
+// The card is a button: it opens the grade where it counts (onOpen); also
+// the composer's grades drawer (MailGradePicker).
+export const CARD_CLASSES = 'latest-grade-card isolate relative widget-card widget-card-visible shadow-md w-full p-3 border border-white card-corners overflow-hidden bg-widget-bg text-left text-text flex flex-col gap-[6px] min-w-0 cursor-pointer'
 
 
 // One grade as a "Note" card's content, also the dashboard's "Dernière
@@ -24,8 +25,9 @@ const CARD_CLASSES = 'latest-grade-card isolate relative widget-card widget-card
 // stands big without its pill like the dashboard's other numbers, and the
 // evaluation holds one line, to fit the dashboard's row height.
 // `typeLabel`: "Rattrapage" or "Session 2", a tag beside the grade, as on
-// the subjects' evaluation rows.
-export function LatestGradeCardBody({ moduleTitle, moduleCode, day, title, value, icon, wash, typeLabel = null, isNew = false, heading = null }) {
+// the subjects' evaluation rows. `scale`: what follows the value (none for
+// a grade given as a word, « Absent »).
+export function LatestGradeCardBody({ moduleTitle, moduleCode, day, title, value, icon, wash, typeLabel = null, isNew = false, heading = null, scale = '/20' }) {
   const dayLabel = day ? <span className={`ml-auto shrink-0 font-body text-[13px] font-medium leading-[1.4] text-text-muted ${heading ? 'max-md:text-[12px]' : ''}`}>{day}</span> : null
   return (
     <>
@@ -53,7 +55,7 @@ export function LatestGradeCardBody({ moduleTitle, moduleCode, day, title, value
       {heading ? (
         <span className="mt-auto flex items-end gap-[3px] leading-[1.06]">
           <span className="font-display text-[32px] font-bold leading-none whitespace-nowrap max-md:text-[28px]">{value}</span>
-          <span className="pb-[2px] text-[17px] font-medium leading-[1.06] text-text-muted whitespace-nowrap max-md:text-[15px]">/20</span>
+          {scale ? <span className="pb-[2px] text-[17px] font-medium leading-[1.06] text-text-muted whitespace-nowrap max-md:text-[15px]">{scale}</span> : null}
           {typeLabel ? <span className="mb-[3px] ml-[6px] self-end max-md:hidden"><TypeBadge label={typeLabel} /></span> : null}
           {/* On a phone's half-width card the badge would crowd the heading:
               a dot by the grade instead. */}
@@ -66,7 +68,7 @@ export function LatestGradeCardBody({ moduleTitle, moduleCode, day, title, value
         <span className="flex items-center gap-[6px] self-start">
           <span className="inline-flex items-end gap-[2px] rounded-full border border-border bg-bg-subtle px-[9px] py-[8px] text-text">
             <span className="font-display text-[17px] font-bold leading-none [text-box:trim-both_cap_alphabetic]">{value}</span>
-            <span className="font-body text-[13px] font-medium leading-none text-text-muted [text-box:trim-both_cap_alphabetic]">/20</span>
+            {scale ? <span className="font-body text-[13px] font-medium leading-none text-text-muted [text-box:trim-both_cap_alphabetic]">{scale}</span> : null}
           </span>
           {typeLabel ? <TypeBadge label={typeLabel} /> : null}
         </span>

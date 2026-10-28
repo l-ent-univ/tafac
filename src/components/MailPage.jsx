@@ -14,6 +14,7 @@ import SwipeableRow from './SwipeableRow'
 import Tooltip from './Tooltip'
 import { getSenderBadgeStyle, getSenderDomainCue, getSenderInitial } from './mailSender'
 import PageEmptyState from './PageEmptyState'
+import MailSearchField from './MailSearchField'
 import { useListTransitions } from '../useListTransitions'
 import { foldMailSearchText, parseMailSearchWords } from '../mailSearch'
 import { normalizeRecipient } from '../mailCompose'
@@ -570,41 +571,6 @@ function MailFolderPills({ folders, currentId, currentUnread, onSelect, onOpenMe
   )
 }
 
-// The search over the list, in the app's material (the other pages'
-// buttons and fields), at the reader toolbar's height (the two line up from
-// 4xl). Escape empties it.
-function MailSearchField({ value, onChange, className = '' }) {
-  return (
-    <div className={`material mail-search-field flex h-11 min-w-0 items-center gap-2 rounded-full pl-4 pr-[5px] text-[15px] focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-text/20 ${className}`}>
-      <Icon icon="carbon:search" className="size-[17px] shrink-0 text-text-muted" aria-hidden="true" />
-      <input
-        type="search"
-        value={value}
-        onChange={(event) => onChange(event.target.value)}
-        onKeyDown={(event) => {
-          if (event.key === 'Escape' && value) {
-            event.preventDefault()
-            onChange('')
-          }
-        }}
-        placeholder="Rechercher"
-        aria-label="Rechercher dans les mails"
-        className="mail-search-input h-full min-w-0 flex-1 border-0 bg-transparent p-0 text-text placeholder:text-text-muted [&::-webkit-search-cancel-button]:hidden"
-      />
-      {value ? (
-        <button
-          type="button"
-          className="mobile-tab-bar-item inline-flex size-8 shrink-0 items-center justify-center rounded-full border-0 bg-transparent text-text-muted cursor-pointer"
-          aria-label="Effacer la recherche"
-          onClick={() => onChange('')}
-        >
-          <Icon icon="carbon:close" className="size-4" aria-hidden="true" />
-        </button>
-      ) : null}
-    </div>
-  )
-}
-
 // The panel while several mails are picked: how many, as a small stack of
 // envelopes, and the way out (Escape works too). The toolbar above acts on
 // them all.
@@ -788,7 +754,8 @@ function MailListItem({ message, fallbackHref, now, onOpen, onContextMenu, onHov
 // « De : ». `composeRequest`: a mail another page asks to write (App's,
 // « Écrire au sujet de cette note » in « Mes notes »: the composer's
 // `restore`), opened once, then handed back (onComposeRequestHandled).
-function MailPage({ onReaderOpenChange, onSignInAgain, sender = null, composeRequest = null, onComposeRequestHandled = () => {}, arrivalSource = 'other' }) {
+// `canAttachGrades`: the composer's « Une note… » (« Mes notes » in the app).
+function MailPage({ onReaderOpenChange, onSignInAgain, sender = null, composeRequest = null, onComposeRequestHandled = () => {}, arrivalSource = 'other', canAttachGrades = false }) {
   // nextOffset: where the next page starts on the server.
   // `folder`: the folder the list is of (the one shown until another's
   // first page arrives).
@@ -2128,7 +2095,7 @@ function MailPage({ onReaderOpenChange, onSignInAgain, sender = null, composeReq
         >
           Messagerie
         </h1>
-        <MailSearchField value={query} onChange={setQuery} className="flex-1" />
+        <MailSearchField value={query} onChange={setQuery} label="Rechercher dans les mails" className="flex-1" />
         <button
           type="button"
           className="mobile-tab-bar group relative ml-2 inline-flex size-11 shrink-0 items-center justify-center rounded-full text-text-muted cursor-pointer transition-[color] duration-150 hover:text-text disabled:cursor-default focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-text/20"
@@ -2338,6 +2305,7 @@ function MailPage({ onReaderOpenChange, onSignInAgain, sender = null, composeReq
             saver={composer.saver}
             restore={composer.restore ?? null}
             sendError={composer.sendError ?? null}
+            canAttachGrades={canAttachGrades}
             ref={composerApiRef}
             onClose={closeComposer}
             onSend={sendComposed}

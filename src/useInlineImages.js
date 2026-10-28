@@ -11,7 +11,7 @@ import { uploadMailAttachment } from './entApi'
 // draft's are parts of it already, shown from the server.
 // `initialItems`: [{ key, cid, source, file? | aid? | messageId + part,
 // name, size, contentType, width, height, status, url? }].
-// → { items, context, markExpired, isUploading(cids) }.
+// → { items, context, add(item), markExpired, isUploading(cids) }.
 export function useInlineImages(initialItems = null, expiredAids = null) {
   const [items, setItems] = useState(() => {
     const expired = new Set(expiredAids ?? [])
@@ -21,8 +21,10 @@ export function useInlineImages(initialItems = null, expiredAids = null) {
       return item.file ? { ...item, aid: null, status: 'queued', error: null } : { ...item, status: 'error', error: 'failed' }
     })
   })
-  // The files' URLs for the view, made and let go with the composer.
+  // The files' URLs for the view, made and let go with the composer (an
+  // item added later, add's, joins them).
   const [urls, setUrls] = useState(() => new Map())
+  const madeUrlsRef = useRef(new Map())
   const itemsRef = useRef(items)
   useEffect(() => {
     itemsRef.current = items
@@ -32,10 +34,22 @@ export function useInlineImages(initialItems = null, expiredAids = null) {
     for (const item of itemsRef.current) {
       if (item.file) made.set(item.cid, URL.createObjectURL(item.file))
     }
-    setUrls(made)
+    madeUrlsRef.current = made
+    setUrls(new Map(made))
     return () => {
-      for (const url of made.values()) URL.revokeObjectURL(url)
+      for (const url of madeUrlsRef.current.values()) URL.revokeObjectURL(url)
+      madeUrlsRef.current = new Map()
     }
+  }, [])
+
+  // An image put in the text while writing (« Une note… »): its item, its
+  // file queued to upload.
+  const add = useCallback((item) => {
+    if (!item?.cid || !item.file) return
+    const url = URL.createObjectURL(item.file)
+    madeUrlsRef.current.set(item.cid, url)
+    setUrls((current) => new Map(current).set(item.cid, url))
+    setItems((current) => [...current.filter((entry) => entry.cid !== item.cid), { ...item, aid: null, status: 'queued', error: null }])
   }, [])
 
   const update = useCallback((cid, patch) => {
@@ -100,5 +114,5 @@ export function useInlineImages(initialItems = null, expiredAids = null) {
     retry,
   }), [items, urls, retry])
 
-  return { items, context, markExpired, isUploading }
+  return { items, context, add, markExpired, isUploading }
 }

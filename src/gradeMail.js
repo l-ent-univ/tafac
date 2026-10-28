@@ -114,19 +114,16 @@ export function findModuleTeacher(absences, module) {
   return { name, email }
 }
 
-// The composer's `restore` for a grade (App's handleComposeMail): its
-// recipient, subject, text and image. The image drawn here (the canvas
-// renderer, loaded on first use); if it can't be, the mail goes without it.
-// `report`: buildGradesReport's; `absences`: the relevé payload's.
-export async function prepareGradeMail({ report, module, evaluation, absences = null }) {
-  const rows = buildGradeSummaryRows(module, evaluation, { showPromoStats: Boolean(report?.showPromoStats) })
-  let image = null
+// A grade's image as the composer's item (useInlineImages's): drawn here
+// (the canvas renderer, loaded on first use), its file to upload. Null if
+// it can't be drawn: the mail goes without it.
+export async function prepareGradeImage({ report, module, evaluation }) {
   try {
     const { renderGradeCardImage } = await import('./gradeCardImage.js')
     const drawn = await renderGradeCardImage({ report, module, evaluation })
     const cid = createInlineCid()
     const name = `note-${String(module.code ?? 'evaluation').replace(/[^\w.-]+/g, '-')}.png`
-    image = {
+    return {
       key: inlineImageKey(cid),
       cid,
       source: 'upload',
@@ -140,8 +137,17 @@ export async function prepareGradeMail({ report, module, evaluation, absences = 
       status: 'queued',
     }
   } catch {
-    image = null
+    return null
   }
+}
+
+// The composer's `restore` for a grade (App's handleComposeMail): its
+// recipient, subject, text and image (prepareGradeImage), full screen from
+// 1024 px (a phone's composer is already).
+// `report`: buildGradesReport's; `absences`: the relevé payload's.
+export async function prepareGradeMail({ report, module, evaluation, absences = null }) {
+  const rows = buildGradeSummaryRows(module, evaluation, { showPromoStats: Boolean(report?.showPromoStats) })
+  const image = await prepareGradeImage({ report, module, evaluation })
   const { html, focusBlock } = buildGradeMailHtml(module, evaluation, rows, image)
   const teacher = findModuleTeacher(absences, module)
   return {
@@ -150,5 +156,6 @@ export async function prepareGradeMail({ report, module, evaluation, absences = 
     html,
     focusBlock,
     inlineImages: image ? [image] : [],
+    isFullscreen: true,
   }
 }

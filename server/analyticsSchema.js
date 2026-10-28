@@ -48,7 +48,7 @@ const PLANNING_ACTION_REQUIRED = {
 }
 const MAIL_ACTIONS = [
   'mail_opened', 'thread_expanded', 'folder_changed', 'search', 'refresh',
-  'compose_opened', 'sent', 'draft_saved', 'draft_discarded',
+  'compose_opened', 'sent', 'draft_saved', 'draft_discarded', 'grade_attached',
   'trash', 'spam', 'move', 'restore', 'delete_forever', 'flag', 'read_toggle', 'empty_folder', 'mark_folder_read',
   'print', 'pdf', 'attachment_downloaded',
 ]

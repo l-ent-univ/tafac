@@ -391,7 +391,7 @@ test('mail_action keeps only the properties of its action, never a subject, an a
   }
   assert.deepEqual(keep({ action: 'pdf', result: 'error' }), { action: 'pdf', result: 'error' })
   assert.deepEqual(keep({ action: 'empty_folder', folder_kind: 'trash', ...leaks }), { action: 'empty_folder', folder_kind: 'trash' })
-  for (const action of ['thread_expanded', 'refresh', 'draft_saved', 'draft_discarded', 'print', 'attachment_downloaded']) {
+  for (const action of ['thread_expanded', 'refresh', 'draft_saved', 'draft_discarded', 'grade_attached', 'print', 'attachment_downloaded']) {
     assert.deepEqual(keep({ action, via: 'toolbar', from: 'list', result: 'ok', ...leaks }), { action })
   }
   // Context properties stay.

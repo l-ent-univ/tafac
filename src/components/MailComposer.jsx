@@ -2,7 +2,7 @@ import { Fragment, useCallback, useEffect, useId, useImperativeHandle, useRef, u
 import { createPortal } from 'react-dom'
 import { Icon } from '@iconify/react'
 import { EditorContent, useEditor, useEditorState } from '@tiptap/react'
-import { Selection } from '@tiptap/pm/state'
+import { Selection, TextSelection } from '@tiptap/pm/state'
 import StarterKit from '@tiptap/starter-kit'
 import { Color, FontFamily, FontSize, TextStyle } from '@tiptap/extension-text-style'
 import Highlight from '@tiptap/extension-highlight'
@@ -14,14 +14,17 @@ import { useComposerSignature, useSignatureNodeSync } from '../useComposerSignat
 import { MailSummary } from '../mailSummaryNode'
 import { MailInlineImage } from '../mailInlineImageNode'
 import { MailInlineImageContext } from '../mailInlineImageContext'
-import { inlineImageCids } from '../mailInlineImages'
+import { MAX_INLINE_IMAGES, inlineImageCids } from '../mailInlineImages'
 import { useInlineImages } from '../useInlineImages'
+import { findModuleTeacher, prepareGradeImage } from '../gradeMail'
+import { buildGradeInsertion, gradeAttachFields, pickGradeInsertIndex } from '../mailGradeAttach'
 import CloseButton from './CloseButton'
 import ConfirmDialog from './ConfirmDialog'
 import ContextMenu from './ContextMenu'
 import Tooltip from './Tooltip'
 import Switch from './Switch'
 import MailDropSheets from './MailDropSheets'
+import MailGradePicker from './MailGradePicker'
 import { TOOLBAR_BUTTON_CLASSES } from './MailToolbar'
 import { getSenderBadgeStyle, getSenderInitial } from './mailSender'
 import FileName from './FileName'
@@ -1138,13 +1141,15 @@ function readInitialFields(restore, sendError, kind, message, ownEmails) {
 // attachments, files, inlineImages (useInlineImages's items), identityId,
 // origin, dirty, focusBlock (the top-level block whose end takes the caret
 // when À has someone: a prefilled mail's line to write on), droppedImages
-// (a draft's images Partage lost) }), `sendError` why a send failed
-// (sendMail's). `onSend(
-// snapshot)`: « Envoyer », MailPage closes it and sends (src/useMailSend.js);
-// false when it can't (a send already waiting). `ref` gets { isDirty,
+// (a draft's images Partage lost), isFullscreen (opened full screen from
+// 1024 px: a send reopened as it was, a mail from « Mes notes ») }),
+// `sendError` why a send failed (sendMail's). `canAttachGrades`: the
+// trombone's « Une note… » (the in-app « Mes notes » for this student,
+// App's). `onSend(snapshot)`: « Envoyer », MailPage closes it and sends
+// (src/useMailSend.js); false when it can't (a send already waiting). `ref` gets { isDirty,
 // saveNow }, for MailPage to save it before another draft takes its place.
 // Keyed by MailPage: each draft starts afresh.
-function MailComposer({ initialKind = 'new', message = null, sender = null, identities = [], attachmentLimits = null, saver = null, restore = null, sendError = null, ref = null, onClose, onSend }) {
+function MailComposer({ initialKind = 'new', message = null, sender = null, identities = [], attachmentLimits = null, saver = null, restore = null, sendError = null, canAttachGrades = false, ref = null, onClose, onSend }) {
   const isPhone = useSyncExternalStore(subscribePhone, isPhoneNow, () => false)
   const titleId = useId()
   const fieldId = useId()
@@ -1169,7 +1174,7 @@ function MailComposer({ initialKind = 'new', message = null, sender = null, iden
   const { items: attachments, add: addAttachments, remove: removeAttachment, retry: retryAttachment, setMessageItems, markExpired, filesRef: attachmentFilesRef } = useAttachments(initialFields.attachments, limits, restore?.files)
   // The text's images (src/useInlineImages.js).
   const inlineImages = useInlineImages(restore?.inlineImages, sendError?.aids)
-  const { markExpired: markImagesExpired, isUploading: isImageUploading } = inlineImages
+  const { add: addInlineImage, markExpired: markImagesExpired, isUploading: isImageUploading } = inlineImages
   // A save refusing uploads gone from Partage: those files to attach again
   // (an image of the text uploads again by itself).
   useEffect(() => saver?.subscribe((status, failure) => {
@@ -1186,6 +1191,8 @@ function MailComposer({ initialKind = 'new', message = null, sender = null, iden
   const dragDepthRef = useRef(0)
   const [showCc, setShowCc] = useState(initialFields.cc.length > 0 || initialFields.bcc.length > 0)
   const [menu, setMenu] = useState(null)
+  // « Une note… »: the grades drawer open over the composer.
+  const [gradePickerOpen, setGradePickerOpen] = useState(false)
   const [notice, setNotice] = useState(null)
   const [confirmingClose, setConfirmingClose] = useState(false)
   // Full screen (from 1024 px; a phone's sheet is already): the window's
@@ -1266,6 +1273,17 @@ function MailComposer({ initialKind = 'new', message = null, sender = null, iden
   // Before the effects below, which reach it through the ref.
   useEffect(() => {
     editorRef.current = editor
+  }, [editor])
+  // Whether the student has been in the text: a grade then goes in at the
+  // caret (attachGrade), else under the text.
+  const textFocusedRef = useRef(false)
+  useEffect(() => {
+    if (!editor) return undefined
+    const onFocus = () => {
+      textFocusedRef.current = true
+    }
+    editor.on('focus', onFocus)
+    return () => editor.off('focus', onFocus)
   }, [editor])
   // The format bar follows the selection (a re-render only when what it
   // shows changes).
@@ -1670,11 +1688,72 @@ function MailComposer({ initialKind = 'new', message = null, sender = null, iden
   const draftLine = draftStatus === 'error' ? 'Brouillon non enregistré' : null
   const canSwitchKind = Boolean(message)
 
-  // The trombone: the file picker; for a reply to a mail with attachments
-  // left out (as Apple Mail does), a menu offering them back too.
+  // The trombone: the file picker; a menu when there's more: a grade
+  // (« Une note… », where « Mes notes » is), and for a reply to a mail with
+  // attachments left out (as Apple Mail does), those back.
   const pickFiles = () => fileInputRef.current?.click()
   const originalAttachments = kind === 'forward' ? [] : messageAttachmentItems(message)
   const canAddOriginal = originalAttachments.some((entry) => !attachments.some((item) => item.key === entry.key))
+  const hasAttachMenu = canAddOriginal || canAttachGrades
+
+  // A grade picked in the drawer, into the text as « Écrire au sujet de
+  // cette note » puts it (src/mailGradeAttach.js): its summary box and its
+  // image (drawn first; the box alone past the server's 3 images, or if it
+  // can't be drawn), at the caret or under the text; the subject and À
+  // filled if still empty.
+  const pendingImagesRef = useRef(0)
+  const attachGrade = async ({ module, evaluation, report, absences }) => {
+    setGradePickerOpen(false)
+    trackMailAction('grade_attached')
+    const fields = gradeAttachFields({ subject, to, toInput }, { module, evaluation, teacher: findModuleTeacher(absences, module) })
+    if (fields.subject) setSubject((current) => (current.trim() ? current : fields.subject))
+    if (fields.to) setTo((current) => (current.length ? current : mergeAddresses([], fields.to, [...cc, ...bcc])))
+    const before = editorRef.current
+    if (!before || before.isDestroyed) return
+    const imagesInText = inlineImageCids(before.getHTML()).length + pendingImagesRef.current
+    let image = null
+    if (imagesInText < MAX_INLINE_IMAGES) {
+      pendingImagesRef.current += 1
+      try {
+        image = await prepareGradeImage({ report, module, evaluation })
+      } finally {
+        pendingImagesRef.current -= 1
+      }
+    }
+    const current = editorRef.current
+    if (!current || current.isDestroyed) return
+    const { nodes, capped } = buildGradeInsertion({ module, evaluation, showPromoStats: Boolean(report?.showPromoStats), image, imagesInText })
+    if (image && !capped) addInlineImage(image)
+    const { doc, selection } = current.state
+    const blocks = []
+    doc.forEach((node) => blocks.push({ type: node.type.name, empty: node.type.name === 'paragraph' && node.content.size === 0 }))
+    const caretIndex = textFocusedRef.current ? selection.$from.index(0) : null
+    const { index, withLine } = pickGradeInsertIndex(blocks, caretIndex)
+    let at = 0
+    for (let block = 0; block < index; block += 1) at += doc.child(block).nodeSize
+    // The selection left where it was (Tiptap's would select the image).
+    current.chain().insertContentAt(at, withLine ? [...nodes, { type: 'paragraph' }] : nodes, { updateSelection: false }).run()
+    // In sight: the text scrolls to the grade's last block.
+    let last = at
+    for (let block = index; block < index + nodes.length - 1; block += 1) last += current.state.doc.child(block).nodeSize
+    const lastDom = current.view.nodeDOM(last)
+    if (lastDom instanceof Element) lastDom.scrollIntoView({ block: 'nearest' })
+    if (caretIndex !== null) {
+      // Back in the text: on the new line under the grade, or where it was.
+      if (withLine) {
+        const next = current.state.doc
+        let end = 0
+        for (let block = 0; block < index + nodes.length; block += 1) end += next.child(block).nodeSize
+        current.view.dispatch(current.state.tr.setSelection(TextSelection.create(next, end + 1)).scrollIntoView())
+      }
+      // After the sheet's own focus handback.
+      window.requestAnimationFrame(() => {
+        if (!current.isDestroyed) current.view.focus()
+      })
+    }
+    if (capped) showNotice(`${MAX_INLINE_IMAGES} images au plus par mail : l’encadré seul est ajouté`)
+    else if (!image) showNotice('Image de la note indisponible : l’encadré seul est ajouté')
+  }
   // A size refusal: the way round it is FileSender (RENATER), said once
   // under the chips.
   const sizeRefused = attachments.some((item) => item.status === 'error' && (item.error === 'too-large' || item.error === 'total'))
@@ -1726,9 +1805,10 @@ function MailComposer({ initialKind = 'new', message = null, sender = null, iden
     onSelect: () => applyFormat(menu.kind, option.value, menu.range),
   })) : menu?.kind === 'attach'
     ? [
-      { id: 'files', label: 'Choisir des fichiers…', icon: 'carbon:document-add', onSelect: pickFiles },
-      { id: 'original', label: 'Pièces jointes d’origine', icon: 'carbon:attachment', detail: String(originalAttachments.length), onSelect: () => setMessageItems(originalAttachments) },
-    ]
+      { id: 'files', label: 'Joindre un fichier…', icon: 'carbon:document-add', onSelect: pickFiles },
+      canAttachGrades ? { id: 'grade', label: 'Une note…', icon: 'carbon:chart-pie', onSelect: () => setGradePickerOpen(true) } : null,
+      canAddOriginal ? { id: 'original', label: 'Pièces jointes d’origine', icon: 'carbon:attachment', detail: String(originalAttachments.length), onSelect: () => setMessageItems(originalAttachments) } : null,
+    ].filter(Boolean)
     : menu?.kind === 'identity'
     ? identities.map((identity) => ({ id: identity.id, label: identity.email, hint: identity.name, checked: identity.id === fromIdentity?.id, onSelect: () => setIdentityId(identity.id) }))
     : menu?.kind === 'kind'
@@ -1773,8 +1853,8 @@ function MailComposer({ initialKind = 'new', message = null, sender = null, iden
         <ToolButton
           label="Joindre un fichier"
           icon="carbon:attachment"
-          menu={canAddOriginal}
-          onClick={(event) => (canAddOriginal ? openMenu('attach', event) : pickFiles())}
+          menu={hasAttachMenu}
+          onClick={(event) => (hasAttachMenu ? openMenu('attach', event) : pickFiles())}
         />
       </span>
     </div>
@@ -1986,6 +2066,8 @@ function MailComposer({ initialKind = 'new', message = null, sender = null, iden
           </div>
         ) : null}
       </div>
+
+      {gradePickerOpen ? <MailGradePicker onPick={(picked) => void attachGrade(picked)} onClose={() => setGradePickerOpen(false)} /> : null}
 
       {menu ? (
         <ContextMenu
