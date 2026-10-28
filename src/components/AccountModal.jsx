@@ -12,6 +12,10 @@ import { PrivacyContent } from './PrivacyModal'
 import Dropdown from './Dropdown'
 import LoadingDots from './LoadingDots'
 import CloseButton from './CloseButton'
+import Switch from './Switch'
+
+// Also the debug menu's toggles (src/components/debug/).
+export { Switch }
 
 function buildSelectOptions(options, selectedOption) {
   const normalizedOptions = Array.isArray(options) ? [...options] : []
@@ -240,24 +244,6 @@ function StepSlider({ options, value, onChange, ariaLabel, disabled = false }) {
 }
 
 const SETTING_BUTTON_CLASSES = `inline-flex h-9 items-center justify-center gap-[6px] rounded-full border-0 ${MUTED_FILL_CLASSES} px-3 font-body text-[14px] font-medium text-[var(--color-text)] transition-colors duration-[120ms] ease-in-out hover:bg-[#edebe5] cursor-pointer disabled:cursor-wait disabled:opacity-60 dark:hover:bg-[var(--color-bg-subtle)]`
-
-// Also the debug menu's toggles (src/components/debug/).
-export function Switch({ checked, onChange }) {
-  return (
-    <button
-      type="button"
-      role="switch"
-      aria-checked={checked}
-      onClick={() => onChange(!checked)}
-      className={`relative inline-flex h-[26px] w-[44px] shrink-0 items-center rounded-full border-0 p-0 transition-colors duration-150 ease-in-out cursor-pointer ${checked ? 'bg-text' : 'bg-text-30'}`}
-    >
-      <span
-        aria-hidden="true"
-        className={`absolute left-[3px] top-[3px] h-5 w-5 rounded-full bg-widget-bg shadow-[0_1px_3px_rgba(0,0,0,0.2)] transition-transform duration-150 ease-in-out ${checked ? 'translate-x-[18px]' : 'translate-x-0'}`}
-      />
-    </button>
-  )
-}
 
 // A row whose whole surface toggles the switch.
 function SwitchRow({ icon, label, description, checked, onChange }) {
@@ -550,9 +536,11 @@ function LogoSetting({ shown, onShownChange, establishmentLabel, source, onSourc
           inert={!shown}
         >
           <div className="min-h-0 overflow-hidden">
-            <div className={`${ROW_CLASSES} border-t border-[var(--color-border)]`}>
-              <span className="min-w-0 font-body text-[16px] font-medium leading-[1.2] tracking-[-0.3125px] text-[var(--color-text)]">Afficher</span>
-              <div className={`flex shrink-0 gap-1 rounded-full ${MUTED_FILL_CLASSES} p-1`} role="group" aria-label="Logo affiché">
+            {/* On a narrow phone the pill wraps under the label rather than
+                running over it. */}
+            <div className={`${ROW_CLASSES} flex-wrap border-t border-[var(--color-border)]`}>
+              <span className="shrink-0 font-body text-[16px] font-medium leading-[1.2] tracking-[-0.3125px] text-[var(--color-text)]">Afficher</span>
+              <div className={`ml-auto flex min-w-0 gap-1 rounded-full ${MUTED_FILL_CLASSES} p-1`} role="group" aria-label="Logo affiché">
                 {LOGO_SOURCE_CHOICES.map((choice) => {
                   const isActive = choice.id === source
                   return (
@@ -562,13 +550,14 @@ function LogoSetting({ shown, onShownChange, establishmentLabel, source, onSourc
                       aria-pressed={isActive}
                       title={choice.id === 'establishment' ? establishmentLabel : undefined}
                       onClick={() => onSourceChange(choice.id)}
-                      className={`inline-flex h-8 items-center justify-center rounded-full border px-3 font-body text-[14px] font-medium text-[var(--color-text)] cursor-pointer transition-[background-color,box-shadow,border-color] duration-150 ease-in-out ${
+                      className={`inline-flex h-8 min-w-0 items-center justify-center rounded-full border px-3 text-[var(--color-text)] cursor-pointer transition-[background-color,box-shadow,border-color] duration-150 ease-in-out max-sm:px-[10px] ${
                         isActive
                           ? 'bg-widget-bg border-white dark:border-[rgba(255,255,255,0.08)] shadow-[0_1px_3px_rgba(0,0,0,0.06)]'
                           : 'bg-transparent border-transparent hover:bg-brand-subtle'
                       }`}
                     >
-                      {choice.label}
+                      {/* The font on a span: index.css gives buttons `font: inherit`, outside Tailwind's layers. */}
+                      <span className="truncate font-body text-[14px] font-medium leading-none max-sm:text-[13px]">{choice.label}</span>
                     </button>
                   )
                 })}

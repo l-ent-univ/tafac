@@ -7,38 +7,7 @@ import { accentStyle } from '../eventAccents'
 import { FULL_BLOCK_HEIGHT } from '../eventBlockLayout'
 import PlanningEventBlock from './PlanningEventBlock'
 import CloseButton from './CloseButton'
-
-// A row of the sheet's cards (the iOS GroupCard's rows, in the look of
-// the evaluation rows of Mes notes): an icon box (none for the occurrences),
-// a line and a second one, parted from the next row by a hairline from the
-// text's edge to as far from the card's right edge. A button with a chevron when it leads somewhere, its hover a
-// rounded fill inside the card, concentric with it (.modal-nested-corners).
-// `href`: an outside link, opened in a new tab. `wrap`: a title that may run
-// over several lines (a note).
-function SheetRow({ icon, title, detail, onClick, href, wrap = false }) {
-  const content = (
-    <>
-      {icon ? (
-        <span className="inline-flex size-7 shrink-0 items-center justify-center corners-[8px] bg-brand-subtle text-text-secondary" aria-hidden="true">
-          <Icon icon={icon} className="size-[15px]" />
-        </span>
-      ) : null}
-      <span className="planning-row-text grid min-w-0 flex-1 content-center gap-[4px] self-stretch mr-3 py-[12px]">
-        <span className={`${wrap ? 'whitespace-pre-line break-words' : 'truncate'} font-body text-[14px] font-semibold leading-[1.2] text-text`}>{title}</span>
-        {detail ? <span className="truncate font-body text-[12.5px] font-medium leading-none text-text-muted">{detail}</span> : null}
-      </span>
-      {onClick ? <Icon icon="carbon:chevron-right" className="-ml-1 mr-3 size-[14px] shrink-0 text-text-30" aria-hidden="true" /> : null}
-      {href ? <Icon icon="carbon:launch" className="-ml-1 mr-3 size-[14px] shrink-0 text-text-30" aria-hidden="true" /> : null}
-    </>
-  )
-  const className = 'planning-row modal-nested-corners flex min-h-11 w-full min-w-0 items-center gap-3 pl-3 text-left text-text'
-  if (href) {
-    return <li><a className={`${className} is-link no-underline`} href={href} target="_blank" rel="noopener noreferrer">{content}</a></li>
-  }
-  return onClick
-    ? <li><button type="button" className={`${className} is-link cursor-pointer border-0 bg-transparent p-0 pl-3`} onClick={onClick}>{content}</button></li>
-    : <li className={className}>{content}</li>
-}
+import { GROUP_CARD_CLASSES, GroupRow } from './GroupCard'
 
 function linkHost(href) {
   try {
@@ -47,8 +16,6 @@ function linkHost(href) {
     return null
   }
 }
-
-const CARD_CLASSES = 'widget-card widget-card-visible m-0 list-none overflow-hidden border bg-widget-bg p-1 [--modal-nested-inset:4px] modal-inner-corners'
 
 // A class's sheet, laid out as the iOS app's (EventDetailViewController)
 // and drawn as a grade's (GradeDetailModal): the course's colour washing
@@ -133,13 +100,13 @@ function PlanningEventSheet({ event, accent, events, todayKey, searching, onClos
                 {contentWidth > 0 ? (
                   <PlanningEventBlock event={event} accent={accent} variant="regular" width={contentWidth} height={FULL_BLOCK_HEIGHT} style={{ position: 'relative' }} />
                 ) : <div style={{ height: FULL_BLOCK_HEIGHT }} />}
-                <ul className={CARD_CLASSES}>
-                  <SheetRow icon="carbon:time" title={`De ${formatTime(event.start)} à ${formatTime(event.end)}`} />
-                  <SheetRow icon="carbon:calendar" title={`${dayText(event.day)} · ${durationText(event.start, event.end)}`} />
-                  {event.group ? <SheetRow icon="carbon:events" title={event.group} /> : null}
-                  {event.notes ? <SheetRow icon="carbon:information" title={event.notes} wrap /> : null}
+                <ul className={GROUP_CARD_CLASSES}>
+                  <GroupRow icon="carbon:time" title={`De ${formatTime(event.start)} à ${formatTime(event.end)}`} />
+                  <GroupRow icon="carbon:calendar" title={`${dayText(event.day)} · ${durationText(event.start, event.end)}`} />
+                  {event.group ? <GroupRow icon="carbon:events" title={event.group} /> : null}
+                  {event.notes ? <GroupRow icon="carbon:information" title={event.notes} wrap /> : null}
                   {event.link ? (
-                    <SheetRow icon="carbon:link" title={event.linkLabel ?? 'Lien'} detail={linkHost(event.link)} href={event.link} />
+                    <GroupRow icon="carbon:link" title={event.linkLabel ?? 'Lien'} detail={linkHost(event.link)} href={event.link} />
                   ) : null}
                 </ul>
               </div>
@@ -151,9 +118,9 @@ function PlanningEventSheet({ event, accent, events, todayKey, searching, onClos
                   <span className="ml-auto font-body text-[13px] font-medium leading-none text-text-muted">sur 30 jours</span>
                 </div>
                 {occurrences.length ? (
-                  <ul className={CARD_CLASSES}>
+                  <ul className={GROUP_CARD_CLASSES}>
                     {occurrences.map((occurrence) => (
-                      <SheetRow
+                      <GroupRow
                         key={occurrence.id}
                         title={relativeDayText(occurrence.day, todayKey)}
                         detail={[`${formatTime(occurrence.start)} – ${formatTime(occurrence.end)}`, occurrence.location].filter(Boolean).join(' · ')}

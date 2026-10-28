@@ -6,6 +6,7 @@ import { formatRank, formatScore, formatSignedPoints, listUeGroups } from '../gr
 import { EvaluationRow, NewBadge, ScoreText } from './SubjectsList'
 import CardInfoTip from './CardInfoTip'
 import { readHistoryNav, writeHistoryNav } from '../appHistory'
+import { withViewTransition } from '../viewTransition'
 import UeBadge from './UeBadge'
 import UeLink from './UeLink'
 import { useUeColor } from '../useUeColor'
@@ -64,22 +65,6 @@ function CoinIcon({ color }) {
 // their own). Names are idents: "UE5.1" → "UE5_1".
 function morph(part, code) {
   return { viewTransitionName: `ue-${part}-${String(code).replace(/[^a-zA-Z0-9-]/g, '_')}` }
-}
-
-// Runs a state change as a view transition where the browser has them and
-// motion is welcome, plainly otherwise. `after` runs on the updated DOM
-// before the new state is captured (to set the scroll it should land on).
-function withViewTransition(update, after = () => {}) {
-  const apply = () => {
-    flushSync(update)
-    after()
-  }
-  const reduceMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
-  if (!document.startViewTransition || reduceMotion) {
-    apply()
-    return Promise.resolve()
-  }
-  return document.startViewTransition(apply).updateCallbackDone.catch(() => {})
 }
 
 // Scrolls whatever scrolls the page (the window or a scrolling ancestor) so

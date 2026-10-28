@@ -8,6 +8,7 @@ import { scoreAppSearch, searchApps } from '../appSearch'
 import { DEMO_PLANNING_APP_FNAME } from '../demoAccount'
 import { getGradesOrigin, opensGradesPageInApp } from '../gradesPortalApp'
 import { getPlanningOrigin, opensPlanningPageInApp } from '../planningPortalApp'
+import ContextMenu from './ContextMenu'
 import LoadingDots from './LoadingDots'
 import {
   ENT_AUTH_PREFIX,
@@ -24,9 +25,7 @@ import {
 } from '../entApi'
 
 const DEFAULT_ERROR_MESSAGE = 'Impossible de charger les applications pour le moment'
-const FAVORITES_CONTEXT_MENU_WIDTH = 216
-const FAVORITES_CONTEXT_MENU_HEIGHT = 56
-const FAVORITES_CONTEXT_MENU_MARGIN = 12
+const CLOSED_CONTEXT_MENU = { open: false, x: 0, y: 0, application: null, source: 'favorite' }
 const FAVORITE_REMOVAL_ANIMATION_MS = 220
 // The sidebar only fits a few favorites; the rest stay starred in the full list.
 const SIDEBAR_FAVORITES_LIMIT = 4
@@ -920,20 +919,6 @@ async function copyTextToClipboard(text) {
   }
 }
 
-function getContextMenuPosition(event) {
-  const maxX = window.innerWidth - FAVORITES_CONTEXT_MENU_WIDTH - FAVORITES_CONTEXT_MENU_MARGIN
-  const maxY = window.innerHeight - FAVORITES_CONTEXT_MENU_HEIGHT - FAVORITES_CONTEXT_MENU_MARGIN
-  const x = Math.max(FAVORITES_CONTEXT_MENU_MARGIN, Math.min(event.clientX, maxX))
-  const y = Math.max(FAVORITES_CONTEXT_MENU_MARGIN, Math.min(event.clientY, maxY))
-
-  return {
-    x,
-    y,
-    originX: `${Math.max(18, event.clientX - x)}px`,
-    originY: `${Math.max(18, event.clientY - y)}px`,
-  }
-}
-
 // What tells the grade service's app ("Notes IUT Lannion": ScoDoc) apart,
 // whatever the list it comes from (see gradesPortalApp.js).
 const GRADES_PORTAL_OPTIONS = {
@@ -992,15 +977,7 @@ function AvailableApplications({
     removingKey: '',
     error: '',
   })
-  const [contextMenuState, setContextMenuState] = useState({
-    open: false,
-    x: 0,
-    y: 0,
-    originX: '24px',
-    originY: '24px',
-    application: null,
-    source: 'favorite',
-  })
+  const [contextMenuState, setContextMenuState] = useState(CLOSED_CONTEXT_MENU)
   const [allServices, setAllServices] = useState([])
   const [appIcons, setAppIcons] = useState(getCachedAppIcons)
   const [loadedIconKey, setLoadedIconKey] = useState('')
@@ -1017,7 +994,6 @@ function AvailableApplications({
   const deferredRemovalsRef = useRef(new Set())
   const launchTargetsRef = useRef({})
   const isMountedRef = useRef(true)
-  const contextMenuRef = useRef(null)
   const dragRef = useRef({ index: -1, didDrag: false })
   const favoritesRowRef = useRef(null)
   const flipRectsRef = useRef(new Map())
@@ -1165,14 +1141,7 @@ function AvailableApplications({
         removingKey: '',
         error: '',
       })
-      setContextMenuState({
-        open: false,
-        x: 0,
-        y: 0,
-        originX: '24px',
-        originY: '24px',
-        application: null,
-      })
+      setContextMenuState(CLOSED_CONTEXT_MENU)
     }
 
     window.addEventListener('pageshow', handlePageShow)
@@ -1182,51 +1151,6 @@ function AvailableApplications({
     }
   }, [])
 
-  useEffect(() => {
-    if (!contextMenuState.open) {
-      return undefined
-    }
-
-    function closeContextMenu() {
-      setContextMenuState({
-        open: false,
-        x: 0,
-        y: 0,
-        originX: '24px',
-        originY: '24px',
-        application: null,
-        source: 'favorite',
-      })
-    }
-
-    function handlePointerDown(event) {
-      if (contextMenuRef.current?.contains(event.target)) {
-        return
-      }
-
-      closeContextMenu()
-    }
-
-    function handleKeyDown(event) {
-      if (event.key === 'Escape') {
-        closeContextMenu()
-      }
-    }
-
-    window.addEventListener('pointerdown', handlePointerDown)
-    window.addEventListener('keydown', handleKeyDown)
-    window.addEventListener('resize', closeContextMenu)
-    window.addEventListener('scroll', closeContextMenu, true)
-    window.addEventListener('blur', closeContextMenu)
-
-    return () => {
-      window.removeEventListener('pointerdown', handlePointerDown)
-      window.removeEventListener('keydown', handleKeyDown)
-      window.removeEventListener('resize', closeContextMenu)
-      window.removeEventListener('scroll', closeContextMenu, true)
-      window.removeEventListener('blur', closeContextMenu)
-    }
-  }, [contextMenuState.open])
 
   useEffect(() => {
     let isCancelled = false
@@ -1451,29 +1375,17 @@ function AvailableApplications({
     })
   }
 
-  function closeContextMenu() {
-    setContextMenuState({
-      open: false,
-      x: 0,
-      y: 0,
-      originX: '24px',
-      originY: '24px',
-      application: null,
-      source: 'favorite',
-    })
-  }
+  // Stable: the menu listens with it (ContextMenu).
+  const closeContextMenu = useCallback(() => setContextMenuState(CLOSED_CONTEXT_MENU), [])
 
   function handleFavoriteContextMenu(event, application, source = 'favorite') {
     event.preventDefault()
 
-    const { x, y, originX, originY } = getContextMenuPosition(event)
     setFavoriteActionState((current) => ({ ...current, error: '' }))
     setContextMenuState({
       open: true,
-      x,
-      y,
-      originX,
-      originY,
+      x: event.clientX,
+      y: event.clientY,
       application,
       source,
     })
@@ -2172,60 +2084,22 @@ function AvailableApplications({
         const targetApplication = favoriteEntry ?? contextMenuState.application
 
         return (
-        <div
-          ref={contextMenuRef}
-          className="favorites-context-menu fixed z-60 min-w-[252px] p-[6px] border border-border corners-[18px] bg-context-bg shadow-[0_18px_40px_var(--color-shadow)] backdrop-blur-[12px] animate-context-menu-in max-md:min-w-[220px]"
-          role="menu"
-          aria-label={`Actions pour ${targetApplication.title}`}
-          style={{
-            top: `${contextMenuState.y}px`,
-            left: `${contextMenuState.x}px`,
-            '--favorites-context-origin-x': contextMenuState.originX,
-            '--favorites-context-origin-y': contextMenuState.originY,
-          }}
-        >
-          <button
-            type="button"
-            className="favorites-context-action w-full flex items-center gap-[10px] min-h-[44px] px-3 border-0 corners-[12px] bg-transparent text-brand font-inherit text-[15px] font-semibold text-left animate-context-action-in hover:bg-context-hover focus-visible:bg-context-hover focus-visible:outline-none"
-            role="menuitem"
-            onClick={() => void handleOpenApplicationInNewTab(targetApplication)}
-          >
-            <Icon icon="carbon:launch" className="w-[18px] h-[18px] shrink-0" aria-hidden="true" />
-            <span>Ouvrir dans un nouvel onglet</span>
-          </button>
-          <button
-            type="button"
-            className="favorites-context-action w-full flex items-center gap-[10px] min-h-[44px] px-3 border-0 corners-[12px] bg-transparent text-brand font-inherit text-[15px] font-semibold text-left animate-context-action-in hover:bg-context-hover focus-visible:bg-context-hover focus-visible:outline-none"
-            role="menuitem"
-            onClick={() => void handleCopyApplicationLink(targetApplication)}
-          >
-            <Icon icon="carbon:copy-link" className="w-[18px] h-[18px] shrink-0" aria-hidden="true" />
-            <span>Copier le lien</span>
-          </button>
-          <div className="mx-2 my-1 h-px bg-border/80" aria-hidden="true" />
-          {isAddMode ? (
-            <button
-              type="button"
-              className="favorites-context-action w-full flex items-center gap-[10px] min-h-[44px] px-3 border-0 corners-[12px] bg-transparent text-brand font-inherit text-[15px] font-semibold text-left animate-context-action-in hover:bg-context-hover focus-visible:bg-context-hover focus-visible:outline-none"
-              role="menuitem"
-              onClick={() => void handleAddFavorite(targetApplication)}
-            >
-              <Icon icon="carbon:star" className="w-[18px] h-[18px] shrink-0" aria-hidden="true" />
-              <span>Ajouter aux favoris</span>
-            </button>
-          ) : (
-            <button
-              type="button"
-              className="favorites-context-action w-full flex items-center gap-[10px] min-h-[44px] px-3 border-0 corners-[12px] bg-transparent text-brand font-inherit text-[15px] font-semibold text-left animate-context-action-in hover:bg-context-hover focus-visible:bg-context-hover focus-visible:outline-none"
-              role="menuitem"
-              onClick={() => void handleUnfavorite(targetApplication)}
-            >
-              <Icon icon="carbon:close-outline" className="w-[18px] h-[18px] shrink-0" aria-hidden="true" />
-              <span>Retirer des favoris</span>
-            </button>
-          )}
-        </div>
-      )})() : null}
+          <ContextMenu
+            x={contextMenuState.x}
+            y={contextMenuState.y}
+            label={`Actions pour ${targetApplication.title}`}
+            onClose={closeContextMenu}
+            items={[
+              { id: 'open', label: 'Ouvrir dans un nouvel onglet', icon: 'carbon:launch', onSelect: () => void handleOpenApplicationInNewTab(targetApplication) },
+              { id: 'copy', label: 'Copier le lien', icon: 'carbon:copy-link', onSelect: () => void handleCopyApplicationLink(targetApplication) },
+              'separator',
+              isAddMode
+                ? { id: 'favorite', label: 'Ajouter aux favoris', icon: 'carbon:star', onSelect: () => void handleAddFavorite(targetApplication) }
+                : { id: 'unfavorite', label: 'Retirer des favoris', icon: 'carbon:close-outline', onSelect: () => void handleUnfavorite(targetApplication) },
+            ]}
+          />
+        )
+      })() : null}
     </>
   )
 }

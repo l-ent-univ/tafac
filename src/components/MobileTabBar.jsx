@@ -9,7 +9,18 @@ const NOTICE_DURATION_MS = 3200
 
 // The dashboard itself: selected unless an in-app page (grades…) is shown.
 // Tapping the selected tab scrolls back to the top.
-const HOME_TAB = { id: 'home', label: 'Accueil', icon: 'ph:house-fill', page: 'dashboard' }
+const HOME_TAB = { id: 'home', label: 'Accueil', icon: 'carbon:home', page: 'dashboard' }
+
+// The bar's icons, all Carbon (as the sidebar's), outlines: the tab shown
+// is told by its lens (.mobile-tab-bar-item--selected), Carbon having no
+// filled versions. Moodle, without a Carbon logo, is its education cap.
+const TAB_ICONS = {
+  moodle: 'carbon:education',
+}
+
+function getTabIcon(item) {
+  return TAB_ICONS[item.id] ?? item.icon
+}
 
 // Up to three tabs: a compact pill sized to roomy tabs. From four on, like
 // iOS, the bar spans the screen (up to 420px) and the tabs share it equally,
@@ -31,7 +42,7 @@ function MobileTabBar({ establishment, gradesSupported = true, activePage = 'das
     item.page ? { ...item, selected: item.page === activePage } : item
   ))
   const tabSizeClasses = getTabSizeClasses(items.length)
-  const iconNames = items.map((item) => item.icon)
+  const iconNames = items.map(getTabIcon)
   const iconKey = iconNames.join(',')
   const [noticeItem, setNoticeItem] = useState(null)
   const { unseenIds } = useChangelog()
@@ -118,7 +129,7 @@ function MobileTabBar({ establishment, gradesSupported = true, activePage = 'das
               {/* `ssr`: draw on the first render. The bar only mounts once these icons
                   are loaded, so there's nothing to wait for. */}
               <span className="relative flex">
-                <Icon icon={item.icon} ssr className="h-[22px] w-[22px]" aria-hidden="true" />
+                <Icon icon={getTabIcon(item)} ssr className="h-[22px] w-[22px]" aria-hidden="true" />
                 {isNew ? <span className="mobile-tab-bar-new-dot changelog-new-dot nav-new-pulse absolute -right-[3px] -top-[2px] h-[9px] w-[9px] rounded-full" aria-hidden="true" /> : null}
               </span>
               {/* Font on the label: index.css gives buttons `font: inherit` outside Tailwind's layers. */}

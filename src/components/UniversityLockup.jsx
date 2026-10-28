@@ -23,6 +23,8 @@ const VARIANTS = {
     uni: 'header-university-logo h-8 w-auto min-w-0 object-contain max-xl:h-6 [filter:brightness(0)_invert(1)_drop-shadow(0_1px_2px_rgba(0,0,0,0.5))_drop-shadow(0_0_10px_rgba(0,0,0,0.35))]',
     uniSquare: 'header-university-logo h-11 w-auto min-w-0 object-contain max-xl:h-9 [filter:brightness(0)_invert(1)_drop-shadow(0_1px_2px_rgba(0,0,0,0.5))_drop-shadow(0_0_10px_rgba(0,0,0,0.35))]',
     row: 'inline-flex items-center gap-4 min-w-0 max-md:gap-3',
+    // Over the photo too: the wordmark in white (the mark keeps its colours).
+    wordmark: 'header-wordmark',
   },
 }
 
@@ -54,7 +56,7 @@ function UniversityLockup({ variant = 'sidebar', establishment = null, showLogo 
 
   return (
     <span className={classes.row}>
-      <LogoBut1 className={classes.lent} />
+      <LogoBut1 className={classes.lent} wordmarkClassName={classes.wordmark ?? ''} />
       {logo && logo.srcDark ? (
         <>
           <img src={logo.src} alt={alt} className={`${uniClasses} is-themed block dark:hidden`} />
