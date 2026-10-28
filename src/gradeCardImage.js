@@ -5,14 +5,14 @@
 // with the app's own fonts (self-hosted: nothing fetched). Loaded on first
 // use only.
 
-import { pickInkOn } from './colorContrast.js'
+import { pickInkOn, shadeHex } from './colorContrast.js'
 import { describeGapToMean } from './gradeDetail.js'
 import { formatUeCode } from './gradesSubjects.js'
 import { describeMailGrade, formatMailDate, formatMailScore } from './gradeMail.js'
 
-const WIDTH = 520
+const WIDTH = 400
 const SCALE = 2
-const PAD = 24
+const PAD = 20
 const RADIUS = 22
 // The light theme's tokens (index.css).
 const INK = '#341200'
@@ -115,6 +115,73 @@ function drawWash(context, ues, width, height) {
   context.restore()
 }
 
+// A UE as « Mes notes » shows it (UeBadge): the ring's arched segment in
+// the UE's colour, its edge catching the light, its shadows down and to
+// the left in a dark shade of the colour, the code set along the arc. The
+// same geometry as UeBadge's SVG (its viewBox 36 0 112 52), drawn at
+// `scale` with its top left at (x, y). Canvas shadows ignore the
+// transform: their offsets and blur are given in device pixels.
+const UE_SEGMENT = 'M91.7426 4.00025C110.328 3.95769 128.525 9.33267 144.114 19.468C144.343 19.6172 144.502 19.8543 144.552 20.1233C144.602 20.3922 144.539 20.6701 144.379 20.8919L124.923 47.8469C124.617 48.2708 124.036 48.3876 123.59 48.1145C114.031 42.2593 103.037 39.1729 91.8324 39.1985C80.6276 39.2242 69.6498 42.3611 60.1205 48.26C59.6759 48.535 59.0936 48.4216 58.7855 47.9993L39.1928 21.1331C39.0316 20.912 38.9671 20.6337 39.016 20.3645C39.0649 20.0954 39.223 19.8575 39.4515 19.7073C54.9881 9.50067 73.1578 4.04298 91.7426 4.00025Z'
+const UE_SHADOWS = [[-1, 1, 2, 0.36], [-4, 6, 3.5, 0.31], [-9, 13, 5, 0.18], [-16, 24, 5.5, 0.05]]
+const UE_ARC = { cx: 91.8, cy: 99.1, r: 75.1 }
+export const UE_RIBBON_SIZE = { width: 112, height: 52 }
+
+function alphaHex(hex, opacity) {
+  const value = hex.replace('#', '')
+  const [r, g, b] = [0, 2, 4].map((index) => parseInt(value.slice(index, index + 2), 16))
+  return `rgb(${r} ${g} ${b} / ${opacity})`
+}
+
+function drawUeRibbon(context, { x, y, scale, color, code }) {
+  const segment = new Path2D(UE_SEGMENT)
+  const device = scale * SCALE
+  const shade = shadeHex(color, 0.55)
+  context.save()
+  context.translate(x - 36 * scale, y)
+  context.scale(scale, scale)
+  context.fillStyle = color
+  for (const [dx, dy, blur, opacity] of UE_SHADOWS) {
+    context.shadowColor = alphaHex(shade, opacity)
+    context.shadowOffsetX = dx * device
+    context.shadowOffsetY = dy * device
+    context.shadowBlur = blur * 2 * device
+    context.fill(segment)
+  }
+  context.shadowColor = 'transparent'
+  context.fill(segment)
+  // The 1px inner edge: the stroke clipped to the shape, lightening.
+  context.save()
+  context.clip(segment)
+  const edge = context.createLinearGradient(91.78, 4, 91.78, 48.41)
+  edge.addColorStop(0, '#515151')
+  edge.addColorStop(1, '#000000')
+  context.globalCompositeOperation = 'lighter'
+  context.strokeStyle = edge
+  context.lineWidth = 2
+  context.stroke(segment)
+  context.restore()
+  // The code on the arc, centred over the top of the circle.
+  const label = formatUeCode(code)
+  context.font = `600 17px ${DISPLAY}`
+  context.fillStyle = pickInkOn(color)
+  context.textAlign = 'center'
+  context.textBaseline = 'middle'
+  const spacing = 0.2
+  const widths = [...label].map((char) => context.measureText(char).width + spacing)
+  const total = widths.reduce((sum, width) => sum + width, 0) - spacing
+  let offset = -total / 2
+  ;[...label].forEach((char, index) => {
+    const angle = -Math.PI / 2 + (offset + widths[index] / 2) / UE_ARC.r
+    context.save()
+    context.translate(UE_ARC.cx + UE_ARC.r * Math.cos(angle), UE_ARC.cy + UE_ARC.r * Math.sin(angle))
+    context.rotate(angle + Math.PI / 2)
+    context.fillText(char, 0, 0)
+    context.restore()
+    offset += widths[index]
+  })
+  context.restore()
+}
+
 function drawPill(context, { x, y, text, font, fill, ink, stroke = null, padX = 9, height = 22 }) {
   context.font = font
   const width = Math.ceil(context.measureText(text).width) + padX * 2
@@ -140,15 +207,17 @@ function layout(context, { report, module, evaluation }, draw) {
   const ues = readUes(report, evaluation)
   let y = PAD
 
-  // The subject and its code, its UEs' tags at the right.
-  context.font = `600 12px ${DISPLAY}`
-  const tags = ues.slice(0, 3).map((ue) => ({ ...ue, label: formatUeCode(ue.code), width: Math.ceil(context.measureText(formatUeCode(ue.code)).width) + 18 }))
-  const tagsWidth = tags.reduce((sum, tag) => sum + tag.width + 6, 0)
+  // The subject and its code, its UEs' ribbons at the right (UeBadge's,
+  // a bit over half size).
+  const ribbonScale = 0.55
+  const ribbonWidth = UE_RIBBON_SIZE.width * ribbonScale
+  const tags = ues.slice(0, 3)
+  const tagsWidth = tags.length * ribbonWidth + Math.max(0, tags.length - 1) * 4
   if (draw) {
-    let x = WIDTH - PAD - tagsWidth + 6
+    let x = WIDTH - PAD - tagsWidth
     for (const tag of tags) {
-      drawPill(context, { x, y: y + 4, text: tag.label, font: `600 12px ${DISPLAY}`, fill: tag.color, ink: pickInkOn(tag.color) })
-      x += tag.width + 6
+      drawUeRibbon(context, { x, y: y - 2, scale: ribbonScale, color: tag.color, code: tag.code })
+      x += ribbonWidth + 4
     }
     const textMax = inner - tagsWidth - (tags.length ? 12 : 0)
     context.fillStyle = INK
