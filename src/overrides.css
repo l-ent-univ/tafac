@@ -4982,9 +4982,44 @@
   }
 }
 
+/* « Messagerie » (MailLaunchCard): the message list's rows slide in from
+   the right one after the other (a soft overshoot), then the first one's
+   unread dot pops in the brand colour. */
+
+.mail-launch-row {
+  border-color: var(--color-border);
+  box-shadow: 0 1px 2px rgb(21 54 99 / 0.12);
+  animation: mail-launch-row-in 700ms var(--fly-spring) calc(140ms + var(--i, 0) * 110ms) backwards;
+}
+
+:where([data-theme="dark"]) .mail-launch-row {
+  box-shadow: 0 1px 2px rgb(0 0 0 / 0.35);
+}
+
+.mail-launch-line {
+  background: var(--color-text);
+  opacity: 0.55;
+}
+
+.mail-launch-line.is-faint {
+  opacity: 0.22;
+}
+
+.mail-launch-unread {
+  background: var(--color-brand);
+  animation: launch-card-pop 520ms var(--dial-spring) 780ms backwards;
+}
+
+@keyframes mail-launch-row-in {
+  from {
+    opacity: 0;
+    transform: translateX(26px) scale(0.94);
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .launch-card,
-  .launch-card :is(.launch-card-hub, .launch-card-rise, .launch-card-cta-arrow, .grades-launch-turn, .grades-launch-step, .grades-launch-ribbon, .planning-launch-block, .planning-launch-now) {
+  .launch-card :is(.launch-card-hub, .launch-card-rise, .launch-card-cta-arrow, .grades-launch-turn, .grades-launch-step, .grades-launch-ribbon, .planning-launch-block, .planning-launch-now, .mail-launch-row, .mail-launch-unread) {
     animation: none;
   }
 

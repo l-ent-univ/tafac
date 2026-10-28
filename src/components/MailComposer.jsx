@@ -26,6 +26,7 @@ import { TOOLBAR_BUTTON_CLASSES } from './MailToolbar'
 import { getSenderBadgeStyle, getSenderInitial } from './mailSender'
 import FileName from './FileName'
 import { getMailRecipientSuggestions, uploadMailAttachment } from '../entApi'
+import { trackMailAction } from '../analytics'
 import {
   FILESENDER_URL,
   checkNewAttachments,
@@ -1409,10 +1410,12 @@ function MailComposer({ initialKind = 'new', message = null, sender = null, iden
   // The close dialog's choices: kept in Brouillons (saved now, the saver
   // outliving the window), or deleted, as Apple Mail's « Supprimer ».
   const saveAndClose = useCallback(() => {
+    trackMailAction('draft_saved')
     void saver?.save(getDraftState())
     onClose()
   }, [saver, getDraftState, onClose])
   const discardAndClose = useCallback(() => {
+    trackMailAction('draft_discarded')
     void saver?.discard()
     onClose()
   }, [saver, onClose])

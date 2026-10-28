@@ -5,6 +5,7 @@ import AvailableApplications from './AvailableApplications'
 import CloseButton from './CloseButton'
 import GradesLaunchCard from './GradesLaunchCard'
 import GreetingCard from './GreetingCard'
+import MailLaunchCard from './MailLaunchCard'
 import PlanningLaunchCard from './PlanningLaunchCard'
 import ServiceNotice from './ServiceNotice'
 import WidgetDeadlines from './WidgetDeadlines'
@@ -318,10 +319,11 @@ function WidgetContainer({
       </div>
 
       <div>
-        {/* A page just launched (the Planning, « Mes notes »): a compact
+        {/* A page just launched (the Messagerie, the Planning, « Mes notes »): a compact
             card under the widgets, out of the band, until it's seen. One at
             a time, the newest first: the others render nothing
             (LaunchCard). */}
+        <MailLaunchCard onOpen={onOpenMailPage} />
         <PlanningLaunchCard onOpen={onOpenPlanningPage} />
         <GradesLaunchCard onOpen={onOpenGradesPage} />
         <div id="sidebar-section-applications">

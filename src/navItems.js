@@ -19,7 +19,7 @@ const MOODLE_HREF = universityConfig.features?.moodle && MOODLE_ORIGIN
 // signed in (or falls back to its launch URL).
 const MAIL_ITEM = universityConfig.mail?.page === false
   ? { id: 'mail', label: 'Messagerie', shortLabel: 'Mail', icon: 'carbon:email', href: `${ENT_AUTH_PREFIX}/mail/open`, target: '_blank' }
-  : { id: 'mail', label: 'Messagerie', shortLabel: 'Mail', icon: 'carbon:email', page: 'mail' }
+  : { id: 'mail', label: 'Messagerie', shortLabel: 'Mail', icon: 'carbon:email', page: 'mail', announcedBy: 'messagerie' }
 
 // "Mes notes" follows the tri-state grades feature: the in-app grades page
 // when live, a greyed-out item with the unavailability notice when

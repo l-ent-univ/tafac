@@ -18,6 +18,7 @@ import FileName from './FileName'
 import { formatAttachmentSize as formatSize, getAttachmentIcon, getAttachmentKind } from '../mailAttachments'
 import { addressMenuItems, attachmentMenuItems } from '../contextMenuItems'
 import { copyToClipboard, useContextMenu } from '../useContextMenu'
+import { trackMailAction } from '../analytics'
 import { bindFrameContextMenu } from '../contextMenuEvents'
 
 const fullDateFormatter = new Intl.DateTimeFormat('fr-FR', { dateStyle: 'full', timeStyle: 'short' })
@@ -332,6 +333,7 @@ function AttachmentRows({ attachments }) {
         link.href = attachment.href
         link.download = attachment.name
         link.click()
+        trackMailAction('attachment_downloaded')
       },
     })
   })
@@ -347,6 +349,7 @@ function AttachmentRows({ attachments }) {
           detail={[getAttachmentKind(attachment), formatSize(attachment.size)].filter(Boolean).join(' · ')}
           href={attachment.href}
           download={attachment.name}
+          onClick={() => trackMailAction('attachment_downloaded')}
           menuProps={menuProps(attachment.part)}
         />
       ))}
@@ -955,7 +958,10 @@ export function MailThread({ id, folder, webmailHref, onBack, onLoaded, backLabe
               onResumeDraft={message.draft && onResumeDraft ? () => onResumeDraft(message) : null}
             />
           ) : (
-            <ThreadFoldedMail message={message} onExpand={() => setExpanded((current) => new Set(current).add(message.id))} />
+            <ThreadFoldedMail message={message} onExpand={() => {
+              trackMailAction('thread_expanded')
+              setExpanded((current) => new Set(current).add(message.id))
+            }} />
           )}
         </div>
       )) : null}

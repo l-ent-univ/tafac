@@ -329,6 +329,43 @@ export function flushPlanningNavigation() {
   planningNavigation.flush()
 }
 
+// The Messagerie, once per arrival (MailPage's mount; refs survive
+// StrictMode's second effect run): page_viewed with how the student got
+// there (`source`, see src/mailAnalytics.js), then mail_loaded when `outcome`
+// (describeMailLoad) first settles for the folder it opens on. Other folders,
+// pages of older mails and background refreshes are never reported.
+export function useMailPageReport(source, outcome) {
+  const startedAtRef = useRef(null)
+  const reportedRef = useRef({ view: false, load: false })
+  const status = outcome?.status ?? null
+  const errorKind = outcome?.errorKind ?? null
+
+  useEffect(() => {
+    if (startedAtRef.current === null) startedAtRef.current = performance.now()
+    const reported = reportedRef.current
+    if (!reported.view) {
+      reported.view = true
+      track('page_viewed', { page: 'mail', source })
+    }
+    if (!status || reported.load) return
+
+    reported.load = true
+    track('mail_loaded', {
+      status,
+      duration_bucket: getDurationBucket(performance.now() - startedAtRef.current),
+      ...(status === 'error' ? { error_kind: errorKind ?? 'other' } : null),
+    })
+  }, [source, status, errorKind])
+}
+
+// One thing done in the Messagerie (mail_action): `action` and its own
+// properties (`from`, `via`, `kind`, `result`… see server/analyticsSchema.js).
+// Properties left null or undefined are not sent.
+export function trackMailAction(action, properties = {}) {
+  const kept = Object.fromEntries(Object.entries(properties).filter(([, value]) => value !== null && value !== undefined))
+  track('mail_action', { action, ...kept })
+}
+
 // Application ids (portal fname or local service id) as a short slug.
 export function toAppSlug(value) {
   return String(value ?? '')

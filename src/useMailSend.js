@@ -1,5 +1,7 @@
 import { useEffect, useRef } from 'react'
 import { mailAction, saveMailDraft, sendMail } from './entApi'
+import { trackMailAction } from './analytics'
+import { describeSend } from './mailAnalytics'
 import { createDraftSaver } from './mailDraftSaver'
 import { createSendUid } from './mailSendPayload'
 import { createMailSendQueue } from './mailSendQueue'
@@ -16,7 +18,13 @@ export function newDraftSaver(options = {}) {
 }
 
 // The app's one send queue (src/mailSendQueue.js), outliving the mail page.
-const queue = createMailSendQueue({ sendMail, createSendUid })
+const queue = createMailSendQueue({
+  sendMail,
+  createSendUid,
+  // Once per send: how it ended, with the files in buckets (never who to,
+  // what about, nor the files).
+  onOutcome: (outcome, snapshot, result) => trackMailAction('sent', describeSend(outcome, snapshot, result)),
+})
 const pageSends = { send: queue.send, undo: queue.undo }
 
 // The tab closing while a mail waits or goes: the browser asks first.

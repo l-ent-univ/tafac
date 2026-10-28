@@ -267,7 +267,7 @@ test('simulator_step keeps reveal outcomes on reveal_shown and `reached` on clos
 test('launch_card only carries its action and which launch', () => {
   const opts = { hasSession: true }
   for (const action of ['shown', 'cta', 'dismissed', 'tab_marker']) {
-    for (const launch of ['grades', 'planning']) {
+    for (const launch of ['grades', 'planning', 'mail']) {
       assert.deepEqual(sanitizeAnalyticsEvent({ event: 'launch_card', properties: { action, launch } }, opts)?.properties, { action, launch })
     }
   }
@@ -351,4 +351,74 @@ test('planning_action keeps only the properties of its action, never a class or 
   assert.equal(keep({ action: 'ics_exported', from: 'header' }), null)
   assert.equal(keep({ action: 'ics_exported', from: 'dashboard', result: 'ok' }), null)
   assert.equal(keep({ action: 'Maths B204' }), null)
+})
+
+test('page_viewed accepts the Messagerie with its own sources', () => {
+  const opts = { hasSession: true }
+  for (const source of ['nav', 'tabbar', 'tile', 'dashboard_card', 'launch_card', 'grades', 'history', 'other']) {
+    assert.deepEqual(sanitizeAnalyticsEvent({ event: 'page_viewed', properties: { page: 'mail', source, view: 'week' } }, opts)?.properties, { page: 'mail', source })
+  }
+  // `sidebar_card` is « Mes notes »'s alone.
+  assert.equal(sanitizeAnalyticsEvent({ event: 'page_viewed', properties: { page: 'mail', source: 'sidebar_card' } }, opts), null)
+  assert.equal(sanitizeAnalyticsEvent({ event: 'page_viewed', properties: { page: 'grades', source: 'grades' } }, opts), null)
+})
+
+test('mail_loaded only carries a status, a duration bucket and the error kind of an error', () => {
+  const opts = { hasSession: true }
+  const keep = (properties) => sanitizeAnalyticsEvent({ event: 'mail_loaded', properties }, opts)?.properties ?? null
+  for (const status of ['ok', 'empty', 'session_expired']) {
+    assert.deepEqual(keep({ status, duration_bucket: '<1s', error_kind: 'network', count: 42, folder: 'Perso' }), { status, duration_bucket: '<1s' })
+  }
+  assert.deepEqual(keep({ status: 'error', duration_bucket: '10s+', error_kind: 'http_5xx' }), { status: 'error', duration_bucket: '10s+', error_kind: 'http_5xx' })
+  assert.equal(keep({ status: 'loading' }), null)
+  assert.equal(keep({}), null)
+})
+
+test('mail_action keeps only the properties of its action, never a subject, an address or a folder name', () => {
+  const opts = { hasSession: true }
+  const keep = (properties) => sanitizeAnalyticsEvent({ event: 'mail_action', properties }, opts)?.properties ?? null
+  const leaks = { subject: 'Convocation', to: 'a@b.fr', folder: 'Projets', query: 'examen', name: 'cv.pdf', id: '123', count: 5 }
+  assert.deepEqual(keep({ action: 'mail_opened', from: 'widget', ...leaks }), { action: 'mail_opened', from: 'widget' })
+  assert.deepEqual(keep({ action: 'folder_changed', folder_kind: 'folder', ...leaks }), { action: 'folder_changed', folder_kind: 'folder' })
+  assert.deepEqual(keep({ action: 'search', scope: 'server', ...leaks }), { action: 'search', scope: 'server' })
+  assert.deepEqual(keep({ action: 'compose_opened', kind: 'grade', ...leaks }), { action: 'compose_opened', kind: 'grade' })
+  assert.deepEqual(
+    keep({ action: 'sent', result: 'partial', attachments: '2-3', inline_images: true, ...leaks }),
+    { action: 'sent', result: 'partial', attachments: '2-3', inline_images: true },
+  )
+  for (const action of ['trash', 'spam', 'move', 'restore', 'delete_forever', 'flag', 'read_toggle']) {
+    for (const via of ['toolbar', 'context_menu', 'swipe', 'keyboard']) assert.deepEqual(keep({ action, via, ...leaks }), { action, via })
+  }
+  assert.deepEqual(keep({ action: 'pdf', result: 'error' }), { action: 'pdf', result: 'error' })
+  assert.deepEqual(keep({ action: 'empty_folder', folder_kind: 'trash', ...leaks }), { action: 'empty_folder', folder_kind: 'trash' })
+  for (const action of ['thread_expanded', 'refresh', 'draft_saved', 'draft_discarded', 'print', 'attachment_downloaded']) {
+    assert.deepEqual(keep({ action, via: 'toolbar', from: 'list', result: 'ok', ...leaks }), { action })
+  }
+  // Context properties stay.
+  assert.deepEqual(keep({ action: 'refresh', device: 'mobile' }), { device: 'mobile', action: 'refresh' })
+  // Without what makes them meaningful, or with anything else, dropped.
+  assert.equal(keep({ action: 'mail_opened' }), null)
+  assert.equal(keep({ action: 'mail_opened', from: 'Projets' }), null)
+  assert.equal(keep({ action: 'folder_changed', folder_kind: 'Projets' }), null)
+  assert.equal(keep({ action: 'search', scope: 'examen' }), null)
+  assert.equal(keep({ action: 'trash' }), null)
+  assert.equal(keep({ action: 'trash', via: 'voice' }), null)
+  assert.equal(keep({ action: 'sent' }), null)
+  assert.equal(keep({ action: 'sent', result: 'ok', attachments: 7 })?.attachments, undefined)
+  assert.equal(keep({ action: 'pdf', result: 'undone' }), null)
+  assert.equal(keep({ action: 'compose_opened', kind: 'spam' }), null)
+  assert.equal(keep({ action: 'delete_everything' }), null)
+  assert.equal(keep({ action: 'Convocation examen' }), null)
+})
+
+test('setting_changed takes the mail signature on/off and its kind, nothing else', () => {
+  const opts = { hasSession: true }
+  const keep = (properties) => sanitizeAnalyticsEvent({ event: 'setting_changed', properties }, opts)?.properties ?? null
+  assert.deepEqual(keep({ setting: 'mail_signature', value: 'off' }), { setting: 'mail_signature', value: 'off' })
+  assert.deepEqual(keep({ setting: 'mail_signature', value: 'on', text: 'Jean Dupont' }), { setting: 'mail_signature', value: 'on' })
+  for (const value of ['auto', 'partage', 'custom']) assert.deepEqual(keep({ setting: 'mail_signature_kind', value }), { setting: 'mail_signature_kind', value })
+  assert.equal(keep({ setting: 'mail_signature_kind', value: 'on' }), null)
+  assert.equal(keep({ setting: 'mail_signature', value: 'custom' }), null)
+  assert.equal(keep({ setting: 'wallpaper', value: 'partage' }), null)
+  assert.equal(keep({ setting: 'theme', value: 'custom' }), null)
 })

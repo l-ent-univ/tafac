@@ -930,6 +930,8 @@ function App() {
   const [gradesArrivalSource, setGradesArrivalSource] = useState(() => (readHistoryNav().page === 'grades' ? 'history' : 'other'))
   // Likewise for the planning page (src/planningAnalytics.js).
   const [planningArrivalSource, setPlanningArrivalSource] = useState(() => (readHistoryNav().page === 'planning' ? 'history' : 'other'))
+  // And the mail page (src/mailAnalytics.js).
+  const [mailArrivalSource, setMailArrivalSource] = useState(() => (readHistoryNav().page === 'mail' ? 'history' : 'other'))
   // Page-switch animations only once the user has switched, not on first load.
   const [hasSwitchedPage, setHasSwitchedPage] = useState(false)
   const [theme, setTheme] = useState(() => getStoredTheme())
@@ -1795,12 +1797,15 @@ function App() {
   // signed in at a school with it.
   const hasConfirmedGradesPage = hasGradesPage && gradesFormation === 'BUT'
   const hasConfirmedPlanningPage = hasPlanningPage && sessionState.authenticated
+  // And those about the Messagerie, students signed in at a school with its page.
+  const hasConfirmedMailPage = hasMailPage && sessionState.authenticated
   useEffect(() => {
     setChangelogAudience([
       ...(hasConfirmedGradesPage ? ['grades-page'] : []),
       ...(hasConfirmedPlanningPage ? ['planning-page'] : []),
+      ...(hasConfirmedMailPage ? ['mail-page'] : []),
     ])
-  }, [hasConfirmedGradesPage, hasConfirmedPlanningPage])
+  }, [hasConfirmedGradesPage, hasConfirmedPlanningPage, hasConfirmedMailPage])
   // Falls back to the dashboard if the grades item goes away (establishment
   // without grade widgets, feature switched off, a relevé that isn't BUT).
   const isGradesPage = useMemo(
@@ -1832,6 +1837,10 @@ function App() {
   useEffect(() => {
     if (isPlanningPage && hasConfirmedPlanningPage) markChangelogEntrySeen('planning')
   }, [isPlanningPage, hasConfirmedPlanningPage])
+  // And the Messagerie's.
+  useEffect(() => {
+    if (isMailPage && hasConfirmedMailPage) markChangelogEntrySeen('messagerie')
+  }, [isMailPage, hasConfirmedMailPage])
   // The other pages sit on the plain background, like with the wallpaper off.
   const isWallpaperShown = showWallpaper && shownPage === 'dashboard'
 
@@ -1906,6 +1915,7 @@ function App() {
   const showPage = useCallback((page, source = 'other') => {
     if (page === 'grades') setGradesArrivalSource(source)
     if (page === 'planning') setPlanningArrivalSource(source)
+    if (page === 'mail') setMailArrivalSource(source)
     setActivePage(page)
     setHasSwitchedPage(true)
     window.requestAnimationFrame(() => {
@@ -2660,7 +2670,7 @@ function App() {
             ) : null}
             {isMailPage ? (
               <div className="page-enter flex-1 min-h-0 4xl:flex-none 4xl:min-h-0">
-                <MailPage onReaderOpenChange={handleMailReaderOpenChange} onSignInAgain={() => void handleSignInAgain()} sender={mailSender} composeRequest={pendingMailCompose} onComposeRequestHandled={clearPendingMailCompose} />
+                <MailPage onReaderOpenChange={handleMailReaderOpenChange} onSignInAgain={() => void handleSignInAgain()} sender={mailSender} composeRequest={pendingMailCompose} onComposeRequestHandled={clearPendingMailCompose} arrivalSource={mailArrivalSource} />
               </div>
             ) : null}
             <div className="4xl:mt-auto">

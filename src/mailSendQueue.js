@@ -39,7 +39,9 @@ export function sentNoticeText(result) {
   return `Envoyé, sauf à ${shown}${invalid.length > 3 ? ` et ${invalid.length - 3} autres` : ''} (adresses refusées)`
 }
 
-export function createMailSendQueue({ sendMail, createSendUid, setTimer = (fn, ms) => setTimeout(fn, ms), clearTimer = (id) => clearTimeout(id), wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms)) }) {
+// `onOutcome(outcome, snapshot, result)`: 'sent' (result ok), 'failed' or
+// 'undone', for the anonymous analytics (src/mailAnalytics.js).
+export function createMailSendQueue({ sendMail, createSendUid, onOutcome = null, setTimer = (fn, ms) => setTimeout(fn, ms), clearTimer = (id) => clearTimeout(id), wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms)) }) {
   // { snapshot, sendUid, phase: 'waiting' | 'sending', timer, delivery }
   let pending = null
   // { snapshot, result }: a failure no page was there to show.
@@ -65,11 +67,13 @@ export function createMailSendQueue({ sendMail, createSendUid, setTimer = (fn, m
     if (sentIn !== generation) return result
     if (pending === entry) pending = null
     if (result.status === 'ok') {
+      onOutcome?.('sent', snapshot, result)
       snapshot.saver.close()
       page?.notify(sentNoticeText(result))
       page?.onSent?.(snapshot, result)
       return result
     }
+    onOutcome?.('failed', snapshot, result)
     if (page) {
       page.notify(null)
       page.reopen(snapshot, result)
@@ -89,6 +93,7 @@ export function createMailSendQueue({ sendMail, createSendUid, setTimer = (fn, m
     if (!entry || entry.phase !== 'waiting') return
     clearTimer(entry.timer)
     pending = null
+    onOutcome?.('undone', entry.snapshot, null)
     page?.notify(null)
     page?.reopen(entry.snapshot, null)
   }

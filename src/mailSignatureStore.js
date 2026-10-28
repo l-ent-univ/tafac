@@ -1,6 +1,7 @@
 import { useEffect, useSyncExternalStore } from 'react'
 import { getMailSignatures, saveMailSignature } from './entApi'
 import { isSignatureKind } from './mailSignatureChoice'
+import { track } from './analytics'
 
 // The signature's choices, shared by Réglages › Messagerie and the
 // composer (both follow a change made in the other), and the student's
@@ -52,8 +53,18 @@ function subscribePrefs(listener) {
   }
 }
 
-export const setMailSignatureEnabled = (enabled) => setPrefs({ enabled: Boolean(enabled) })
-export const setMailSignatureKind = (kind) => setPrefs({ kind: isSignatureKind(kind) ? kind : 'auto' })
+// Réglages and the composer's switch: a change is counted as a setting
+// (on or off, which kind: never the signature itself).
+export const setMailSignatureEnabled = (enabled) => {
+  const next = Boolean(enabled)
+  if (next !== prefs.enabled) track('setting_changed', { setting: 'mail_signature', value: next ? 'on' : 'off' })
+  setPrefs({ enabled: next })
+}
+export const setMailSignatureKind = (kind) => {
+  const next = isSignatureKind(kind) ? kind : 'auto'
+  if (next !== prefs.kind) track('setting_changed', { setting: 'mail_signature_kind', value: next })
+  setPrefs({ kind: next })
+}
 
 // { enabled, kind }.
 export function useMailSignaturePrefs() {

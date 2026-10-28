@@ -19,6 +19,8 @@ import { foldMailSearchText, parseMailSearchWords } from '../mailSearch'
 import { normalizeRecipient } from '../mailCompose'
 import { draftInlineImageItems } from '../mailInlineImages'
 import { useContextMenu } from '../useContextMenu'
+import { trackMailAction, useMailPageReport } from '../analytics'
+import { createSearchReporter, describeMailLoad, toComposeKind, toFolderKind, toMailPageSource, toMailVia, toRemoveAction } from '../mailAnalytics'
 import {
   SHIMMER_CLASSES,
   formatReceivedAt,
@@ -786,7 +788,7 @@ function MailListItem({ message, fallbackHref, now, onOpen, onContextMenu, onHov
 // « De : ». `composeRequest`: a mail another page asks to write (App's,
 // « Écrire au sujet de cette note » in « Mes notes »: the composer's
 // `restore`), opened once, then handed back (onComposeRequestHandled).
-function MailPage({ onReaderOpenChange, onSignInAgain, sender = null, composeRequest = null, onComposeRequestHandled = () => {} }) {
+function MailPage({ onReaderOpenChange, onSignInAgain, sender = null, composeRequest = null, onComposeRequestHandled = () => {}, arrivalSource = 'other' }) {
   // nextOffset: where the next page starts on the server.
   // `folder`: the folder the list is of (the one shown until another's
   // first page arrives).
@@ -814,6 +816,22 @@ function MailPage({ onReaderOpenChange, onSignInAgain, sender = null, composeReq
   useEffect(() => {
     openIdRef.current = openId
   }, [openId])
+  // The anonymous analytics (src/mailAnalytics.js): the arrival and how the
+  // folder it opens on loaded, once each; a mail already open on arrival
+  // (the dashboard's card, a reload) counts as opened from there.
+  useMailPageReport(toMailPageSource(arrivalSource), describeMailLoad({
+    status: state.status,
+    messageCount: state.messages.length,
+    errorKind: state.errorKind,
+    sessionExpired: isSessionExpired,
+  }))
+  const arrivedOnMailRef = useRef(false)
+  useEffect(() => {
+    if (arrivedOnMailRef.current) return
+    arrivedOnMailRef.current = true
+    if (openIdRef.current) trackMailAction('mail_opened', { from: arrivalSource === 'dashboard_card' ? 'widget' : 'history' })
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- on arrival only
+  }, [])
   // The mail the page opened by itself (removeMessages), read only after
   // AUTO_OPENED_READ_DELAY_MS; `pendingReadRef`: its unread mails waiting
   // for that, { threadId, ids, timer }.
@@ -889,6 +907,13 @@ function MailPage({ onReaderOpenChange, onSignInAgain, sender = null, composeReq
   // (parseMailSearchWords, the server's own rule): « a » filters the loaded
   // list alone, rather than a prefix search for a* over the whole mailbox.
   const canSearchServer = parseMailSearchWords(searchText).length > 0
+  // One search_ event per burst of typing (src/mailAnalytics.js), never the text.
+  const searchReporterRef = useRef(null)
+  searchReporterRef.current ??= createSearchReporter((scope) => trackMailAction('search', { scope }))
+  useEffect(() => {
+    searchReporterRef.current.report(isSearching ? (canSearchServer ? 'server' : 'local') : null)
+  }, [isSearching, canSearchServer, searchText])
+  useEffect(() => () => searchReporterRef.current.cancel(), [])
   const isSearchCurrent = search.query === searchText && search.folder === folderParam
   const hasServerResults = isSearching && canSearchServer && isSearchCurrent && search.status === 'ok'
   const isSearchFailed = isSearching && canSearchServer && isSearchCurrent && search.status === 'error'
@@ -1014,6 +1039,7 @@ function MailPage({ onReaderOpenChange, onSignInAgain, sender = null, composeReq
   const [searchNonce, setSearchNonce] = useState(0)
   const refresh = useCallback(async () => {
     if (isRefreshing) return
+    trackMailAction('refresh')
     setIsRefreshing(true)
     setSearchNonce((value) => value + 1)
     const minimumSpin = new Promise((resolve) => { window.setTimeout(resolve, REFRESH_MIN_SPIN_MS) })
@@ -1040,12 +1066,13 @@ function MailPage({ onReaderOpenChange, onSignInAgain, sender = null, composeReq
   // the open mail stays in the reader.
   const selectFolder = useCallback((id) => {
     if (id === folderIdRef.current) return
+    trackMailAction('folder_changed', { folder_kind: toFolderKind(folders?.find((folder) => folder.id === id)?.kind) })
     folderIdRef.current = id
     setFolderId(id)
     setSelectedIds([])
     setMoreStatus('idle')
     void loadMail()
-  }, [loadMail])
+  }, [loadMail, folders])
 
   const { status, hasMore, nextOffset } = state
   const loadMore = useCallback(async () => {
@@ -1203,6 +1230,7 @@ function MailPage({ onReaderOpenChange, onSignInAgain, sender = null, composeReq
     lastOpenedRef.current = id
     // The student's own choice: read as soon as it loads.
     autoOpenedIdRef.current = null
+    trackMailAction('mail_opened', { from: 'list' })
     writeHistoryNav({ page: 'mail', mail: id })
     setOpenId(id)
   }, [openId, closeMail])
@@ -1262,6 +1290,7 @@ function MailPage({ onReaderOpenChange, onSignInAgain, sender = null, composeReq
       if (page !== 'mail') return
       // Back or Forward to a mail is the student's own opening too.
       autoOpenedIdRef.current = null
+      if (mail) trackMailAction('mail_opened', { from: 'history' })
       setOpenId(mail)
     }
     window.addEventListener('popstate', handlePopState)
@@ -1323,6 +1352,7 @@ function MailPage({ onReaderOpenChange, onSignInAgain, sender = null, composeReq
   // its body most often already in the reader's cache.
   const startCompose = useCallback(async (kind) => {
     if (kind === 'new') {
+      trackMailAction('compose_opened', { kind: toComposeKind(kind) })
       showComposer({ key: Date.now(), kind, message: null, saver: newDraftSaver() })
       return
     }
@@ -1332,6 +1362,7 @@ function MailPage({ onReaderOpenChange, onSignInAgain, sender = null, composeReq
       const thread = settledValue(threadCache, threadKey(threadId, folderId)) ?? await fetchThread(threadId, folderId)
       const newest = thread[thread.length - 1]
       const message = await loadMessage(newest?.id ?? threadId)
+      trackMailAction('compose_opened', { kind: toComposeKind(kind) })
       showComposer({ key: Date.now(), kind, message, saver: newDraftSaver() })
     } catch {
       showToast(failureText('Le mail n’a pas chargé'))
@@ -1390,6 +1421,7 @@ function MailPage({ onReaderOpenChange, onSignInAgain, sender = null, composeReq
     services: {
       compose: (address) => {
         const to = normalizeRecipient(address)
+        trackMailAction('compose_opened', { kind: 'new' })
         showComposer({ key: Date.now(), kind: 'new', message: null, saver: newDraftSaver(), restore: to ? { to: [to] } : null })
       },
       search: (text) => {
@@ -1406,6 +1438,7 @@ function MailPage({ onReaderOpenChange, onSignInAgain, sender = null, composeReq
   useEffect(() => {
     if (!composeRequest || handledComposeRef.current === composeRequest) return
     handledComposeRef.current = composeRequest
+    trackMailAction('compose_opened', { kind: 'grade' })
     showComposer({ key: Date.now(), kind: 'new', message: null, saver: newDraftSaver(), restore: composeRequest })
     onComposeRequestHandled()
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -1417,6 +1450,7 @@ function MailPage({ onReaderOpenChange, onSignInAgain, sender = null, composeReq
     const draftId = row.messageIds?.[0] ?? (row.id.startsWith('-') ? row.id.slice(1) : row.id)
     try {
       const draft = await getMailDraft(draftId)
+      trackMailAction('compose_opened', { kind: 'draft' })
       showComposer({
         key: Date.now(),
         kind: draft.origin ? (draft.origin.kind === 'forward' ? 'forward' : 'reply') : 'new',
@@ -1558,8 +1592,9 @@ function MailPage({ onReaderOpenChange, onSignInAgain, sender = null, composeReq
 
   // Unread or flag, on all of them: shown at once, each put back as it was
   // if the webmail refuses.
-  const setMessagesFlag = useCallback((ids, key, value) => {
+  const setMessagesFlag = useCallback((ids, key, value, via = null) => {
     if (!ids.length) return
+    trackMailAction(key === 'unread' ? 'read_toggle' : 'flag', { via: toMailVia(via) })
     // Read or unread by hand: the page's own marking, if it was waiting
     // (handleThreadLoaded), no longer has a say.
     if (key === 'unread' && ids.includes(pendingReadRef.current?.threadId)) cancelPendingRead()
@@ -1580,8 +1615,9 @@ function MailPage({ onReaderOpenChange, onSignInAgain, sender = null, composeReq
   // trashed mail was), `move` (to `folder`, named `folderLabel` in the
   // notice) and `delete` (for good, once confirmed: its notice has no
   // « Annuler », there's nothing to bring back).
-  const removeMessages = useCallback((ids, action, { folder: target = null, folderLabel = '' } = {}) => {
+  const removeMessages = useCallback((ids, action, { folder: target = null, folderLabel = '', via = null } = {}) => {
     if (!ids.length) return
+    trackMailAction(toRemoveAction(action), { via: toMailVia(via) })
     const removed = state.messages
       .map((message, index) => ({ message, index }))
       .filter(({ message }) => ids.includes(message.id))
@@ -1711,20 +1747,20 @@ function MailPage({ onReaderOpenChange, onSignInAgain, sender = null, composeReq
 
   // « Déplacer » picked a folder: the mails filed there, out of this list
   // as a deletion would take them, « Annuler » moving them back.
-  const moveMessages = useCallback((ids, target) => {
+  const moveMessages = useCallback((ids, target, via = null) => {
     const folder = folders?.find((entry) => entry.id === target)
     if (!ids.length || !folder || target === folderIdRef.current) return
-    removeMessages(ids, 'move', { folder: target, folderLabel: getFolderLabel(folder) })
+    removeMessages(ids, 'move', { folder: target, folderLabel: getFolderLabel(folder), via })
   }, [folders, removeMessages])
 
   // The tree under a pill or a button (`rect`, its box): « Dossiers » to
   // show a folder, « Déplacer vers » to file `ids`. A button in the lower
   // half of the screen (the phone's toolbar) opens it upwards.
-  const openFolderMenu = useCallback((kind, rect, ids = []) => {
+  const openFolderMenu = useCallback((kind, rect, ids = [], via = null) => {
     const above = rect.top != null && rect.top > window.innerHeight / 2
     setContextMenu(null)
     setPillMenu(null)
-    setFolderMenu({ kind, x: rect.left, y: above ? rect.top - 6 : rect.bottom + 6, above, ids })
+    setFolderMenu({ kind, x: rect.left, y: above ? rect.top - 6 : rect.bottom + 6, above, ids, via })
   }, [])
   const closeFolderMenu = useCallback(() => setFolderMenu(null), [])
   const closePillMenu = useCallback(() => setPillMenu(null), [])
@@ -1738,6 +1774,7 @@ function MailPage({ onReaderOpenChange, onSignInAgain, sender = null, composeReq
   // (one FolderActionRequest), shown at once — its rows, its count and its
   // pill's dot — and loaded again from the webmail if it refused.
   const markFolderRead = useCallback((id) => {
+    trackMailAction('mark_folder_read', { folder_kind: toFolderKind(folders?.find((folder) => folder.id === id)?.kind) })
     const isShown = state.folder === id
     setFolders((current) => current?.map((folder) => (folder.id === id ? { ...folder, unread: 0 } : folder)) ?? current)
     if (isShown) {
@@ -1756,7 +1793,7 @@ function MailPage({ onReaderOpenChange, onSignInAgain, sender = null, composeReq
       if (folderIdRef.current === id) void loadMail({ background: true, fresh: true })
       void loadFolders()
     })
-  }, [state.folder, cancelPendingRead, showToast, failureText, loadMail, loadFolders])
+  }, [state.folder, folders, cancelPendingRead, showToast, failureText, loadMail, loadFolders])
 
   // « Vider la corbeille », « Vider les indésirables » (confirmed first):
   // all of it deleted for good, then the list empty, with a plain notice —
@@ -1766,6 +1803,7 @@ function MailPage({ onReaderOpenChange, onSignInAgain, sender = null, composeReq
     const kind = folders?.find((folder) => folder.id === id)?.kind
     if (kind !== 'trash' && kind !== 'junk') return
     const ok = await mailFolderAction(id, 'empty')
+    if (ok) trackMailAction('empty_folder', { folder_kind: kind })
     if (!ok) {
       showToast(failureText(kind === 'trash' ? 'La corbeille n’a pas pu être vidée' : 'Les indésirables n’ont pas pu être vidés'))
       return
@@ -1787,7 +1825,7 @@ function MailPage({ onReaderOpenChange, onSignInAgain, sender = null, composeReq
   const confirmPending = useCallback(() => {
     const pending = confirmation
     setConfirmation(null)
-    if (pending?.kind === 'delete') removeMessages(pending.ids, 'delete')
+    if (pending?.kind === 'delete') removeMessages(pending.ids, 'delete', { via: pending.via })
     else if (pending?.kind === 'empty') void emptyFolder(pending.folder)
   }, [confirmation, removeMessages, emptyFolder])
   const cancelConfirmation = useCallback(() => setConfirmation(null), [])
@@ -1820,16 +1858,19 @@ function MailPage({ onReaderOpenChange, onSignInAgain, sender = null, composeReq
     try {
       if (pdf) {
         const outcome = await saveMailPdf(id, folderId)
+        if (outcome !== 'cancelled') trackMailAction('pdf', { result: 'ok' })
         if (outcome === 'downloaded') {
           showToast('PDF téléchargé')
           return
         }
       } else {
         await printMail(id, folderId)
+        trackMailAction('print')
       }
       window.clearTimeout(toastTimerRef.current)
       setToast(null)
     } catch {
+      if (pdf) trackMailAction('pdf', { result: 'error' })
       showToast(failureText(pdf ? 'Le PDF n’a pas pu être créé' : 'Le mail n’a pas pu être imprimé'))
     }
   }, [folderId, showToast, failureText])
@@ -1845,13 +1886,13 @@ function MailPage({ onReaderOpenChange, onSignInAgain, sender = null, composeReq
         id: 'unread',
         label: described?.unread ? 'Marquer comme lu' : 'Marquer comme non lu',
         icon: described?.unread ? 'carbon:email' : 'carbon:email-new',
-        onSelect: () => setMessagesFlag(ids, 'unread', !described?.unread),
+        onSelect: () => setMessagesFlag(ids, 'unread', !described?.unread, 'context_menu'),
       },
       {
         id: 'flag',
         label: described?.flagged ? 'Retirer le drapeau' : 'Ajouter un drapeau',
         icon: described?.flagged ? 'carbon:flag' : 'carbon:flag-filled',
-        onSelect: () => setMessagesFlag(ids, 'flagged', !described?.flagged),
+        onSelect: () => setMessagesFlag(ids, 'flagged', !described?.flagged, 'context_menu'),
       },
       'separator',
       // One mail (or thread) at a time.
@@ -1861,17 +1902,17 @@ function MailPage({ onReaderOpenChange, onSignInAgain, sender = null, composeReq
         'separator',
       ] : []),
       // The folder picker where the menu was (the menu closes first).
-      { id: 'move', label: 'Déplacer…', icon: 'carbon:folder-move-to', onSelect: () => openFolderMenu('move', { left: contextMenu.x, top: contextMenu.y, bottom: contextMenu.y }, ids) },
+      { id: 'move', label: 'Déplacer…', icon: 'carbon:folder-move-to', onSelect: () => openFolderMenu('move', { left: contextMenu.x, top: contextMenu.y, bottom: contextMenu.y }, ids, 'context_menu') },
       // The trash: back to the inbox, or gone for good. The junk folder:
       // out of it, or gone for good. Elsewhere: junk, or the trash. Gone for
       // good asks first (ConfirmDialog).
       ...({
-        trash: [{ id: 'restore', label: 'Restaurer', icon: 'carbon:undo', onSelect: () => removeMessages(ids, 'restore') }],
-        junk: [{ id: 'not-spam', label: 'Pas indésirable', icon: 'carbon:checkmark-outline', onSelect: () => removeMessages(ids, 'inbox') }],
-      }[folderKind] ?? [{ id: 'spam', label: 'Indésirable', icon: 'carbon:misuse-outline', onSelect: () => removeMessages(ids, 'spam') }]),
+        trash: [{ id: 'restore', label: 'Restaurer', icon: 'carbon:undo', onSelect: () => removeMessages(ids, 'restore', { via: 'context_menu' }) }],
+        junk: [{ id: 'not-spam', label: 'Pas indésirable', icon: 'carbon:checkmark-outline', onSelect: () => removeMessages(ids, 'inbox', { via: 'context_menu' }) }],
+      }[folderKind] ?? [{ id: 'spam', label: 'Indésirable', icon: 'carbon:misuse-outline', onSelect: () => removeMessages(ids, 'spam', { via: 'context_menu' }) }]),
       folderKind === 'trash' || folderKind === 'junk'
-        ? { id: 'delete-forever', label: single ? 'Supprimer définitivement' : `Supprimer ${ids.length} mails définitivement`, icon: 'carbon:trash-can', destructive: true, onSelect: () => setConfirmation({ kind: 'delete', ids }) }
-        : { id: 'trash', label: single ? 'Supprimer' : `Supprimer ${ids.length} mails`, icon: 'carbon:trash-can', destructive: true, onSelect: () => removeMessages(ids, 'trash') },
+        ? { id: 'delete-forever', label: single ? 'Supprimer définitivement' : `Supprimer ${ids.length} mails définitivement`, icon: 'carbon:trash-can', destructive: true, onSelect: () => setConfirmation({ kind: 'delete', ids, via: 'context_menu' }) }
+        : { id: 'trash', label: single ? 'Supprimer' : `Supprimer ${ids.length} mails`, icon: 'carbon:trash-can', destructive: true, onSelect: () => removeMessages(ids, 'trash', { via: 'context_menu' }) },
     ]
   })()
 
@@ -1899,7 +1940,7 @@ function MailPage({ onReaderOpenChange, onSignInAgain, sender = null, composeReq
         detail: !moving && unread > 0 && !isQuietFolder(folder, byId) ? unread : null,
         checked: moving ? undefined : folder.id === folderId,
         disabled: moving && folder.id === folderId,
-        onSelect: () => (moving ? moveMessages(folderMenu.ids, folder.id) : selectFolder(folder.id)),
+        onSelect: () => (moving ? moveMessages(folderMenu.ids, folder.id, folderMenu.via) : selectFolder(folder.id)),
       }
     })
   })()
@@ -1956,27 +1997,27 @@ function MailPage({ onReaderOpenChange, onSignInAgain, sender = null, composeReq
           icon: message.unread ? 'carbon:email' : 'carbon:email-new',
           tone: 'blue',
           full: true,
-          onSelect: () => setMessagesFlag(ids, 'unread', !message.unread),
+          onSelect: () => setMessagesFlag(ids, 'unread', !message.unread, 'swipe'),
         },
       ],
       trailing: [
         // In the trash, back to the inbox instead (gone for good is in the
         // long press's menu: it asks first, which a swipe can't).
         ...(folderKind === 'trash' ? [
-          { id: 'restore', label: 'Restaurer', icon: 'carbon:undo', tone: 'blue', full: true, removes: true, onSelect: () => removeMessages(ids, 'restore') },
+          { id: 'restore', label: 'Restaurer', icon: 'carbon:undo', tone: 'blue', full: true, removes: true, onSelect: () => removeMessages(ids, 'restore', { via: 'swipe' }) },
         ] : [
-          { id: 'trash', label: 'Supprimer', icon: 'carbon:trash-can', tone: 'red', full: true, removes: true, onSelect: () => removeMessages(ids, 'trash') },
+          { id: 'trash', label: 'Supprimer', icon: 'carbon:trash-can', tone: 'red', full: true, removes: true, onSelect: () => removeMessages(ids, 'trash', { via: 'swipe' }) },
         ]),
         {
           id: 'flag',
           label: message.flagged ? 'Sans drapeau' : 'Drapeau',
           icon: message.flagged ? 'carbon:flag' : 'carbon:flag-filled',
           tone: 'orange',
-          onSelect: () => setMessagesFlag(ids, 'flagged', !message.flagged),
+          onSelect: () => setMessagesFlag(ids, 'flagged', !message.flagged, 'swipe'),
         },
         folderKind === 'junk'
-          ? { id: 'not-spam', label: 'Pas indésirable', icon: 'carbon:checkmark-outline', tone: 'gray', removes: true, onSelect: () => removeMessages(ids, 'inbox') }
-          : { id: 'spam', label: 'Indésirable', icon: 'carbon:misuse-outline', tone: 'gray', removes: true, onSelect: () => removeMessages(ids, 'spam') },
+          ? { id: 'not-spam', label: 'Pas indésirable', icon: 'carbon:checkmark-outline', tone: 'gray', removes: true, onSelect: () => removeMessages(ids, 'inbox', { via: 'swipe' }) }
+          : { id: 'spam', label: 'Indésirable', icon: 'carbon:misuse-outline', tone: 'gray', removes: true, onSelect: () => removeMessages(ids, 'spam', { via: 'swipe' }) },
       ],
     }
   }
@@ -2024,13 +2065,13 @@ function MailPage({ onReaderOpenChange, onSignInAgain, sender = null, composeReq
             onReply={() => void startCompose('reply')}
             onReplyAll={() => void startCompose('reply-all')}
             onForward={() => void startCompose('forward')}
-            onTrash={() => removeMessages(targetIds, 'trash')}
-            onSpam={() => removeMessages(targetIds, folderKind === 'junk' ? 'inbox' : 'spam')}
-            onRestore={() => removeMessages(targetIds, 'restore')}
-            onDeleteForever={() => setConfirmation({ kind: 'delete', ids: targetIds })}
-            onMove={(event) => openFolderMenu('move', event.currentTarget.getBoundingClientRect(), targetIds)}
-            onToggleUnread={() => setMessagesFlag(targetIds, 'unread', !targetState?.unread)}
-            onToggleFlag={() => setMessagesFlag(targetIds, 'flagged', !targetState?.flagged)}
+            onTrash={() => removeMessages(targetIds, 'trash', { via: 'toolbar' })}
+            onSpam={() => removeMessages(targetIds, folderKind === 'junk' ? 'inbox' : 'spam', { via: 'toolbar' })}
+            onRestore={() => removeMessages(targetIds, 'restore', { via: 'toolbar' })}
+            onDeleteForever={() => setConfirmation({ kind: 'delete', ids: targetIds, via: 'toolbar' })}
+            onMove={(event) => openFolderMenu('move', event.currentTarget.getBoundingClientRect(), targetIds, 'toolbar')}
+            onToggleUnread={() => setMessagesFlag(targetIds, 'unread', !targetState?.unread, 'toolbar')}
+            onToggleFlag={() => setMessagesFlag(targetIds, 'flagged', !targetState?.flagged, 'toolbar')}
           />
           {/* On a phone the list (and its notice) is hidden behind the
               reader: the notice over the mail then. Beside the list, the
