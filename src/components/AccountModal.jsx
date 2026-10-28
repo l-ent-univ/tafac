@@ -13,6 +13,7 @@ import Dropdown from './Dropdown'
 import LoadingDots from './LoadingDots'
 import CloseButton from './CloseButton'
 import Switch from './Switch'
+import MailSignatureSettings from './MailSignatureSettings'
 
 // Also the debug menu's toggles (src/components/debug/).
 export { Switch }
@@ -685,6 +686,9 @@ function AccountModal({
   planningSelection = null,
   anonymousAnalytics = true,
   onAnonymousAnalyticsChange = null,
+  // { auto }: Réglages › Messagerie, with the in-app mail page (null
+  // without); `auto` the automatic signature's lines.
+  mailSignature = null,
 }) {
   const [activeSectionId, setActiveSectionId] = useState('account')
   const tabRefs = useRef({})
@@ -746,6 +750,7 @@ function AccountModal({
   const sections = [
     { id: 'account', label: 'Compte', icon: 'carbon:user-avatar' },
     { id: 'planning', label: 'Planning', icon: 'carbon:calendar' },
+    mailSignature ? { id: 'mail', label: 'Messagerie', icon: 'carbon:email' } : null,
     canToggleWidgets ? { id: 'dashboard', label: 'Tableau de bord', icon: 'carbon:dashboard' } : null,
     hasAppearance ? { id: 'appearance', label: 'Apparence', icon: 'carbon:image' } : null,
     hasPrivacy ? { id: 'privacy', label: 'Confidentialité', icon: 'carbon:locked' } : null,
@@ -900,6 +905,9 @@ function AccountModal({
             ) : null}
           </>
         )
+
+      case 'mail':
+        return <MailSignatureSettings autoSignature={mailSignature.auto} />
 
       case 'dashboard':
         return (

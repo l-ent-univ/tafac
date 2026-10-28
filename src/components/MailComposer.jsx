@@ -2,6 +2,7 @@ import { Fragment, useCallback, useEffect, useId, useImperativeHandle, useRef, u
 import { createPortal } from 'react-dom'
 import { Icon } from '@iconify/react'
 import { EditorContent, useEditor, useEditorState } from '@tiptap/react'
+import { Selection } from '@tiptap/pm/state'
 import StarterKit from '@tiptap/starter-kit'
 import { Color, FontFamily, FontSize, TextStyle } from '@tiptap/extension-text-style'
 import Highlight from '@tiptap/extension-highlight'
@@ -9,11 +10,13 @@ import { Indent } from '../tiptapIndent'
 import { withViewTransition } from '../viewTransition'
 import { MailSignature } from '../mailSignatureNode'
 import { MailSignatureContext } from '../mailSignatureContext'
+import { useComposerSignature, useSignatureNodeSync } from '../useComposerSignature'
 import CloseButton from './CloseButton'
 import ConfirmDialog from './ConfirmDialog'
 import ContextMenu from './ContextMenu'
 import Tooltip from './Tooltip'
 import Switch from './Switch'
+import MailDropSheets from './MailDropSheets'
 import { TOOLBAR_BUTTON_CLASSES } from './MailToolbar'
 import { getSenderBadgeStyle, getSenderInitial } from './mailSender'
 import FileName from './FileName'
@@ -49,6 +52,7 @@ import {
   recipientKey,
   tidyQuotedText,
 } from '../mailCompose'
+import { composeOrigin, pickDefaultIdentity, sendFailureText } from '../mailSendPayload'
 
 // The window a new mail is written in, in the spirit of Apple Mail's: a
 // toolbar of glass pills (the kind of reply, attachments, then the round
@@ -56,15 +60,16 @@ import {
 // the format bar (always shown), then the text. The recipients' fields
 // suggest from the webmail's contacts and directory (RecipientInput).
 //
-// A first version that sends nothing: there is no route for it on the
-// server yet, so « Envoyer » only says so and keeps the draft. Its
-// attachments are ready for one, though (AttachmentChip, useAttachments):
-// a forwarded mail's stay in the mailbox (a reference to each), a file
-// picked, dropped or pasted goes to the webmail as soon as it's added,
-// while the mail is written, and is then held by its id there. The draft
-// lives in this component's memory alone, never in localStorage: the app is
-// used on shared computers, and a mail half-written there must not outlive
-// the window. Closing one that was changed asks first.
+// « Envoyer » hands the mail to MailPage (src/useMailSend.js), which closes
+// the window at once and sends it after a few seconds' « Annuler »; a
+// failure reopens it as it was, the reason said. The attachments
+// (AttachmentChip, useAttachments): a forwarded mail's stay in the mailbox
+// (a reference to each), a file picked, dropped or pasted goes to the
+// webmail as soon as it's added, while the mail is written, and is then
+// held by its id there. The draft is saved to the webmail's Drafts folder
+// a few seconds after each change (its `saver`, src/mailDraftSaver.js),
+// never in the browser's storage: the app is used on shared computers.
+// Closing one that was changed asks: save it, or delete it.
 //
 // From 1024 px a window floating over the bottom right of the page, which
 // stays usable around it (non-modal: the mail answered can still be read);
@@ -137,32 +142,16 @@ const EDITOR_EXTENSIONS = [
   Color,
   FontFamily,
   FontSize,
-  Highlight.configure({ multicolor: true }),
+  // Ranked above TextStyle (101): the highlight wraps a coloured text
+  // (<mark><span style="color">), so the dark text it sets (overrides.css,
+  // and the sent mail's) leaves a chosen colour as it is.
+  Highlight.extend({ priority: 110 }).configure({ multicolor: true }),
   Indent,
   MailSignature,
 ]
 
-// The automatic signature on or off, remembered for the device (a choice,
-// not a mail's content): on until the student turns it off, then off for
-// every draft until they turn it back on.
-const SIGNATURE_KEY = 'l-ent:mail-signature'
-
-function readSignatureMode() {
-  try {
-    return localStorage.getItem(SIGNATURE_KEY) === 'none' ? 'none' : 'auto'
-  } catch {
-    return 'auto'
-  }
-}
-
-function storeSignatureMode(mode) {
-  try {
-    if (mode === 'none') localStorage.setItem(SIGNATURE_KEY, 'none')
-    else localStorage.removeItem(SIGNATURE_KEY)
-  } catch {
-    // Storage unavailable: the choice lasts for this draft.
-  }
-}
+// The switch's label, by the signature's kind (Réglages › Messagerie).
+const SIGNATURE_LABELS = { auto: 'Signature automatique', partage: 'Signature Partage', custom: 'Signature personnalisée' }
 
 function subscribePhone(callback) {
   const query = window.matchMedia(PHONE_QUERY)
@@ -215,6 +204,27 @@ function linesToParagraph(text) {
   return content.length ? { type: 'paragraph', content } : { type: 'paragraph' }
 }
 
+// A resumed draft's HTML with the signature's placeholder (`include`) where
+// the composer puts it (syncSignatureNode): before a reply's quote and its
+// header line (and the empty line above them), else at the end. Zimbra
+// keeps the draft's HTML but not the placeholder's data attribute.
+function withSignaturePlaceholder(html, include) {
+  if (!include || /data-mail-signature/.test(html) || typeof DOMParser === 'undefined') return html
+  const body = new DOMParser().parseFromString(`<body>${html}</body>`, 'text/html').body
+  const blocks = [...body.children]
+  const quoteIndex = blocks.findIndex((block) => block.tagName === 'BLOCKQUOTE')
+  let before = null
+  if (quoteIndex >= 1) {
+    let headerIndex = quoteIndex - 1
+    if (headerIndex >= 1 && blocks[headerIndex - 1].tagName === 'P' && !blocks[headerIndex - 1].textContent.trim()) headerIndex -= 1
+    before = blocks[headerIndex]
+  }
+  const placeholder = body.ownerDocument.createElement('div')
+  placeholder.setAttribute('data-mail-signature', '')
+  body.insertBefore(placeholder, before)
+  return body.innerHTML
+}
+
 // The text a draft opens with: an empty line to write on, the signature
 // (`withSignature`), then for a reply or a forward the line naming the mail
 // and its text, quoted.
@@ -265,7 +275,7 @@ function RecipientToken({ address, field, hintId, onRemove, onEdit, onKeyDown })
   const label = address.name || address.email
   const badgeStyle = address.invalid ? null : getSenderBadgeStyle(address.email.toLowerCase())
   const spoken = address.invalid
-    ? `${address.email}, adresse non valide`
+    ? `${address.email}, ${address.refused ? 'adresse refusée' : 'adresse non valide'}`
     : address.name ? `${address.name}, ${address.email}` : address.email
   return (
     <span
@@ -322,7 +332,7 @@ function RecipientToken({ address, field, hintId, onRemove, onEdit, onKeyDown })
         <Icon icon="carbon:close" className="size-[13px]" aria-hidden="true" />
       </button>
       <Tooltip
-        title={address.invalid ? 'Adresse non valide' : address.name || address.email}
+        title={address.invalid ? (address.refused ? 'Adresse refusée' : 'Adresse non valide') : address.name || address.email}
         detail={address.invalid ? address.email : address.name ? address.email : null}
         side="bottom-start"
         className="max-4xl:hidden"
@@ -849,8 +859,11 @@ const ATTACHMENT_ERRORS = {
   rate: 'Trop d’envois, réessaie plus tard',
   expired: 'Session expirée',
   failed: 'Échec du chargement',
+  // The webmail no longer has it (a send said so): uploaded again with a
+  // retry, while the composer still holds the file.
+  'expired-upload': 'À joindre de nouveau',
 }
-const RETRYABLE_ERRORS = new Set(['failed', 'rate'])
+const RETRYABLE_ERRORS = new Set(['failed', 'rate', 'expired-upload'])
 
 function attachmentDetail(item) {
   const size = formatAttachmentSize(item.size)
@@ -888,7 +901,7 @@ function UploadRing({ progress, waiting }) {
 // size): its ring while it goes, its error in red, a retry when that may
 // help, × taking it out (and stopping its upload). The name in full in the
 // tooltip. A whole row on a phone.
-function AttachmentChip({ item, onRemove, onRetry }) {
+function AttachmentChip({ item, onRemove, onRetry = null }) {
   const busy = item.status === 'uploading' || item.status === 'queued'
   const failed = item.status === 'error'
   const detail = attachmentDetail(item)
@@ -912,7 +925,7 @@ function AttachmentChip({ item, onRemove, onRetry }) {
         <span className="text-[13px] font-semibold leading-[1.15] text-text"><FileName name={item.name} /></span>
         <span className={`truncate text-[11.5px] font-medium leading-none tabular-nums ${failed ? 'text-error' : 'text-text-muted'}`}>{detail}</span>
       </span>
-      {failed && RETRYABLE_ERRORS.has(item.error) ? (
+      {failed && onRetry && RETRYABLE_ERRORS.has(item.error) ? (
         <button
           type="button"
           className="inline-flex size-8 shrink-0 items-center justify-center rounded-full border-0 bg-transparent p-0 text-text-muted cursor-pointer transition-colors duration-120 hover:bg-black/5 hover:text-text dark:hover:bg-white/10 focus-visible:outline-2 focus-visible:outline-text"
@@ -947,9 +960,12 @@ const isFileDrag = (event) => [...(event.dataTransfer?.types ?? [])].includes('F
 // more on its own (the server signs in again meanwhile). Removing one stops
 // its upload; closing the composer stops them all. The files themselves are
 // held here (a ref) only until they're uploaded: a retry needs them.
-function useAttachments(initialItems, limits) {
+// The files themselves stay in memory (a ref) for as long as the composer
+// is open, and go with a send to MailPage: one the webmail lost by the time
+// it's sent can be uploaded again (`initialFiles`, a reopened composer's).
+function useAttachments(initialItems, limits, initialFiles = null) {
   const [items, setItems] = useState(initialItems)
-  const filesRef = useRef(new Map())
+  const filesRef = useRef(initialFiles ?? new Map())
   const queueRef = useRef([])
   const abortsRef = useRef(new Map())
   const retriedRef = useRef(new Set())
@@ -981,7 +997,6 @@ function useAttachments(initialItems, limits) {
           return
         }
         if (result.status === 'ok') {
-          filesRef.current.delete(key)
           update(key, { status: 'ready', progress: 1, aid: result.attachment.aid, size: result.attachment.size, contentType: result.attachment.contentType })
         } else if (result.code === 'retry' && !retriedRef.current.has(key)) {
           retriedRef.current.add(key)
@@ -1054,31 +1069,72 @@ function useAttachments(initialItems, limits) {
   const setMessageItems = (messageItems) => {
     setItems((current) => {
       const added = messageItems.filter((entry) => !current.some((item) => item.key === entry.key))
-      return [...current.filter((item) => item.source !== 'message' || messageItems.some((entry) => entry.key === item.key)), ...added]
-        .sort((left, right) => (left.source === 'message' ? 0 : 1) - (right.source === 'message' ? 0 : 1))
+      const isOriginal = (item) => item.key.startsWith('message:')
+      return [...current.filter((item) => !isOriginal(item) || messageItems.some((entry) => entry.key === item.key)), ...added]
+        .sort((left, right) => (isOriginal(left) ? 0 : 1) - (isOriginal(right) ? 0 : 1))
     })
   }
 
-  return { items, add, remove, retry, setMessageItems }
+  return { items, add, remove, retry, setMessageItems, filesRef }
 }
 
-// `initialKind`: 'new', 'reply', 'reply-all' or 'forward'; `message` the// `initialKind`: 'new', 'reply', 'reply-all' or 'forward'; `message` the
+// How long the typing rests before the draft is saved (createDraftSaver).
+const AUTOSAVE_DELAY_MS = 4500
+
+// A reopened composer's tokens that the webmail refused (a send's
+// `invalid`): marked, shown red until fixed.
+function markRefused(list, refused) {
+  if (!refused.size) return list
+  return list.map((address) => (refused.has(address.email.toLowerCase()) ? { ...address, invalid: true, refused: true } : address))
+}
+
+// The fields a composer opens with: a draft resumed or a composer
+// reopened (`restore`: its fields as they were, a failed send's refusals
+// marked), else a new mail's or an answer's (buildDraftFields).
+function readInitialFields(restore, sendError, kind, message, ownEmails) {
+  if (!restore) return { ...buildDraftFields(kind, message, ownEmails), bcc: [] }
+  const refused = new Set((sendError?.invalid ?? []).map((email) => email.toLowerCase()))
+  const expired = new Set(sendError?.aids ?? [])
+  return {
+    to: markRefused(restore.to ?? [], refused),
+    cc: markRefused(restore.cc ?? [], refused),
+    bcc: markRefused(restore.bcc ?? [], refused),
+    subject: restore.subject ?? '',
+    attachments: (restore.attachments ?? []).map((item) => (item.aid && expired.has(item.aid) ? { ...item, status: 'error', error: 'expired-upload' } : item)),
+  }
+}
+
+// `initialKind`: 'new', 'reply', 'reply-all' or 'forward'; `message` the
 // mail answered or forwarded (getMailMessage's), null for a new one.
-// `sender`: the student's { name, email }, for « De : » and to leave them
-// out of a « Répondre à tous ». `attachmentLimits`: { maxFileBytes,
-// maxTotalBytes } from the webmail (getMailPrefs), the fallback's until
-// they're known. `ref` gets { isDirty }, for MailPage to
-// ask before another draft takes this one's place. Keyed by MailPage: each
-// draft starts afresh.
-function MailComposer({ initialKind = 'new', message = null, sender = null, attachmentLimits = null, ref = null, onClose }) {
+// `sender`: the student's { name, email, signature }, for « De : » and to
+// leave them out of a « Répondre à tous ». `identities`: the addresses the
+// account may send from ({ id, name, email }, the default first:
+// getMailPrefs), « De : » a choice when there are several.
+// `attachmentLimits`: { maxFileBytes, maxTotalBytes } from the webmail
+// (getMailPrefs), the fallback's until they're known. `saver`: the draft's
+// saves (createDraftSaver, MailPage's). `restore`: the composer as it was
+// (a draft resumed, an undo, a failed send: { to, cc, bcc, subject,
+// content (the editor's JSON) or html, attachments, files, identityId,
+// origin, dirty }), `sendError` why a send failed (sendMail's). `onSend(
+// snapshot)`: « Envoyer », MailPage closes it and sends (src/useMailSend.js);
+// false when it can't (a send already waiting). `ref` gets { isDirty,
+// saveNow }, for MailPage to save it before another draft takes its place.
+// Keyed by MailPage: each draft starts afresh.
+function MailComposer({ initialKind = 'new', message = null, sender = null, identities = [], attachmentLimits = null, saver = null, restore = null, sendError = null, ref = null, onClose, onSend }) {
   const isPhone = useSyncExternalStore(subscribePhone, isPhoneNow, () => false)
   const titleId = useId()
   const fieldId = useId()
-  const [initialFields] = useState(() => buildDraftFields(initialKind, message, sender?.email))
+  const [initialFields] = useState(() => readInitialFields(restore, sendError, initialKind, message, [sender?.email, ...identities.map((identity) => identity.email)]))
   const [kind, setKind] = useState(initialKind)
   const [to, setTo] = useState(initialFields.to)
   const [cc, setCc] = useState(initialFields.cc)
-  const [bcc, setBcc] = useState([])
+  const [bcc, setBcc] = useState(initialFields.bcc)
+  // « De : »: an identity's id (null: the account's default, the server's).
+  const [identityId, setIdentityId] = useState(() => restore?.identityId ?? pickDefaultIdentity(identities, message))
+  const origin = composeOrigin(kind, message, restore?.origin)
+  // The draft's saves: « Brouillon non enregistré » when one fails.
+  const [draftStatus, setDraftStatus] = useState(() => saver?.status ?? 'idle')
+  useEffect(() => saver?.subscribe(setDraftStatus), [saver])
   const [toInput, setToInput] = useState('')
   const [ccInput, setCcInput] = useState('')
   const [bccInput, setBccInput] = useState('')
@@ -1087,20 +1143,20 @@ function MailComposer({ initialKind = 'new', message = null, sender = null, atta
   const [suggestionCache] = useState(createSuggestionCache)
   const [subject, setSubject] = useState(initialFields.subject)
   const limits = readAttachmentLimits(attachmentLimits)
-  const { items: attachments, add: addAttachments, remove: removeAttachment, retry: retryAttachment, setMessageItems } = useAttachments(initialFields.attachments, limits)
+  const { items: attachments, add: addAttachments, remove: removeAttachment, retry: retryAttachment, setMessageItems, filesRef: attachmentFilesRef } = useAttachments(initialFields.attachments, limits, restore?.files)
   const fileInputRef = useRef(null)
   // A file dragged over the composer (the drop zone shows), counted by the
   // elements entered and left on its way.
   const [dragActive, setDragActive] = useState(false)
   const dragDepthRef = useRef(0)
-  const [showCc, setShowCc] = useState(initialFields.cc.length > 0)
+  const [showCc, setShowCc] = useState(initialFields.cc.length > 0 || initialFields.bcc.length > 0)
   const [menu, setMenu] = useState(null)
   const [notice, setNotice] = useState(null)
   const [confirmingClose, setConfirmingClose] = useState(false)
   // Full screen (from 1024 px; a phone's sheet is already): the window's
   // frame grows into it as a UE's tile opens full page (the same view
   // transition, .mail-composer's view-transition classes).
-  const [isFullscreen, setIsFullscreen] = useState(false)
+  const [isFullscreen, setIsFullscreen] = useState(Boolean(restore?.isFullscreen))
   const toggleFullscreen = useCallback(() => withViewTransition(() => setIsFullscreen((value) => !value)), [])
 
   const rootRef = useRef(null)
@@ -1125,6 +1181,9 @@ function MailComposer({ initialKind = 'new', message = null, sender = null, atta
       'aria-label': 'Message',
       spellcheck: 'true',
     },
+    // ⌘/Ctrl+Enter sends (the composer's own keydown): not the hard break
+    // Tiptap gives it.
+    handleKeyDown: (view, event) => event.key === 'Enter' && (event.metaKey || event.ctrlKey),
     handlePaste: (view, event) => {
       const text = event.clipboardData?.getData('text/plain')
       if (text) editorRef.current?.chain().insertContent(textToParagraphs(text).length > 1 ? textToParagraphs(text) : { type: 'text', text }).run()
@@ -1138,22 +1197,36 @@ function MailComposer({ initialKind = 'new', message = null, sender = null, atta
       return true
     },
   }))
-  // The automatic signature: its lines (`sender.signature`, from App) and
-  // whether it's on (SIGNATURE_KEY). Without lines it can't be.
-  const signature = sender?.signature?.name ? sender.signature : null
-  const [signatureMode, setSignatureMode] = useState(readSignatureMode)
-  const [initialContent] = useState(() => buildInitialContent(message, initialKind, Boolean(signature) && signatureMode === 'auto'))
+  // The signature: on or off and which (Réglages › Messagerie, shared with
+  // it), the automatic one's lines (`sender.signature`, from App).
+  const signature = useComposerSignature({
+    autoSignature: sender?.signature?.name ? sender.signature : null,
+    identityId,
+    reply: Boolean(origin),
+  })
+  // A resumed draft's or a reopened composer's text, else a new one's. A
+  // draft read back from Zimbra may have lost its signature's placeholder:
+  // put back while the signature is on.
+  const [initialContent] = useState(() => restore?.content
+    ?? (restore?.html != null ? withSignaturePlaceholder(restore.html, signature.on) : null)
+    ?? buildInitialContent(message, initialKind, signature.on))
+  // Read by the editor's update (set up once): the autosave's timer.
+  const scheduleAutosaveRef = useRef(() => {})
   const editor = useEditor({
     extensions: EDITOR_EXTENSIONS,
     content: initialContent,
     editorProps,
     // The draft's starting point, once the editor holds its text (before
-    // that, it has no schema to read the text with).
+    // that, it has no schema to read the text with). A composer reopened
+    // after an undo or a failure holds a mail not sent: always changed.
     onCreate: ({ editor: created }) => {
       if (initialSnapshotRef.current === null) {
-        initialSnapshotRef.current = JSON.stringify([initialFields.to, initialFields.cc, [], '', '', '', initialFields.subject.trim(), created.getText(), initialFields.attachments.map((item) => item.key)])
+        initialSnapshotRef.current = restore?.dirty
+          ? 'unsent'
+          : JSON.stringify([initialFields.to, initialFields.cc, initialFields.bcc, '', '', '', initialFields.subject.trim(), created.getText(), initialFields.attachments.map((item) => item.key)])
       }
     },
+    onUpdate: () => scheduleAutosaveRef.current(),
   })
   // Before the effects below, which reach it through the ref.
   useEffect(() => {
@@ -1167,13 +1240,35 @@ function MailComposer({ initialKind = 'new', message = null, sender = null, atta
   // reply (its recipients are there already); back where it was on close.
   useEffect(() => {
     const previous = document.activeElement
-    if (initialKind === 'reply' || initialKind === 'reply-all') editorRef.current?.commands.focus('start')
-    else toInputRef.current?.focus({ preventScroll: true })
+    if (initialKind !== 'reply' && initialKind !== 'reply-all') toInputRef.current?.focus({ preventScroll: true })
     return () => {
       window.clearTimeout(noticeTimerRef.current)
       if (previous instanceof HTMLElement && previous.isConnected) previous.focus({ preventScroll: true })
     }
   }, [initialKind])
+  // A reply's caret, once the editor is in the page: until then it has no
+  // commands (Tiptap mounts it a moment later, which a phone made visible:
+  // the reply crashed), so on its « create » if it isn't ready yet. Set by
+  // hand, then the focus: on a phone Tiptap's focus command focuses first,
+  // whose own transaction made the command's stale (« mismatched
+  // transaction »).
+  const focusedStartRef = useRef(false)
+  useEffect(() => {
+    if (focusedStartRef.current || !editor || (initialKind !== 'reply' && initialKind !== 'reply-all')) return undefined
+    const focusStart = () => {
+      if (editor.isDestroyed || focusedStartRef.current) return
+      focusedStartRef.current = true
+      const { state, view } = editor
+      view.dispatch(state.tr.setSelection(Selection.atStart(state.doc)))
+      view.focus()
+    }
+    if (editor.isInitialized) {
+      focusStart()
+      return undefined
+    }
+    editor.on('create', focusStart)
+    return () => editor.off('create', focusStart)
+  }, [editor, initialKind])
 
   // While the composer is open, a file dropped beside it (on the page under
   // the floating window) isn't opened by the browser in the draft's place.
@@ -1199,7 +1294,56 @@ function MailComposer({ initialKind = 'new', message = null, sender = null, atta
     return initialSnapshotRef.current !== null && snapshot !== initialSnapshotRef.current
   }, [to, cc, bcc, toInput, ccInput, bccInput, subject, attachments])
 
-  useImperativeHandle(ref, () => ({ isDirty }), [isDirty])
+  // The draft as saved and sent (buildComposePayload): the tokens, and
+  // what's typed in a field still (as a send would take it); the text as
+  // the editor's HTML (the signature's placeholder where it sits); the
+  // signature's kind and choices, never its HTML.
+  const getDraftState = useCallback(() => {
+    const current = editorRef.current
+    const typed = { to: toInput, cc: ccInput, bcc: bccInput }
+    const fields = { to, cc, bcc }
+    for (const name of RECIPIENT_FIELDS) {
+      if (!typed[name].trim()) continue
+      const others = RECIPIENT_FIELDS.filter((other) => other !== name).flatMap((other) => fields[other])
+      fields[name] = mergeAddresses(fields[name], parseRecipientText(typed[name]), others)
+    }
+    return {
+      ...fields,
+      subject,
+      html: current && !current.isDestroyed && current.schema ? current.getHTML() : '',
+      attachments,
+      origin,
+      identityId,
+      signature: signature.payload,
+    }
+  }, [to, cc, bcc, toInput, ccInput, bccInput, subject, attachments, origin, identityId, signature.payload])
+
+  const saveNow = useCallback(() => saver?.save(getDraftState()), [saver, getDraftState])
+
+  useImperativeHandle(ref, () => ({ isDirty, saveNow }), [isDirty, saveNow])
+
+  // Saved AUTOSAVE_DELAY_MS after the last change, once the draft differs
+  // from how it opened (an untouched one makes no draft); the saver skips a
+  // save that would change nothing. A resumed draft starts as saved.
+  const autosaveTimerRef = useRef(null)
+  useEffect(() => {
+    scheduleAutosaveRef.current = () => {
+      window.clearTimeout(autosaveTimerRef.current)
+      autosaveTimerRef.current = window.setTimeout(() => {
+        if (saver && isDirty()) void saver.save(getDraftState())
+      }, AUTOSAVE_DELAY_MS)
+    }
+  }, [saver, isDirty, getDraftState])
+  useEffect(() => {
+    scheduleAutosaveRef.current()
+  }, [to, cc, bcc, subject, attachments, identityId, signature.payload])
+  useEffect(() => () => window.clearTimeout(autosaveTimerRef.current), [])
+  const resumedRef = useRef(false)
+  useEffect(() => {
+    if (resumedRef.current || !editor || !restore || restore.dirty || !saver?.id) return
+    resumedRef.current = true
+    saver.markSaved(getDraftState())
+  }, [editor, restore, saver, getDraftState])
 
   const showNotice = useCallback((text) => {
     window.clearTimeout(noticeTimerRef.current)
@@ -1215,13 +1359,33 @@ function MailComposer({ initialKind = 'new', message = null, sender = null, atta
     else onClose()
   }, [isDirty, onClose])
 
-  // Nothing leaves: no route sends yet. What was typed in À, Cc and Cci
-  // still becomes tokens, as it would before a real send, one field after
+  // The close dialog's choices: kept in Brouillons (saved now, the saver
+  // outliving the window), or deleted, as Apple Mail's « Supprimer ».
+  const saveAndClose = useCallback(() => {
+    void saver?.save(getDraftState())
+    onClose()
+  }, [saver, getDraftState, onClose])
+  const discardAndClose = useCallback(() => {
+    void saver?.discard()
+    onClose()
+  }, [saver, onClose])
+
+  // A failed send reopened: its reason, the field to fix in focus.
+  useEffect(() => {
+    if (!sendError) return
+    showNotice(sendFailureText(sendError))
+  }, [sendError, showNotice])
+
+  // What was typed in À, Cc and Cci becomes tokens first, one field after
   // the other (none adding what another has); then what a send would
-  // refuse is said: an address that isn't one, no recipient at all. A send
-  // route will check the same again on the server (src/mailCompose.js's
-  // isValidAddress and sanitizeDisplayName are shared for it).
+  // refuse is said: an address that isn't one, no recipient at all, files
+  // still uploading. Else the mail goes to MailPage (onSend), which closes
+  // this and sends it; the server checks it all again (src/mailCompose.js's
+  // isValidAddress and sanitizeDisplayName are shared for it). Once only:
+  // a second press while it goes does nothing.
+  const sendingRef = useRef(false)
   const send = useCallback(() => {
+    if (sendingRef.current) return
     const next = { to, cc, bcc }
     const typed = { to: toInput, cc: ccInput, bcc: bccInput }
     for (const name of RECIPIENT_FIELDS) {
@@ -1236,11 +1400,37 @@ function MailComposer({ initialKind = 'new', message = null, sender = null, atta
     setCcInput('')
     setBccInput('')
     const all = [...next.to, ...next.cc, ...next.bcc]
-    if (all.some((address) => address.invalid)) showNotice('Une adresse n’est pas valide')
+    if (all.some((address) => address.refused)) showNotice(all.filter((address) => address.refused).length > 1 ? 'Des adresses ont été refusées' : 'Une adresse a été refusée')
+    else if (all.some((address) => address.invalid)) showNotice('Une adresse n’est pas valide')
     else if (!all.length) showNotice('Aucun destinataire')
     else if (attachments.some((item) => item.status === 'uploading' || item.status === 'queued')) showNotice('Pièces jointes en cours de chargement')
-    else showNotice('L’envoi arrive bientôt')
-  }, [to, cc, bcc, toInput, ccInput, bccInput, attachments, showNotice])
+    else if (attachments.some((item) => item.status === 'error' && !isRefusedAttachment(item))) showNotice('Une pièce jointe n’est pas chargée')
+    else {
+      const current = editorRef.current
+      sendingRef.current = true
+      const accepted = onSend?.({
+        kind,
+        message,
+        to: next.to,
+        cc: next.cc,
+        bcc: next.bcc,
+        subject,
+        content: current?.getJSON() ?? null,
+        attachments,
+        files: new Map(attachmentFilesRef.current),
+        identityId,
+        origin,
+        isFullscreen,
+        saver,
+        dirty: true,
+        state: { ...getDraftState(), to: next.to, cc: next.cc, bcc: next.bcc },
+      })
+      if (accepted === false) {
+        sendingRef.current = false
+        showNotice('Un message part déjà, réessaie dans un instant')
+      }
+    }
+  }, [to, cc, bcc, toInput, ccInput, bccInput, attachments, showNotice, onSend, kind, message, subject, identityId, origin, isFullscreen, saver, getDraftState, attachmentFilesRef])
 
   // A format command on the text: back in it first, at the selection it
   // had (the editor keeps it while a select or a picker has the focus).
@@ -1254,41 +1444,9 @@ function MailComposer({ initialKind = 'new', message = null, sender = null, atta
     apply(range ? chain.setTextSelection(range) : chain).run()
   }, [])
 
-  // The signature in or out of the text. In: under the text written, above a
-  // reply's quote (before the blank line and the header introducing it), or
-  // at the end.
-  const changeSignature = (mode) => {
-    setSignatureMode(mode)
-    storeSignatureMode(mode)
-    const current = editorRef.current
-    if (!current) return
-    const { doc } = current.state
-    const signatures = []
-    let quoteIndex = -1
-    let offset = 0
-    doc.forEach((node, nodeOffset, index) => {
-      if (node.type.name === 'mailSignature') signatures.push({ from: nodeOffset, to: nodeOffset + node.nodeSize })
-      if (node.type.name === 'blockquote') quoteIndex = index
-      offset = nodeOffset + node.nodeSize
-    })
-    if (mode === 'none') {
-      if (!signatures.length) return
-      const tr = current.state.tr
-      for (const range of signatures.reverse()) tr.delete(range.from, range.to)
-      current.view.dispatch(tr)
-      return
-    }
-    if (signatures.length || !signature) return
-    let at = offset
-    if (quoteIndex >= 1) {
-      // Before the header, and before the empty line above it if there's one.
-      let headerIndex = quoteIndex - 1
-      if (headerIndex >= 1 && doc.child(headerIndex - 1).type.name === 'paragraph' && doc.child(headerIndex - 1).content.size === 0) headerIndex -= 1
-      at = 0
-      for (let index = 0; index < headerIndex; index += 1) at += doc.child(index).nodeSize
-    }
-    current.chain().insertContentAt(at, { type: 'mailSignature' }).run()
-  }
+  // The signature in or out of the text as it's turned on or off, here or
+  // in Réglages.
+  useSignatureNodeSync(editorRef, editor, signature.on)
 
   const setBlock = (value, range = null) => edit((chain) => {
     if (value === 'h2' || value === 'h3') return chain.setHeading({ level: value === 'h2' ? 2 : 3 })
@@ -1300,7 +1458,7 @@ function MailComposer({ initialKind = 'new', message = null, sender = null, atta
   // follow (the text written stays), and so does the quote's header line.
   const switchKind = (next) => {
     if (!message || next === kind) return
-    const fields = buildDraftFields(next, message, sender?.email)
+    const fields = buildDraftFields(next, message, [sender?.email, ...identities.map((identity) => identity.email)])
     setKind(next)
     setTo(fields.to)
     setCc(fields.cc)
@@ -1415,7 +1573,8 @@ function MailComposer({ initialKind = 'new', message = null, sender = null, atta
     // The editor marks Escape handled (ProseMirror's base keys select the
     // block around the cursor): from the text, it still closes.
     const fromEditor = event.target instanceof Element && Boolean(event.target.closest('.ProseMirror'))
-    if (event.defaultPrevented && !(event.key === 'Escape' && fromEditor)) return
+    const sendKeys = event.key === 'Enter' && (event.metaKey || event.ctrlKey)
+    if (event.defaultPrevented && !((event.key === 'Escape' || sendKeys) && fromEditor)) return
     if (event.key === 'Escape') {
       event.preventDefault()
       event.stopPropagation()
@@ -1424,7 +1583,7 @@ function MailComposer({ initialKind = 'new', message = null, sender = null, atta
       else requestClose()
       return
     }
-    if (event.key === 'Enter' && (event.metaKey || event.ctrlKey)) {
+    if (sendKeys) {
       event.preventDefault()
       send()
       return
@@ -1446,7 +1605,14 @@ function MailComposer({ initialKind = 'new', message = null, sender = null, atta
   }
 
   const kindTitle = KIND_TITLES[kind]
-  const fromLabel = sender?.name && sender?.email ? `${sender.name} – ${sender.email}` : sender?.email || sender?.name || 'Ton adresse'
+  // « De : »: the identity picked (the account's default until the list
+  // comes), else the account's own name and address.
+  const fromIdentity = identities.find((identity) => identity.id === identityId) ?? identities[0] ?? null
+  const fromName = fromIdentity?.name || sender?.name || ''
+  const fromEmail = fromIdentity?.email || sender?.email || ''
+  const fromLabel = fromName && fromEmail ? `${fromName} – ${fromEmail}` : fromEmail || fromName || 'Ton adresse'
+  // Only a failed save is said: a saved draft goes without a word.
+  const draftLine = draftStatus === 'error' ? 'Brouillon non enregistré' : null
   const canSwitchKind = Boolean(message)
 
   // The trombone: the file picker; for a reply to a mail with attachments
@@ -1508,6 +1674,8 @@ function MailComposer({ initialKind = 'new', message = null, sender = null, atta
       { id: 'files', label: 'Choisir des fichiers…', icon: 'carbon:document-add', onSelect: pickFiles },
       { id: 'original', label: 'Pièces jointes d’origine', icon: 'carbon:attachment', detail: String(originalAttachments.length), onSelect: () => setMessageItems(originalAttachments) },
     ]
+    : menu?.kind === 'identity'
+    ? identities.map((identity) => ({ id: identity.id, label: identity.email, hint: identity.name, checked: identity.id === fromIdentity?.id, onSelect: () => setIdentityId(identity.id) }))
     : menu?.kind === 'kind'
     ? ['reply', 'reply-all', 'forward'].map((id) => ({ id, label: KIND_TITLES[id], icon: KIND_ICONS[id], checked: kind === id, onSelect: () => switchKind(id) }))
     : menu?.kind === 'list'
@@ -1517,15 +1685,18 @@ function MailComposer({ initialKind = 'new', message = null, sender = null, atta
       ]
       : []
 
+  // Dimmed while files are still uploading: a press then says so (send).
+  const uploading = attachments.some((item) => item.status === 'uploading' || item.status === 'queued')
   const sendButton = (
     <button
       type="button"
-      className="group relative inline-flex size-9 shrink-0 items-center justify-center rounded-full border-0 bg-text text-bg cursor-pointer transition-[transform,filter] duration-100 ease-out hover:brightness-110 active:scale-[0.92] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-text"
+      className={`group relative inline-flex size-9 shrink-0 items-center justify-center rounded-full border-0 bg-text text-bg cursor-pointer transition-[transform,filter,opacity] duration-100 ease-out hover:brightness-110 active:scale-[0.92] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-text ${uploading ? 'opacity-40' : ''}`}
       aria-label="Envoyer"
+      aria-disabled={uploading || undefined}
       onClick={send}
     >
       <Icon icon="carbon:arrow-up" className="size-[19px]" aria-hidden="true" />
-      <Tooltip title="Envoyer" detail={`${MOD_KEY} Entrée`} side="bottom-end" className="max-4xl:hidden" />
+      <Tooltip title={uploading ? 'Pièces jointes en cours de chargement' : 'Envoyer'} detail={uploading ? null : `${MOD_KEY} Entrée`} side="bottom-end" className="max-4xl:hidden" />
     </button>
   )
 
@@ -1594,7 +1765,10 @@ function MailComposer({ initialKind = 'new', message = null, sender = null, atta
             <button type="button" className="justify-self-start rounded-full border-0 bg-transparent px-1 py-1.5 text-text cursor-pointer" onClick={requestClose}>
               <span className="text-[16px] font-medium leading-none">Annuler</span>
             </button>
-            <h2 id={titleId} className="m-0 max-w-[50vw] truncate text-[16px] font-semibold leading-tight">{subject.trim() || kindTitle}</h2>
+            <div className="grid min-w-0 max-w-[50vw] justify-items-center">
+              <h2 id={titleId} className="m-0 max-w-full truncate text-[16px] font-semibold leading-tight">{subject.trim() || kindTitle}</h2>
+              {draftLine ? <span className="text-[11.5px] font-medium leading-tight text-text-muted" role="status">{draftLine}</span> : null}
+            </div>
             <span className="justify-self-end">{sendButton}</span>
           </div>
           {tools}
@@ -1612,7 +1786,10 @@ function MailComposer({ initialKind = 'new', message = null, sender = null, atta
             <Icon icon={isFullscreen ? 'carbon:minimize' : 'carbon:maximize'} className="size-[15px]" aria-hidden="true" />
             <Tooltip title={isFullscreen ? 'Quitter le plein écran' : 'Plein écran'} side="bottom-start" />
           </button>
-          <h2 id={titleId} className="m-0 min-w-0 flex-1 truncate text-[15px] font-semibold leading-tight">{subject.trim() || kindTitle}</h2>
+          <div className="flex min-w-0 flex-1 items-baseline gap-2.5">
+            <h2 id={titleId} className="m-0 min-w-0 truncate text-[15px] font-semibold leading-tight">{subject.trim() || kindTitle}</h2>
+            {draftLine ? <span className="shrink-0 whitespace-nowrap text-[12px] font-medium leading-tight text-text-muted max-[1180px]:hidden" role="status">{draftLine}</span> : null}
+          </div>
           {tools}
           {sendButton}
         </header>
@@ -1654,19 +1831,45 @@ function MailComposer({ initialKind = 'new', message = null, sender = null, atta
             />
           </FieldRow>
           <FieldRow label="De :">
-            <span className="min-w-0 flex-1 truncate text-text">{fromLabel}</span>
-            {/* The automatic signature (name, group, establishment, logos), on
-                or off; its label shimmers while it's on. */}
-            {signature ? (
-              <label className="flex shrink-0 cursor-pointer items-center gap-2.5">
-                <span className={`text-[13px] font-medium text-text-muted max-sm:hidden ${signatureMode === 'auto' ? 'mail-signature-shimmer' : ''}`}>Signature automatique</span>
-                <Switch small label="Signature automatique" checked={signatureMode === 'auto'} onChange={(on) => changeSignature(on ? 'auto' : 'none')} />
+            {identities.length > 1 ? (
+              // Several addresses: a choice, in the app's menu.
+              <span className="flex min-w-0 flex-1">
+                <button
+                  type="button"
+                  className="-ml-2 inline-flex h-8 min-w-0 max-w-full items-center gap-1.5 rounded-[9px] border-0 bg-transparent px-2 text-text cursor-pointer transition-[background-color] duration-120 hover:bg-bg-subtle aria-expanded:bg-bg-subtle focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-text"
+                  aria-label={`De : ${fromLabel}`}
+                  aria-haspopup="menu"
+                  onClick={(event) => openMenu('identity', event)}
+                >
+                  <span className="min-w-0 truncate">{fromLabel}</span>
+                  <Icon icon="carbon:chevron-down" className="size-3 shrink-0 text-text-muted" aria-hidden="true" />
+                </button>
+              </span>
+            ) : (
+              <span className="min-w-0 flex-1 truncate text-text">{fromLabel}</span>
+            )}
+            {/* The signature (Réglages › Messagerie: the automatic one, the
+                webmail's or the student's own), on or off; its label
+                shimmers while it's on. On a phone, its own row below. */}
+            {signature.available ? (
+              <label className="flex shrink-0 cursor-pointer items-center gap-2.5 max-sm:hidden">
+                <span className={`text-[13px] font-medium text-text-muted ${signature.on ? 'mail-signature-shimmer' : ''}`}>{SIGNATURE_LABELS[signature.kind]}</span>
+                <Switch small label={SIGNATURE_LABELS[signature.kind]} checked={signature.on} onChange={signature.setOn} />
               </label>
             ) : null}
           </FieldRow>
+          {signature.available ? (
+            <label className="flex min-h-[42px] cursor-pointer items-center justify-between gap-3 border-b border-border px-4 sm:hidden">
+              <span className={`min-w-0 truncate font-medium text-text-muted ${signature.on ? 'mail-signature-shimmer' : ''}`}>{SIGNATURE_LABELS[signature.kind]}</span>
+              <Switch small label={SIGNATURE_LABELS[signature.kind]} checked={signature.on} onChange={signature.setOn} />
+            </label>
+          ) : null}
           {attachments.length ? (
             <div className="grid gap-2 border-b border-border px-5 py-3 max-4xl:px-4">
-              <ul className="m-0 flex list-none flex-wrap gap-2 overflow-y-auto overscroll-contain p-0 4xl:max-h-[148px]" aria-label="Pièces jointes">
+              {/* A scroll box only past two rows (four chips, from 4xl): the
+                  chips' tooltips hang under them, and inside a scroll box
+                  they made it scroll even for one chip. */}
+              <ul className={`m-0 flex list-none flex-wrap gap-2 p-0 ${attachments.length > 4 ? 'overflow-y-auto overscroll-contain 4xl:max-h-[148px]' : ''}`} aria-label="Pièces jointes">
                 {attachments.map((item) => (
                   <AttachmentChip key={item.key} item={item} onRemove={() => removeAttachment(item.key)} onRetry={() => retryAttachment(item.key)} />
                 ))}
@@ -1704,14 +1907,14 @@ function MailComposer({ initialKind = 'new', message = null, sender = null, atta
             </FormatSegment>
           </div>
 
-        <MailSignatureContext.Provider value={signature}>
+        <MailSignatureContext.Provider value={signature.value}>
           <EditorContent editor={editor} className="flex min-h-0 flex-1 flex-col [&>.mail-composer-body]:flex-1" />
         </MailSignatureContext.Provider>
       </div>
 
       {dragActive ? (
         <div className="pointer-events-none absolute inset-2 z-20 flex flex-col items-center justify-center gap-2 rounded-[20px] border-2 border-dashed border-text/25 bg-widget-bg/85 backdrop-blur-[6px]" aria-hidden="true">
-          <Icon icon="carbon:attachment" className="size-[26px] text-text" />
+          <MailDropSheets />
           <span className="text-[15px] font-semibold leading-tight text-text">Déposer pour joindre</span>
           <span className="text-[12.5px] font-medium leading-tight text-text-muted">{formatAttachmentLimit(limits.maxTotalBytes)} au maximum par mail</span>
         </div>
@@ -1731,7 +1934,8 @@ function MailComposer({ initialKind = 'new', message = null, sender = null, atta
         <ContextMenu
           x={menu.x}
           y={menu.y}
-          label={formatMenu?.label ?? (menu.kind === 'kind' ? 'Type de réponse' : menu.kind === 'attach' ? 'Joindre' : 'Listes')}
+          label={formatMenu?.label ?? (menu.kind === 'kind' ? 'Type de réponse' : menu.kind === 'attach' ? 'Joindre' : menu.kind === 'identity' ? 'Envoyer depuis' : 'Listes')}
+          title={menu.kind === 'identity' ? 'Envoyer depuis' : null}
           items={menuItems}
           anchor={menu.opener}
           onClose={closeMenu}
@@ -1739,13 +1943,14 @@ function MailComposer({ initialKind = 'new', message = null, sender = null, atta
       ) : null}
       <ConfirmDialog
         open={confirmingClose}
-        title="Supprimer le brouillon ?"
-        confirmLabel="Supprimer"
-        destructive
-        onConfirm={onClose}
+        title="Enregistrer le brouillon ?"
+        confirmLabel="Enregistrer"
+        extraLabel="Supprimer"
+        onExtra={discardAndClose}
+        onConfirm={saveAndClose}
         onCancel={cancelClose}
       >
-        Il n’est enregistré nulle part
+        Tu pourras le reprendre depuis Brouillons
       </ConfirmDialog>
     </section>,
     document.body,

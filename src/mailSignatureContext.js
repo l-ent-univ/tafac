@@ -1,6 +1,8 @@
 import { createContext } from 'react'
 
-// The automatic signature's lines and logos (MailComposer provides them,
-// MailSignatureView draws them inside the text): { name, group,
-// establishment, university, logos: [{ src, srcDark, alt }] }, or null.
+// The signature MailSignatureView draws inside the text (MailComposer
+// provides it): { kind: 'auto' | 'partage' | 'custom', auto: { name,
+// login, group, establishment, university, logos: [{ src, srcDark, alt }] }
+// | null, own: { status, signature: { html, text, hasImages } | null } },
+// or null.
 export const MailSignatureContext = createContext(null)

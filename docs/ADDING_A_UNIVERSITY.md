@@ -149,6 +149,19 @@ Un feature à `false` : le serveur répond `{ disabled: true }` sur les endpoint
   }
   ```
   Le serveur parcourt la chaîne SSO du webmail (Shibboleth → CAS) avec une copie du cookie jar de session, puis lit la boîte via l'API Zimbra (SOAP `SearchRequest`/`GetFolderRequest`, repli REST `/service/home/~/inbox?fmt=json`). Résultat mis en cache 2 min par session. Le compte démo renvoie des mails fictifs. Pour un autre webmail (SOGo, Roundcube, Exchange…), ajoutez une fonction dans `MAIL_PROVIDERS` (`server/entAuthApp.js`) qui renvoie `{ unreadCount, webmailHref, messages }` ; un `provider` inconnu répond `500 { error: 'Mail provider not configured' }`.
+- `mail.signature` (optionnel, `server.js`) — la signature automatique des mails envoyés depuis le composeur (`POST /__ent_auth/mail/send`, `server/mailSend.js`). Le serveur la construit lui-même : le nom de l'identité Zimbra, le groupe choisi (texte court, échappé), l'établissement (son id, vérifié dans `establishments`), le nom de l'université et les logos, joints au mail en images inline (CID). Les logos sont des PNG (Gmail et Outlook n'affichent pas le SVG), versions claires sur une plaque blanche arrondie, rendus à 2× par `scripts/render-mail-logos.mjs` (ajoutez-y les vôtres) ; leur taille affichée est lue dans le fichier (moitié des pixels).
+  ```js
+  signature: {
+    university: university.name,
+    logo: { file: fileURLToPath(new URL('./assets/mail/logo.png', import.meta.url)), alt: university.name },
+    establishments: {
+      iutlan: { label: establishmentNames.iutlan, logo: { file: …, alt: … } },   // ids de client.js › establishments.byId
+    },
+  }
+  ```
+  Sans ce bloc, la signature n'a que le nom et le groupe. Les noms des établissements sont dans `shared.js` (`establishmentNames`), lus par `client.js` et `server.js`.
+- `mail.signature.showLogin` (optionnel, `server.js` **et** `client.js`, `false` par défaut) — ajoute à la signature automatique une ligne « Identifiant : <login CAS> » sous le nom (Rennes 2). Le serveur la prend dans la session (`session.user`), jamais dans la requête du composeur ; le composeur et Réglages l'affichent depuis `sessionState.user`. Un login qui n'est pas fait de lettres, chiffres, `.`, `-`, `_` (32 au plus), une adresse mail par exemple, ne donne aucune ligne (`signatureLogin`, `src/mailSignatureChoice.js`). Déclarez la valeur une fois dans `shared.js` et lisez-la des deux côtés, comme Rennes 2 (`mailSignatureShowsLogin`).
+- Signatures de l'étudiant (aucune clé) — Réglages › Messagerie (avec la page Messagerie) choisit la signature : automatique, celle de Partage (`GetSignaturesRequest` et la signature par défaut de l'identité), ou une personnalisée, enregistrée dans Partage sous le nom « Tafac » (`POST /__ent_auth/mail/signature`, `server/mailSignature.js`). Le serveur relit la signature dans Partage à chaque envoi et nettoie son HTML (liste blanche, sans images) : le composeur n'envoie que le type choisi. Réservé à `mail.provider: 'zimbra'`.
 - `launch.allowedDomains` (optionnel) — domaines que le relais `/__ent_auth/launch` peut ouvrir avec la session, sous-domaines compris (Rennes : `['univ-rennes.fr', 'univ-rennes1.fr', 'iut-lannion.loxya.app']`). Les hôtes des origines et URLs de service de la config (ENT, CAS, ADE, Moodle, planning, notes, webmail, certificat) et les `signInDomains` sont déjà autorisés. Toute autre cible est renvoyée vers `/` par le relais et ouverte directement par le navigateur (`launch-preview` répond `useServerLaunch: false`, `reason: 'target-not-allowed'`). Ajoutez ici les domaines des applications de l'ENT protégées par le CAS de l'université, et ceux de vos `extraServices` (`client.js`).
 
 ## Icônes des applications

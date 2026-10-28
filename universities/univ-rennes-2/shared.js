@@ -20,6 +20,12 @@ export const university = {
   logoShape: 'square',
 }
 
+// The establishments' names (client.js's establishments.byId, and the sent
+// mail's signature in server.js), by their ids.
+export const establishmentNames = {
+  rennes2: 'Université Rennes 2',
+}
+
 export const branding = {
   appName: 'Tafac',
   defaultTitle: "Tafac | Cours, notes et services de ton université",
@@ -73,6 +79,11 @@ export const planningServiceUrl = 'https://tempo.univ-rennes2.fr/'
 // Webmail ("Messagerie"): RENATER Partage (Zimbra), behind Shibboleth
 // (shibboleth.uhb.fr) → CAS. Opened through /__ent_auth/mail/open.
 export const mailWebmailUrl = 'https://webmail.univ-rennes2.fr/'
+
+// The automatic signature says the student's CAS login (« Identifiant :
+// e2101234 »), as Rennes 2's staff ask for it: read by the composer's view
+// (client.js) and the server's signature (server.js), from the session.
+export const mailSignatureShowsLogin = true
 
 // Moodle « Cursus », signed in through its CAS login (moodle.casLoginPath).
 export const moodleOrigin = 'https://cursus.univ-rennes2.fr'

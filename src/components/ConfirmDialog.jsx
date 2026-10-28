@@ -8,10 +8,12 @@ import { createPortal } from 'react-dom'
 // button in red when `destructive`. Escape, a click on the backdrop or
 // « Annuler » call `onCancel`. The focus lands on the safe choice: « Annuler »
 // for a destructive one (Enter can't erase by accident, as Apple's
-// guidelines ask), else the confirm button.
+// guidelines ask), else the confirm button. `extraLabel` and `onExtra`: a
+// third choice, on the left in red (the composer's « Supprimer » beside
+// « Enregistrer », as Apple Mail asks on closing a draft).
 // Text sits on spans: a <button> takes its font from index.css's
 // `button { font: inherit }`, outside Tailwind's layers.
-function ConfirmDialog({ open, title, children = null, confirmLabel, cancelLabel = 'Annuler', destructive = false, onConfirm, onCancel }) {
+function ConfirmDialog({ open, title, children = null, confirmLabel, cancelLabel = 'Annuler', destructive = false, extraLabel = null, onExtra = null, onConfirm, onCancel }) {
   const confirmRef = useRef(null)
   const cancelRef = useRef(null)
 
@@ -57,6 +59,11 @@ function ConfirmDialog({ open, title, children = null, confirmLabel, cancelLabel
             {children ? <p id="confirm-dialog-text" className="m-0 text-[14px] font-medium leading-[1.4] text-text-muted">{children}</p> : null}
           </div>
           <div className="flex justify-end gap-2">
+            {extraLabel && onExtra ? (
+              <button type="button" className="mr-auto inline-flex h-9 items-center rounded-full border-0 bg-transparent px-3 -ml-3 cursor-pointer transition-[background-color] duration-120 hover:bg-[#d1342f]/8 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-text" onClick={onExtra}>
+                <span className="text-[13px] font-semibold leading-none text-[#d1342f] dark:text-[#ff6b63]">{extraLabel}</span>
+              </button>
+            ) : null}
             <button ref={cancelRef} type="button" className="material inline-flex h-9 items-center rounded-full px-4 cursor-pointer" onClick={onCancel}>
               <span className="text-[13px] font-semibold leading-none text-text">{cancelLabel}</span>
             </button>

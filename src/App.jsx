@@ -19,7 +19,8 @@ import UpdateNotice from './components/UpdateNotice'
 import WelcomeFromLent from './components/WelcomeFromLent'
 import { settingsTransfer } from './settingsTransferBoot'
 import { appendPreviewToken, findProfilePhotoCandidate } from './profilePhoto'
-import { DEMO_CREDENTIALS, DEMO_SESSION_MODE } from './demoAccount'
+import { DEMO_CREDENTIALS, DEMO_SESSION_MODE, DEMO_SIGNATURE_LOGIN } from './demoAccount'
+import { signatureLogin } from './mailSignatureChoice'
 import { storeBrowserPasswordCredential } from './browserCredentials'
 import { syncRuntimeSeo } from './seo'
 import {
@@ -1769,6 +1770,12 @@ function App() {
     () => getMobileTabItems(establishment, { gradesSupported }).some((item) => item.page === 'planning'),
     [establishment, gradesSupported],
   )
+  // The in-app mail page (features.mail, mail.page in client.js): the
+  // dashboard's mail card opens it, Réglages › Messagerie comes with it.
+  const hasMailPage = useMemo(
+    () => getMobileTabItems(establishment, { gradesSupported }).some((item) => item.page === 'mail'),
+    [establishment, gradesSupported],
+  )
   const hasMobileTabBar =useMemo(() => getMobileTabItems(establishment, { gradesSupported }).length > 0, [establishment, gradesSupported])
   // « Nouveautés » about « Mes notes » only reach students who have it: a
   // school with the page and a relevé confirmed BUT (not while unknown, so
@@ -1926,6 +1933,19 @@ function App() {
     handleNavigatePage('planning', 'dashboard_card')
   }, [handleNavigatePage])
   const clearPendingPlanningDay = useCallback(() => setPendingPlanningDay(null), [])
+  // The webmail's app in the app lists ('tile'): the mail page rather than
+  // the webmail.
+  const handleOpenMailPage = useCallback((source = 'tile') => handleNavigatePage('mail', source), [handleNavigatePage])
+  // The dashboard's "Mails récents": the mail page, on a mail (its history
+  // entry names it, which the page reads as it opens).
+  const handleOpenMail = useCallback((id) => {
+    if (id) {
+      writeHistoryNav({ page: 'mail', mail: id })
+      showPage('mail', 'dashboard_card')
+      return
+    }
+    handleNavigatePage('mail', 'dashboard_card')
+  }, [showPage, handleNavigatePage])
 
   // The current entry says which page it is (the first one included); the
   // app sets scroll positions itself. Back and forward show the entry's page
@@ -2443,8 +2463,16 @@ function App() {
     email: accountDisplayInfo.email,
     signature: {
       name: mailSenderName,
+      // The CAS login, where the university shows it (mail.signature.showLogin):
+      // the server writes its own copy from the session, never this one.
+      login: universityConfig.mail?.signature?.showLogin === true
+        ? signatureLogin(sessionState.user === DEMO_CREDENTIALS.username ? DEMO_SIGNATURE_LOGIN : sessionState.user)
+        : null,
       group: HAS_PERSONAL_PLANNING ? null : [selectedTp?.yearLabel, selectedTp?.tpLabel ?? selectedTp?.tdLabel].filter(Boolean).join(' · ') || selectedTp?.label || null,
       establishment: ownEstablishment?.label ?? null,
+      // Its id, all the server takes of it (the sent mail's signature is
+      // built there, server/mailSend.js).
+      establishmentId: ownEstablishment ? establishment : null,
       university: universityConfig.university?.name ?? null,
       logos: [
         ownEstablishment?.logo ? { src: ownEstablishment.logo, srcDark: ownEstablishment.logoDark ?? null, alt: ownEstablishment.logoAlt ?? ownEstablishment.label ?? '' } : null,
@@ -2546,8 +2574,11 @@ function App() {
             ) : null}
             {showChangelogPill ? (
               // Right under the header buttons, eating into the space above
-              // the cards rather than pushing them down a full row.
-              <ChangelogPill className="4xl:hidden flex justify-end px-6 pt-2 -mb-2 max-md:px-3 max-md:pt-1.5" />
+              // the cards rather than pushing them down a full row: over
+              // them (relative z-10), not cut by the page's block coming up
+              // under it. On a phone, with the top bar: on the dashboard
+              // only (the other pages start with their own header).
+              <ChangelogPill className={`${shownPage !== 'dashboard' ? 'max-md:hidden ' : ''}relative z-10 4xl:hidden flex justify-end px-6 pt-2 -mb-2 max-md:px-3 max-md:pt-1.5`} />
             ) : null}
             {sessionState.warning ? (
               <div className="px-6 pt-3 max-md:px-3 4xl:pt-5">
@@ -2577,6 +2608,8 @@ function App() {
                 onOpenGradesPage={hasGradesPage ? handleOpenGradesPage : null}
                 onOpenPlanningPage={hasPlanningPage ? handleOpenPlanningPage : null}
                 onOpenPlanningDay={hasPlanningPage ? handleOpenPlanningDay : null}
+                onOpenMail={hasMailPage ? handleOpenMail : null}
+                onOpenMailPage={hasMailPage ? handleOpenMailPage : null}
                 showAppDescriptions={showAppDescriptions}
               />
             </div>
@@ -2661,6 +2694,7 @@ function App() {
         planningSelection={selectedTp}
         anonymousAnalytics={anonymousAnalytics}
         onAnonymousAnalyticsChange={isAnalyticsAvailable ? handleAnonymousAnalyticsChange : null}
+        mailSignature={hasMailPage && sessionState.authenticated ? { auto: mailSenderName ? mailSender.signature : null } : null}
       />
       <WelcomeFromLent
         visible={welcomeFromLentOpen}

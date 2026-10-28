@@ -1,5 +1,6 @@
 // Université Rennes 2 — server-side configuration.
-import { appIcons, id, casOrigin, entOrigin, features, gradesCopy, mailWebmailUrl, moodleOrigin, planningServiceUrl, portalEntryPath } from './shared.js'
+import { fileURLToPath } from 'node:url'
+import { appIcons, id, casOrigin, entOrigin, establishmentNames, features, gradesCopy, mailSignatureShowsLogin, mailWebmailUrl, moodleOrigin, planningServiceUrl, portalEntryPath, university } from './shared.js'
 
 export default {
   id,
@@ -57,6 +58,19 @@ export default {
     // Hosts the SAML sign-in chain may visit, besides the webmail and CAS
     // hosts (RENATER's Partage SP and the university IdP).
     signInDomains: ['partage.renater.fr', 'uhb.fr', 'univ-rennes2.fr'],
+    // The automatic signature of a sent mail (server/mailSend.js), as
+    // univ-rennes's: one establishment, the university itself (its name
+    // said once), the logo as PNG (scripts/render-mail-logos.mjs).
+    signature: {
+      university: university.name,
+      // A line « Identifiant : <CAS login> » under the name (the session's
+      // login, never the page's).
+      showLogin: mailSignatureShowsLogin,
+      logo: { file: fileURLToPath(new URL('./assets/mail/logo.png', import.meta.url)), alt: university.name },
+      establishments: {
+        rennes2: { label: establishmentNames.rennes2 },
+      },
+    },
   },
 
   // Certificat de scolarité (features.schoolCertificate): Mon Dossier Web

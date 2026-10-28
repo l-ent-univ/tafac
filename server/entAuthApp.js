@@ -12,6 +12,7 @@ import express from 'express'
 import cookieParser from 'cookie-parser'
 import { createProxyMiddleware } from 'http-proxy-middleware'
 import { randomUUID } from 'node:crypto'
+import { readFileSync } from 'node:fs'
 import { Readable } from 'node:stream'
 import {
   createAdeApiClient,
@@ -44,12 +45,14 @@ import {
 import { createLaunchTargetPolicy } from './launchTargets.js'
 import {
   buildMailMessage,
+  dropOwnMailCopies,
   getMailPartDisposition,
   isValidDemoMailMessageId,
   isValidMailMessageId,
   isValidMailPartId,
   mailTextToHtml,
   readContentDispositionFilename,
+  sanitizeMailHtml,
 } from './mailMessage.js'
 import { isEmptiableMailFolder, normalizeZimbraFolderTree, parseZimbraMarkReadPref } from './mailFolders.js'
 import { buildZimbraAutoCompleteRequest, normalizeZimbraAutoComplete, searchDemoMailContacts } from './mailAutocomplete.js'
@@ -59,8 +62,34 @@ import {
   createUploadByteCounter,
   createUploadLimiter,
   readContentLength,
+  isValidZimbraUploadId,
   sendToZimbraUpload,
 } from './mailUpload.js'
+import {
+  buildMailHtml,
+  buildMailSignature,
+  buildZimbraMessage,
+  composerHtmlToText,
+  createSendLimiter,
+  mapDraftAttachments,
+  mapZimbraSendFault,
+  normalizeComposePayload,
+  normalizeZimbraIdentities,
+  pickIdentity,
+  readDraftAttachmentParts,
+  readDraftForComposer,
+  readIdentitySignatureIds,
+  readPngSize,
+  sanitizeComposerHtml,
+} from './mailSend.js'
+import {
+  buildCustomSignatureRequest,
+  findCustomSignature,
+  frameSignature,
+  pickPartageSignature,
+  readZimbraSignatures,
+} from './mailSignature.js'
+import { CUSTOM_SIGNATURE_MAX_LENGTH, normalizeCustomSignatureText } from '../src/mailSignatureChoice.js'
 import { createPlanningPortalApiClient } from '../planningPortalApi.js'
 import {
   buildDrupalLayout,
@@ -74,6 +103,7 @@ import { createPlanningRpcClient } from '../planningRpc.js'
 import { createTempoApiClient } from '../tempoApi.js'
 import {
   DEMO_ACCOUNT,
+  DEMO_SIGNATURE_LOGIN,
   DEMO_GRADES_DEPARTMENT_MESSAGE,
   DEMO_SESSION_MODE,
   applyDemoLayoutMutation,
@@ -215,6 +245,31 @@ const MAIL_RATE_LIMIT_PER_SECOND = 5
 const MAIL_UPLOAD_PER_MINUTE = 20
 const MAIL_UPLOAD_BYTES_PER_HOUR = 300 * 1024 * 1024
 const MAIL_UPLOAD_CONCURRENT = 3
+// Sending (POST /__ent_auth/mail/send), apart from the reading bucket, per
+// session AND per user (one allowance for a student signed in on a phone
+// and a laptop): 5 a minute is a burst of quick replies; 100 mails and 500
+// recipients a day are far past what a student writes, and stop a stolen
+// session or a stuck script before Partage (or RENATER's outbound filters)
+// throttles or blocks the account, or this server's one address that every
+// student's mail goes out from. Past it: 429 with Retry-After.
+const MAIL_SEND_PER_MINUTE = 5
+const MAIL_SEND_PER_DAY = 100
+const MAIL_SEND_RECIPIENTS_PER_DAY = 500
+// Drafts (POST /mail/draft), per session: the composer saves a few seconds
+// after the typing stops, so 20 a minute is two composers open at once
+// (two tabs) saving all the time; 1000 a day bounds it.
+const MAIL_DRAFT_PER_MINUTE = 20
+const MAIL_DRAFT_PER_DAY = 1000
+// The custom signature's writes (POST /mail/signature), per session: saved
+// by hand, a few times while it's written; 100 a day bounds a script.
+const MAIL_SIGNATURE_PER_MINUTE = 10
+const MAIL_SIGNATURE_PER_DAY = 100
+// The JSON body of those two (the editor's HTML, a long quote under a reply
+// included, and the rest), past express.json()'s 100 kB default.
+const MAIL_COMPOSE_MAX_BODY_BYTES = 2 * 1024 * 1024
+// The uploads a session's sends may name (runtimeMailUploads), the oldest
+// forgotten past this.
+const MAIL_UPLOADS_KEPT = 200
 // Domains the webmail sign-in chain may visit (webmail, SAML SP, IdP, CAS).
 // Anything else — or any non-HTTPS URL — aborts the chain.
 function buildSignInDomains(extraDomains, urls) {
@@ -375,6 +430,24 @@ const mailUploadLimiter = createUploadLimiter({
   bytesPerHour: MAIL_UPLOAD_BYTES_PER_HOUR,
   concurrent: MAIL_UPLOAD_CONCURRENT,
 })
+
+// The sends' and the drafts' own limits (MAIL_SEND_*, MAIL_DRAFT_*).
+const mailSendLimiter = createSendLimiter({
+  perMinute: MAIL_SEND_PER_MINUTE,
+  perDay: MAIL_SEND_PER_DAY,
+  recipientsPerDay: MAIL_SEND_RECIPIENTS_PER_DAY,
+})
+const mailDraftLimiter = createSendLimiter({ perMinute: MAIL_DRAFT_PER_MINUTE, perDay: MAIL_DRAFT_PER_DAY })
+const mailSignatureLimiter = createSendLimiter({ perMinute: MAIL_SIGNATURE_PER_MINUTE, perDay: MAIL_SIGNATURE_PER_DAY })
+// sessionId → Map(aid → { size, name }): the files the session uploaded
+// (/mail/upload), in order. A send or a draft names only those (an aid made
+// up, or one from before a restart, is refused as expired: the page uploads
+// it again), and their sizes add up against the account's limit.
+const runtimeMailUploads = new Map()
+// sessionId → { drafts: Map(id → draft), sent: [rows], flags: Map(id →
+// 'r' | 'w'), next, customSignature }: what the demo account's composer
+// saved and sent, and its custom signature (Réglages), in memory only (never the cookie, never Zimbra), gone with the session.
+const runtimeDemoMail = new Map()
 
 // Utility functions
 function escapeRegExp(value) {
@@ -752,6 +825,8 @@ function dropRuntimeSession(sessionId) {
   runtimeMailCache.delete(sessionId)
   runtimeMailContexts.delete(sessionId)
   runtimeMailAddresses.delete(sessionId)
+  runtimeMailUploads.delete(sessionId)
+  runtimeDemoMail.delete(sessionId)
   runtimeMoodleDeadlinesCache.delete(sessionId)
   runtimeMoodleContexts.delete(sessionId)
 }
@@ -888,6 +963,8 @@ function clearMailCaches(sessionId) {
 
   runtimeMailCache.delete(sessionId)
   runtimeMailContexts.delete(sessionId)
+  runtimeMailUploads.delete(sessionId)
+  runtimeDemoMail.delete(sessionId)
 }
 
 function getCachedMoodleDeadlines(sessionId) {
@@ -2407,8 +2484,10 @@ app.post('/__ent_auth/mail/upload', async (req, res) => {
       }
       clearTimeout(deadline)
       if (controller.signal.aborted) throw controller.signal.reason ?? new UploadIdleError('Upload ended early.')
+      const aid = `demo-upload-${randomUUID()}`
+      rememberMailUpload(session.id, aid, { size: received, name, contentType })
       setSessionCookie(res, session)
-      return res.status(200).json({ attachment: { aid: `demo-upload-${randomUUID()}`, name, size: received, contentType } })
+      return res.status(200).json({ attachment: { aid, name, size: received, contentType } })
     }
 
     // The account's limit (one GetInfo per webmail sign-in, often read
@@ -2450,6 +2529,7 @@ app.post('/__ent_auth/mail/upload', async (req, res) => {
       throw new Error(`Zimbra upload failed (HTTP ${httpStatus}, ${parsed ? `status ${parsed.status}` : 'unreadable answer'}).`)
     }
     const [upload] = parsed.uploads
+    rememberMailUpload(session.id, upload.aid, { size: upload.size ?? received, name, contentType: upload.contentType || contentType })
     setSessionCookie(res, session)
     return res.status(200).json({
       attachment: { aid: upload.aid, name, size: upload.size ?? received, contentType: upload.contentType || contentType },
@@ -2464,6 +2544,34 @@ app.post('/__ent_auth/mail/upload', async (req, res) => {
     if (cause.some((entry) => entry instanceof UploadIdleError)) return res.status(408).json({ error: 'mail_upload_idle' })
     return sendMailRouteError(res, 'upload', error)
   }
+})
+
+// The composer's send and draft bodies (the editor's HTML in them): their
+// own cap, MAIL_COMPOSE_MAX_BODY_BYTES, instead of express.json()'s 100 kB.
+// Cross-site or without a session cookie, refused before a byte of the
+// body is read (the routes check both again, the session fully).
+const parseMailComposeBody = express.json({ limit: MAIL_COMPOSE_MAX_BODY_BYTES })
+app.use(['/__ent_auth/mail/send', '/__ent_auth/mail/draft'], (req, res, next) => {
+  if (req.method !== 'POST') return next()
+  if (!FEATURES.mail) {
+    res.setHeader('Connection', 'close')
+    return res.status(404).json({ ok: false, disabled: true, feature: 'mail' })
+  }
+  const fetchSite = req.headers['sec-fetch-site']
+  const refusal = fetchSite && fetchSite !== 'same-origin' ? [403, 'Cross-site request.']
+    : !readSessionCookie(req)?.data?.id ? [401, 'Authentication required.']
+      : null
+  if (refusal) {
+    res.setHeader('Cache-Control', 'no-store')
+    res.setHeader('Connection', 'close')
+    return res.status(refusal[0]).json({ error: refusal[1] })
+  }
+  return parseMailComposeBody(req, res, (error) => {
+    if (!error) return next()
+    res.setHeader('Cache-Control', 'no-store')
+    res.setHeader('Connection', 'close')
+    return res.status(error.status === 413 ? 413 : 400).json({ error: error.status === 413 ? 'mail_send_too_large' : 'mail_send_invalid' })
+  })
 })
 
 app.use('/__ent_auth', express.json()) // Automatically parse incoming JSON requests for auth endpoints
@@ -3531,6 +3639,11 @@ async function zimbraSoapRequest(context, requestName, requestBody, namespace = 
     const error = /AUTH_(REQUIRED|EXPIRED)/.test(code) || response.status === 401
       ? new MailAuthError(`Zimbra ${requestName} rejected the session (${code}).`)
       : new Error(`Zimbra ${requestName} failed (${code}).`)
+    // For the routes that tell the page why (mapZimbraSendFault): the code
+    // and the fault's arguments (an address refused, an upload gone). Kept
+    // off the message, which is logged.
+    error.zimbraCode = fault?.Detail?.Error?.Code ?? null
+    error.zimbraArgs = Array.isArray(fault?.Detail?.Error?.a) ? fault.Detail.Error.a : []
     throw error
   }
 
@@ -3556,6 +3669,15 @@ async function zimbraRestInbox(context, limit) {
   return Array.isArray(payload.m) ? payload.m : []
 }
 
+// The Message-ID header a GetConv asked for: in `_attrs` (JSON), or as a
+// `header` list; Zimbra's own `mid` otherwise.
+function readZimbraMessageIdHeader(message) {
+  const fromAttrs = message?._attrs?.['Message-ID']
+  const fromList = Array.isArray(message?.header) ? message.header.find((header) => header?.n === 'Message-ID')?._content : null
+  const value = [fromAttrs, fromList, message?.mid].find((candidate) => typeof candidate === 'string' && candidate.trim())
+  return value ? value.trim().toLowerCase() : null
+}
+
 function normalizeZimbraMessage(message) {
   const addresses = Array.isArray(message?.e) ? message.e : []
   const sender = addresses.find((address) => address?.t === 'f') ?? null
@@ -3578,6 +3700,13 @@ function normalizeZimbraMessage(message) {
     receivedAt: Number.isFinite(timestamp) && timestamp > 0 ? new Date(timestamp).toISOString() : null,
     unread: typeof message?.f === 'string' && message.f.includes('u'),
     flagged: typeof message?.f === 'string' && message.f.includes('f'),
+    // Answered or forwarded from this mailbox (Zimbra's r and w flags,
+    // set by a send with origid and rt).
+    replied: typeof message?.f === 'string' && message.f.includes('r'),
+    forwarded: typeof message?.f === 'string' && message.f.includes('w'),
+    // Not sent yet (Zimbra's d flag): a draft, in a thread beside the mails
+    // it answers.
+    draft: typeof message?.f === 'string' && message.f.includes('d'),
     // A row is a thread (normalizeZimbraConversation); a lone message (the
     // REST fallback's) is one of one.
     messageIds: id ? [id] : [],
@@ -3605,6 +3734,8 @@ function normalizeZimbraConversation(conversation) {
     ...base,
     unread: flags.includes('u') || Number(conversation?.u) > 0,
     flagged: flags.includes('f'),
+    replied: flags.includes('r'),
+    forwarded: flags.includes('w'),
     messageIds,
     count: Math.max(Number(conversation?.n) || 1, messageIds.length, 1),
   }
@@ -3613,11 +3744,12 @@ function normalizeZimbraConversation(conversation) {
 // One thread for the reader (GetConvRequest): its mails, oldest first, as
 // list rows. Those in the trash or the junk folder are left out unless the
 // thread is read from there (`folder`). A lone mail's virtual thread that
-// Zimbra won't give is that mail alone.
+// Zimbra won't give is that mail alone. A mail sent to oneself shows once
+// (dropOwnMailCopies, by its Message-ID header, asked for here).
 async function queryZimbraThread(context, id, folder) {
   let result = null
   try {
-    result = await zimbraSoapRequest(context, 'GetConvRequest', { c: { id } })
+    result = await zimbraSoapRequest(context, 'GetConvRequest', { c: { id, header: [{ n: 'Message-ID' }] } })
   } catch (error) {
     if (!id.startsWith('-')) throw error
   }
@@ -3627,10 +3759,15 @@ async function queryZimbraThread(context, id, folder) {
       const location = String(message?.l ?? '')
       return location === folder || !['3', '4'].includes(location)
     })
-    .map((message) => ({ ...normalizeZimbraMessage(message), folder: String(message?.l ?? '') }))
+    .map((message) => ({ ...normalizeZimbraMessage(message), folder: String(message?.l ?? ''), messageIdHeader: readZimbraMessageIdHeader(message) }))
     .filter((message) => message.id)
     .sort((left, right) => String(left.receivedAt ?? '').localeCompare(String(right.receivedAt ?? '')))
-  if (messages.length) return messages
+  const shown = dropOwnMailCopies(messages, folder).map((message) => {
+    const row = { ...message }
+    delete row.messageIdHeader
+    return row
+  })
+  if (shown.length) return shown
   return id.startsWith('-') ? [{ id: id.slice(1), messageIds: [id.slice(1)], count: 1, folder }] : []
 }
 
@@ -3977,7 +4114,9 @@ app.get('/__ent_auth/mail/message', async (req, res) => {
   }
 
   try {
-    const message = isDemoSession(session) ? buildDemoMailMessage(id) : await fetchZimbraMessage(session, id)
+    const message = isDemoSession(session)
+      ? buildDemoMailMessage(id) ?? runtimeDemoMail.get(session.id)?.sent.find((entry) => entry.row.id === id)?.message ?? null
+      : await fetchZimbraMessage(session, id)
     if (!message) throw new MailNotFoundError('No such message.')
     setSessionCookie(res, session)
     return res.status(200).json({ message })
@@ -4008,6 +4147,9 @@ const MAIL_ACTIONS = {
   // hold to that too: only mails lying in the trash (t) or the junk folder
   // (j) are deleted, any other id in the list is left alone.
   delete: { op: 'delete', tcon: 'tj' },
+  // A draft discarded from the composer (« Supprimer », as Apple Mail's):
+  // deleted, held to the Drafts folder (d) whatever the id.
+  discard: { op: 'delete', tcon: 'd' },
 }
 // A selection is the loaded list at most (pages of MAIL_MAX_MESSAGES).
 const MAIL_ACTION_MAX_IDS = 500
@@ -4076,6 +4218,11 @@ app.post('/__ent_auth/mail/action', async (req, res) => {
       // Nothing moves in the demo, but the same rule: one of its folders.
       if (move && !DEMO_MAIL_FOLDERS.some((entry) => entry.id === folder)) {
         return res.status(400).json({ error: 'Invalid folder.' })
+      }
+      // Its drafts (kept in memory) go when discarded, trashed or deleted.
+      if (['discard', 'trash', 'delete'].includes(req.body.action)) {
+        const drafts = runtimeDemoMail.get(session.id)?.drafts
+        for (const id of ids) drafts?.delete(id)
       }
     } else {
       if (move) {
@@ -4205,7 +4352,8 @@ app.get('/__ent_auth/mail/thread', async (req, res) => {
   const folder = isValidMailFolderId(String(req.query.folder ?? '')) ? String(req.query.folder) : MAIL_INBOX_FOLDER
   try {
     const messages = isDemoSession(session)
-      ? buildDemoMailPayload().messages.filter((message) => message.id === id).map((message) => ({ ...message, messageIds: [message.id], count: 1, folder }))
+      ? [...withDemoMailState(session, buildDemoMailPayload()).messages.filter((message) => message.id === id), ...[findDemoMailRow(session, id)].filter(Boolean)]
+        .map((message) => ({ ...message, messageIds: [message.id], count: 1, folder }))
       : await withZimbraContext(session, (context) => queryZimbraThread(context, id, folder))
     setSessionCookie(res, session)
     return res.status(200).json({ messages })
@@ -4308,32 +4456,42 @@ app.post('/__ent_auth/mail/folder-action', async (req, res) => {
 // zimbraPrefMarkMsgRead (parseZimbraMarkReadPref), how many seconds an open
 // mail waits before it's marked read, -1 never, 0 at once; and the
 // composer's attachment limits (readZimbraAttachmentLimits), for it to
-// refuse a file too large before a byte of it is sent. Read once per
+// refuse a file too large before a byte of it is sent; the identities its
+// « De : » offers (readZimbraIdentities). Read once per
 // webmail sign-in (kept on its context, which goes with the session); the
 // demo account marks at once and has the fallback limits.
-//   200 { markRead: number, attachments: { maxFileBytes, maxTotalBytes } },
+//   200 { markRead: number, attachments: { maxFileBytes, maxTotalBytes },
+//   identities: [{ id, name, email }] },
 //   401 no session.
 app.get('/__ent_auth/mail/prefs', async (req, res) => {
   res.setHeader('Cache-Control', 'no-store')
   const session = getMailMessageSession(req, res)
   if (!session) return undefined
   try {
-    const { markRead, limits } = isDemoSession(session)
-      ? { markRead: 0, limits: deriveAttachmentLimits(null) }
+    const { markRead, limits, identities } = isDemoSession(session)
+      ? { markRead: 0, limits: deriveAttachmentLimits(null), identities: DEMO_MAIL_IDENTITIES }
       : await withZimbraContext(session, async (context) => {
-        const [markReadDelay, attachmentLimits] = await Promise.all([
+        const [markReadDelay, attachmentLimits, accountIdentities] = await Promise.all([
           context.markReadDelay === undefined
             ? zimbraSoapRequest(context, 'GetPrefsRequest', { pref: [{ name: 'zimbraPrefMarkMsgRead' }] }, 'urn:zimbraAccount').then(parseZimbraMarkReadPref)
             : context.markReadDelay,
           readZimbraAttachmentLimits(context),
+          // « De : » without a choice rather than no prefs at all.
+          readZimbraIdentities(context).catch((error) => {
+            if (error instanceof MailAuthError) throw error
+            return []
+          }),
         ])
         context.markReadDelay = markReadDelay
-        return { markRead: markReadDelay, limits: attachmentLimits }
+        return { markRead: markReadDelay, limits: attachmentLimits, identities: accountIdentities }
       })
     setSessionCookie(res, session)
     return res.status(200).json({
       markRead,
       attachments: { maxFileBytes: limits.maxFileBytes, maxTotalBytes: limits.maxTotalBytes },
+      // The addresses the composer may send from (readZimbraIdentities),
+      // the default first: id, name and address only.
+      identities: identities.map(({ id, name, email }) => ({ id, name, email })),
     })
   } catch (error) {
     return sendMailRouteError(res, 'prefs', error)
@@ -4379,6 +4537,759 @@ app.get('/__ent_auth/mail/autocomplete', async (req, res) => {
   }
 })
 
+// ---------------------------------------------------------------------------
+// Sending and drafts (the composer, src/components/MailComposer.jsx;
+// server/mailSend.js for the pieces tested on their own)
+// ---------------------------------------------------------------------------
+
+// The uploads a session made (runtimeMailUploads), in order, MAIL_UPLOADS_KEPT
+// at most. Forgotten once a send or a save has used them: Zimbra deletes an
+// upload it has put into a mail.
+function rememberMailUpload(sessionId, aid, entry) {
+  let uploads = runtimeMailUploads.get(sessionId)
+  if (!uploads) {
+    uploads = new Map()
+    runtimeMailUploads.set(sessionId, uploads)
+  }
+  uploads.delete(aid)
+  uploads.set(aid, { size: Number(entry.size) || 0, name: entry.name, contentType: entry.contentType })
+  while (uploads.size > MAIL_UPLOADS_KEPT) uploads.delete(uploads.keys().next().value)
+}
+
+function forgetMailUploads(sessionId, aids) {
+  const uploads = runtimeMailUploads.get(sessionId)
+  for (const aid of aids) uploads?.delete(aid)
+}
+
+const DEMO_UPLOAD_ID_PATTERN = /^demo-upload-[0-9a-f-]{36}$/
+
+// An upload's id as a session's send may name it: Partage's for a real
+// session, the made-up ones (/mail/upload) for the demo account.
+function isValidSessionUploadId(session, aid) {
+  return isDemoSession(session) ? typeof aid === 'string' && DEMO_UPLOAD_ID_PATTERN.test(aid) : isValidZimbraUploadId(aid)
+}
+
+// A send or a save the server itself refuses, with its code for the page.
+class MailSendRefusal extends Error {
+  constructor(status, code, extra = null) {
+    super(code)
+    this.status = status
+    this.code = code
+    this.extra = extra
+  }
+}
+
+// The account's identities (normalizeZimbraIdentities), kept on the Zimbra
+// context as its other account data: read once per webmail sign-in, by
+// /mail/prefs (for « De : ») or the first send. GetInfo's same answer gives
+// the attachment limits. A GetIdentitiesRequest that fails (not for the
+// session) leaves the account's own address.
+async function readZimbraIdentities(context) {
+  if (Array.isArray(context.mailIdentities)) return context.mailIdentities
+  const [identities, info] = await Promise.allSettled([
+    zimbraSoapRequest(context, 'GetIdentitiesRequest', {}, 'urn:zimbraAccount'),
+    zimbraSoapRequest(context, 'GetInfoRequest', { sections: 'mbox,attrs' }, 'urn:zimbraAccount'),
+  ])
+  for (const result of [identities, info]) {
+    if (result.status === 'rejected' && result.reason instanceof MailAuthError) throw result.reason
+  }
+  if (info.status === 'rejected') throw info.reason
+  context.attachmentLimits ??= deriveAttachmentLimits(info.value?.attSizeLimit)
+  context.mailIdentities = normalizeZimbraIdentities(identities.status === 'fulfilled' ? identities.value : null, info.value)
+  // The webmail signature each one names, for « Partage » (mailSignature.js).
+  context.mailIdentitySignatureIds = readIdentitySignatureIds(identities.status === 'fulfilled' ? identities.value : null)
+  return context.mailIdentities
+}
+
+// The demo account's: its address and a second one, for « De : » to offer
+// a choice.
+const DEMO_MAIL_IDENTITIES = [
+  { id: 'demo-default', name: DEMO_ACCOUNT.name, email: DEMO_ACCOUNT.email, isDefault: true },
+  { id: 'demo-etudiant', name: DEMO_ACCOUNT.name, email: 'camille.martin@etudiant.tafac.fr', isDefault: false },
+]
+
+// Its webmail signature, as GetSignatures would give it (an HTML one, with
+// an image left out and a link), named by its first identity; the second
+// names none (« Partage » takes the first one there is). Its custom one
+// lives in its memory (getDemoMailState), never anywhere else.
+const DEMO_PARTAGE_SIGNATURE = {
+  id: 'demo-signature-partage',
+  name: 'Signature',
+  content: [{
+    type: 'text/html',
+    _content: `<div><strong>${DEMO_ACCOUNT.name}</strong></div><div style="color:#6b625b">Étudiante · compte de démonstration</div><div><a href="https://tafac.fr">tafac.fr</a></div><div><img src="https://tafac.fr/logo.png" alt="logo"></div>`,
+  }],
+}
+const DEMO_SIGNATURE_IDS = new Map([['demo-default', { signatureId: DEMO_PARTAGE_SIGNATURE.id, replySignatureId: null }]])
+const DEMO_CUSTOM_SIGNATURE_ID = 'demo-signature-tafac'
+
+function readDemoSignatures(session) {
+  const custom = runtimeDemoMail.get(session.id)?.customSignature ?? ''
+  return readZimbraSignatures({
+    signature: [
+      DEMO_PARTAGE_SIGNATURE,
+      ...(custom ? [{ id: DEMO_CUSTOM_SIGNATURE_ID, name: 'Tafac', content: [{ type: 'text/plain', _content: custom }] }] : []),
+    ],
+  })
+}
+
+// The signature's config (universities/<id>/server.js → mail.signature):
+// the university's name and logo, the establishments by id, each with its
+// label and logo (PNG files, read once, their size from the file: drawn at
+// 2×, shown at half).
+const MAIL_SIGNATURE = universityConfig.mail?.signature ?? null
+const signatureLogoCache = new Map()
+
+function readSignatureLogo(logo) {
+  if (!logo?.file) return null
+  if (!signatureLogoCache.has(logo.file)) {
+    let entry = null
+    try {
+      const bytes = readFileSync(logo.file)
+      const size = readPngSize(bytes)
+      if (size) entry = { bytes, width: Math.round(size.width / 2), height: Math.round(size.height / 2) }
+    } catch (error) {
+      console.error(`[mail] signature logo unreadable: ${error instanceof Error ? error.message : String(error)}`)
+    }
+    signatureLogoCache.set(logo.file, entry)
+  }
+  const entry = signatureLogoCache.get(logo.file)
+  return entry ? { ...entry, alt: String(logo.alt ?? '') } : null
+}
+
+// What the signature holds for this send, or null when it's off: the
+// identity's name, the session's CAS login where the config shows it
+// (mail.signature.showLogin; never the page's), the page's group label
+// (cleaned by normalizeComposePayload), its establishment if the config has
+// that id, the university, their logos.
+function resolveMailSignature(options, identity, session) {
+  if (!options?.include) return null
+  const establishments = MAIL_SIGNATURE?.establishments ?? {}
+  const establishment = options.establishment && Object.hasOwn(establishments, options.establishment) ? establishments[options.establishment] : null
+  return {
+    name: identity?.name ?? '',
+    login: MAIL_SIGNATURE?.showLogin === true ? (isDemoSession(session) ? DEMO_SIGNATURE_LOGIN : session?.user ?? null) : null,
+    group: options.group ?? '',
+    establishment: establishment?.label ?? '',
+    university: MAIL_SIGNATURE?.university ?? '',
+    logos: [establishment?.logo, MAIL_SIGNATURE?.logo].map(readSignatureLogo).filter(Boolean),
+  }
+}
+
+// The student's own signature for this send (« Partage » or « Personnalisée »:
+// payload.signature.mode), read from the webmail's list, never from the
+// page: { html, text } (frameSignature's), empty when they have none.
+// `signatures`: readZimbraSignatures'; `signatureIds`: the identities'
+// (readIdentitySignatureIds). A reply or a forward takes the identity's
+// reply signature, as the webmail does.
+function resolveOwnSignature(options, identity, signatures, signatureIds, { reply = false } = {}) {
+  const picked = options.mode === 'custom'
+    ? findCustomSignature(signatures)
+    : pickPartageSignature(signatures, signatureIds?.get(identity?.id) ?? null, { reply })
+  return frameSignature(picked)
+}
+
+async function readZimbraSignatureList(context) {
+  return readZimbraSignatures(await zimbraSoapRequest(context, 'GetSignaturesRequest', {}, 'urn:zimbraAccount'))
+}
+
+// The signature's logos as inline parts of one mail: uploaded to Partage
+// with the mail (a few KB each). Not kept across sends: Zimbra deletes an
+// upload once a sent mail has used it. A logo that won't upload is left out
+// (the signature's text stays); the session refused, signed in again
+// (withZimbraContext).
+async function uploadSignatureLogos(context, logos) {
+  const uploaded = await Promise.all(logos.map(async (logo, index) => {
+    try {
+      const { httpStatus, parsed } = await sendToZimbraUpload({
+        send: (url, init) => fetchWithJar(url, context.jar, init),
+        origin: context.origin,
+        csrfToken: context.csrfToken,
+        body: logo.bytes,
+        length: logo.bytes.length,
+        name: `logo-${index + 1}.png`,
+        contentType: 'image/png',
+        signal: AbortSignal.timeout(ZIMBRA_REQUEST_TIMEOUT_MS),
+      })
+      if (httpStatus === 401 || httpStatus === 403 || isRedirectStatus(httpStatus) || parsed?.status === 401) {
+        throw new MailAuthError(`Zimbra upload rejected the session (HTTP ${httpStatus}).`)
+      }
+      if (httpStatus !== 200 || parsed?.status !== 200 || parsed.uploads.length !== 1) {
+        throw new Error(`Zimbra logo upload failed (HTTP ${httpStatus}).`)
+      }
+      return { aid: parsed.uploads[0].aid, cid: `<tafac-logo-${index + 1}.${randomUUID()}@tafac.fr>`, width: logo.width, height: logo.height, alt: logo.alt }
+    } catch (error) {
+      if (error instanceof MailAuthError) throw error
+      console.error(`[mail] signature logo left out: ${error instanceof Error ? error.message : String(error)}`)
+      return null
+    }
+  }))
+  return uploaded.filter(Boolean)
+}
+
+// The mail answered or forwarded: whether it's still there, and its
+// Message-ID (for In-Reply-To), read here, never taken from the page.
+async function readOriginalMessage(context, id) {
+  try {
+    const result = await zimbraSoapRequest(context, 'GetMsgRequest', { m: { id, max: 1 } })
+    const message = Array.isArray(result.m) ? result.m[0] : result.m
+    const header = typeof message?.mid === 'string' ? message.mid.trim() : ''
+    return { exists: Boolean(message), messageIdHeader: /^<[^<>\s]{1,500}>$/.test(header) ? header : null }
+  } catch (error) {
+    if (!(error instanceof MailAuthError) && /NO_SUCH_(MSG|ITEM)/.test(error.message)) return { exists: false, messageIdHeader: null }
+    throw error
+  }
+}
+
+// The uploads named, each one this session made, and all of a mail's
+// together within the account's limit (the files of other mails aren't
+// counted: Partage checks the mail as a whole anyway).
+function checkMailUploads(session, attachments, limits) {
+  const uploads = runtimeMailUploads.get(session.id)
+  const aids = attachments.filter((entry) => entry.source === 'upload').map((entry) => entry.aid)
+  const unknown = aids.filter((aid) => !uploads?.has(aid))
+  if (unknown.length) throw new MailSendRefusal(409, 'mail_send_upload_expired', { aids: unknown })
+  const total = aids.reduce((sum, aid) => sum + (uploads.get(aid)?.size ?? 0), 0)
+  if (total > limits.maxTotalBytes) throw new MailSendRefusal(413, 'mail_send_too_large', { maxBytes: limits.maxTotalBytes })
+  return aids
+}
+
+// A send through Partage: SendMsgRequest with the identity's address as
+// From, the HTML and its text, the signature's logos inline, the
+// attachments by reference, the original's id and Message-ID for a reply or
+// a forward, the draft it replaces (did, deleted once sent) and the page's
+// send uid (suid: Zimbra answers a request it already sent without sending
+// it twice).
+async function sendZimbraMail(context, session, payload) {
+  const [identities, limits] = await Promise.all([readZimbraIdentities(context), readZimbraAttachmentLimits(context)])
+  const identity = pickIdentity(identities, payload.identityId)
+  if (!identity) throw new MailSendRefusal(400, 'mail_send_invalid_identity')
+  const aids = checkMailUploads(session, payload.attachments, limits)
+  const ownSignature = payload.signature.include && payload.signature.mode !== 'auto'
+  const signature = ownSignature ? null : resolveMailSignature(payload.signature, identity, session)
+  const [original, logoParts, signatures] = await Promise.all([
+    payload.origin ? readOriginalMessage(context, payload.origin.messageId) : null,
+    signature?.logos.length ? uploadSignatureLogos(context, signature.logos) : [],
+    ownSignature ? readZimbraSignatureList(context) : null,
+  ])
+  // An original deleted meanwhile: the mail still goes, as a new one.
+  const origin = payload.origin && original?.exists ? { ...payload.origin, messageIdHeader: original.messageIdHeader } : null
+  const built = ownSignature
+    ? resolveOwnSignature(payload.signature, identity, signatures, context.mailIdentitySignatureIds, { reply: Boolean(payload.origin) })
+    : signature ? buildMailSignature({ ...signature, logos: logoParts }) : { html: '', text: '' }
+  const message = buildZimbraMessage({
+    identity,
+    to: payload.to,
+    cc: payload.cc,
+    bcc: payload.bcc,
+    subject: payload.subject,
+    html: buildMailHtml(payload.html, { signatureHtml: built.html }),
+    text: composerHtmlToText(payload.html, { signatureText: built.text }),
+    inlineParts: logoParts,
+    attachments: payload.attachments,
+    origin,
+    draftId: payload.draftId,
+  })
+  let partial = null
+  try {
+    await zimbraSoapRequest(context, 'SendMsgRequest', { suid: payload.sendUid, m: message })
+  } catch (error) {
+    // The draft gone meanwhile (sent or deleted in the webmail): sent
+    // without it, once (the same suid).
+    if (message.did && /NO_SUCH_(MSG|ITEM)/.test(String(error.zimbraCode ?? ''))) {
+      delete message.did
+      await zimbraSoapRequest(context, 'SendMsgRequest', { suid: payload.sendUid, m: message })
+    } else if (error.zimbraCode === 'mail.SEND_PARTIAL_ADDRESS_FAILURE') {
+      partial = error
+    } else {
+      throw error
+    }
+  }
+  forgetMailUploads(session.id, aids)
+  // The inbox's cached first page would show the original as it was.
+  runtimeMailCache.delete(session.id)
+  return { partial }
+}
+
+// A draft saved to Partage's Drafts folder (SaveDraftRequest): the same
+// mail, without the signature (its placeholder kept for the composer) nor
+// In-Reply-To; `id` replaces the draft saved before. → { id, attachments }:
+// each of the page's references as a part of the draft now (its uploads
+// are gone once used), in the page's order.
+async function saveZimbraDraft(context, session, payload) {
+  const [identities, limits] = await Promise.all([readZimbraIdentities(context), readZimbraAttachmentLimits(context)])
+  const identity = pickIdentity(identities, payload.identityId) ?? identities[0] ?? null
+  const aids = checkMailUploads(session, payload.attachments, limits)
+  const message = buildZimbraMessage({
+    identity,
+    to: payload.to,
+    cc: payload.cc,
+    bcc: payload.bcc,
+    subject: payload.subject,
+    html: buildMailHtml(payload.html, { keepPlaceholder: true }),
+    text: composerHtmlToText(payload.html),
+    attachments: payload.attachments,
+    origin: payload.origin,
+    draftId: payload.draftId,
+    forDraft: true,
+  })
+  let result
+  try {
+    result = await zimbraSoapRequest(context, 'SaveDraftRequest', { m: message })
+  } catch (error) {
+    // The draft deleted meanwhile (in the webmail): saved as a new one.
+    if (!message.id || !/NO_SUCH_(MSG|ITEM)/.test(String(error.zimbraCode ?? ''))) throw error
+    delete message.id
+    result = await zimbraSoapRequest(context, 'SaveDraftRequest', { m: message })
+  }
+  let draft = Array.isArray(result.m) ? result.m[0] : result.m
+  const id = String(draft?.id ?? '')
+  if (!isValidMailMessageId(id)) throw new Error('Zimbra SaveDraftRequest gave no draft id.')
+  forgetMailUploads(session.id, aids)
+  // Its parts, when the answer didn't list them.
+  if (payload.attachments.length && !Array.isArray(draft?.mp)) {
+    const read = await zimbraSoapRequest(context, 'GetMsgRequest', { m: { id, max: 1 } })
+    draft = Array.isArray(read.m) ? read.m[0] : read.m
+  }
+  return { id, attachments: mapDraftAttachments(payload.attachments, id, readDraftAttachmentParts(draft)) }
+}
+
+// ── The demo account: the same checks, nothing leaves ──
+
+function getDemoMailState(sessionId) {
+  let state = runtimeDemoMail.get(sessionId)
+  if (!state) {
+    state = { drafts: new Map(), sent: [], flags: new Map(), next: 1, customSignature: '' }
+    runtimeDemoMail.set(sessionId, state)
+  }
+  return state
+}
+
+// A demo reference's file, or null when there's none: a demo mail's
+// sample attachment, a part of one of its drafts, one of its uploads.
+function readDemoAttachment(session, state, reference) {
+  if (reference.source === 'upload') {
+    const upload = runtimeMailUploads.get(session.id)?.get(reference.aid)
+    return upload ? { name: upload.name, size: upload.size, contentType: upload.contentType } : null
+  }
+  const parts = DEMO_MAIL_ATTACHMENTS[reference.messageId]?.map((entry) => ({ ...entry, contentType: entry.type }))
+    ?? state.drafts.get(reference.messageId)?.draft.attachments
+  const part = parts?.find((entry) => entry.part === reference.part)
+  return part ? { name: part.name, size: part.size, contentType: part.contentType } : null
+}
+
+function demoMailRow(id, identity, payload, text, date) {
+  const first = payload.to[0] ?? payload.cc[0] ?? payload.bcc[0] ?? null
+  return {
+    id,
+    from: { name: identity.name, email: identity.email },
+    to: first ? { name: first.name || first.email, email: first.email } : null,
+    subject: payload.subject,
+    snippet: text.replace(/\s+/g, ' ').trim().slice(0, 280),
+    receivedAt: new Date(date).toISOString(),
+    unread: false,
+    flagged: false,
+    messageIds: [id],
+    count: 1,
+    href: null,
+  }
+}
+
+function resolveDemoAttachments(session, state, attachments) {
+  const files = attachments.map((reference) => readDemoAttachment(session, state, reference))
+  if (files.some((file) => !file)) throw new MailSendRefusal(409, 'mail_send_missing_reference')
+  const total = files.reduce((sum, file, index) => sum + (attachments[index].source === 'upload' ? file.size : 0), 0)
+  const limits = deriveAttachmentLimits(null)
+  if (total > limits.maxTotalBytes) throw new MailSendRefusal(413, 'mail_send_too_large', { maxBytes: limits.maxTotalBytes })
+  return files
+}
+
+function sendDemoMail(session, payload) {
+  const state = getDemoMailState(session.id)
+  const identity = pickIdentity(DEMO_MAIL_IDENTITIES, payload.identityId)
+  if (!identity) throw new MailSendRefusal(400, 'mail_send_invalid_identity')
+  const unknown = payload.attachments.filter((entry) => entry.source === 'upload' && !runtimeMailUploads.get(session.id)?.has(entry.aid)).map((entry) => entry.aid)
+  if (unknown.length) throw new MailSendRefusal(409, 'mail_send_upload_expired', { aids: unknown })
+  const files = resolveDemoAttachments(session, state, payload.attachments)
+  // The signature with its logos as data: URLs, for the demo's copy in
+  // « Envoyés » to show them (a real mail has them inline, by cid).
+  const ownSignature = payload.signature.include && payload.signature.mode !== 'auto'
+  const signature = ownSignature ? null : resolveMailSignature(payload.signature, identity, session)
+  const built = ownSignature
+    ? resolveOwnSignature(payload.signature, identity, readDemoSignatures(session), DEMO_SIGNATURE_IDS, { reply: Boolean(payload.origin) })
+    : signature
+      ? buildMailSignature({ ...signature, logos: signature.logos.map((logo) => ({ ...logo, cid: 'demo', src: `data:image/png;base64,${logo.bytes.toString('base64')}` })) })
+      : { html: '', text: '' }
+  const text = composerHtmlToText(payload.html, { signatureText: built.text })
+  const id = `demo-sent-${state.next}`
+  state.next += 1
+  const now = Date.now()
+  state.sent.unshift({
+    row: demoMailRow(id, identity, payload, text, now),
+    message: {
+      id,
+      subject: payload.subject,
+      from: { name: identity.name, email: identity.email },
+      replyTo: null,
+      to: payload.to.map((entry) => ({ name: entry.name || entry.email, email: entry.email })),
+      cc: payload.cc.map((entry) => ({ name: entry.name || entry.email, email: entry.email })),
+      receivedAt: new Date(now).toISOString(),
+      unread: false,
+      format: 'html',
+      html: sanitizeMailHtml(buildMailHtml(payload.html, { signatureHtml: built.html })).html,
+      remoteImages: 0,
+      truncated: false,
+      attachments: files.map((file, index) => ({ part: String(index + 2), name: file.name, type: file.contentType, size: file.size, href: null })),
+    },
+  })
+  state.sent.length = Math.min(state.sent.length, 50)
+  if (payload.origin) state.flags.set(payload.origin.messageId, payload.origin.replyType)
+  if (payload.draftId) state.drafts.delete(payload.draftId)
+  forgetMailUploads(session.id, payload.attachments.filter((entry) => entry.source === 'upload').map((entry) => entry.aid))
+  return { partial: null }
+}
+
+function saveDemoDraft(session, payload) {
+  const state = getDemoMailState(session.id)
+  const identity = pickIdentity(DEMO_MAIL_IDENTITIES, payload.identityId) ?? DEMO_MAIL_IDENTITIES[0]
+  const unknown = payload.attachments.filter((entry) => entry.source === 'upload' && !runtimeMailUploads.get(session.id)?.has(entry.aid)).map((entry) => entry.aid)
+  if (unknown.length) throw new MailSendRefusal(409, 'mail_send_upload_expired', { aids: unknown })
+  const files = resolveDemoAttachments(session, state, payload.attachments)
+  let id = payload.draftId && state.drafts.has(payload.draftId) ? payload.draftId : null
+  if (!id) {
+    if (state.drafts.size >= 20) throw new MailSendRefusal(413, 'mail_send_quota')
+    id = `demo-draft-${state.next}`
+    state.next += 1
+  }
+  // As Zimbra numbers them: the uploads first, then the other mails' files.
+  const order = [...payload.attachments.keys()].sort((left, right) => Number(payload.attachments[left].source !== 'upload') - Number(payload.attachments[right].source !== 'upload'))
+  const attachments = order.map((index, position) => ({ part: String(position + 2), ...files[index] }))
+  const now = Date.now()
+  state.drafts.set(id, {
+    row: demoMailRow(id, identity, payload, composerHtmlToText(payload.html), now),
+    draft: {
+      id,
+      to: payload.to,
+      cc: payload.cc,
+      bcc: payload.bcc,
+      subject: payload.subject,
+      html: payload.html,
+      attachments,
+      identityId: identity.id,
+      origin: payload.origin ? { kind: payload.origin.replyType === 'w' ? 'forward' : 'reply', messageId: payload.origin.messageId } : null,
+    },
+  })
+  forgetMailUploads(session.id, payload.attachments.filter((entry) => entry.source === 'upload').map((entry) => entry.aid))
+  return { id, attachments: mapDraftAttachments(payload.attachments, id, attachments) }
+}
+
+// The demo's list rows with what its composer did: replied to, forwarded
+// (the reply arrow), its drafts and sent mails in their folders.
+function withDemoMailState(session, mail, folder = MAIL_INBOX_FOLDER) {
+  const state = runtimeDemoMail.get(session.id)
+  if (folder === '6') return { ...mail, unreadCount: 0, messages: state ? [...state.drafts.values()].map((entry) => entry.row).reverse() : [], hasMore: false }
+  if (folder === '5') return { ...mail, unreadCount: 0, messages: state ? state.sent.map((entry) => entry.row) : [], hasMore: false }
+  if (!state?.flags.size) return mail
+  return {
+    ...mail,
+    messages: mail.messages.map((message) => {
+      const flag = state.flags.get(message.id)
+      return flag ? { ...message, replied: message.replied || flag === 'r', forwarded: message.forwarded || flag === 'w' } : message
+    }),
+  }
+}
+
+function findDemoMailRow(session, id) {
+  const state = runtimeDemoMail.get(session.id)
+  return state?.drafts.get(id)?.row ?? state?.sent.find((entry) => entry.row.id === id)?.row ?? null
+}
+
+// What the page is told when a send or a save fails: a refusal's code, a
+// Zimbra fault it can act on (mapZimbraSendFault: addresses refused,
+// uploads gone, quota, size), else the routes' generic answer.
+function sendMailComposeError(res, route, error, { recipients = [], aids = [] } = {}) {
+  if (error instanceof MailSendRefusal) {
+    return res.status(error.status).json({ error: error.code, ...error.extra })
+  }
+  const mapped = mapZimbraSendFault(error, { recipients, aids })
+  if (mapped) {
+    console.error(`[mail] ${route} refused: ${mapped.code}`)
+    const { status, code, ...extra } = mapped
+    return res.status(status).json({ error: code, ...extra })
+  }
+  return sendMailRouteError(res, route, error)
+}
+
+function checkComposeRequest(req, res) {
+  res.setHeader('Cache-Control', 'no-store')
+  const fetchSite = req.headers['sec-fetch-site']
+  if (fetchSite && fetchSite !== 'same-origin') {
+    res.status(403).json({ error: 'Cross-site request.' })
+    return null
+  }
+  return getMailMessageSession(req, res)
+}
+
+function readComposePayload(req, res, session, { draft }) {
+  const parsed = normalizeComposePayload(req.body, {
+    draft,
+    isValidMessageId: (id) => isValidSessionMailId(session, id),
+    isValidUploadId: (aid) => isValidSessionUploadId(session, aid),
+  })
+  if (parsed.ok) return parsed.value
+  const status = parsed.error === 'mail_send_invalid' ? 400 : parsed.error === 'mail_send_too_large' ? 413 : 422
+  res.status(status).json({ error: parsed.error, ...(parsed.invalid ? { invalid: parsed.invalid } : null) })
+  return null
+}
+
+// 6k. Send the composer's mail (MailComposer, src/useMailSend.js). Its body
+// (normalizeComposePayload, server/mailSend.js): { to, cc, bcc: [{ name,
+// email }], subject, html (the editor's), attachments: [{ source: 'upload',
+// aid } | { source: 'message', messageId, part }], origin: { kind: 'reply' |
+// 'replyAll' | 'forward', messageId } | null, identityId, draftId, sendUid,
+// signature: { include, mode: 'auto' | 'partage' | 'custom', group,
+// establishment } }. Never a From address, nor the signature's HTML: both
+// are the server's (the account's identities, the university's config, the
+// webmail's signatures read at send time). Same-origin only, its own body cap and its own
+// limits, per session and per user (MAIL_SEND_*), on top of the mail
+// routes' bucket. Nothing of the mail (recipients, subject, text) is ever
+// logged. The demo account's is checked the same, then kept in its memory.
+//   200 { ok: true } | { ok: true, partial: true, invalid } (sent, those
+//   addresses refused), 400 { error } a malformed body or an identity not
+//   the account's, 401 no session, 403 cross-site, 409 { error:
+//   'mail_send_upload_expired', aids } (to upload again) or
+//   'mail_send_missing_reference', 413 { error: 'mail_send_too_large' |
+//   'mail_send_quota' }, 422 { error: 'mail_send_invalid_recipients',
+//   invalid } | 'mail_send_no_recipient' | 'mail_send_too_many_recipients',
+//   429 { error: 'mail_send_rate_limited' } (Retry-After), 500 { error }.
+app.post('/__ent_auth/mail/send', async (req, res) => {
+  const session = checkComposeRequest(req, res)
+  if (!session) return undefined
+  const payload = readComposePayload(req, res, session, { draft: false })
+  if (!payload) return undefined
+  const recipients = [...payload.to, ...payload.cc, ...payload.bcc].map((entry) => entry.email)
+  const aids = payload.attachments.filter((entry) => entry.source === 'upload').map((entry) => entry.aid)
+  // The demo account's user is shared by every demo session: its own
+  // session only.
+  const keys = [`session:${session.id}`, ...(!isDemoSession(session) && session.user ? [`user:${String(session.user).toLowerCase()}`] : [])]
+  const slot = mailSendLimiter.take(keys, recipients.length)
+  if (!slot.ok) {
+    res.setHeader('Retry-After', String(slot.retryAfter))
+    return res.status(429).json({ error: 'mail_send_rate_limited' })
+  }
+  try {
+    const { partial } = isDemoSession(session)
+      ? sendDemoMail(session, payload)
+      : await withZimbraContext(session, (context) => sendZimbraMail(context, session, payload))
+    setSessionCookie(res, session)
+    if (partial) {
+      const mapped = mapZimbraSendFault(partial, { recipients, aids })
+      return res.status(200).json({ ok: true, partial: true, invalid: mapped?.invalid ?? [] })
+    }
+    return res.status(200).json({ ok: true })
+  } catch (error) {
+    if (error instanceof MailSendRefusal) slot.release()
+    return sendMailComposeError(res, 'send', error, { recipients, aids })
+  }
+})
+
+// 6l. Save the composer's draft (SaveDraftRequest), the same body as a send
+// (without sendUid): what a send would refuse is left out instead (an
+// address not yet right, no recipient). `draftId` the draft saved before,
+// replaced. Its own limit (MAIL_DRAFT_*): the composer saves a few seconds
+// after the typing stops, never when nothing changed.
+//   200 { draft: { id, attachments: [{ messageId, part } | null] } } (each
+//   of the body's attachments, in its order, as a part of the draft: what
+//   the next save or the send names instead of an upload), 409 { error:
+//   'mail_send_upload_expired', aids }, 413, 429 (Retry-After), as a send.
+app.post('/__ent_auth/mail/draft', async (req, res) => {
+  const session = checkComposeRequest(req, res)
+  if (!session) return undefined
+  const payload = readComposePayload(req, res, session, { draft: true })
+  if (!payload) return undefined
+  const slot = mailDraftLimiter.take([`session:${session.id}`])
+  if (!slot.ok) {
+    res.setHeader('Retry-After', String(slot.retryAfter))
+    return res.status(429).json({ error: 'mail_send_rate_limited' })
+  }
+  try {
+    const draft = isDemoSession(session)
+      ? saveDemoDraft(session, payload)
+      : await withZimbraContext(session, (context) => saveZimbraDraft(context, session, payload))
+    runtimeMailCache.delete(session.id)
+    setSessionCookie(res, session)
+    return res.status(200).json({ draft })
+  } catch (error) {
+    return sendMailComposeError(res, 'draft', error, { aids: payload.attachments.filter((entry) => entry.source === 'upload').map((entry) => entry.aid) })
+  }
+})
+
+// 6m. A draft, to resume it in the composer (readDraftForComposer): its
+// recipients, subject, HTML (cleaned to what the editor holds), files (as
+// parts of the draft), identity and the mail it answers. Only a mail of the
+// Drafts folder.
+//   200 { draft: { id, to, cc, bcc, subject, html, attachments: [{ part,
+//   name, size, contentType }], identityId, origin } }, 404, 401.
+app.get('/__ent_auth/mail/draft', async (req, res) => {
+  res.setHeader('Cache-Control', 'no-store')
+  const session = getMailMessageSession(req, res)
+  if (!session) return undefined
+  const id = String(req.query.id ?? '')
+  if (!isValidSessionMailId(session, id) || id.startsWith('-')) {
+    return res.status(400).json({ error: 'Invalid message id.' })
+  }
+  try {
+    let draft = null
+    if (isDemoSession(session)) {
+      draft = runtimeDemoMail.get(session.id)?.drafts.get(id)?.draft ?? null
+    } else {
+      draft = await withZimbraContext(session, async (context) => {
+        let result
+        try {
+          result = await zimbraSoapRequest(context, 'GetMsgRequest', { m: { id, html: 1, neuter: 0, max: MAIL_MESSAGE_MAX_BYTES } })
+        } catch (error) {
+          if (/NO_SUCH_(MSG|ITEM)/.test(error.message)) return null
+          throw error
+        }
+        const message = Array.isArray(result.m) ? result.m[0] : result.m
+        if (!message || !(String(message.l ?? '') === '6' || String(message.f ?? '').includes('d'))) return null
+        return readDraftForComposer(message, await readZimbraIdentities(context))
+      })
+    }
+    if (!draft) return res.status(404).json({ error: 'No such draft.' })
+    setSessionCookie(res, session)
+    return res.status(200).json({ draft: { ...draft, html: sanitizeComposerHtml(draft.html) } })
+  } catch (error) {
+    return sendMailRouteError(res, 'draft', error)
+  }
+})
+
+// ── The student's own signatures (server/mailSignature.js) ──
+
+// What the page is given of them: each webmail signature cleaned
+// (readZimbraSignatures), which one each identity takes for « Partage »
+// (pickPartageSignature, a new mail and a reply), the custom one's id.
+function describeMailSignatures(signatures, identities, signatureIds) {
+  return {
+    signatures: signatures.map(({ id, name, html, text, hasImages }) => ({ id, name, html, text, hasImages })),
+    identities: identities.map((identity) => {
+      const ids = signatureIds?.get(identity.id) ?? null
+      return {
+        id: identity.id,
+        signatureId: pickPartageSignature(signatures, ids)?.id ?? null,
+        replySignatureId: pickPartageSignature(signatures, ids, { reply: true })?.id ?? null,
+      }
+    }),
+    customId: findCustomSignature(signatures)?.id ?? null,
+    maxLength: CUSTOM_SIGNATURE_MAX_LENGTH,
+  }
+}
+
+// The webmail's Tafac signature made `text` (buildCustomSignatureRequest:
+// that one only, by its id, never another of the student's), then the list
+// as it is now.
+async function writeZimbraCustomSignature(context, text) {
+  const request = buildCustomSignatureRequest(text, findCustomSignature(await readZimbraSignatureList(context)))
+  if (request) {
+    try {
+      await zimbraSoapRequest(context, request.name, request.body, 'urn:zimbraAccount')
+    } catch (error) {
+      // Made meanwhile (another tab, the webmail): modified instead, once.
+      if (request.name !== 'CreateSignatureRequest' || !/SIGNATURE_EXISTS/.test(String(error.zimbraCode ?? ''))) throw error
+      const retry = buildCustomSignatureRequest(text, findCustomSignature(await readZimbraSignatureList(context)))
+      if (!retry || retry.name === 'CreateSignatureRequest') throw error
+      await zimbraSoapRequest(context, retry.name, retry.body, 'urn:zimbraAccount')
+    }
+  }
+  return readZimbraSignatureList(context)
+}
+
+// 6n. The signatures Réglages › Messagerie and the composer show
+// (src/mailSignatureStore.js), for the student to see what goes: a send
+// never takes them from the page, it reads them again
+// (resolveOwnSignature). Same-origin only. `fresh=1` (Réglages) reads the
+// identities again (a default signature changed in the webmail since).
+//   200 { signatures: [{ id, name, html, text, hasImages }], identities:
+//   [{ id, signatureId, replySignatureId }], customId, maxLength },
+//   401 no session, 403 cross-site, 500 { error }.
+app.get('/__ent_auth/mail/signatures', async (req, res) => {
+  res.setHeader('Cache-Control', 'no-store')
+  const fetchSite = req.headers['sec-fetch-site']
+  if (fetchSite && fetchSite !== 'same-origin') {
+    return res.status(403).json({ error: 'Cross-site request.' })
+  }
+  const session = getMailMessageSession(req, res)
+  if (!session) return undefined
+  try {
+    const { signatures, identities, signatureIds } = isDemoSession(session)
+      ? { signatures: readDemoSignatures(session), identities: DEMO_MAIL_IDENTITIES, signatureIds: DEMO_SIGNATURE_IDS }
+      : await withZimbraContext(session, async (context) => {
+        if (req.query.fresh === '1') context.mailIdentities = null
+        const [list, accountIdentities] = await Promise.all([readZimbraSignatureList(context), readZimbraIdentities(context)])
+        return { signatures: list, identities: accountIdentities, signatureIds: context.mailIdentitySignatureIds }
+      })
+    setSessionCookie(res, session)
+    return res.status(200).json(describeMailSignatures(signatures, identities, signatureIds))
+  } catch (error) {
+    return sendMailRouteError(res, 'signatures', error)
+  }
+})
+
+// 6o. The custom signature written (Réglages › Messagerie): { text }, plain
+// text (normalizeCustomSignatureText: CUSTOM_SIGNATURE_MAX_LENGTH
+// characters at most, refused past it), kept as the webmail's Tafac
+// signature (writeZimbraCustomSignature); an empty text removes it.
+// Same-origin only, its own limit per session (MAIL_SIGNATURE_*) on top of
+// the mail routes' bucket. The text is never logged. The demo account's
+// stays in its memory.
+//   200 (as GET /mail/signatures), 400 { error: 'mail_signature_invalid' },
+//   401, 403, 409 { error: 'mail_signature_limit' } (the webmail's number of
+//   signatures reached), 413 { error: 'mail_signature_too_long' }, 429 {
+//   error: 'mail_signature_rate_limited' } (Retry-After), 500 { error }.
+app.post('/__ent_auth/mail/signature', async (req, res) => {
+  res.setHeader('Cache-Control', 'no-store')
+  const fetchSite = req.headers['sec-fetch-site']
+  if (fetchSite && fetchSite !== 'same-origin') {
+    return res.status(403).json({ error: 'Cross-site request.' })
+  }
+  const session = getMailMessageSession(req, res)
+  if (!session) return undefined
+  const parsed = normalizeCustomSignatureText(req.body?.text)
+  if (!parsed.ok) {
+    return res.status(parsed.error === 'mail_signature_too_long' ? 413 : 400).json({ error: parsed.error })
+  }
+  const slot = mailSignatureLimiter.take([`session:${session.id}`])
+  if (!slot.ok) {
+    res.setHeader('Retry-After', String(slot.retryAfter))
+    return res.status(429).json({ error: 'mail_signature_rate_limited' })
+  }
+  try {
+    let described
+    if (isDemoSession(session)) {
+      getDemoMailState(session.id).customSignature = parsed.text
+      described = describeMailSignatures(readDemoSignatures(session), DEMO_MAIL_IDENTITIES, DEMO_SIGNATURE_IDS)
+    } else {
+      described = await withZimbraContext(session, async (context) => {
+        const list = await writeZimbraCustomSignature(context, parsed.text)
+        return describeMailSignatures(list, await readZimbraIdentities(context), context.mailIdentitySignatureIds)
+      })
+    }
+    setSessionCookie(res, session)
+    return res.status(200).json(described)
+  } catch (error) {
+    const code = String(error?.zimbraCode ?? '')
+    if (/TOO_MANY_SIGNATURES/.test(code)) {
+      slot.release()
+      return res.status(409).json({ error: 'mail_signature_limit' })
+    }
+    if (/SIGNATURE_TOO_LONG|TOO_LONG/.test(code)) {
+      slot.release()
+      return res.status(413).json({ error: 'mail_signature_too_long' })
+    }
+    return sendMailRouteError(res, 'signature', error)
+  }
+})
+
 app.get('/__ent_auth/mail/recent', async (req, res) => {
   try {
     res.setHeader('Cache-Control', 'no-store')
@@ -4394,9 +5305,10 @@ app.get('/__ent_auth/mail/recent', async (req, res) => {
     }
 
     if (folder !== MAIL_INBOX_FOLDER) {
-      // The demo account has nothing but its inbox.
+      // The demo account has its inbox, and what its composer saved and
+      // sent (withDemoMailState).
       const mail = isDemoSession(session)
-        ? { ...buildDemoMailPayload(), unreadCount: 0, messages: [], hasMore: false }
+        ? withDemoMailState(session, { ...buildDemoMailPayload(), unreadCount: 0, messages: [], hasMore: false }, offset === 0 && !words.length ? folder : null)
         : await fetchRecentMail(session, { offset, words, folder })
       setSessionCookie(res, session)
       return res.status(200).json({
@@ -4420,7 +5332,7 @@ app.get('/__ent_auth/mail/recent', async (req, res) => {
 
     if (isDemoSession(session)) {
       setSessionCookie(res, session)
-      const demoMail = buildDemoMailPayload()
+      const demoMail = withDemoMailState(session, buildDemoMailPayload())
       return res.status(200).json({
         authenticated: true,
         sessionMode: DEMO_SESSION_MODE,

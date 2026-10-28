@@ -13,6 +13,12 @@ export const university = {
   slug: 'rennes',
 }
 
+// The establishments' names (client.js's establishments.byId, and the sent
+// mail's signature in server.js), by their ids.
+export const establishmentNames = {
+  iutlan: 'IUT de Lannion',
+}
+
 // Branding text (no assets here — the logo lives in client.js so this file
 // stays importable by Node).
 export const branding = {

@@ -1,7 +1,8 @@
 // Université de Rennes — server-side configuration.
 // Never imported by client code: holds origins, auth-flow parameters and the
 // reverse-engineered ADE mobile-app credentials.
-import { appIcons, id, casOrigin, entOrigin, features, gradesCopy, gradesOrigin, mailWebmailUrl, moodleOrigin, planningServiceUrl, portalEntryPath } from './shared.js'
+import { fileURLToPath } from 'node:url'
+import { appIcons, id, casOrigin, entOrigin, establishmentNames, features, gradesCopy, gradesOrigin, mailWebmailUrl, moodleOrigin, planningServiceUrl, portalEntryPath, university } from './shared.js'
 
 export default {
   id,
@@ -80,6 +81,20 @@ export default {
     // Hosts the SAML sign-in chain may visit, besides the webmail and CAS
     // hosts (RENATER's Partage SP and the university IdP).
     signInDomains: ['partage.renater.fr', 'univ-rennes1.fr', 'univ-rennes.fr'],
+    // The automatic signature of a sent mail (server/mailSend.js): the
+    // university's name and logo, and the establishments with a line of
+    // their own (by client.js's establishments.byId ids), each with its
+    // logo. PNG, as mail clients show it (scripts/render-mail-logos.mjs).
+    signature: {
+      university: university.name,
+      logo: { file: fileURLToPath(new URL('./assets/mail/logo.png', import.meta.url)), alt: university.name },
+      establishments: {
+        iutlan: {
+          label: establishmentNames.iutlan,
+          logo: { file: fileURLToPath(new URL('./assets/mail/iutlan.png', import.meta.url)), alt: establishmentNames.iutlan },
+        },
+      },
+    },
   },
 
   // Certificat de scolarité (features.schoolCertificate): the ESUP

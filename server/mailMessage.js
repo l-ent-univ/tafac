@@ -71,11 +71,12 @@ export function isValidMailMessageId(value) {
   return typeof value === 'string' && /^-?\d{1,10}$/.test(value)
 }
 
-// The demo account's ids (src/demoAccount.js: demo-mail-1…). Accepted only
-// for a demo session, whose routes never call Zimbra: a real session's ids
-// stay numeric.
+// The demo account's ids (src/demoAccount.js: demo-mail-1…; its drafts and
+// sent mails, demo-draft-1… and demo-sent-1…, kept in the server's memory).
+// Accepted only for a demo session, whose routes never call Zimbra: a real
+// session's ids stay numeric.
 export function isValidDemoMailMessageId(value) {
-  return typeof value === 'string' && /^demo-mail-\d{1,4}$/.test(value)
+  return typeof value === 'string' && /^demo-(?:mail|draft|sent)-\d{1,4}$/.test(value)
 }
 
 // The mail's CSS (style attributes, <style> blocks) loads things too:
@@ -413,4 +414,36 @@ export function readContentDispositionFilename(header) {
     }
   }
   return value.match(/filename\s*=\s*"([^"]*)"/i)?.[1] ?? value.match(/filename\s*=\s*([^;\s]+)/i)?.[1] ?? null
+}
+
+// A mail sent to oneself sits twice in its thread: the copy in Envoyés and
+// the one received. One is shown, as Apple Mail does: the copy in the folder
+// read (`folder`), else the received one. Copies are told by their
+// Message-ID header (`messageIdHeader`); without it (Partage didn't give
+// it), by a sent copy with the same sender, subject and time (to the
+// second) as another. `messages`: the reader's thread rows, each with its
+// `folder`; `sentFolder`, Envoyés' id.
+export function dropOwnMailCopies(messages, folder, sentFolder = '5') {
+  const keyOf = (message) => {
+    if (message.messageIdHeader) return `id:${message.messageIdHeader}`
+    const time = Date.parse(message.receivedAt ?? '')
+    if (!message.from?.email || !Number.isFinite(time)) return null
+    return `same:${message.from.email.toLowerCase()}|${message.subject}|${Math.round(time / 1000)}`
+  }
+  const groups = new Map()
+  for (const message of messages) {
+    const key = keyOf(message)
+    if (!key) continue
+    groups.set(key, [...(groups.get(key) ?? []), message])
+  }
+  const dropped = new Set()
+  for (const [key, copies] of groups) {
+    if (copies.length < 2) continue
+    // Without the header, only a sent copy beside a received one counts:
+    // two different mails can share a sender, subject and second.
+    if (key.startsWith('same:') && !(copies.some((copy) => copy.folder === sentFolder) && copies.some((copy) => copy.folder !== sentFolder))) continue
+    const kept = copies.find((copy) => copy.folder === folder) ?? copies.find((copy) => copy.folder !== sentFolder) ?? copies[0]
+    for (const copy of copies) if (copy !== kept) dropped.add(copy)
+  }
+  return dropped.size ? messages.filter((message) => !dropped.has(message)) : messages
 }

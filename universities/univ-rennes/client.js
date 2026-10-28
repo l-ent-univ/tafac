@@ -15,10 +15,12 @@ import {
   branding,
   casOrigin,
   entOrigin,
+  establishmentNames,
   features,
   gradesCopy,
   gradesServiceUrl,
   moodleOrigin,
+  mailWebmailUrl,
   planningServiceUrl,
   portalEntryPath,
   university,
@@ -86,6 +88,9 @@ export default {
   // services (ScoDoc, the docs).
   mail: {
     ownDomains: ['univ-rennes.fr', 'univ-rennes1.fr'],
+    // The webmail's links (its public entry, where its sign-in lands): the
+    // app lists' tiles leading there open the mail page (mailPortalApp.js).
+    webmailUrls: [mailWebmailUrl],
   },
 
   auth: {
@@ -127,7 +132,7 @@ export default {
     fallbackId: 'other',
     byId: {
       iutlan: {
-        label: 'IUT de Lannion',
+        label: establishmentNames.iutlan,
         // Next to Tafac's in the sidebar and header, instead of the
         // university's: a square badge, its letters light in dark mode.
         logo: iutLannionLogo,

@@ -9,8 +9,11 @@ import {
   branding,
   casOrigin,
   entOrigin,
+  establishmentNames,
   features,
   gradesCopy,
+  mailSignatureShowsLogin,
+  mailWebmailUrl,
   moodleOrigin,
   planningServiceUrl,
   portalEntryPath,
@@ -90,17 +93,22 @@ export default {
     ],
   },
 
-  // Mail: the "Mails récents" card and a « Messagerie » link to the webmail,
-  // no in-app mail page yet.
+  // Mail: the "Mails récents" card and the in-app mail page (Partage's
+  // Zimbra, as Rennes'), reading and sending.
   mail: {
-    page: false,
-    // For the mail page, once it's on: the university's own mail domains,
+    // For the mail page: the university's own mail domains,
     // sub-domains included (etudiant.univ-rennes2.fr…). A sender from any
     // other domain has it shown next to their name in the list, so a
     // display name copying the university's stands out (src/mailDomain.js).
     // uhb.fr: Rennes 2's former name (Université Haute-Bretagne), still on
     // some of its hosts (shibboleth.uhb.fr).
     ownDomains: ['univ-rennes2.fr', 'uhb.fr'],
+    // The webmail's links (its public entry, where its sign-in lands): the
+    // app lists' tiles leading there open the mail page (mailPortalApp.js).
+    webmailUrls: [mailWebmailUrl, 'https://webmail.etudiant.univ-rennes2.fr/'],
+    // The automatic signature's « Identifiant : » line (shared.js), as the
+    // server writes it in the mail sent.
+    signature: { showLogin: mailSignatureShowsLogin },
   },
 
   // One establishment for everyone, with the "Prochain cours" card.
@@ -108,7 +116,7 @@ export default {
     fallbackId: 'rennes2',
     byId: {
       rennes2: {
-        label: 'Université Rennes 2',
+        label: establishmentNames.rennes2,
         nextClassWidget: true,
       },
     },

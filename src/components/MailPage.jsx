@@ -1,11 +1,13 @@
 import { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Icon } from '@iconify/react'
 import { readHistoryNav, writeHistoryNav } from '../appHistory'
-import { getMailFolders, getMailPrefs, getRecentMail, mailAction, mailFolderAction, onMailSessionExpired } from '../entApi'
+import { getMailDraft, getMailFolders, getMailPrefs, getRecentMail, mailAction, mailFolderAction, onMailSessionExpired } from '../entApi'
+import { newDraftSaver, useMailSend } from '../useMailSend'
 import LoadingDots from './LoadingDots'
 import { MailThread } from './MailReader'
 import { fetchThread, loadMessage, prefetchMailThread, settledValue, threadCache, threadKey } from '../mailReadCache'
-import MailToolbar from './MailToolbar'
+import { preloadMailPdf, printMail, saveMailPdf } from '../mailPrint'
+import MailToolbar, { PRIMARY_COMPOSE_CLASSES } from './MailToolbar'
 import ContextMenu from './ContextMenu'
 import ConfirmDialog from './ConfirmDialog'
 import SwipeableRow from './SwipeableRow'
@@ -14,6 +16,8 @@ import { getSenderBadgeStyle, getSenderDomainCue, getSenderInitial } from './mai
 import PageEmptyState from './PageEmptyState'
 import { useListTransitions } from '../useListTransitions'
 import { foldMailSearchText, parseMailSearchWords } from '../mailSearch'
+import { normalizeRecipient } from '../mailCompose'
+import { useContextMenu } from '../useContextMenu'
 import {
   SHIMMER_CLASSES,
   formatReceivedAt,
@@ -262,6 +266,9 @@ function appendMessages(list, more) {
 // button as the time to undo runs out (paused under the pointer), and the
 // notice closes once it has (`onExpire`). It rises in and sinks out
 // (.mail-toast-in, .mail-toast-out): the last one is kept while it leaves.
+// `duration`: its own time to undo (TOAST_MS by default); `steady`: the
+// ring doesn't pause under the pointer (a send's: its timer runs on, its
+// end isn't the notice's to decide).
 function MailToast({ toast, onExpire, readerOpen }) {
   const [shown, setShown] = useState(toast)
   if (toast && toast !== shown) setShown(toast)
@@ -275,7 +282,7 @@ function MailToast({ toast, onExpire, readerOpen }) {
       {shown ? (
         <div
           key={shown.key}
-          className={`mail-toast ${leaving ? 'mail-toast-out' : 'mail-toast-in'} pointer-events-auto select-none flex max-w-full items-center gap-3 rounded-full bg-black py-1.5 text-white shadow-[0_12px_32px_rgba(0,0,0,0.18)] dark:bg-white dark:text-black ${shown.onUndo ? 'pl-4 pr-1.5' : 'px-4 min-h-[39px]'}`}
+          className={`mail-toast ${shown.steady ? 'mail-toast--steady' : ''} ${leaving ? 'mail-toast-out' : 'mail-toast-in'} pointer-events-auto select-none flex max-w-full items-center gap-3 rounded-full bg-black py-1.5 text-white shadow-[0_12px_32px_rgba(0,0,0,0.18)] dark:bg-white dark:text-black ${shown.onUndo ? 'pl-4 pr-1.5' : 'px-4 min-h-[39px]'}`}
           inert={leaving || undefined}
           onAnimationEnd={(event) => {
             if (event.target === event.currentTarget && leaving) setShown(null)
@@ -295,10 +302,10 @@ function MailToast({ toast, onExpire, readerOpen }) {
                   pathLength="1"
                   strokeWidth="1.5"
                   strokeLinecap="round"
-                  style={{ '--toast-duration': `${TOAST_MS}ms` }}
+                  style={{ '--toast-duration': `${shown.duration ?? TOAST_MS}ms` }}
                   onAnimationEnd={(event) => {
                     event.stopPropagation()
-                    onExpire()
+                    onExpire(shown.key)
                   }}
                 />
               </svg>
@@ -444,7 +451,7 @@ function usePillLongPress(onLongPress) {
   })
 }
 
-const PILL_CLASSES = 'mail-folder-pill group relative inline-flex h-10 min-w-0 basis-0 select-none items-center justify-center gap-2 rounded-full border-0 px-3 cursor-pointer [-webkit-touch-callout:none] transition-[flex-grow,background-color,color] duration-[320ms] ease-[cubic-bezier(0.32,0.72,0,1)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-text max-md:basis-11 max-md:px-0'
+const PILL_CLASSES = 'mail-folder-pill group relative inline-flex h-10 min-w-0 basis-0 select-none items-center justify-center gap-2 rounded-full border-0 px-3 cursor-pointer [-webkit-touch-callout:none] transition-[flex-grow,background-color,color,box-shadow] duration-[320ms] ease-[cubic-bezier(0.32,0.72,0,1)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-text max-md:basis-11 max-md:px-0'
 
 // The mailbox's folders as Apple Mail's category pills: each an icon, the
 // one shown a dark pill wider than the others with its name (they ease
@@ -512,14 +519,14 @@ function MailFolderPills({ folders, currentId, currentUnread, onSelect, onOpenMe
           <button
             key={folder.id}
             type="button"
-            className={`${PILL_CLASSES} ${current ? 'grow-[2.6] bg-text text-bg max-md:grow max-md:px-4' : 'grow bg-transparent text-text-muted hover:bg-bg-muted max-md:grow-0'}`}
+            className={`${PILL_CLASSES} ${current ? 'mail-folder-pill--current grow-[2.6] text-text max-md:grow max-md:px-4' : 'grow bg-transparent text-text-muted hover:bg-bg-muted max-md:grow-0'}`}
             aria-current={current || undefined}
             aria-label={unread > 0 && dot ? `${label}, ${unread} non lu${unread > 1 ? 's' : ''}` : label}
             {...pillProps(folder.id, () => onSelect(folder.id))}
           >
             <span className="relative inline-flex shrink-0">
               <Icon icon={getFolderIcon(folder)} className="size-[18px]" aria-hidden="true" />
-              {dot ? <span className={`mail-unread-dot absolute -right-[3px] -top-[2px] size-[7px] rounded-full ${current ? 'ring-2 ring-text' : ''}`} aria-hidden="true" /> : null}
+              {dot ? <span className={`mail-unread-dot absolute -right-[3px] -top-[2px] size-[7px] rounded-full ${current ? 'mail-unread-dot--on-pill ring-2' : ''}`} aria-hidden="true" /> : null}
             </span>
             <span
               className={`min-w-0 overflow-hidden whitespace-nowrap text-ellipsis transition-[max-width,opacity] duration-[320ms] ease-[cubic-bezier(0.32,0.72,0,1)] ${current ? 'max-w-[160px] opacity-100' : 'max-w-0 opacity-0'}`}
@@ -534,7 +541,7 @@ function MailFolderPills({ folders, currentId, currentUnread, onSelect, onOpenMe
       {menuFolders.length ? (
         <button
           type="button"
-          className={`${PILL_CLASSES} ${currentMenuFolder ? 'grow-[2.6] bg-text text-bg max-md:grow max-md:px-4' : 'grow bg-transparent text-text-muted hover:bg-bg-muted max-md:grow-0'}`}
+          className={`${PILL_CLASSES} ${currentMenuFolder ? 'mail-folder-pill--current grow-[2.6] text-text max-md:grow max-md:px-4' : 'grow bg-transparent text-text-muted hover:bg-bg-muted max-md:grow-0'}`}
           aria-current={currentMenuFolder ? true : undefined}
           aria-haspopup="menu"
           aria-label={currentMenuFolder
@@ -544,7 +551,7 @@ function MailFolderPills({ folders, currentId, currentUnread, onSelect, onOpenMe
         >
           <span className="relative inline-flex shrink-0">
             <Icon icon={currentMenuFolder ? getFolderIcon(currentMenuFolder) : 'carbon:folder'} className="size-[18px]" aria-hidden="true" />
-            {menuUnread ? <span className={`mail-unread-dot absolute -right-[3px] -top-[2px] size-[7px] rounded-full ${currentMenuFolder ? 'ring-2 ring-text' : ''}`} aria-hidden="true" /> : null}
+            {menuUnread ? <span className={`mail-unread-dot absolute -right-[3px] -top-[2px] size-[7px] rounded-full ${currentMenuFolder ? 'mail-unread-dot--on-pill ring-2' : ''}`} aria-hidden="true" /> : null}
           </span>
           <span
             className={`min-w-0 overflow-hidden whitespace-nowrap text-ellipsis transition-[max-width,opacity] duration-[320ms] ease-[cubic-bezier(0.32,0.72,0,1)] ${currentMenuFolder ? 'max-w-[160px] opacity-100' : 'max-w-0 opacity-0'}`}
@@ -560,11 +567,12 @@ function MailFolderPills({ folders, currentId, currentUnread, onSelect, onOpenMe
   )
 }
 
-// The search over the list, of the reader toolbar's glass and height (the
-// two line up from 4xl). Escape empties it.
+// The search over the list, in the app's material (the other pages'
+// buttons and fields), at the reader toolbar's height (the two line up from
+// 4xl). Escape empties it.
 function MailSearchField({ value, onChange, className = '' }) {
   return (
-    <div className={`mobile-tab-bar flex h-11 min-w-0 items-center gap-2 rounded-full pl-4 pr-[5px] text-[15px] focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-text/20 ${className}`}>
+    <div className={`material mail-search-field flex h-11 min-w-0 items-center gap-2 rounded-full pl-4 pr-[5px] text-[15px] focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-text/20 ${className}`}>
       <Icon icon="carbon:search" className="size-[17px] shrink-0 text-text-muted" aria-hidden="true" />
       <input
         type="search"
@@ -678,6 +686,8 @@ function MailListItem({ message, fallbackHref, now, onOpen, onContextMenu, onHov
           ) : null}
         </span>
         <span className="flex shrink-0 items-center gap-[6px]">
+          {/* Answered or forwarded from here, small and quiet (Zimbra's flags). */}
+          {message.forwarded ? <Icon icon="carbon:reply" className="size-3 text-text-muted [transform:scaleX(-1)]" aria-label="Transféré" /> : message.replied ? <Icon icon="carbon:reply" className="size-3 text-text-muted" aria-label="Répondu" /> : null}
           {message.flagged ? <Icon icon="carbon:flag-filled" className="size-3 text-[#f0932b]" aria-label="Drapeau" /> : null}
           <span className={`text-[12px] leading-none tabular-nums font-medium ${unread ? 'text-text-70' : 'text-text-muted'}`}>{timeLabel}</span>
         </span>
@@ -812,12 +822,15 @@ function MailPage({ onReaderOpenChange, onSignInAgain, sender = null }) {
   // The composer's attachment limits, from the same answer (null until it
   // comes: the composer has a fallback, the server checks again).
   const [attachmentLimits, setAttachmentLimits] = useState(null)
+  // And the addresses its « De : » offers (the default first).
+  const [identities, setIdentities] = useState([])
   useEffect(() => {
     let cancelled = false
-    void getMailPrefs().then(({ markRead, attachments }) => {
+    void getMailPrefs().then(({ markRead, attachments, identities: accountIdentities }) => {
       if (cancelled) return
       markReadDelayRef.current = markRead
       setAttachmentLimits(attachments)
+      setIdentities(accountIdentities)
     })
     return () => {
       cancelled = true
@@ -1194,6 +1207,8 @@ function MailPage({ onReaderOpenChange, onSignInAgain, sender = null }) {
   // A row clicked: ⌘/Ctrl adds or takes it out of the selection (the open
   // mail its first), Shift picks the range from the last one clicked; a
   // plain click, or a selection down to one, opens that mail.
+  // Set once resumeDraft exists (further down): a draft's row opens it.
+  const resumeDraftRef = useRef(null)
   const handleRowClick = useCallback((id, event) => {
     const ids = visibleMessages.map((entry) => entry.id)
     let next = null
@@ -1218,8 +1233,13 @@ function MailPage({ onReaderOpenChange, onSignInAgain, sender = null }) {
     // Back to the open one (or a plain click on it, leaving a selection): it
     // stays open.
     if ((next || selection.length >= 2) && single === openId) return
+    const row = listFolderKind === 'drafts' ? visibleMessages.find((entry) => entry.id === single) : null
+    if (row) {
+      void resumeDraftRef.current?.(row)
+      return
+    }
     openMail(single)
-  }, [visibleMessages, selection, openId, openMail])
+  }, [visibleMessages, selection, openId, openMail, listFolderKind])
 
   // Escape lets go of a selection.
   useEffect(() => {
@@ -1269,21 +1289,26 @@ function MailPage({ onReaderOpenChange, onSignInAgain, sender = null }) {
     row?.focus({ preventScroll: true })
   }, [openId])
 
-  const showToast = useCallback((text, onUndo = null) => {
+  // `options`: { duration, steady } for an « Annuler » of its own time (a
+  // send's), `busy` for one that stays until the next (« Envoi… »).
+  const showToast = useCallback((text, onUndo = null, { duration = null, steady = false, busy = false } = {}) => {
     window.clearTimeout(toastTimerRef.current)
-    setToast({ key: Date.now(), text, onUndo })
+    setToast({ key: Date.now(), text, onUndo, duration, steady })
     // With « Annuler », its ring's end closes it (MailToast).
-    if (!onUndo) toastTimerRef.current = window.setTimeout(() => setToast(null), TOAST_MS)
+    if (!onUndo && !busy) toastTimerRef.current = window.setTimeout(() => setToast(null), TOAST_MS)
   }, [])
   useEffect(() => () => window.clearTimeout(toastTimerRef.current), [])
   // An action's failure notice: « Session expirée » when that's why (the
   // 401 is reported before mailAction answers), else what didn't happen.
   const failureText = useCallback((text) => (sessionExpiredRef.current ? 'Session expirée' : text), [])
 
-  // The composer (MailComposer): { key, kind, message } while one is open,
-  // `message` the mail answered or forwarded. One at a time: another asked
-  // for while the open one was changed waits for « Supprimer le brouillon ? »
-  // (`pendingCompose`). Nothing of it is stored: closed, it's gone.
+  // The composer (MailComposer): { key, kind, message, saver, restore,
+  // sendError } while one is open, `message` the mail answered or
+  // forwarded, `saver` its draft's saves (newDraftSaver), `restore` the
+  // composer as it was (a draft resumed, a send taken back or failed). One
+  // at a time: another asked for while the open one was changed waits for
+  // « Remplacer le message ? » (`pendingCompose`), the open one then kept
+  // in Brouillons.
   const [composer, setComposer] = useState(null)
   const [pendingCompose, setPendingCompose] = useState(null)
   const composerApiRef = useRef(null)
@@ -1295,7 +1320,7 @@ function MailPage({ onReaderOpenChange, onSignInAgain, sender = null }) {
   // its body most often already in the reader's cache.
   const startCompose = useCallback(async (kind) => {
     if (kind === 'new') {
-      showComposer({ key: Date.now(), kind, message: null })
+      showComposer({ key: Date.now(), kind, message: null, saver: newDraftSaver() })
       return
     }
     const threadId = openIdRef.current
@@ -1304,17 +1329,110 @@ function MailPage({ onReaderOpenChange, onSignInAgain, sender = null }) {
       const thread = settledValue(threadCache, threadKey(threadId, folderId)) ?? await fetchThread(threadId, folderId)
       const newest = thread[thread.length - 1]
       const message = await loadMessage(newest?.id ?? threadId)
-      showComposer({ key: Date.now(), kind, message })
+      showComposer({ key: Date.now(), kind, message, saver: newDraftSaver() })
     } catch {
       showToast(failureText('Le mail n’a pas chargé'))
     }
   }, [folderId, showComposer, showToast, failureText])
   const closeComposer = useCallback(() => setComposer(null), [])
   const confirmPendingCompose = useCallback(() => {
+    void composerApiRef.current?.saveNow()
     setComposer(pendingCompose)
     setPendingCompose(null)
   }, [pendingCompose])
   const cancelPendingCompose = useCallback(() => setPendingCompose(null), [])
+
+  // Sending (src/useMailSend.js): the composer closes at once, the notice
+  // counts down « Annuler », then the mail goes. Taken back or failed, the
+  // composer opens again as it was (asking first if another is open and
+  // changed). Once sent, the original shows as answered and the open
+  // folder's list is read again (Envoyés, Brouillons).
+  const notifySend = useCallback((text, { onUndo = null, ...options } = {}) => {
+    if (text === null) {
+      window.clearTimeout(toastTimerRef.current)
+      setToast(null)
+    } else {
+      showToast(text, onUndo, options)
+    }
+  }, [showToast])
+  const reopenComposer = useCallback((snapshot, sendError) => {
+    showComposer({ key: Date.now(), kind: snapshot.kind, message: snapshot.message, saver: snapshot.saver, restore: snapshot, sendError })
+  }, [showComposer])
+  const handleSent = useCallback((snapshot) => {
+    const origin = snapshot.state?.origin
+    if (origin?.messageId) {
+      const flag = origin.kind === 'forward' ? { forwarded: true } : { replied: true }
+      setState((current) => ({
+        ...current,
+        messages: current.messages.map((entry) => (entry.id === origin.messageId || entry.messageIds?.includes(origin.messageId) ? { ...entry, ...flag } : entry)),
+      }))
+    }
+    void loadMail({ background: true, fresh: true })
+    void loadFolders()
+  }, [loadMail, loadFolders])
+  const mailSend = useMailSend({ notify: notifySend, reopen: reopenComposer, onSent: handleSent })
+  const sendComposed = useCallback((snapshot) => {
+    const accepted = mailSend.send(snapshot)
+    if (accepted) setComposer(null)
+    return accepted
+  }, [mailSend])
+
+  // What the right-click menus inside the page offer (ContextMenuHost):
+  // « Nouveau message » to an address (a name in the reader, a mailto:
+  // link), « Rechercher dans les mails » for selected text (the reader
+  // leaving the list's place for it on a narrow screen).
+  const pageMenuProps = useContextMenu(null, {
+    longPress: false,
+    services: {
+      compose: (address) => {
+        const to = normalizeRecipient(address)
+        showComposer({ key: Date.now(), kind: 'new', message: null, saver: newDraftSaver(), restore: to ? { to: [to] } : null })
+      },
+      search: (text) => {
+        setQuery(text)
+        if (openId && !window.matchMedia(READER_BESIDE_QUERY).matches) closeMail()
+      },
+    },
+  })
+
+  // A draft (a row of Brouillons) opens in the composer, not the reader:
+  // its fields, its text and its files as saved, saved over from there.
+  const resumeDraft = useCallback(async (row) => {
+    const draftId = row.messageIds?.[0] ?? (row.id.startsWith('-') ? row.id.slice(1) : row.id)
+    try {
+      const draft = await getMailDraft(draftId)
+      showComposer({
+        key: Date.now(),
+        kind: draft.origin ? (draft.origin.kind === 'forward' ? 'forward' : 'reply') : 'new',
+        message: null,
+        saver: newDraftSaver({ draftId: draft.id }),
+        restore: {
+          to: draft.to,
+          cc: draft.cc,
+          bcc: draft.bcc,
+          subject: draft.subject,
+          html: draft.html,
+          attachments: draft.attachments.map((file) => ({
+            key: `draft:${file.part}`,
+            source: 'message',
+            messageId: draft.id,
+            part: file.part,
+            name: file.name,
+            size: file.size,
+            contentType: file.contentType,
+            status: 'ready',
+          })),
+          identityId: draft.identityId,
+          origin: draft.origin,
+        },
+      })
+    } catch {
+      showToast(failureText('Le brouillon n’a pas chargé'))
+    }
+  }, [showComposer, showToast, failureText])
+  useEffect(() => {
+    resumeDraftRef.current = resumeDraft
+  }, [resumeDraft])
 
   // Messages' state, in the list and the reader's copy; the unread count
   // follows. `patch`: an object, or a function of the message giving one.
@@ -1672,8 +1790,31 @@ function MailPage({ onReaderOpenChange, onSignInAgain, sender = null }) {
     event.preventDefault()
     const ids = isMultiple && selection.includes(id) ? selection : [id]
     setContextMenu({ x: event.clientX, y: event.clientY, ids })
+    if (ids.length === 1) preloadMailPdf()
   }, [isMultiple, selection])
   const closeContextMenu = useCallback(() => setContextMenu(null), [])
+
+  // « Imprimer », « Enregistrer en PDF » (src/mailPrint.js): a mail or its
+  // whole thread, a notice while it's put together. Neither marks it read.
+  const exportMail = useCallback(async (id, kind) => {
+    const pdf = kind === 'pdf'
+    showToast(pdf ? 'Création du PDF…' : 'Préparation de l’impression…', null, { busy: true })
+    try {
+      if (pdf) {
+        const outcome = await saveMailPdf(id, folderId)
+        if (outcome === 'downloaded') {
+          showToast('PDF téléchargé')
+          return
+        }
+      } else {
+        await printMail(id, folderId)
+      }
+      window.clearTimeout(toastTimerRef.current)
+      setToast(null)
+    } catch {
+      showToast(failureText(pdf ? 'Le PDF n’a pas pu être créé' : 'Le mail n’a pas pu être imprimé'))
+    }
+  }, [folderId, showToast, failureText])
 
   const contextMenuItems = (() => {
     if (!contextMenu) return []
@@ -1695,6 +1836,12 @@ function MailPage({ onReaderOpenChange, onSignInAgain, sender = null }) {
         onSelect: () => setMessagesFlag(ids, 'flagged', !described?.flagged),
       },
       'separator',
+      // One mail (or thread) at a time.
+      ...(single ? [
+        { id: 'print', label: 'Imprimer', icon: 'carbon:printer', onSelect: () => void exportMail(ids[0], 'print') },
+        { id: 'pdf', label: 'Enregistrer en PDF', icon: 'carbon:document-pdf', onSelect: () => void exportMail(ids[0], 'pdf') },
+        'separator',
+      ] : []),
       // The folder picker where the menu was (the menu closes first).
       { id: 'move', label: 'Déplacer…', icon: 'carbon:folder-move-to', onSelect: () => openFolderMenu('move', { left: contextMenu.x, top: contextMenu.y, bottom: contextMenu.y }, ids) },
       // The trash: back to the inbox, or gone for good. The junk folder:
@@ -1834,14 +1981,15 @@ function MailPage({ onReaderOpenChange, onSignInAgain, sender = null }) {
       ref={sectionRef}
       className={`relative w-full grid gap-4 pt-4 px-6 pb-6 4xl:pt-0 max-md:px-3 max-md:pt-5 max-md:pb-5 ${isResizingReader ? '' : '4xl:transition-[padding-right] 4xl:duration-[340ms] 4xl:ease-[cubic-bezier(0.32,0.72,0,1)]'} ${openId || isMultiple ? '4xl:pr-[calc(var(--mail-reader-width)+24px)]' : ''}`}
       style={{ '--mail-reader-width': readerWidthCss(readerWidth) }}
-      aria-labelledby="mail-page-title" aria-busy={state.status === 'loading' || undefined}>
+      aria-labelledby="mail-page-title" aria-busy={state.status === 'loading' || undefined}
+      {...pageMenuProps()}>
       {/* Under 1024 px the reader takes the list's place; above, it sits in
           a panel on the right, drawn as the sidebar (display: contents drops
           the panel's box on the narrow screens). */}
       {panelId || isMultiple ? (
         <div
           ref={panelRef}
-          className={`mail-reader-panel card-corners border max-4xl:contents 4xl:fixed 4xl:top-3 4xl:right-3 4xl:bottom-3 4xl:z-30 4xl:w-[var(--mail-reader-width)] 4xl:overflow-y-auto 4xl:overscroll-contain 4xl:p-5 ${isPanelClosing ? 'is-closing max-4xl:hidden' : ''}`}
+          className={`mail-reader-panel @container/reader card-corners border max-4xl:contents 4xl:fixed 4xl:top-3 4xl:right-3 4xl:bottom-3 4xl:z-30 4xl:w-[var(--mail-reader-width)] 4xl:overflow-y-auto 4xl:overscroll-contain 4xl:p-5 ${isPanelClosing ? 'is-closing max-4xl:hidden' : ''}`}
           onAnimationEnd={(event) => {
             if (event.target === event.currentTarget && isPanelClosing) setPanelId(null)
           }}
@@ -1882,6 +2030,7 @@ function MailPage({ onReaderOpenChange, onSignInAgain, sender = null }) {
               webmailHref={webmailHref}
               onBack={isPanelClosing ? noop : closeMail}
               onLoaded={(messages) => handleThreadLoaded(panelId, messages)}
+              onResumeDraft={(message) => void resumeDraftRef.current?.({ id: message.id, messageIds: [message.id] })}
             />
           ) : null}
         </div>
@@ -1899,18 +2048,24 @@ function MailPage({ onReaderOpenChange, onSignInAgain, sender = null }) {
           takes the section's top padding inside (a negative margin back), so
           it keeps it when stuck: at 4xl 33px, level with the reader's
           toolbar (the panel's 12px inset, 1px border and 20px padding). */}
-      <div className={`gd-header ${hasOpenedMail ? 'mail-pop-in' : ''} sticky top-0 z-20 -mx-6 -mt-4 grid gap-4 px-6 pt-4 max-md:-mx-3 max-md:-mt-5 max-md:px-3 max-md:pt-5 4xl:mt-0 4xl:pt-[33px] ${isHeaderStuck ? 'is-stuck' : ''}`}>
+      <div className={`gd-header ${hasOpenedMail ? 'mail-pop-in' : ''} sticky top-0 z-20 -mx-6 -mt-4 grid gap-4 px-6 pt-4 pb-4 max-md:-mx-3 max-md:-mt-5 max-md:px-3 max-md:pt-5 4xl:mt-0 4xl:pt-[33px] ${isHeaderStuck ? 'is-stuck' : ''}`}>
+      {/* The other pages' tinted top, its own layer behind (as the
+          planning's): the band clips its spread to its height, which would
+          cut the pills' tooltips hanging under it. */}
+      <span className="page-top-band mail-top-band" aria-hidden="true" />
       <span className="gd-header-blur" aria-hidden="true">
         <span /><span /><span /><span /><span />
       </span>
       {/* The title folds away while searching (the field's focus — not the
-          refresh button's — or text in it), the field taking the row. */}
+          refresh button's — or text in it), the field taking the row. A
+          named group (search): a plain one would also show the refresh
+          button's tooltip whenever the row is hovered. */}
       {/* Above the folder pills (z-10): the refresh button's glass makes its
           own stacking context, so its tooltip couldn't rise over them. */}
-      <div className="group relative z-10 flex min-w-0 items-center" data-searching={query ? '' : undefined}>
+      <div className="group/search relative z-10 flex min-w-0 items-center" data-searching={query ? '' : undefined}>
         <h1
           id="mail-page-title"
-          className="m-0 shrink-0 overflow-hidden whitespace-nowrap max-w-[220px] mr-4 max-md:mr-3 leading-[1.15] text-2xl font-bold max-md:text-[22px] max-md:tracking-[-0.01em] transition-[max-width,margin,opacity] duration-[300ms] ease-[cubic-bezier(0.32,0.72,0,1)] group-has-[input:focus]:max-w-0 group-has-[input:focus]:mr-0 group-has-[input:focus]:opacity-0 group-data-searching:max-w-0 group-data-searching:mr-0 group-data-searching:opacity-0"
+          className="m-0 shrink-0 overflow-hidden whitespace-nowrap max-w-[220px] mr-4 max-md:mr-3 leading-[1.15] text-2xl font-bold max-md:text-[22px] max-md:tracking-[-0.01em] transition-[max-width,margin,opacity] duration-[300ms] ease-[cubic-bezier(0.32,0.72,0,1)] group-has-[input:focus]/search:max-w-0 group-has-[input:focus]/search:mr-0 group-has-[input:focus]/search:opacity-0 group-data-searching/search:max-w-0 group-data-searching/search:mr-0 group-data-searching/search:opacity-0"
         >
           Messagerie
         </h1>
@@ -1928,15 +2083,17 @@ function MailPage({ onReaderOpenChange, onSignInAgain, sender = null }) {
         </button>
         {/* On a phone the only way to a new mail (the reader's toolbar is
             about the open one there). From 4xl, hidden while the reader's
-            panel is open: its toolbar has the same button. */}
+            panel is open: its toolbar has the same button. The page's
+            primary button, its label beside the icon, but on a phone (the
+            icon alone there, the search keeping its room). */}
         <button
           type="button"
-          className={`mobile-tab-bar group relative ml-2 inline-flex size-11 shrink-0 items-center justify-center rounded-full text-text cursor-pointer focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-text/20 ${openId || isMultiple ? '4xl:hidden' : ''}`}
+          className={`${PRIMARY_COMPOSE_CLASSES} ml-2 h-11 pl-4 pr-[18px] max-sm:w-11 max-sm:px-0 ${openId || isMultiple ? '4xl:hidden' : ''}`}
           aria-label="Nouveau message"
           onClick={() => void startCompose('new')}
         >
-          <Icon icon="carbon:edit" className="size-[18px]" aria-hidden="true" />
-          <Tooltip title="Nouveau message" side="bottom-end" className="max-4xl:hidden" />
+          <Icon icon="carbon:edit" className="size-[18px] shrink-0" aria-hidden="true" />
+          <span className="whitespace-nowrap text-[14px] font-semibold leading-none max-sm:hidden" aria-hidden="true">Nouveau message</span>
         </button>
       </div>
 
@@ -2063,7 +2220,12 @@ function MailPage({ onReaderOpenChange, onSignInAgain, sender = null }) {
       ) : null}
       </div>
 
-      <MailToast toast={toast} onExpire={() => setToast(null)} readerOpen={Boolean(openId) || isMultiple} />
+      <MailToast
+        toast={toast}
+        // A steady one (a send's) is replaced by its own timer.
+        onExpire={(key) => setToast((current) => (current?.key === key && !current.steady ? null : current))}
+        readerOpen={Boolean(openId) || isMultiple}
+      />
       {contextMenu ? (
         <ContextMenu
           x={contextMenu.x}
@@ -2112,21 +2274,25 @@ function MailPage({ onReaderOpenChange, onSignInAgain, sender = null }) {
             initialKind={composer.kind}
             message={composer.message}
             sender={sender}
+            identities={identities}
             attachmentLimits={attachmentLimits}
+            saver={composer.saver}
+            restore={composer.restore ?? null}
+            sendError={composer.sendError ?? null}
             ref={composerApiRef}
             onClose={closeComposer}
+            onSend={sendComposed}
           />
         </Suspense>
       ) : null}
       <ConfirmDialog
         open={Boolean(pendingCompose)}
-        title="Supprimer le brouillon ?"
-        confirmLabel="Supprimer"
-        destructive
+        title="Remplacer le message en cours ?"
+        confirmLabel="Remplacer"
         onConfirm={confirmPendingCompose}
         onCancel={cancelPendingCompose}
       >
-        Le message en cours sera remplacé
+        Il reste dans Brouillons
       </ConfirmDialog>
     </section>
   )

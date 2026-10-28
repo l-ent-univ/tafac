@@ -346,13 +346,14 @@ export function quoteHeader(message, kind) {
 
 // The fields a new draft opens with. `kind`: 'new', 'reply', 'reply-all'
 // or 'forward'; `message` the mail answered (the thread's newest), as
-// getMailMessage gives it; `ownEmail` the student's address, never among
-// the recipients of a « Répondre à tous ». A reply to one's own mail (from
-// the Sent folder) goes to its recipients rather than back to oneself.
+// getMailMessage gives it; `ownEmail` the student's address (or all of
+// them: the account's identities), never among the recipients of a
+// « Répondre à tous ». A reply to one's own mail (from the Sent folder)
+// goes to its recipients rather than back to oneself.
 export function buildDraftFields(kind, message, ownEmail = '') {
   if (kind === 'new' || !message) return { to: [], cc: [], subject: '', attachments: [] }
-  const own = normalizeEmail(ownEmail)
-  const isOwn = (address) => Boolean(own) && normalizeEmail(address?.email) === own
+  const own = new Set([].concat(ownEmail).map(normalizeEmail).filter(Boolean))
+  const isOwn = (address) => own.has(normalizeEmail(address?.email))
   const withEmail = (list) => (list ?? []).filter((address) => isValidAddress(address?.email))
   if (kind === 'forward') {
     // Its attachments go along, by reference (messageAttachmentItems): they're

@@ -6,6 +6,8 @@ import { pickAdeGroupForAlias } from './adeGroupMatch'
 import { buildParcoursTpAliases } from './scodocParcoursGroups'
 import { getLoadedUniversityId, getUniversityRequestHeaders } from './universityRuntime'
 import { buildUploadDisposition, normalizeAttachmentType, readAttachmentLimits, sanitizeAttachmentName } from './mailAttachments'
+import { isValidAddress, sanitizeDisplayName } from './mailCompose'
+import { readMailSignatures } from './mailSignatureChoice'
 
 // Null on the neutral page (no university picked yet).
 export const ENT_ORIGIN = universityConfig.origins.ent
@@ -609,10 +611,160 @@ export async function getMailPrefs() {
     return {
       markRead: response.ok && Number.isFinite(markRead) ? markRead : 0,
       attachments: readAttachmentLimits(response.ok ? payload?.attachments : null),
+      identities: response.ok ? readMailIdentities(payload?.identities) : [],
     }
   } catch {
-    return { markRead: 0, attachments: readAttachmentLimits(null) }
+    return { markRead: 0, attachments: readAttachmentLimits(null), identities: [] }
   }
+}
+
+// The addresses « De : » offers ({ id, name, email }, the default first),
+// checked: an id, a valid address.
+function readMailIdentities(list) {
+  return (Array.isArray(list) ? list : [])
+    .filter((entry) => typeof entry?.id === 'string' && entry.id.length <= 64 && isValidAddress(entry.email))
+    .slice(0, 20)
+    .map((entry) => ({ id: entry.id, name: sanitizeDisplayName(typeof entry.name === 'string' ? entry.name : '', entry.email), email: entry.email }))
+}
+
+// The student's signatures (GET /__ent_auth/mail/signatures: the webmail's,
+// which each identity takes, the custom one), for Réglages › Messagerie and
+// the composer to show. `fresh`: the identities read again (Réglages).
+// Never throws: { status: 'ok', data (readMailSignatures') } or { status:
+// 'error' }.
+export async function getMailSignatures({ fresh = false } = {}) {
+  try {
+    const response = await fetch(`${ENT_AUTH_PREFIX}/mail/signatures${fresh ? '?fresh=1' : ''}`, { credentials: 'same-origin' })
+    const payload = await response.json().catch(() => null)
+    if (!response.ok) {
+      if (isMailSessionExpired(response, payload)) reportMailSessionExpired()
+      return { status: 'error' }
+    }
+    return { status: 'ok', data: readMailSignatures(payload) }
+  } catch {
+    return { status: 'error' }
+  }
+}
+
+// The custom signature written (POST /__ent_auth/mail/signature: kept in
+// the webmail as its « Tafac » signature; '' removes it). Never throws: {
+// status: 'ok', data } (the signatures as they are now) or { status:
+// 'error', code: 'too-long' | 'limit' | 'rate' | 'expired' | 'failed' }.
+const MAIL_SIGNATURE_CODES = {
+  mail_signature_too_long: 'too-long',
+  mail_signature_limit: 'limit',
+  mail_signature_rate_limited: 'rate',
+  mail_rate_limited: 'rate',
+}
+
+export async function saveMailSignature(text) {
+  try {
+    const response = await fetch(`${ENT_AUTH_PREFIX}/mail/signature`, {
+      method: 'POST',
+      credentials: 'same-origin',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text }),
+    })
+    const payload = await response.json().catch(() => null)
+    if (response.ok) return { status: 'ok', data: readMailSignatures(payload) }
+    if (isMailSessionExpired(response, payload)) {
+      reportMailSessionExpired()
+      return { status: 'error', code: 'expired' }
+    }
+    return { status: 'error', code: MAIL_SIGNATURE_CODES[payload?.error] ?? 'failed' }
+  } catch {
+    return { status: 'error', code: 'failed' }
+  }
+}
+
+// The send and draft routes' error codes, as the composer names them.
+const MAIL_SEND_CODES = {
+  mail_send_invalid_recipients: 'invalid-recipients',
+  mail_send_no_recipient: 'no-recipient',
+  mail_send_too_many_recipients: 'too-many-recipients',
+  mail_send_upload_expired: 'upload-expired',
+  mail_send_missing_reference: 'missing-reference',
+  mail_send_too_large: 'too-large',
+  mail_send_quota: 'quota',
+  mail_send_rate_limited: 'rate',
+  mail_rate_limited: 'rate',
+  mail_send_invalid_identity: 'identity',
+}
+
+async function postMailCompose(path, body, { signal } = {}) {
+  let response
+  try {
+    response = await fetch(`${ENT_AUTH_PREFIX}/mail/${path}`, {
+      method: 'POST',
+      credentials: 'same-origin',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+      signal,
+    })
+  } catch {
+    // Nothing came back: sent or not, unknown (a send tries again with the
+    // same uid, which Zimbra won't send twice).
+    return { status: 'error', code: signal?.aborted ? 'aborted' : 'network' }
+  }
+  const payload = await response.json().catch(() => null)
+  if (response.ok) return { status: 'ok', payload }
+  if (isMailSessionExpired(response, payload)) {
+    reportMailSessionExpired()
+    return { status: 'error', code: 'expired' }
+  }
+  return {
+    status: 'error',
+    code: MAIL_SEND_CODES[payload?.error] ?? 'failed',
+    retryAfter: Number(response.headers.get('Retry-After')) || null,
+    invalid: Array.isArray(payload?.invalid) ? payload.invalid.filter((entry) => typeof entry === 'string').slice(0, 100) : [],
+    aids: Array.isArray(payload?.aids) ? payload.aids.filter((entry) => typeof entry === 'string').slice(0, 50) : [],
+  }
+}
+
+// Sends the composer's mail (POST /__ent_auth/mail/send, its body built by
+// buildComposePayload, src/mailSendPayload.js). Never throws: { status:
+// 'ok', partial, invalid } (partial: sent, but `invalid` refused) or {
+// status: 'error', code ('invalid-recipients', 'no-recipient',
+// 'too-many-recipients', 'upload-expired', 'missing-reference', 'too-large',
+// 'quota', 'rate', 'identity', 'expired', 'network', 'failed'), retryAfter,
+// invalid (addresses), aids (uploads to do again) }.
+export async function sendMail(body) {
+  const result = await postMailCompose('send', body)
+  if (result.status !== 'ok') return result
+  return { status: 'ok', partial: result.payload?.partial === true, invalid: Array.isArray(result.payload?.invalid) ? result.payload.invalid : [] }
+}
+
+// Saves the composer's draft (POST /__ent_auth/mail/draft): { status: 'ok',
+// draft: { id, attachments: [{ messageId, part } | null] } } or a send's
+// errors.
+export async function saveMailDraft(body, { signal } = {}) {
+  const result = await postMailCompose('draft', body, { signal })
+  if (result.status !== 'ok') return result
+  const draft = result.payload?.draft
+  if (typeof draft?.id !== 'string' || !draft.id) return { status: 'error', code: 'failed' }
+  return {
+    status: 'ok',
+    draft: {
+      id: draft.id,
+      attachments: Array.isArray(draft.attachments)
+        ? draft.attachments.map((entry) => (typeof entry?.messageId === 'string' && typeof entry?.part === 'string' ? { messageId: entry.messageId, part: entry.part } : null))
+        : [],
+    },
+  }
+}
+
+// A draft to resume in the composer (GET /__ent_auth/mail/draft?id=…):
+// { id, to, cc, bcc, subject, html (cleaned by the server to what the
+// editor holds), attachments: [{ part, name, size, contentType }],
+// identityId, origin: { kind, messageId } | null }. Throws on a failure.
+export async function getMailDraft(id) {
+  const response = await fetch(`${ENT_AUTH_PREFIX}/mail/draft?id=${encodeURIComponent(id)}`, { credentials: 'same-origin' })
+  const payload = await response.json().catch(() => null)
+  if (isMailSessionExpired(response, payload)) reportMailSessionExpired()
+  if (!response.ok || !payload?.draft) {
+    throw createHttpError(payload?.error || `Draft request failed (${response.status}).`, response.status)
+  }
+  return payload.draft
 }
 
 // One file for the composer (POST /__ent_auth/mail/upload), sent as it is

@@ -26,4 +26,5 @@ Universités à vérifier : **toutes celles du dépôt au moment du commit**, pa
 - **Textes** : un texte qui nomme un service (« ADE », « ScoDoc », « Moodle ») alors qu'une université en utilise un autre (`planning.providerName`).
 - **Documentation** : une nouvelle clé de config absente de `docs/ADDING_A_UNIVERSITY.md`.
 - **Tests** : une nouvelle logique pure sans test, ou un test qui ne couvre qu'une variante.
+- **Signature des mails** : un établissement ou un logo ajouté à `client.js` (`establishments.byId`, `branding.logo`) sans son entrée dans `server.js › mail.signature` (et son PNG rendu par `scripts/render-mail-logos.mjs`) n'apparaît pas dans la signature des mails envoyés. De même, `mail.signature.showLogin` doit avoir la même valeur dans `client.js` et `server.js` (une constante de `shared.js`) : sinon le composeur montre une ligne « Identifiant » que le mail envoyé n'a pas, ou l'inverse.
 - **`devOnly`** : une université encore en `devOnly: true` qui reçoit une fonctionnalité annoncée comme publique.

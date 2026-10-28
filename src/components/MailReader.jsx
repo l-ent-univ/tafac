@@ -16,6 +16,9 @@ import { getSenderBadgeStyle, getSenderDomainCue, getSenderInitial } from './mai
 import { GROUP_CARD_CLASSES, GroupRow } from './GroupCard'
 import FileName from './FileName'
 import { formatAttachmentSize as formatSize, getAttachmentIcon, getAttachmentKind } from '../mailAttachments'
+import { addressMenuItems, attachmentMenuItems } from '../contextMenuItems'
+import { copyToClipboard, useContextMenu } from '../useContextMenu'
+import { bindFrameContextMenu } from '../contextMenuEvents'
 
 const fullDateFormatter = new Intl.DateTimeFormat('fr-FR', { dateStyle: 'full', timeStyle: 'short' })
 const weekdayFormatter = new Intl.DateTimeFormat('fr-FR', { weekday: 'short' })
@@ -237,6 +240,9 @@ function AddressButton({ address, className, children }) {
   const anchorRef = useRef(null)
   const { email, name } = addressParts(address)
   const close = useCallback(() => setOpen(false), [])
+  // Its right-click menu (a long press): a new message to them (MailPage's
+  // `compose`), their address copied.
+  const menuProps = useContextMenu((_, { services }) => addressMenuItems({ name, email }, { copy: copyToClipboard, compose: services.compose ?? null }))
   return (
     <span className="relative inline-flex min-w-0 max-w-full">
       <button
@@ -247,6 +253,7 @@ function AddressButton({ address, className, children }) {
         aria-expanded={open}
         aria-label={name ? `${name}, ${email}` : email}
         onClick={() => setOpen((value) => !value)}
+        {...menuProps()}
       >
         {children}
       </button>
@@ -309,6 +316,41 @@ function RecipientsRow({ label, list }) {
         ) : null}
       </dd>
     </>
+  )
+}
+
+// A mail's attachments as rows, each a download; a right click (a long
+// press) offers to see an image in a tab too.
+function AttachmentRows({ attachments }) {
+  const menuProps = useContextMenu((part) => {
+    const attachment = attachments.find((entry) => entry.part === part)
+    if (!attachment?.href) return null
+    return attachmentMenuItems(attachment, {
+      open: (href) => window.open(href, '_blank', 'noopener,noreferrer'),
+      download: () => {
+        const link = document.createElement('a')
+        link.href = attachment.href
+        link.download = attachment.name
+        link.click()
+      },
+    })
+  })
+  return (
+    <ul className={GROUP_CARD_CLASSES}>
+      {attachments.map((attachment) => (
+        <GroupRow
+          key={attachment.part}
+          icon={getAttachmentIcon(attachment.type)}
+          title={<FileName name={attachment.name} />}
+          hint={attachment.name}
+          compact
+          detail={[getAttachmentKind(attachment), formatSize(attachment.size)].filter(Boolean).join(' · ')}
+          href={attachment.href}
+          download={attachment.name}
+          menuProps={menuProps(attachment.part)}
+        />
+      ))}
+    </ul>
   )
 }
 
@@ -444,10 +486,15 @@ function markQuotedPart(doc) {
 
 // The mail's body, as tall as its content (followed as images load). Fixed
 // widths give way to the frame (buildFrameStyle), so most mails wrap to it.
-function MailBodyFrame({ message, showRemoteImages, title }) {
+// `onResumeDraft`: a draft's body, with « Reprendre le brouillon » under
+// it, before the quote's button.
+function MailBodyFrame({ message, showRemoteImages, title, onResumeDraft = null }) {
   const colors = useThemeColors()
   const frameRef = useRef(null)
   const observerRef = useRef(null)
+  // The app's right-click menu on the body's links and selection, bound on
+  // each load (bindFrameContextMenu).
+  const unbindMenuRef = useRef(null)
   const [height, setHeight] = useState(120)
   // A reply's quoted part (markQuotedPart): folded until asked for, the
   // choice kept when the frame reloads (remote images shown).
@@ -484,6 +531,8 @@ function MailBodyFrame({ message, showRemoteImages, title }) {
 
   const handleLoad = useCallback(() => {
     observerRef.current?.disconnect()
+    unbindMenuRef.current?.()
+    unbindMenuRef.current = bindFrameContextMenu(frameRef.current)
     const doc = frameRef.current?.contentDocument
     if (!doc?.body) return
     if (window.matchMedia(PHONE_QUERY).matches) raiseTextSizes(doc)
@@ -501,7 +550,10 @@ function MailBodyFrame({ message, showRemoteImages, title }) {
     for (const image of doc.images) image.addEventListener('load', fit, { once: true })
   }, [fit])
 
-  useEffect(() => () => observerRef.current?.disconnect(), [])
+  useEffect(() => () => {
+    observerRef.current?.disconnect()
+    unbindMenuRef.current?.()
+  }, [])
 
   const toggleQuote = () => {
     const shown = !quoteShown
@@ -523,16 +575,26 @@ function MailBodyFrame({ message, showRemoteImages, title }) {
         srcDoc={buildFrameDocument(message, { showRemoteImages, colors })}
         onLoad={handleLoad}
       />
-      {hasQuote ? (
-        <button
-          type="button"
-          className="material -mt-1 inline-flex h-8 items-center gap-2 justify-self-start rounded-full px-3 cursor-pointer"
-          aria-expanded={quoteShown}
-          onClick={toggleQuote}
-        >
-          <Icon icon={quoteShown ? 'carbon:chevron-up' : 'carbon:overflow-menu-horizontal'} className="size-4 shrink-0 text-text-muted" aria-hidden="true" />
-          <span className="text-[13px] font-semibold leading-none text-text">{quoteShown ? 'Masquer le message cité' : 'Afficher le message cité'}</span>
-        </button>
+      {hasQuote || onResumeDraft ? (
+        <div className="-mt-1 flex flex-wrap items-center gap-2">
+          {onResumeDraft ? (
+            <button type="button" className="material inline-flex h-8 items-center gap-2 rounded-full px-3 cursor-pointer" onClick={onResumeDraft}>
+              <Icon icon="carbon:edit" className="size-4 shrink-0 text-text-muted" aria-hidden="true" />
+              <span className="text-[13px] font-semibold leading-none text-text">Reprendre le brouillon</span>
+            </button>
+          ) : null}
+          {hasQuote ? (
+            <button
+              type="button"
+              className="material inline-flex h-8 items-center gap-2 rounded-full px-3 cursor-pointer"
+              aria-expanded={quoteShown}
+              onClick={toggleQuote}
+            >
+              <Icon icon={quoteShown ? 'carbon:chevron-up' : 'carbon:overflow-menu-horizontal'} className="size-4 shrink-0 text-text-muted" aria-hidden="true" />
+              <span className="text-[13px] font-semibold leading-none text-text">{quoteShown ? 'Masquer le message cité' : 'Afficher le message cité'}</span>
+            </button>
+          ) : null}
+        </div>
       ) : null}
     </>
   )
@@ -564,7 +626,9 @@ function ReaderBackRow({ onBack, label = 'Réception' }) {
 // what the reader can't show (a cut mail, a failure). `embedded`: one of a
 // thread's (MailThread), which has the back button and Escape itself;
 // `autoFocus` then on its newest only.
-function MailReader({ id, webmailHref, onBack, onLoaded, embedded = false, autoFocus = !embedded, backLabel }) {
+// `draft`: a draft in its thread (not sent yet), said so on its header, and
+// `onResumeDraft` opens it in the composer.
+function MailReader({ id, webmailHref, onBack, onLoaded, embedded = false, autoFocus = !embedded, backLabel, draft = false, onResumeDraft = null }) {
   const [state, setState] = useState(() => {
     const cached = settledValue(messageCache, id)
     return cached ? { status: 'ok', message: cached, notFound: false } : { status: 'loading', message: null, notFound: false }
@@ -674,7 +738,9 @@ function MailReader({ id, webmailHref, onBack, onLoaded, embedded = false, autoF
                 ) : (
                   <p className="m-0 min-w-0 truncate text-[16px] font-semibold leading-[1.3] text-text">{sender}</p>
                 )}
-                {receivedAt ? (
+                {draft ? (
+                  <DraftTag />
+                ) : receivedAt ? (
                   <time className="shrink-0 text-[13px] font-medium text-text-muted tabular-nums" dateTime={receivedAt.toISOString()} title={fullDateFormatter.format(receivedAt)}>
                     {formatHeaderDate(receivedAt)}
                   </time>
@@ -701,20 +767,7 @@ function MailReader({ id, webmailHref, onBack, onLoaded, embedded = false, autoF
                 <h3 id="mail-attachments-title" className="m-0 font-body text-base font-medium leading-[1.06]">Pièces jointes</h3>
                 <span className="ml-auto font-body text-[13px] font-medium leading-none text-text-muted tabular-nums">{message.attachments.length}</span>
               </div>
-              <ul className={GROUP_CARD_CLASSES}>
-                {message.attachments.map((attachment) => (
-                  <GroupRow
-                    key={attachment.part}
-                    icon={getAttachmentIcon(attachment.type)}
-                    title={<FileName name={attachment.name} />}
-                    hint={attachment.name}
-                    compact
-                    detail={[getAttachmentKind(attachment), formatSize(attachment.size)].filter(Boolean).join(' · ')}
-                    href={attachment.href}
-                    download={attachment.name}
-                  />
-                ))}
-              </ul>
+              <AttachmentRows attachments={message.attachments} />
             </section>
           ) : null}
 
@@ -731,7 +784,7 @@ function MailReader({ id, webmailHref, onBack, onLoaded, embedded = false, autoF
           ) : null}
 
           {message.html ? (
-            <MailBodyFrame message={message} showRemoteImages={showRemoteImages} title={`Contenu du mail : ${subject}`} />
+            <MailBodyFrame message={message} showRemoteImages={showRemoteImages} title={`Contenu du mail : ${subject}`} onResumeDraft={draft ? onResumeDraft : null} />
           ) : (
             <p className="m-0 text-[14px] text-text-muted">Ce mail n’a pas de texte</p>
           )}
@@ -751,6 +804,12 @@ function MailReader({ id, webmailHref, onBack, onLoaded, embedded = false, autoF
       ) : null}
     </article>
   )
+}
+
+// « Brouillon » where a mail's date goes: a draft isn't sent, it has no
+// date to show (as Apple Mail marks one, in red).
+function DraftTag() {
+  return <span className="shrink-0 text-[13px] font-semibold text-error">Brouillon</span>
 }
 
 // An older mail of a thread, folded: its sender, date and preview on one
@@ -782,7 +841,7 @@ function ThreadFoldedMail({ message, onExpand }) {
             <span className={`min-w-0 truncate text-[14px] leading-tight ${message.unread ? 'font-bold text-text' : 'font-semibold text-text-70'}`}>{sender}</span>
             {senderDomain ? <span className="max-w-[55%] shrink-0 truncate text-[12px] leading-tight font-medium text-text-muted">{senderDomain}</span> : null}
           </span>
-          {receivedAt ? <span className="shrink-0 text-[12px] font-medium text-text-muted tabular-nums">{formatHeaderDate(receivedAt)}</span> : null}
+          {message.draft ? <DraftTag /> : receivedAt ? <span className="shrink-0 text-[12px] font-medium text-text-muted tabular-nums">{formatHeaderDate(receivedAt)}</span> : null}
         </span>
         {message.snippet ? <span className="truncate text-[13px] leading-tight text-text-muted">{message.snippet}</span> : null}
       </span>
@@ -796,8 +855,9 @@ function ThreadFoldedMail({ message, onExpand }) {
 // `folder`: the one it's read from (its trash or junk mails only there).
 // `onLoaded(messages)` once its mails are known (to mark them read), and
 // again with the fresh list when it opened from the cache.
-// `backLabel`: the folder the back button returns to.
-export function MailThread({ id, folder, webmailHref, onBack, onLoaded, backLabel }) {
+// `backLabel`: the folder the back button returns to. `onResumeDraft(mail)`:
+// a draft of the thread opened in the composer.
+export function MailThread({ id, folder, webmailHref, onBack, onLoaded, backLabel, onResumeDraft = null }) {
   // A thread already seen opens at once (refreshed behind); a new one waits
   // for the mails it opens with too, so its one skeleton gives way to the
   // whole thread rather than to each mail's own.
@@ -880,7 +940,7 @@ export function MailThread({ id, folder, webmailHref, onBack, onLoaded, backLabe
         </div>
       ) : null}
       {state.status === 'ok' && messages.length > 1 ? (
-        <p className="m-0 -mb-1 text-[12.5px] font-semibold text-text-muted">{messages.length} mails dans ce fil</p>
+        <p className="m-0 -mb-1 text-[12.5px] font-semibold text-text-muted">{threadCountLabel(messages)}</p>
       ) : null}
       {state.status === 'ok' ? messages.map((message, index) => (
         <div key={message.id} className={`min-w-0 ${index > 0 ? 'border-t border-border pt-4' : ''}`}>
@@ -891,6 +951,8 @@ export function MailThread({ id, folder, webmailHref, onBack, onLoaded, backLabe
               onBack={onBack}
               embedded
               autoFocus={index === messages.length - 1}
+              draft={Boolean(message.draft)}
+              onResumeDraft={message.draft && onResumeDraft ? () => onResumeDraft(message) : null}
             />
           ) : (
             <ThreadFoldedMail message={message} onExpand={() => setExpanded((current) => new Set(current).add(message.id))} />
@@ -899,6 +961,16 @@ export function MailThread({ id, folder, webmailHref, onBack, onLoaded, backLabe
       )) : null}
     </div>
   )
+}
+
+// « 3 mails dans ce fil », its drafts counted apart: « 1 mail et
+// 1 brouillon dans ce fil ».
+function threadCountLabel(messages) {
+  const drafts = messages.filter((message) => message.draft).length
+  const mails = messages.length - drafts
+  const mailText = `${mails} mail${mails > 1 ? 's' : ''}`
+  if (!drafts) return `${mailText} dans ce fil`
+  return `${mailText} et ${drafts} brouillon${drafts > 1 ? 's' : ''} dans ce fil`
 }
 
 export default MailReader

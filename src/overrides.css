@@ -718,6 +718,58 @@
   width: auto;
 }
 
+/* The student's own signature (« Partage », « Personnalisée »): in the
+   text's colour, as the mail sent has it (server/mailSignature.js); a hint
+   in its place when there's none. */
+.mail-composer-signature--own {
+  color: var(--color-text);
+}
+
+.mail-composer-signature-hint {
+  color: var(--color-text-muted);
+  font-style: italic;
+  font-synthesis-style: auto;
+}
+
+/* A webmail signature's HTML (MailSignatureHtml), in the composer and in
+   Réglages: its blocks and lists as a mail shows them, links underlined.
+   In the dark theme its colours give way to the theme's (a black text
+   was unreadable); the mail sent keeps them. */
+.mail-signature-html {
+  overflow-wrap: anywhere;
+  font-synthesis-style: auto;
+}
+
+.mail-signature-html p,
+.mail-signature-html div {
+  margin: 0;
+}
+
+.mail-signature-html ul,
+.mail-signature-html ol {
+  margin: 0.25em 0;
+  padding-left: 1.5em;
+}
+
+.mail-signature-html ul {
+  list-style: disc;
+}
+
+.mail-signature-html ol {
+  list-style: decimal;
+}
+
+.mail-signature-html a {
+  color: inherit;
+  text-decoration: underline;
+  text-decoration-color: color-mix(in srgb, currentColor 35%, transparent);
+  text-underline-offset: 2px;
+}
+
+:where([data-theme="dark"]) .mail-signature-html [style] {
+  color: inherit !important;
+}
+
 /* « Signature automatique » beside the composer's switch, while it's on: a
    light passing over the word now and then (a gradient clipped to the
    text), as the app's skeletons shimmer. Still with reduced motion. */
@@ -808,6 +860,16 @@
 
 :where([data-theme="dark"]) .mail-composer-body blockquote {
   border-left-color: rgb(255 255 255 / 0.2);
+}
+
+/* A highlight's text stays dark on its light colour, the dark theme's
+   light text being unreadable on it (as in the sent mail, mailSend.js). A
+   chosen text colour sits inside the highlight and keeps its own. */
+.mail-composer-body mark {
+  /* Over the « color: inherit » Tiptap writes on the mark itself. */
+  color: #1f1f1f !important;
+  border-radius: 3px;
+  padding-inline: 1px;
 }
 
 .mail-composer-body .mail-composer-quote-header {
@@ -4115,6 +4177,16 @@
   transform-origin: var(--context-origin-x, 0) var(--context-origin-y, 0);
 }
 
+/* A place a long press opens the menu of (useContextMenu): no callout,
+   no text selection starting under the finger. */
+@media (hover: none) {
+  [data-menu-press] {
+    -webkit-touch-callout: none;
+    -webkit-user-select: none;
+    user-select: none;
+  }
+}
+
 /* The dropdowns' (Dropdown, the planning's header), in the older look. */
 .favorites-context-menu {
   transform-origin: var(--favorites-context-origin-x, 24px)
@@ -6669,4 +6741,192 @@ li:has(> .planning-row.is-link:active) + li > .planning-row .planning-row-text,
   .planning-export-label {
     transition: none;
   }
+}
+
+/* The composer's drop zone (MailDropSheets): three sheets fan out of a pile
+   with a little spring, one after the other, then float, each on its own
+   beat. The fan moves the individual translate/rotate/scale properties,
+   the float the transform, so the two add up. Still with reduced motion,
+   laid out where the fan ends. */
+.mail-drop-sheets {
+  position: relative;
+  display: block;
+  width: 132px;
+  height: 92px;
+  margin-bottom: 6px;
+}
+
+.mail-drop-sheet {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 50px;
+  height: 62px;
+  overflow: visible;
+  filter: drop-shadow(0 1px 1.5px rgb(52 18 0 / 0.1)) drop-shadow(0 8px 14px rgb(52 18 0 / 0.14));
+  translate: var(--sheet-x) var(--sheet-y);
+  rotate: var(--sheet-r);
+  animation:
+    mail-drop-fan 560ms cubic-bezier(0.34, 1.56, 0.64, 1) var(--sheet-delay) both,
+    mail-drop-float 2.8s ease-in-out var(--sheet-float-delay) infinite;
+}
+
+.mail-drop-sheet--left {
+  --sheet-x: calc(-50% - 34px);
+  --sheet-y: calc(-50% + 4px);
+  --sheet-r: -13deg;
+  --sheet-delay: 40ms;
+  --sheet-float-delay: -0.9s;
+}
+
+.mail-drop-sheet--right {
+  --sheet-x: calc(-50% + 34px);
+  --sheet-y: calc(-50% + 4px);
+  --sheet-r: 12deg;
+  --sheet-delay: 100ms;
+  --sheet-float-delay: -1.8s;
+}
+
+.mail-drop-sheet--front {
+  --sheet-x: -50%;
+  --sheet-y: calc(-50% - 4px);
+  --sheet-r: -2deg;
+  --sheet-delay: 0ms;
+  --sheet-float-delay: 0s;
+  z-index: 1;
+}
+
+.mail-drop-sheet-paper {
+  fill: var(--color-widget-bg);
+  stroke: rgb(52 18 0 / 0.12);
+  stroke-width: 1;
+}
+
+.mail-drop-sheet-fold {
+  fill: rgb(52 18 0 / 0.07);
+  stroke: rgb(52 18 0 / 0.12);
+  stroke-width: 1;
+  stroke-linejoin: round;
+}
+
+.mail-drop-sheet-line {
+  fill: rgb(52 18 0 / 0.13);
+}
+
+:where([data-theme="dark"]) .mail-drop-sheet {
+  filter: drop-shadow(0 1px 1.5px rgb(0 0 0 / 0.4)) drop-shadow(0 8px 14px rgb(0 0 0 / 0.5));
+}
+
+:where([data-theme="dark"]) .mail-drop-sheet-paper,
+:where([data-theme="dark"]) .mail-drop-sheet-fold {
+  stroke: rgb(255 255 255 / 0.14);
+}
+
+:where([data-theme="dark"]) .mail-drop-sheet-fold {
+  fill: rgb(255 255 255 / 0.08);
+}
+
+:where([data-theme="dark"]) .mail-drop-sheet-line {
+  fill: rgb(255 255 255 / 0.16);
+}
+
+@keyframes mail-drop-fan {
+  from {
+    opacity: 0;
+    translate: -50% calc(-50% + 14px);
+    rotate: 0deg;
+    scale: 0.7;
+  }
+}
+
+@keyframes mail-drop-float {
+  0%,
+  100% {
+    transform: translateY(0) rotate(0deg);
+  }
+  50% {
+    transform: translateY(-4px) rotate(1.5deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mail-drop-sheet {
+    animation: none;
+  }
+}
+
+/* Dark mode, inside the composer: its window (#1c1c1c) is as dark as the
+   app's subtle fills (#1e1e1e), so the format bar's pills, the tokens and
+   the attachments' chips vanished into it. Lighter fills there only, and
+   a pressed format button (bold on…) lighter still. */
+:where([data-theme="dark"]) .mail-composer {
+  --color-bg-subtle: #2b2b2b;
+  --color-bg-muted: #363636;
+}
+
+:where([data-theme="dark"]) .mail-composer [role="toolbar"] button[aria-pressed="true"] {
+  background-color: #444444;
+  box-shadow: 0 1px 2px rgb(0 0 0 / 0.4);
+}
+
+/* The mail search's field is .material, but a field, not a button: no
+   press-in when the text is clicked, no lift on hover. And a tighter,
+   lighter shadow than a button's: spread under a field this wide, the
+   material's warm one read as an orange smudge on the tinted band. */
+.mail-search-field.material,
+.mail-search-field.material:hover {
+  box-shadow: 0 1px 2px rgb(52 18 0 / 0.06), 0 3px 10px -4px rgb(52 18 0 / 0.12);
+}
+
+.mail-search-field.material:active {
+  transform: none;
+}
+
+:where([data-theme="dark"]) .mail-search-field.material,
+:where([data-theme="dark"]) .mail-search-field.material:hover {
+  box-shadow: 0 1px 2px rgb(0 0 0 / 0.35), 0 3px 10px -4px rgb(0 0 0 / 0.5);
+}
+
+/* The mail page's folder pills: the one shown in the app's secondary look
+   (the material's white surface and soft shadow, as the search beside),
+   not the primary dark fill, too loud for a mere folder. Shadows only (no
+   border), so the pill keeps its size as it grows. */
+.mail-folder-pill--current {
+  background-color: #ffffff;
+  box-shadow: 0 1px 3px rgb(52 18 0 / 0.08), 0 8px 20px -10px rgb(52 18 0 / 0.28);
+}
+
+:where([data-theme="dark"]) .mail-folder-pill--current {
+  background-color: #262626;
+  box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.08), 0 1px 3px rgb(0 0 0 / 0.4), 0 8px 20px -10px rgb(0 0 0 / 0.7);
+}
+
+/* The unread dot on the shown folder's pill: ringed in the pill's own
+   colour, so it reads as cut out of it. */
+.mail-unread-dot--on-pill {
+  --tw-ring-color: #ffffff;
+}
+
+:where([data-theme="dark"]) .mail-unread-dot--on-pill {
+  --tw-ring-color: #262626;
+}
+
+/* After .page-top-band's own rule (position: relative), which it beats. */
+.dashboard-no-wallpaper .mail-top-band {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+}
+
+/* With the band (no wallpaper), the header is solid: the list goes under it
+   hidden. Its progressive blur would only tint the header's own width once
+   the list scrolls, darker than the band carried on either side. */
+.dashboard-no-wallpaper .gd-header:has(> .mail-top-band) .gd-header-blur {
+  display: none;
+}
+
+/* A send's « Annuler » (src/useMailSend.js): its timer runs on under the
+   pointer, so its ring does too. */
+.mail-toast--steady:hover .mail-toast-ring {
+  animation-play-state: running;
 }

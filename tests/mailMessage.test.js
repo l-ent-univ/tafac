@@ -2,6 +2,7 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import {
   buildMailMessage,
+  dropOwnMailCopies,
   getMailPartDisposition,
   isValidDemoMailMessageId,
   isValidMailMessageId,
@@ -244,4 +245,26 @@ test('upstream file names are read', () => {
   assert.equal(readContentDispositionFilename("attachment; filename*=UTF-8''%C3%A9t%C3%A9.pdf"), 'été.pdf')
   assert.equal(readContentDispositionFilename('inline; filename=x.png'), 'x.png')
   assert.equal(readContentDispositionFilename(null), null)
+})
+
+test('dropOwnMailCopies shows a mail sent to oneself once, the copy in the folder read', () => {
+  const sent = { id: '10', folder: '5', messageIdHeader: '<a@x>', from: { email: 'me@u.fr' }, subject: 'Test', receivedAt: '2026-10-28T17:27:00.000Z' }
+  const received = { id: '11', folder: '2', messageIdHeader: '<a@x>', from: { email: 'me@u.fr' }, subject: 'Test', receivedAt: '2026-10-28T17:27:01.000Z' }
+  const other = { id: '12', folder: '2', messageIdHeader: '<b@x>', from: { email: 'me@u.fr' }, subject: 'Test', receivedAt: '2026-10-28T17:27:00.000Z' }
+  assert.deepEqual(dropOwnMailCopies([sent, received, other], '2').map((m) => m.id), ['11', '12'])
+  assert.deepEqual(dropOwnMailCopies([sent, received], '5').map((m) => m.id), ['10'])
+  // Read from elsewhere (a search, a sub-folder): the received copy.
+  assert.deepEqual(dropOwnMailCopies([sent, received], '300').map((m) => m.id), ['11'])
+})
+
+test('dropOwnMailCopies without the header: only a sent copy beside a received one, same second', () => {
+  const base = { from: { email: 'Me@u.fr' }, subject: 'Test', messageIdHeader: null }
+  const sent = { ...base, id: '10', folder: '5', receivedAt: '2026-10-28T17:27:00.200Z' }
+  const received = { ...base, id: '11', folder: '2', receivedAt: '2026-10-28T17:27:00.400Z' }
+  assert.deepEqual(dropOwnMailCopies([sent, received], '2').map((m) => m.id), ['11'])
+  // Two received mails alike stay two.
+  const twin = { ...received, id: '12' }
+  assert.deepEqual(dropOwnMailCopies([received, twin], '2').map((m) => m.id), ['11', '12'])
+  // A minute apart: not copies.
+  assert.deepEqual(dropOwnMailCopies([sent, { ...received, receivedAt: '2026-10-28T17:28:00.000Z' }], '2').map((m) => m.id), ['10', '11'])
 })
