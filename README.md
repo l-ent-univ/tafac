@@ -13,7 +13,7 @@
   <a href="docs/ADDING_A_UNIVERSITY.md">Ajouter une université</a>
 </p>
 
-Tafac est un client web alternatif aux espaces numériques de travail universitaires (ENT). Il rassemble les applications de l’ENT, l’emploi du temps, les notes, les mails récents et les échéances Moodle dans une interface adaptée au téléphone comme à l’ordinateur.
+Tafac est un client web alternatif aux espaces numériques de travail universitaires (ENT). Il rassemble les applications de l’ENT, l’emploi du temps, les notes, la messagerie et les échéances Moodle dans une interface adaptée au téléphone comme à l’ordinateur.
 
 Tafac est un **projet étudiant libre, indépendant et non officiel**, sans affiliations aux universités. Ce projet fait partie de [Papillon](https://papillon.bzh). L’intégration réelle présente dans ce dépôt est celle de l’Université de Rennes, avec des fonctionnalités spécifiques à l’IUT de Lannion.
 
@@ -25,6 +25,7 @@ Tafac est un **projet étudiant libre, indépendant et non officiel**, sans affi
 | **Applications** | Catalogue issu de l’ENT avec les applications disponibles            |
 | **Planning** | Choix de la formation et des groupes TD/TP, différentes vues disponibles avec les détails des cours et des prochaines séances. |
 | **Export calendrier** | Téléchargement d’un fichier `.ics` couvrant 60 jours à partir du lundi de la semaine courante, importable dans un agenda. Il s’agit pour le momet d’un export ponctuel et non d’un abonnement synchronisé. |
+| **Messagerie** | Boîte mail de l’université (RENATER Partage / Zimbra) dans l’application : conversations, recherche, dossiers, actions et balayage sur téléphone ; rédaction avec mise en forme, pièces jointes, brouillons, signatures et envoi annulable ; impression et PDF d’une conversation ; mail prérempli au sujet d’une note ou d’un cours. |
 | **Mes notes** | Cette partie est spécifique aux B.U.T et supporte les relevés ScoDoc par semestre, UE, matières et SAÉ, détail des évaluations, statistiques disponibles, crédits ECTS et téléchargement du relevé PDF lorsque le département le propose. |
 | **Simulateur** | Modification de notes et ajout d’évaluations fictives pour estimer leur effet sur les moyennes et la validation des UE (Pour B.U.T uniquement). La simulation reste dans l’interface et ne modifie pas ScoDoc. |
 | **Compte** | Réglage du groupe TD/TP, quels widgets à afficher, changement du thème clair/sombre/automatique, fond personnalisé, couleurs et certificat de scolarité lorsque l’intégration est disponible. |

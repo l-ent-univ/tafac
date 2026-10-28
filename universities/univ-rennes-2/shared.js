@@ -31,7 +31,7 @@ export const branding = {
   defaultTitle: "Tafac | Cours, notes et services de ton université",
   seoTitle: "Tafac | Client alternatif ENT Université Rennes 2",
   seoDescription: "Client alternatif non officiel aux services numériques de l'Université Rennes 2. Projet étudiant libre, non affilié à l'université.",
-  pwaDescription: "Tes services de l'Université Rennes 2 sur une seule page. Projet étudiant non affilié à l'université.",
+  pwaDescription: "Tes services de l'Université Rennes 2 dans une seule app. Projet étudiant non affilié à l'université.",
   nameInText: 'l’Université Rennes 2',
   logoAlt: 'Université Rennes 2',
   sidebarLogoAlt: "Tafac - Université Rennes 2",

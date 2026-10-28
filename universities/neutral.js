@@ -17,9 +17,9 @@ export const branding = {
   defaultTitle: 'Tafac | Cours, notes et services de ton université',
   seoTitle: 'Tafac – Tout ton ENT en une seule app',
   seoDescription:
-    "Emploi du temps, notes, mails et rendus Moodle sur une seule page. Projet étudiant libre, non affilié aux universités.",
+    "Emploi du temps, notes, messagerie et rendus Moodle dans une seule app. Projet étudiant libre, non affilié aux universités.",
   pwaDescription:
-    "Emploi du temps, notes, mails et rendus Moodle sur une seule page. Projet étudiant non affilié aux universités.",
+    "Emploi du temps, notes, messagerie et rendus Moodle dans une seule app. Projet étudiant non affilié aux universités.",
   // Former names, for search engines (the site's name in results).
   alternateNames: ["l'ent"],
   // How the landing's copy names the university mid-sentence ({university}

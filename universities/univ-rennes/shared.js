@@ -28,9 +28,9 @@ export const branding = {
   // link previews, the installed app).
   seoTitle: "Tafac – Ton ENT de l'Université de Rennes en une app",
   seoDescription:
-    "Emploi du temps ADE, notes ScoDoc, mails et rendus Moodle de l'Université de Rennes sur une seule page. Projet étudiant libre, non affilié à l'université.",
+    "Emploi du temps ADE, notes ScoDoc, messagerie Partage et rendus Moodle de l'Université de Rennes dans une seule app. Projet étudiant libre, non affilié à l'université.",
   pwaDescription:
-    "Emploi du temps, notes ScoDoc, mails et rendus Moodle sur une seule page. Projet étudiant non affilié à l'Université de Rennes.",
+    "Emploi du temps, notes ScoDoc, messagerie et rendus Moodle dans une seule app. Projet étudiant non affilié à l'Université de Rennes.",
   // Former names, for search engines (the site's name in results).
   alternateNames: ["l'ent"],
   // How the landing's copy names the university mid-sentence ({university}
@@ -102,8 +102,9 @@ export const gradesServiceUrl = `${gradesOrigin}/services/doAuth.php?href=${enco
 // in there for the "Échéances Moodle" widget.
 export const moodleOrigin = 'https://foad.univ-rennes.fr'
 
-// Webmail ("Messagerie"): RENATER Partage (Zimbra), behind Shibboleth → CAS.
-// Opened through /__ent_auth/launch by the "Mails récents" widget.
+// Webmail: RENATER Partage (Zimbra), behind Shibboleth → CAS. The app's
+// own Messagerie reads and sends through it (server.js's `mail`), and the
+// webmail's tiles open that page (client.js's mail.webmailUrls).
 export const mailWebmailUrl = 'https://partage.univ-rennes.fr/'
 
 // Fallback copy shown when the upstream grade service is unavailable.
