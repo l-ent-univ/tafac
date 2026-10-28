@@ -9,6 +9,7 @@ import {
   buildZimbraMessage,
   composerHtmlToText,
   createSendLimiter,
+  createSendOnce,
   mapDraftAttachments,
   mapZimbraSendFault,
   normalizeComposePayload,
@@ -19,6 +20,8 @@ import {
   readPngSize,
   sanitizeComposerHtml,
   sanitizeSubject,
+  settleDraftAttachments,
+  submitZimbraSend,
 } from '../server/mailSend.js'
 import { isValidMailMessageId } from '../server/mailMessage.js'
 import { isValidZimbraUploadId } from '../server/mailUpload.js'
@@ -270,6 +273,83 @@ test('a saved draft\'s parts, mapped back to the page\'s references', () => {
   assert.deepEqual(readDraftAttachmentParts({ mp: [{ ct: 'multipart/alternative' }] }), [])
 })
 
+test('a saved draft\'s uploads: only those mapped to a part are forgotten', () => {
+  const references = [{ source: 'upload', aid: 'a' }, { source: 'upload', aid: 'b' }, { source: 'message', messageId: '257', part: '2' }]
+  // As many parts as references: all by position.
+  const parts = [{ part: '2', name: 'a.pdf' }, { part: '3', name: 'b.png' }, { part: '4', name: 'c.txt' }]
+  assert.deepEqual(settleDraftAttachments(references, '400', parts).used, ['a', 'b'])
+  // One part fewer (Zimbra merged or dropped one): by the uploads' names,
+  // the one not found kept for the next save.
+  const settled = settleDraftAttachments(references, '400', [{ part: '3', name: 'b.png' }, { part: '2', name: 'c.txt' }], ['a.pdf', 'b.png', null])
+  assert.deepEqual(settled.attachments, [null, { messageId: '400', part: '3' }, null])
+  assert.deepEqual(settled.used, ['b'])
+  // Without the names (the bug: every reference null, every upload gone).
+  assert.deepEqual(settleDraftAttachments(references, '400', [{ part: '3', name: 'b.png' }]).used, [])
+  // No parts read at all: nothing forgotten.
+  assert.deepEqual(settleDraftAttachments(references, '400', [], ['a.pdf', 'b.png', null]), { attachments: [null, null, null], used: [] })
+})
+
+test('a SendMsgRequest: a partial send read the same on the retry without the draft', async () => {
+  const fault = (code) => Object.assign(new Error(`Zimbra SendMsgRequest failed (${code}).`), { zimbraCode: code, zimbraArgs: [] })
+  const partial = fault('mail.SEND_PARTIAL_ADDRESS_FAILURE')
+  const run = async (answers, message = { did: '400', su: 'x' }) => {
+    const sent = []
+    const result = await submitZimbraSend(async (m) => {
+      sent.push({ ...m })
+      const answer = answers.shift()
+      if (answer) throw answer
+    }, message)
+    return { result, sent }
+  }
+  assert.deepEqual(await run([null]), { result: null, sent: [{ did: '400', su: 'x' }] })
+  assert.equal((await run([partial])).result, partial)
+  // The draft gone: sent again without it; partial then too (the bug: it
+  // was thrown, the page told « Message envoyé » with no cleanup).
+  const retried = await run([fault('mail.NO_SUCH_MSG'), partial])
+  assert.equal(retried.result, partial)
+  assert.deepEqual(retried.sent, [{ did: '400', su: 'x' }, { su: 'x' }])
+  assert.equal((await run([fault('mail.NO_SUCH_MSG'), null])).result, null)
+  // Without a draft, a missing message is the caller's to map; another fault too.
+  await assert.rejects(run([fault('mail.NO_SUCH_MSG')], { su: 'x' }), /NO_SUCH_MSG/)
+  await assert.rejects(run([fault('mail.SEND_ABORTED_ADDRESS_FAILURE')]), /SEND_ABORTED/)
+  await assert.rejects(run([fault('mail.NO_SUCH_MSG'), fault('mail.SEND_ABORTED_ADDRESS_FAILURE')]), /SEND_ABORTED/)
+  // What the page is told of it, the same way on both paths.
+  const named = Object.assign(fault('mail.SEND_PARTIAL_ADDRESS_FAILURE'), { zimbraArgs: [{ n: 'invalid', _content: 'Nope@univ.fr' }] })
+  assert.deepEqual(mapZimbraSendFault(named, { recipients: ['leo@univ.fr', 'nope@univ.fr'] }), { status: 200, code: 'mail_send_partial', invalid: ['nope@univ.fr'] })
+})
+
+test('a send asked for twice: the first one\'s outcome, failures forgotten', async () => {
+  const once = createSendOnce({ ttlMs: 1000, perKey: 2 })
+  let calls = 0
+  let release = null
+  const first = once.run('s1', 'uid-1', () => new Promise((resolve) => {
+    calls += 1
+    release = () => resolve({ partial: null })
+  }), 0)
+  assert.equal(once.has('s1', 'uid-1', 10), true)
+  assert.equal(once.has('s2', 'uid-1', 10), false)
+  // While the first goes: the same wait.
+  const second = once.run('s1', 'uid-1', () => { calls += 1 }, 10)
+  await new Promise((resolve) => setImmediate(resolve))
+  release()
+  assert.deepEqual(await first, { partial: null })
+  assert.equal(await second, await first)
+  // Once sent: its answer, nothing run again.
+  assert.deepEqual(await once.run('s1', 'uid-1', () => { calls += 1 }, 20), { partial: null })
+  assert.equal(calls, 1)
+  // A failure is forgotten: a later try goes.
+  await assert.rejects(once.run('s1', 'uid-2', () => { throw new Error('refused') }, 30), /refused/)
+  assert.equal(once.has('s1', 'uid-2', 40), false)
+  assert.equal(await once.run('s1', 'uid-2', () => 'sent', 50), 'sent')
+  // Bounded: past ttlMs, or perKey uids, the oldest go.
+  assert.equal(once.has('s1', 'uid-1', 1000), false)
+  await once.run('s1', 'uid-3', () => 'sent', 60)
+  assert.equal(once.has('s1', 'uid-1', 70), false)
+  assert.equal(once.has('s1', 'uid-3', 70), true)
+  once.forget('s1')
+  assert.equal(once.has('s1', 'uid-3', 70), false)
+})
+
 test('a draft back into the composer', () => {
   const draft = readDraftForComposer({
     id: '400',
@@ -424,6 +504,15 @@ test('the draft saver: one save at a time, none when nothing changed, parts kept
   assert.equal(bodies.length, 2)
 })
 
+test('the draft saver: a failed save tells its listeners why', async () => {
+  const failure = { status: 'error', code: 'upload-expired', aids: ['aid-1'] }
+  const saver = createDraftSaver({ save: async () => failure, discardDraft: async () => {} })
+  const heard = []
+  saver.subscribe((status, why) => heard.push([status, why]))
+  await saver.save({ to: [], cc: [], bcc: [], subject: 'a', html: '', attachments: [{ key: 'upload:1', source: 'upload', aid: 'aid-1', status: 'ready' }], origin: null, identityId: null, signature: { include: false } })
+  assert.deepEqual(heard, [['saving', null], ['error', failure]])
+})
+
 // ── The routes, on the demo account (nothing leaves) ──
 
 async function withApp(run) {
@@ -512,4 +601,49 @@ test('the send and draft routes: refusals, the demo\'s fake send, its drafts', (
   const other = await post(base, 'draft', cookie, mail)
   await post(base, 'action', cookie, { ids: [other.body.draft.id], action: 'discard' })
   assert.equal((await fetch(`${base}/__ent_auth/mail/draft?id=${other.body.draft.id}`, { headers: { cookie } })).status, 404)
+}))
+
+const uploadDemoFile = (base, cookie, bytes = 5) => fetch(`${base}/__ent_auth/mail/upload`, {
+  method: 'POST',
+  headers: { cookie, 'Content-Type': 'text/plain', 'Content-Disposition': 'attachment; filename="a.txt"' },
+  body: Buffer.alloc(bytes, 97),
+}).then((response) => response.json())
+
+test('a send retried with its uid: the first answer, not a second mail', () => withApp(async ({ base, signIn }) => {
+  const cookie = await signIn()
+  const { attachment } = await uploadDemoFile(base, cookie)
+  const mail = { to: [{ email: 'leo@univ.fr' }], subject: 'Une fois', html: '<p>x</p>', attachments: [{ source: 'upload', aid: attachment.aid }], sendUid: 'uid-retry-0001' }
+  const first = await post(base, 'send', cookie, mail)
+  assert.deepEqual([first.status, first.body], [200, { ok: true }])
+  // The answer lost, the page tries again: its upload is used and forgotten
+  // since, yet it's the first answer, and one mail in « Envoyés ».
+  const retry = await post(base, 'send', cookie, mail)
+  assert.deepEqual([retry.status, retry.body], [200, { ok: true }])
+  const sent = await fetch(`${base}/__ent_auth/mail/recent?folder=5`, { headers: { cookie } }).then((response) => response.json())
+  assert.equal(sent.mail.messages.filter((row) => row.subject === 'Une fois').length, 1)
+  // A new uid naming that upload is a new send: refused, the file to attach again.
+  const fresh = await post(base, 'send', cookie, { ...mail, sendUid: 'uid-retry-0002' })
+  assert.deepEqual([fresh.status, fresh.body], [409, { error: 'mail_send_upload_expired', aids: [attachment.aid] }])
+  // A uid of another session is that session's own.
+  const other = await signIn()
+  assert.equal((await post(base, 'send', other, mail)).body.error, 'mail_send_upload_expired')
+}))
+
+test('the send and draft bodies: the mail bucket before a byte is read, counted once', () => withApp(async ({ base, signIn }) => {
+  const cookie = await signIn()
+  // A malformed body is read (400) only once a token is taken: one each.
+  let read = 0
+  let blocked = null
+  for (let request = 0; request < 100 && !blocked; request += 1) {
+    const answer = await post(base, 'draft', cookie, '{not json')
+    if (answer.status === 429) blocked = answer
+    else read += 1
+  }
+  assert.ok(blocked, 'never limited')
+  assert.ok(read >= 60 && read < 75, `${read} read`)
+  assert.deepEqual(blocked.body, { error: 'mail_rate_limited' })
+  assert.ok(Number(blocked.headers.get('retry-after')) >= 1)
+  assert.equal(blocked.headers.get('connection'), 'close')
+  // Past the bucket: a send's body isn't read either (not its 400).
+  assert.equal((await post(base, 'send', cookie, '{not json')).status, 429)
 }))

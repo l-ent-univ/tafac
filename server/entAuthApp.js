@@ -72,6 +72,7 @@ import {
   buildZimbraMessage,
   composerHtmlToText,
   createSendLimiter,
+  createSendOnce,
   mapDraftAttachments,
   mapZimbraSendFault,
   normalizeComposePayload,
@@ -82,6 +83,8 @@ import {
   readIdentitySignatureIds,
   readPngSize,
   sanitizeComposerHtml,
+  settleDraftAttachments,
+  submitZimbraSend,
 } from './mailSend.js'
 import {
   buildCustomSignatureRequest,
@@ -439,6 +442,9 @@ const mailSendLimiter = createSendLimiter({
   recipientsPerDay: MAIL_SEND_RECIPIENTS_PER_DAY,
 })
 const mailDraftLimiter = createSendLimiter({ perMinute: MAIL_DRAFT_PER_MINUTE, perDay: MAIL_DRAFT_PER_DAY })
+// The sends asked for lately, by session and send uid (createSendOnce): a
+// retry of one is answered as the first was.
+const mailSendOnce = createSendOnce()
 const mailSignatureLimiter = createSendLimiter({ perMinute: MAIL_SIGNATURE_PER_MINUTE, perDay: MAIL_SIGNATURE_PER_DAY })
 // sessionId → Map(aid → { size, name }): the files the session uploaded
 // (/mail/upload), in order. A send or a draft names only those (an aid made
@@ -828,6 +834,7 @@ function dropRuntimeSession(sessionId) {
   runtimeMailAddresses.delete(sessionId)
   runtimeMailUploads.delete(sessionId)
   runtimeDemoMail.delete(sessionId)
+  mailSendOnce.forget(sessionId)
   runtimeMoodleDeadlinesCache.delete(sessionId)
   runtimeMoodleContexts.delete(sessionId)
 }
@@ -966,6 +973,7 @@ function clearMailCaches(sessionId) {
   runtimeMailContexts.delete(sessionId)
   runtimeMailUploads.delete(sessionId)
   runtimeDemoMail.delete(sessionId)
+  mailSendOnce.forget(sessionId)
 }
 
 function getCachedMoodleDeadlines(sessionId) {
@@ -2549,8 +2557,10 @@ app.post('/__ent_auth/mail/upload', async (req, res) => {
 
 // The composer's send and draft bodies (the editor's HTML in them): their
 // own cap, MAIL_COMPOSE_MAX_BODY_BYTES, instead of express.json()'s 100 kB.
-// Cross-site or without a session cookie, refused before a byte of the
-// body is read (the routes check both again, the session fully).
+// Cross-site, without a session cookie or past the session's mail bucket
+// (takeMailRateLimitToken, taken here once: the mail routes' limit below
+// skips a request already counted), refused before a byte of the body is
+// read (the routes check the rest again, the session fully).
 const parseMailComposeBody = express.json({ limit: MAIL_COMPOSE_MAX_BODY_BYTES })
 app.use(['/__ent_auth/mail/send', '/__ent_auth/mail/draft'], (req, res, next) => {
   if (req.method !== 'POST') return next()
@@ -2559,14 +2569,23 @@ app.use(['/__ent_auth/mail/send', '/__ent_auth/mail/draft'], (req, res, next) =>
     return res.status(404).json({ ok: false, disabled: true, feature: 'mail' })
   }
   const fetchSite = req.headers['sec-fetch-site']
+  const sessionId = readSessionCookie(req)?.data?.id
   const refusal = fetchSite && fetchSite !== 'same-origin' ? [403, 'Cross-site request.']
-    : !readSessionCookie(req)?.data?.id ? [401, 'Authentication required.']
+    : typeof sessionId !== 'string' || !sessionId ? [401, 'Authentication required.']
       : null
   if (refusal) {
     res.setHeader('Cache-Control', 'no-store')
     res.setHeader('Connection', 'close')
     return res.status(refusal[0]).json({ error: refusal[1] })
   }
+  const retryAfterSeconds = takeMailRateLimitToken(sessionId)
+  if (retryAfterSeconds) {
+    res.setHeader('Cache-Control', 'no-store')
+    res.setHeader('Connection', 'close')
+    res.setHeader('Retry-After', String(retryAfterSeconds))
+    return res.status(429).json({ error: 'mail_rate_limited' })
+  }
+  res.locals.mailRateCounted = true
   return parseMailComposeBody(req, res, (error) => {
     if (!error) return next()
     res.setHeader('Cache-Control', 'no-store')
@@ -2607,8 +2626,10 @@ app.use((req, res, next) => {
 
 // The mail routes' limit, per session (MAIL_RATE_LIMIT_*). Keyed by the
 // session cookie's id; a request without one goes on to its route's 401,
-// which reaches nothing upstream.
+// which reaches nothing upstream. A send or a draft took its token before
+// its body was read (mailRateCounted).
 app.use('/__ent_auth/mail', (req, res, next) => {
+  if (res.locals.mailRateCounted) return next()
   const sessionId = readSessionCookie(req)?.data?.id
   if (typeof sessionId !== 'string' || !sessionId) return next()
   const retryAfterSeconds = takeMailRateLimitToken(sessionId)
@@ -4783,21 +4804,7 @@ async function sendZimbraMail(context, session, payload) {
     origin,
     draftId: payload.draftId,
   })
-  let partial = null
-  try {
-    await zimbraSoapRequest(context, 'SendMsgRequest', { suid: payload.sendUid, m: message })
-  } catch (error) {
-    // The draft gone meanwhile (sent or deleted in the webmail): sent
-    // without it, once (the same suid).
-    if (message.did && /NO_SUCH_(MSG|ITEM)/.test(String(error.zimbraCode ?? ''))) {
-      delete message.did
-      await zimbraSoapRequest(context, 'SendMsgRequest', { suid: payload.sendUid, m: message })
-    } else if (error.zimbraCode === 'mail.SEND_PARTIAL_ADDRESS_FAILURE') {
-      partial = error
-    } else {
-      throw error
-    }
-  }
+  const partial = await submitZimbraSend((m) => zimbraSoapRequest(context, 'SendMsgRequest', { suid: payload.sendUid, m }), message)
   forgetMailUploads(session.id, aids)
   // The inbox's cached first page would show the original as it was.
   runtimeMailCache.delete(session.id)
@@ -4812,7 +4819,11 @@ async function sendZimbraMail(context, session, payload) {
 async function saveZimbraDraft(context, session, payload) {
   const [identities, limits] = await Promise.all([readZimbraIdentities(context), readZimbraAttachmentLimits(context)])
   const identity = pickIdentity(identities, payload.identityId) ?? identities[0] ?? null
-  const aids = checkMailUploads(session, payload.attachments, limits)
+  checkMailUploads(session, payload.attachments, limits)
+  // The uploads' names, for their parts to be found by name when the
+  // draft's count of them isn't what was sent (mapDraftAttachments).
+  const uploads = runtimeMailUploads.get(session.id)
+  const names = payload.attachments.map((entry) => (entry.source === 'upload' ? uploads?.get(entry.aid)?.name ?? null : null))
   const message = buildZimbraMessage({
     identity,
     to: payload.to,
@@ -4838,13 +4849,23 @@ async function saveZimbraDraft(context, session, payload) {
   let draft = Array.isArray(result.m) ? result.m[0] : result.m
   const id = String(draft?.id ?? '')
   if (!isValidMailMessageId(id)) throw new Error('Zimbra SaveDraftRequest gave no draft id.')
-  forgetMailUploads(session.id, aids)
-  // Its parts, when the answer didn't list them.
+  // Its parts, when the answer didn't list them. Saved already: a failure
+  // here still gives the page the draft's id (else its next save makes
+  // another draft), its files then unmapped.
   if (payload.attachments.length && !Array.isArray(draft?.mp)) {
-    const read = await zimbraSoapRequest(context, 'GetMsgRequest', { m: { id, max: 1 } })
-    draft = Array.isArray(read.m) ? read.m[0] : read.m
+    try {
+      const read = await zimbraSoapRequest(context, 'GetMsgRequest', { m: { id, max: 1 } })
+      draft = Array.isArray(read.m) ? read.m[0] : read.m
+    } catch (error) {
+      console.error(`[mail] draft parts unread: ${error instanceof Error ? error.message : String(error)}`)
+      draft = null
+    }
   }
-  return { id, attachments: mapDraftAttachments(payload.attachments, id, readDraftAttachmentParts(draft)) }
+  // Only the uploads now known as parts of the draft are forgotten
+  // (settleDraftAttachments).
+  const { attachments, used } = settleDraftAttachments(payload.attachments, id, readDraftAttachmentParts(draft), names)
+  forgetMailUploads(session.id, used)
+  return { id, attachments }
 }
 
 // ── The demo account: the same checks, nothing leaves ──
@@ -5047,6 +5068,8 @@ function readComposePayload(req, res, session, { draft }) {
 // limits, per session and per user (MAIL_SEND_*), on top of the mail
 // routes' bucket. Nothing of the mail (recipients, subject, text) is ever
 // logged. The demo account's is checked the same, then kept in its memory.
+// A sendUid this session sent lately gets the first answer again
+// (mailSendOnce), not a second send.
 //   200 { ok: true } | { ok: true, partial: true, invalid } (sent, those
 //   addresses refused), 400 { error } a malformed body or an identity not
 //   the account's, 401 no session, 403 cross-site, 409 { error:
@@ -5065,15 +5088,18 @@ app.post('/__ent_auth/mail/send', async (req, res) => {
   // The demo account's user is shared by every demo session: its own
   // session only.
   const keys = [`session:${session.id}`, ...(!isDemoSession(session) && session.user ? [`user:${String(session.user).toLowerCase()}`] : [])]
-  const slot = mailSendLimiter.take(keys, recipients.length)
-  if (!slot.ok) {
+  // The page's retry of a send whose answer it never got (the same uid):
+  // the first one's answer, nothing checked or counted again (mailSendOnce).
+  const repeated = mailSendOnce.has(session.id, payload.sendUid)
+  const slot = repeated ? null : mailSendLimiter.take(keys, recipients.length)
+  if (slot && !slot.ok) {
     res.setHeader('Retry-After', String(slot.retryAfter))
     return res.status(429).json({ error: 'mail_send_rate_limited' })
   }
   try {
-    const { partial } = isDemoSession(session)
+    const { partial } = await mailSendOnce.run(session.id, payload.sendUid, () => (isDemoSession(session)
       ? sendDemoMail(session, payload)
-      : await withZimbraContext(session, (context) => sendZimbraMail(context, session, payload))
+      : withZimbraContext(session, (context) => sendZimbraMail(context, session, payload))))
     setSessionCookie(res, session)
     if (partial) {
       const mapped = mapZimbraSendFault(partial, { recipients, aids })
@@ -5081,7 +5107,7 @@ app.post('/__ent_auth/mail/send', async (req, res) => {
     }
     return res.status(200).json({ ok: true })
   } catch (error) {
-    if (error instanceof MailSendRefusal) slot.release()
+    if (error instanceof MailSendRefusal) slot?.release()
     return sendMailComposeError(res, 'send', error, { recipients, aids })
   }
 })

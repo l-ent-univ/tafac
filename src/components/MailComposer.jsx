@@ -1064,6 +1064,16 @@ function useAttachments(initialItems, limits, initialFiles = null) {
     pump()
   }
 
+  // Uploads Partage no longer has (a draft save refused them): to attach
+  // again (« À joindre de nouveau », retried from the file kept), left out
+  // of the draft meanwhile so its saves go on.
+  const markExpired = useCallback((aids) => {
+    const expired = new Set(aids)
+    setItems((current) => (current.some((item) => item.aid && expired.has(item.aid) && item.status === 'ready')
+      ? current.map((item) => (item.aid && expired.has(item.aid) && item.status === 'ready' ? { ...item, status: 'error', error: 'expired-upload' } : item))
+      : current))
+  }, [])
+
   // A forwarded mail's in or out (a switch between reply and forward), the
   // uploads kept.
   const setMessageItems = (messageItems) => {
@@ -1075,7 +1085,7 @@ function useAttachments(initialItems, limits, initialFiles = null) {
     })
   }
 
-  return { items, add, remove, retry, setMessageItems, filesRef }
+  return { items, add, remove, retry, setMessageItems, markExpired, filesRef }
 }
 
 // How long the typing rests before the draft is saved (createDraftSaver).
@@ -1134,7 +1144,6 @@ function MailComposer({ initialKind = 'new', message = null, sender = null, iden
   const origin = composeOrigin(kind, message, restore?.origin)
   // The draft's saves: « Brouillon non enregistré » when one fails.
   const [draftStatus, setDraftStatus] = useState(() => saver?.status ?? 'idle')
-  useEffect(() => saver?.subscribe(setDraftStatus), [saver])
   const [toInput, setToInput] = useState('')
   const [ccInput, setCcInput] = useState('')
   const [bccInput, setBccInput] = useState('')
@@ -1143,7 +1152,12 @@ function MailComposer({ initialKind = 'new', message = null, sender = null, iden
   const [suggestionCache] = useState(createSuggestionCache)
   const [subject, setSubject] = useState(initialFields.subject)
   const limits = readAttachmentLimits(attachmentLimits)
-  const { items: attachments, add: addAttachments, remove: removeAttachment, retry: retryAttachment, setMessageItems, filesRef: attachmentFilesRef } = useAttachments(initialFields.attachments, limits, restore?.files)
+  const { items: attachments, add: addAttachments, remove: removeAttachment, retry: retryAttachment, setMessageItems, markExpired, filesRef: attachmentFilesRef } = useAttachments(initialFields.attachments, limits, restore?.files)
+  // A save refusing uploads gone from Partage: those files to attach again.
+  useEffect(() => saver?.subscribe((status, failure) => {
+    setDraftStatus(status)
+    if (failure?.code === 'upload-expired' && failure.aids?.length) markExpired(failure.aids)
+  }), [saver, markExpired])
   const fileInputRef = useRef(null)
   // A file dragged over the composer (the drop zone shows), counted by the
   // elements entered and left on its way.

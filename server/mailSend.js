@@ -640,7 +640,8 @@ export function readDraftAttachmentParts(message) {
 // After a save, each of the page's references as a part of the draft (its
 // uploads are gone from Zimbra once used): [{ messageId, part } | null], in
 // the page's order. By position (zimbraAttachmentOrder), when the draft has
-// as many attachments as were sent; else by name where one matches.
+// as many attachments as were sent; else by name where one matches
+// (`names`: the page's references' file names, null where unknown).
 export function mapDraftAttachments(attachments, draftId, parts, names = []) {
   const order = zimbraAttachmentOrder(attachments)
   const result = attachments.map(() => null)
@@ -657,6 +658,17 @@ export function mapDraftAttachments(attachments, draftId, parts, names = []) {
     if (at >= 0) result[index] = { messageId: draftId, part: free.splice(at, 1)[0].part }
   })
   return result
+}
+
+// A saved draft's references (mapDraftAttachments) and the uploads now
+// parts of it (`used`: to forget, Partage has them in the draft). An upload
+// left unmapped isn't among them: the page names it again on its next save,
+// so it's still one the session may name (Partage refusing it if it's
+// gone, 409 with its aid: the composer asks for it again).
+export function settleDraftAttachments(attachments, draftId, parts, names = []) {
+  const mapped = mapDraftAttachments(attachments, draftId, parts, names)
+  const used = attachments.filter((entry, index) => entry.source === 'upload' && mapped[index]).map((entry) => entry.aid)
+  return { attachments: mapped, used }
 }
 
 // ── Zimbra's faults ────────────────────────────────────────────────────────
@@ -685,6 +697,33 @@ export function mapZimbraSendFault(error, { recipients = [], aids = [] } = {}) {
   if (/MESSAGE_TOO_BIG|TOO_LARGE|UPLOAD_TOO_LARGE/.test(code)) return { status: 413, code: 'mail_send_too_large' }
   if (/NO_SUCH_(MSG|ITEM|PART)/.test(code)) return { status: 409, code: 'mail_send_missing_reference' }
   return null
+}
+
+const isPartialSend = (error) => error?.zimbraCode === 'mail.SEND_PARTIAL_ADDRESS_FAILURE'
+
+// SendMsgRequest (`request(message)`, the same suid each time) → null once
+// sent, or the SEND_PARTIAL_ADDRESS_FAILURE fault when it went to some
+// addresses only (sent all the same: mapZimbraSendFault names the others).
+// The draft it replaces gone meanwhile (sent or deleted in the webmail):
+// sent once more without it (`message.did` dropped), a partial send read
+// the same way on that second try.
+export async function submitZimbraSend(request, message) {
+  const attempt = async () => {
+    try {
+      await request(message)
+      return null
+    } catch (error) {
+      if (isPartialSend(error)) return error
+      throw error
+    }
+  }
+  try {
+    return await attempt()
+  } catch (error) {
+    if (!message.did || !/NO_SUCH_(MSG|ITEM)/.test(String(error?.zimbraCode ?? ''))) throw error
+    delete message.did
+    return attempt()
+  }
 }
 
 // ── Limits ────────────────────────────────────────────────────────────────
@@ -751,6 +790,64 @@ export function createSendLimiter({ perMinute, perDay, recipientsPerDay = null }
   }
 
   return { take, _entries: entries }
+}
+
+// ── A send asked for twice ─────────────────────────────────────────────────
+
+// The sends a key (a session) asked for, by the page's send uid: the page
+// tries a send once more, with the same uid, when its answer never came
+// (src/mailSendQueue.js). The first one may have gone through all the same,
+// its uploads used and forgotten since: checked again, the retry would be
+// refused as « to attach again », and the mail sent anew. So a uid seen
+// shares the first one's outcome instead (`run(key, uid, fn)`: fn's promise,
+// started once): its answer once sent, the same wait while it goes. A send
+// that failed is forgotten, for a later try to go (nothing left: Zimbra's
+// suid covers one that went through all the same). `ttlMs` and `perKey`
+// bound what's kept; keys idle past ttlMs are dropped (looked over once a
+// minute at most).
+export function createSendOnce({ ttlMs = 10 * 60_000, perKey = 20 } = {}) {
+  const entries = new Map()
+  let prunedAt = 0
+
+  function prune(now) {
+    if (now - prunedAt < 60_000) return
+    prunedAt = now
+    for (const [key, sends] of entries) {
+      for (const [uid, entry] of sends) {
+        if (now - entry.at >= ttlMs) sends.delete(uid)
+      }
+      if (!sends.size) entries.delete(key)
+    }
+  }
+
+  function find(key, uid, now = Date.now()) {
+    prune(now)
+    const entry = entries.get(key)?.get(uid)
+    return entry && now - entry.at < ttlMs ? entry : null
+  }
+
+  // Whether `uid` was asked for already (the limits aren't counted again).
+  const has = (key, uid, now = Date.now()) => Boolean(find(key, uid, now))
+
+  function run(key, uid, fn, now = Date.now()) {
+    const known = find(key, uid, now)
+    if (known) return known.promise
+    let sends = entries.get(key)
+    if (!sends) {
+      sends = new Map()
+      entries.set(key, sends)
+    }
+    const entry = { at: now, promise: Promise.resolve().then(fn) }
+    sends.delete(uid)
+    sends.set(uid, entry)
+    while (sends.size > perKey) sends.delete(sends.keys().next().value)
+    entry.promise.catch(() => {
+      if (sends.get(uid) === entry) sends.delete(uid)
+    })
+    return entry.promise
+  }
+
+  return { has, run, forget: (key) => entries.delete(key), _entries: entries }
 }
 
 // ── A draft, back into the composer ────────────────────────────────────────

@@ -10,8 +10,10 @@ import { buildComposePayload, draftStateKey } from './mailSendPayload.js'
 // what the last save had (draftStateKey) doesn't go. Once saved, the
 // draft's files are parts of it (Zimbra deletes an upload once used): the
 // saver keeps, by item key, the part each became (`refs`), which the next
-// save and the send name instead (buildComposePayload). `listener(status)`:
-// 'saving', 'saved' or 'error', for the composer's quiet line. `save(body)`
+// save and the send name instead (buildComposePayload). `listener(status,
+// failure)`: 'saving', 'saved' or 'error', for the composer's quiet line,
+// with the failed save's result (saveMailDraft's: an 'upload-expired' one
+// names the files to attach again, `aids`). `save(body)`
 // and `discardDraft(id)`: the requests (entApi's saveMailDraft, mailAction
 // 'discard'), given by src/useMailSend.js.
 export function createDraftSaver({ draftId = null, refs = null, save, discardDraft }) {
@@ -23,9 +25,9 @@ export function createDraftSaver({ draftId = null, refs = null, save, discardDra
   const partRefs = new Map(refs ?? [])
   const listeners = new Set()
 
-  const setStatus = (next) => {
+  const setStatus = (next, failure = null) => {
     status = next
-    for (const listener of listeners) listener(next)
+    for (const listener of listeners) listener(next, failure)
   }
 
   async function run(state) {
@@ -41,7 +43,7 @@ export function createDraftSaver({ draftId = null, refs = null, save, discardDra
       return
     }
     if (result.status !== 'ok') {
-      setStatus('error')
+      setStatus('error', result)
       return
     }
     id = result.draft.id
