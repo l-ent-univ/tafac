@@ -33,8 +33,10 @@ function MetaLabel({ icon, text }) {
 // A class in the list, drawn as the grid's blocks (a widget card under the
 // course's wash, its accent bar): its hours and length, its title, then its
 // room, teacher and group. On a wide screen the hours stand in a column of
-// their own, as an agenda's. A button opening the class's sheet.
-function PlanningListCard({ event, accent, ongoing, onOpen, menuProps = null }) {
+// their own, as an agenda's. A button opening the class's sheet; also the
+// composer's « Un cours… » drawer's (MailCoursePicker), `className` its
+// own.
+export function PlanningListCard({ event, accent, ongoing, onOpen, menuProps = null, className = '' }) {
   const hours = `${formatTime(event.start)} – ${formatTime(event.end)}`
   const duration = durationText(event.start, event.end)
   const meta = [
@@ -45,7 +47,7 @@ function PlanningListCard({ event, accent, ongoing, onOpen, menuProps = null }) 
   return (
     <button
       type="button"
-      className="planning-list-card widget-card widget-card-visible isolate relative flex w-full min-w-0 items-stretch gap-3 overflow-hidden card-corners-sm border bg-widget-bg p-[13px] text-left text-text cursor-pointer 4xl:gap-4 4xl:px-4"
+      className={`planning-list-card widget-card widget-card-visible isolate relative flex w-full min-w-0 items-stretch gap-3 overflow-hidden card-corners-sm border bg-widget-bg p-[13px] text-left text-text cursor-pointer 4xl:gap-4 4xl:px-4 ${className}`}
       style={accentStyle(accent)}
       onClick={() => onOpen(event)}
       {...menuProps?.(event.id)}

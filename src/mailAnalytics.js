@@ -13,8 +13,9 @@
 // - dashboard_card: the dashboard's « Mails récents »;
 // - launch_card: the Messagerie's announcement under the widgets;
 // - grades: « Écrire au sujet de cette note » (« Mes notes »);
+// - planning: « Écrire au sujet de ce cours » (the Planning);
 // - history: back, forward or a reload landing on the page.
-export const MAIL_PAGE_SOURCES = ['nav', 'tabbar', 'tile', 'dashboard_card', 'launch_card', 'grades', 'history', 'other']
+export const MAIL_PAGE_SOURCES = ['nav', 'tabbar', 'tile', 'dashboard_card', 'launch_card', 'grades', 'planning', 'history', 'other']
 
 export function toMailPageSource(source) {
   return MAIL_PAGE_SOURCES.includes(source) ? source : 'other'
@@ -45,7 +46,7 @@ export function toFolderKind(kind) {
 }
 
 // The composer's kinds as the analytics name them.
-const COMPOSE_KINDS = { new: 'new', reply: 'reply', 'reply-all': 'reply_all', forward: 'forward', draft: 'draft', grade: 'grade' }
+const COMPOSE_KINDS = { new: 'new', reply: 'reply', 'reply-all': 'reply_all', forward: 'forward', draft: 'draft', grade: 'grade', course: 'course' }
 
 export function toComposeKind(kind) {
   return Object.hasOwn(COMPOSE_KINDS, kind) ? COMPOSE_KINDS[kind] : 'new'

@@ -60,7 +60,9 @@ export function normalizeZimbraAutoComplete(response, limit = MAX_RECIPIENT_SUGG
 }
 
 // The demo account's address book: made-up people of the demo's mails
-// (src/demoAccount.js) and a few more, so typing finds someone.
+// (src/demoAccount.js) and a few more, so typing finds someone; the demo
+// planning's teachers among them (« Écrire au sujet de ce cours »), two
+// Le Fur for a teacher found twice.
 export const DEMO_MAIL_CONTACTS = Object.freeze([
   { name: 'Thomas Lemoine', email: 'thomas.lemoine@univ-rennes.fr', kind: 'recent' },
   { name: 'Scolarité IUT de Lannion', email: 'scolarite-iut-lannion@univ-rennes.fr', kind: 'recent' },
@@ -74,6 +76,13 @@ export const DEMO_MAIL_CONTACTS = Object.freeze([
   { name: 'Secrétariat MMI', email: 'secretariat-mmi-lannion@univ-rennes.fr', kind: 'directory' },
   { name: 'MMI 2e année', email: 'mmi2-lannion@listes.univ-rennes.fr', kind: 'group' },
   { name: 'Service des sports', email: 'suaps@univ-rennes.fr', kind: 'directory' },
+  { name: 'Anne Le Fur', email: 'anne.le-fur@univ-rennes.fr', kind: 'directory' },
+  { name: 'Yann Le Fur', email: 'yann.le-fur@univ-rennes.fr', kind: 'directory' },
+  { name: 'Sophie Riou', email: 'sophie.riou@univ-rennes.fr', kind: 'directory' },
+  { name: 'Gwenola Kerjean', email: 'gwenola.kerjean@univ-rennes.fr', kind: 'directory' },
+  { name: 'Erwan Le Goff', email: 'erwan.le-goff@univ-rennes.fr', kind: 'directory' },
+  { name: 'Pierre Guillou', email: 'pierre.guillou@univ-rennes.fr', kind: 'directory' },
+  { name: 'Claire Martin', email: 'claire.martin@univ-rennes.fr', kind: 'directory' },
 ])
 
 // The demo's answer to a query: its contacts whose name or address a word

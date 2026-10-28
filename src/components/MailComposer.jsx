@@ -17,7 +17,13 @@ import { MailInlineImageContext } from '../mailInlineImageContext'
 import { MAX_INLINE_IMAGES, inlineImageCids } from '../mailInlineImages'
 import { useInlineImages } from '../useInlineImages'
 import { findModuleTeacher, prepareGradeImage } from '../gradeMail'
-import { buildGradeInsertion, gradeAttachFields, pickGradeInsertIndex } from '../mailGradeAttach'
+import { buildGradeInsertion, gradeAttachFields } from '../mailGradeAttach'
+import { pickAboutInsertIndex } from '../mailAboutBlocks'
+import { buildCourseInsertion, courseAttachSubject, prepareCourseImage } from '../courseMail'
+import { lookupTeacherRecipients, offerOnly } from '../teacherRecipients'
+import { findModuleTeacherNames, moduleWindowMondays } from '../moduleTeachers'
+import { readPlanningEvents } from '../usePlanningWeeks'
+import { toDayKey } from '../planningDates'
 import CloseButton from './CloseButton'
 import ConfirmDialog from './ConfirmDialog'
 import ContextMenu from './ContextMenu'
@@ -25,6 +31,7 @@ import Tooltip from './Tooltip'
 import Switch from './Switch'
 import MailDropSheets from './MailDropSheets'
 import MailGradePicker from './MailGradePicker'
+import MailCoursePicker from './MailCoursePicker'
 import { TOOLBAR_BUTTON_CLASSES } from './MailToolbar'
 import { getSenderBadgeStyle, getSenderInitial } from './mailSender'
 import FileName from './FileName'
@@ -274,6 +281,22 @@ function readFormatState(editor) {
     canIndent: editor.isActive('listItem') ? editor.can().sinkListItem('listItem') : editor.can().indent(),
     canOutdent: editor.isActive('listItem') ? editor.can().liftListItem('listItem') : editor.can().outdent(),
   }
+}
+
+// The caret at the end of the text's top-level block `index` (a prefilled
+// mail's line to write on), the text focused. Set by hand, then the focus:
+// on a phone Tiptap's focus command focuses first, whose own transaction
+// made the command's stale (« mismatched transaction »).
+function caretAtBlock(editor, index = null) {
+  const { state, view } = editor
+  let selection = Selection.atStart(state.doc)
+  if (Number.isInteger(index) && index >= 0 && index < state.doc.childCount) {
+    let end = 0
+    for (let block = 0; block <= index; block += 1) end += state.doc.child(block).nodeSize
+    selection = Selection.near(state.doc.resolve(end - 1), -1)
+  }
+  view.dispatch(state.tr.setSelection(selection).scrollIntoView())
+  view.focus()
 }
 
 // A token of À, Cc or Cci: a small badge and the name (the address when
@@ -763,6 +786,69 @@ function FieldRow({ label, htmlFor, top = false, children }) {
   )
 }
 
+// A class's teachers found in the recipient suggestions, offered under À
+// (MailComposer's teacherHints): each match a chip, its badge, name and
+// address, added to À with a click; each teacher's name before its chips
+// when there are several; « Tout ajouter » when each has one match; × puts
+// the row away. Nothing is in À until the student says so.
+function TeacherSuggestions({ groups, canAddAll, onAdd, onDismiss }) {
+  const several = groups.length > 1
+  return (
+    <div className="flex min-h-[42px] min-w-0 items-start gap-2 border-b border-border px-5 py-[6px] max-4xl:px-4" role="group" aria-label="Enseignants suggérés">
+      <span className="shrink-0 font-medium leading-7 text-text-muted max-4xl:leading-8">{several || groups[0]?.matches.length > 1 ? 'Suggestions :' : 'Suggestion :'}</span>
+      <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-3 gap-y-1.5">
+        {groups.map((group) => (
+          <span key={group.name} className="inline-flex min-w-0 max-w-full flex-wrap items-center gap-1.5">
+            {several ? <span className="shrink-0 text-[12.5px] font-medium leading-none text-text-muted">{group.name}</span> : null}
+            {group.matches.map((match) => {
+              const badgeStyle = getSenderBadgeStyle(match.email.toLowerCase())
+              return (
+                <button
+                  key={match.email}
+                  type="button"
+                  className="group relative inline-flex h-7 min-w-0 max-w-full items-center gap-[7px] rounded-full border-0 bg-bg-subtle py-0 pl-[4px] pr-[8px] text-text cursor-pointer transition-colors duration-100 hover:bg-bg-muted focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-text max-4xl:h-8"
+                  aria-label={`Ajouter ${match.name || match.email}, ${match.email}, pour ${group.name}`}
+                  onClick={() => onAdd([match])}
+                >
+                  <span
+                    className={`inline-flex size-5 shrink-0 items-center justify-center rounded-full text-[10.5px] font-semibold leading-none ${badgeStyle ? 'app-icon--auto' : 'bg-bg-muted text-text-muted'}`}
+                    style={badgeStyle ?? undefined}
+                    aria-hidden="true"
+                  >
+                    {getSenderInitial(match.name || match.email)}
+                  </span>
+                  <span className="min-w-0 truncate text-[13.5px] font-medium leading-none text-text">{match.name || match.email}</span>
+                  {match.name ? <span className="min-w-0 truncate text-[12.5px] font-medium leading-none text-text-muted max-sm:hidden">{match.email}</span> : null}
+                  <Icon icon="carbon:add" className="size-4 shrink-0 text-text-muted" aria-hidden="true" />
+                  <Tooltip title={match.email} detail={`Enseignant : ${group.name}`} side="bottom-start" className="max-4xl:hidden" />
+                </button>
+              )
+            })}
+          </span>
+        ))}
+        {canAddAll && several ? (
+          <button
+            type="button"
+            className="inline-flex h-7 items-center rounded-full border-0 bg-transparent px-2 text-text cursor-pointer hover:bg-bg-subtle focus-visible:outline-2 focus-visible:outline-text max-4xl:h-8"
+            onClick={() => onAdd(groups.flatMap((group) => group.matches))}
+          >
+            <span className="text-[13px] font-semibold leading-none text-text">Tout ajouter</span>
+          </button>
+        ) : null}
+      </div>
+      <button
+        type="button"
+        className="group relative inline-flex size-7 shrink-0 items-center justify-center rounded-full border-0 bg-transparent text-text-muted cursor-pointer hover:bg-bg-subtle hover:text-text focus-visible:outline-2 focus-visible:outline-text max-4xl:size-8"
+        aria-label="Masquer les suggestions"
+        onClick={onDismiss}
+      >
+        <Icon icon="carbon:close" className="size-4" aria-hidden="true" />
+        <Tooltip title="Masquer les suggestions" side="bottom-end" className="max-4xl:hidden" />
+      </button>
+    </div>
+  )
+}
+
 // A native select in the format bar's look: grey, its chevron drawn over.
 // Native, so it opens as the system's list on a phone.
 // A button of the composer's toolbar, as the reader's (MailToolbar): an
@@ -1145,11 +1231,16 @@ function readInitialFields(restore, sendError, kind, message, ownEmails) {
 // 1024 px: a send reopened as it was, a mail from « Mes notes ») }),
 // `sendError` why a send failed (sendMail's). `canAttachGrades`: the
 // trombone's « Une note… » (the in-app « Mes notes » for this student,
-// App's). `onSend(snapshot)`: « Envoyer », MailPage closes it and sends
+// App's). `planning`: { selection, user } for its « Un cours… » (the
+// in-app Planning, App's), null without. `restore.teachers`: a class's
+// teachers as the planning names them (« Écrire au sujet de ce cours »),
+// looked up for À (suggestTeachers). `restore.moduleCode`: a grade's
+// module (« Écrire au sujet de cette note »), its teachers in the planning
+// offered under À (suggestModuleTeachers). `onSend(snapshot)`: « Envoyer », MailPage closes it and sends
 // (src/useMailSend.js); false when it can't (a send already waiting). `ref` gets { isDirty,
 // saveNow }, for MailPage to save it before another draft takes its place.
 // Keyed by MailPage: each draft starts afresh.
-function MailComposer({ initialKind = 'new', message = null, sender = null, identities = [], attachmentLimits = null, saver = null, restore = null, sendError = null, canAttachGrades = false, ref = null, onClose, onSend }) {
+function MailComposer({ initialKind = 'new', message = null, sender = null, identities = [], attachmentLimits = null, saver = null, restore = null, sendError = null, canAttachGrades = false, planning = null, ref = null, onClose, onSend }) {
   const isPhone = useSyncExternalStore(subscribePhone, isPhoneNow, () => false)
   const titleId = useId()
   const fieldId = useId()
@@ -1191,8 +1282,13 @@ function MailComposer({ initialKind = 'new', message = null, sender = null, iden
   const dragDepthRef = useRef(0)
   const [showCc, setShowCc] = useState(initialFields.cc.length > 0 || initialFields.bcc.length > 0)
   const [menu, setMenu] = useState(null)
-  // « Une note… »: the grades drawer open over the composer.
+  // « Une note… », « Un cours… »: their drawer open over the composer.
   const [gradePickerOpen, setGradePickerOpen] = useState(false)
+  const [coursePickerOpen, setCoursePickerOpen] = useState(false)
+  // A class's teachers found in the recipient suggestions but not put in
+  // À (suggestTeachers): offered under it, { groups: [{ name, matches }],
+  // canAddAll }, or null.
+  const [teacherHints, setTeacherHints] = useState(null)
   const [notice, setNotice] = useState(null)
   const [confirmingClose, setConfirmingClose] = useState(false)
   // Full screen (from 1024 px; a phone's sheet is already): the window's
@@ -1305,25 +1401,15 @@ function MailComposer({ initialKind = 'new', message = null, sender = null, iden
   }, [startsInText])
   // A reply's caret, once the editor is in the page: until then it has no
   // commands (Tiptap mounts it a moment later, which a phone made visible:
-  // the reply crashed), so on its « create » if it isn't ready yet. Set by
-  // hand, then the focus: on a phone Tiptap's focus command focuses first,
-  // whose own transaction made the command's stale (« mismatched
-  // transaction »).
+  // the reply crashed), so on its « create » if it isn't ready yet
+  // (caretAtBlock).
   const focusedStartRef = useRef(false)
   useEffect(() => {
     if (focusedStartRef.current || !editor || !startsInText) return undefined
     const focusStart = () => {
       if (editor.isDestroyed || focusedStartRef.current) return
       focusedStartRef.current = true
-      const { state, view } = editor
-      let selection = Selection.atStart(state.doc)
-      if (bodyFocusBlock !== null && bodyFocusBlock < state.doc.childCount) {
-        let end = 0
-        for (let index = 0; index <= bodyFocusBlock; index += 1) end += state.doc.child(index).nodeSize
-        selection = Selection.near(state.doc.resolve(end - 1), -1)
-      }
-      view.dispatch(state.tr.setSelection(selection).scrollIntoView())
-      view.focus()
+      caretAtBlock(editor, bodyFocusBlock)
     }
     if (editor.isInitialized) {
       focusStart()
@@ -1332,6 +1418,62 @@ function MailComposer({ initialKind = 'new', message = null, sender = null, iden
     editor.on('create', focusStart)
     return () => editor.off('create', focusStart)
   }, [editor, startsInText, bodyFocusBlock])
+
+  // A class's teachers as recipients (src/teacherRecipients.js): each name
+  // looked up in the recipient suggestions, here in the browser (the route
+  // the fields use: never logged). One teacher found surely goes in À while
+  // À is empty and nothing's typed there, the caret then on the line to
+  // write on if it was still waiting in À (`focusLine`); otherwise those
+  // found are offered under À (teacherHints), one click each; none found,
+  // nothing (À as it was). `prefill` false: offered only, whatever the
+  // match (a grade's module teachers). Read through a ref: the answer
+  // comes later.
+  const fieldsRef = useRef({ to, cc, bcc, toInput })
+  useEffect(() => {
+    fieldsRef.current = { to, cc, bcc, toInput }
+  }, [to, cc, bcc, toInput])
+  // The trombone's last lookup (a class's or a grade's teachers).
+  const lookupRef = useRef(null)
+  const suggestTeachers = useCallback(async (teachers, { signal, focusLine = null, prefill = true } = {}) => {
+    const found = await lookupTeacherRecipients(teachers, { search: getMailRecipientSuggestions, signal })
+    if (signal?.aborted) return
+    const plan = prefill ? found : offerOnly(found)
+    const fields = fieldsRef.current
+    if (plan.prefill.length && !fields.to.length && !fields.toInput.trim()) {
+      const waiting = document.activeElement === toInputRef.current
+      setTo((current) => (current.length ? current : mergeAddresses([], plan.prefill, [...fields.cc, ...fields.bcc])))
+      setTeacherHints(null)
+      const current = editorRef.current
+      if (waiting && Number.isInteger(focusLine) && current && !current.isDestroyed && current.isInitialized) caretAtBlock(current, focusLine)
+      return
+    }
+    setTeacherHints(plan.suggestions.length ? { groups: plan.suggestions, canAddAll: plan.canAddAll } : null)
+  }, [])
+  // A grade's module (`moduleCode`, « R5.11 »): who teaches it, from its
+  // classes in the planning (the Planning's weeks, src/moduleTeachers.js),
+  // offered only: who teaches a module didn't necessarily grade it (the
+  // relevé's own teacher, findModuleTeacher, is in À already when it names
+  // one). No planning in the app, none read, no class of it: nothing.
+  const suggestModuleTeachers = useCallback(async (moduleCode, { signal } = {}) => {
+    if (!planning?.selection) return
+    const todayKey = toDayKey(Date.now())
+    const events = await readPlanningEvents({ selection: planning.selection, user: planning.user, mondays: moduleWindowMondays(todayKey) }).catch(() => [])
+    if (signal?.aborted) return
+    const names = findModuleTeacherNames(events, moduleCode, todayKey)
+    if (names.length) await suggestTeachers(names.join('\n'), { signal, prefill: false })
+  }, [planning, suggestTeachers])
+  // « Écrire au sujet de ce cours » or « … de cette note »: its teachers,
+  // as it opens (asked again after StrictMode's second run, the first one
+  // called off).
+  useEffect(() => {
+    if (!restore?.teachers && !restore?.moduleCode) return undefined
+    const controller = new AbortController()
+    if (restore.teachers) void suggestTeachers(restore.teachers, { signal: controller.signal, focusLine: restore.focusBlock ?? null })
+    else void suggestModuleTeachers(restore.moduleCode, { signal: controller.signal })
+    return () => controller.abort()
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+  useEffect(() => () => lookupRef.current?.abort(), [])
 
   // While the composer is open, a file dropped beside it (on the page under
   // the floating window) isn't opened by the browser in the draft's place.
@@ -1677,6 +1819,23 @@ function MailComposer({ initialKind = 'new', message = null, sender = null, iden
     }
   }
 
+  // The teachers offered under À, without anyone already in a field (added
+  // by hand meanwhile); one taken goes to À, and its teacher's other
+  // matches with it, the focus back in À (the chip pressed is gone, and
+  // with it Escape would no longer reach the composer).
+  const shownAddresses = new Set([...to, ...cc, ...bcc].map(recipientKey))
+  const hintGroups = (teacherHints?.groups ?? [])
+    .filter((group) => !group.matches.some((match) => shownAddresses.has(recipientKey(match))))
+  const addTeachers = (matches) => {
+    setTo((current) => mergeAddresses(current, matches, [...cc, ...bcc]))
+    const taken = new Set(matches.map(recipientKey))
+    setTeacherHints((current) => {
+      const groups = (current?.groups ?? []).filter((group) => !group.matches.some((match) => taken.has(recipientKey(match))))
+      return groups.length ? { ...current, groups } : null
+    })
+    toInputRef.current?.focus({ preventScroll: true })
+  }
+
   const kindTitle = KIND_TITLES[kind]
   // « De : »: the identity picked (the account's default until the list
   // comes), else the account's own name and address.
@@ -1689,25 +1848,23 @@ function MailComposer({ initialKind = 'new', message = null, sender = null, iden
   const canSwitchKind = Boolean(message)
 
   // The trombone: the file picker; a menu when there's more: a grade
-  // (« Une note… », where « Mes notes » is), and for a reply to a mail with
-  // attachments left out (as Apple Mail does), those back.
+  // (« Une note… », where « Mes notes » is), a class (« Un cours… », where
+  // the Planning is), and for a reply to a mail with attachments left out
+  // (as Apple Mail does), those back.
   const pickFiles = () => fileInputRef.current?.click()
   const originalAttachments = kind === 'forward' ? [] : messageAttachmentItems(message)
   const canAddOriginal = originalAttachments.some((entry) => !attachments.some((item) => item.key === entry.key))
-  const hasAttachMenu = canAddOriginal || canAttachGrades
+  const canAttachCourses = Boolean(planning)
+  const hasAttachMenu = canAddOriginal || canAttachGrades || canAttachCourses
 
-  // A grade picked in the drawer, into the text as « Écrire au sujet de
-  // cette note » puts it (src/mailGradeAttach.js): its summary box and its
-  // image (drawn first; the box alone past the server's 3 images, or if it
-  // can't be drawn), at the caret or under the text; the subject and À
-  // filled if still empty.
+  // A grade or a class picked in its drawer, into the text as « Écrire au
+  // sujet de… » puts it (src/mailAboutBlocks.js): its summary box and its
+  // image (drawn first, `prepareImage`; the box alone past the server's 3
+  // images, grades and classes alike, or if it can't be drawn: then
+  // `missingImage` says so), at the caret or under the text.
+  // `build({ image, imagesInText })`: its nodes.
   const pendingImagesRef = useRef(0)
-  const attachGrade = async ({ module, evaluation, report, absences }) => {
-    setGradePickerOpen(false)
-    trackMailAction('grade_attached')
-    const fields = gradeAttachFields({ subject, to, toInput }, { module, evaluation, teacher: findModuleTeacher(absences, module) })
-    if (fields.subject) setSubject((current) => (current.trim() ? current : fields.subject))
-    if (fields.to) setTo((current) => (current.length ? current : mergeAddresses([], fields.to, [...cc, ...bcc])))
+  const attachAbout = async ({ prepareImage, build, missingImage }) => {
     const before = editorRef.current
     if (!before || before.isDestroyed) return
     const imagesInText = inlineImageCids(before.getHTML()).length + pendingImagesRef.current
@@ -1715,31 +1872,31 @@ function MailComposer({ initialKind = 'new', message = null, sender = null, iden
     if (imagesInText < MAX_INLINE_IMAGES) {
       pendingImagesRef.current += 1
       try {
-        image = await prepareGradeImage({ report, module, evaluation })
+        image = await prepareImage()
       } finally {
         pendingImagesRef.current -= 1
       }
     }
     const current = editorRef.current
     if (!current || current.isDestroyed) return
-    const { nodes, capped } = buildGradeInsertion({ module, evaluation, showPromoStats: Boolean(report?.showPromoStats), image, imagesInText })
+    const { nodes, capped } = build({ image, imagesInText })
     if (image && !capped) addInlineImage(image)
     const { doc, selection } = current.state
     const blocks = []
     doc.forEach((node) => blocks.push({ type: node.type.name, empty: node.type.name === 'paragraph' && node.content.size === 0 }))
     const caretIndex = textFocusedRef.current ? selection.$from.index(0) : null
-    const { index, withLine } = pickGradeInsertIndex(blocks, caretIndex)
+    const { index, withLine } = pickAboutInsertIndex(blocks, caretIndex)
     let at = 0
     for (let block = 0; block < index; block += 1) at += doc.child(block).nodeSize
     // The selection left where it was (Tiptap's would select the image).
     current.chain().insertContentAt(at, withLine ? [...nodes, { type: 'paragraph' }] : nodes, { updateSelection: false }).run()
-    // In sight: the text scrolls to the grade's last block.
+    // In sight: the text scrolls to the last block put in.
     let last = at
     for (let block = index; block < index + nodes.length - 1; block += 1) last += current.state.doc.child(block).nodeSize
     const lastDom = current.view.nodeDOM(last)
     if (lastDom instanceof Element) lastDom.scrollIntoView({ block: 'nearest' })
     if (caretIndex !== null) {
-      // Back in the text: on the new line under the grade, or where it was.
+      // Back in the text: on the new line under the blocks, or where it was.
       if (withLine) {
         const next = current.state.doc
         let end = 0
@@ -1752,7 +1909,45 @@ function MailComposer({ initialKind = 'new', message = null, sender = null, iden
       })
     }
     if (capped) showNotice(`${MAX_INLINE_IMAGES} images au plus par mail : l’encadré seul est ajouté`)
-    else if (!image) showNotice('Image de la note indisponible : l’encadré seul est ajouté')
+    else if (!image) showNotice(missingImage)
+  }
+  // A grade (« Une note… »): the subject and À (the teacher, when the
+  // relevé names one) filled if still empty; its module's teachers in the
+  // planning offered under À.
+  const attachGrade = async ({ module, evaluation, report, absences }) => {
+    setGradePickerOpen(false)
+    trackMailAction('grade_attached')
+    const fields = gradeAttachFields({ subject, to, toInput }, { module, evaluation, teacher: findModuleTeacher(absences, module) })
+    if (fields.subject) setSubject((current) => (current.trim() ? current : fields.subject))
+    if (fields.to) setTo((current) => (current.length ? current : mergeAddresses([], fields.to, [...cc, ...bcc])))
+    // Its module's teachers from the planning: offered only.
+    lookupRef.current?.abort()
+    lookupRef.current = new AbortController()
+    void suggestModuleTeachers(module.code, { signal: lookupRef.current.signal })
+    await attachAbout({
+      prepareImage: () => prepareGradeImage({ report, module, evaluation }),
+      build: ({ image, imagesInText }) => buildGradeInsertion({ module, evaluation, showPromoStats: Boolean(report?.showPromoStats), image, imagesInText }),
+      missingImage: 'Image de la note indisponible : l’encadré seul est ajouté',
+    })
+  }
+  // A class (« Un cours… »): the subject filled if still empty, its
+  // teachers looked up for À (suggestTeachers' rule: never over what's
+  // there).
+  const attachCourse = async ({ event, accent }) => {
+    setCoursePickerOpen(false)
+    trackMailAction('course_attached')
+    const nextSubject = courseAttachSubject(subject, event)
+    if (nextSubject) setSubject((current) => (current.trim() ? current : nextSubject))
+    if (event.teacher) {
+      lookupRef.current?.abort()
+      lookupRef.current = new AbortController()
+      void suggestTeachers(event.teacher, { signal: lookupRef.current.signal })
+    }
+    await attachAbout({
+      prepareImage: () => prepareCourseImage({ event, accent }),
+      build: ({ image, imagesInText }) => buildCourseInsertion({ event, image, imagesInText }),
+      missingImage: 'Image du cours indisponible : l’encadré seul est ajouté',
+    })
   }
   // A size refusal: the way round it is FileSender (RENATER), said once
   // under the chips.
@@ -1807,6 +2002,7 @@ function MailComposer({ initialKind = 'new', message = null, sender = null, iden
     ? [
       { id: 'files', label: 'Joindre un fichier…', icon: 'carbon:document-add', onSelect: pickFiles },
       canAttachGrades ? { id: 'grade', label: 'Une note…', icon: 'carbon:chart-pie', onSelect: () => setGradePickerOpen(true) } : null,
+      canAttachCourses ? { id: 'course', label: 'Un cours…', icon: 'carbon:calendar', onSelect: () => setCoursePickerOpen(true) } : null,
       canAddOriginal ? { id: 'original', label: 'Pièces jointes d’origine', icon: 'carbon:attachment', detail: String(originalAttachments.length), onSelect: () => setMessageItems(originalAttachments) } : null,
     ].filter(Boolean)
     : menu?.kind === 'identity'
@@ -1946,6 +2142,17 @@ function MailComposer({ initialKind = 'new', message = null, sender = null, iden
               </button>
             )}
           </FieldRow>
+          {hintGroups.length ? (
+            <TeacherSuggestions
+              groups={hintGroups}
+              canAddAll={Boolean(teacherHints?.canAddAll)}
+              onAdd={addTeachers}
+              onDismiss={() => {
+                setTeacherHints(null)
+                toInputRef.current?.focus({ preventScroll: true })
+              }}
+            />
+          ) : null}
           {showCc ? (
             <>
               <FieldRow label="Cc :" htmlFor={`${fieldId}-cc`} top>
@@ -2068,6 +2275,7 @@ function MailComposer({ initialKind = 'new', message = null, sender = null, iden
       </div>
 
       {gradePickerOpen ? <MailGradePicker onPick={(picked) => void attachGrade(picked)} onClose={() => setGradePickerOpen(false)} /> : null}
+      {coursePickerOpen ? <MailCoursePicker planning={planning} onPick={(picked) => void attachCourse(picked)} onClose={() => setCoursePickerOpen(false)} /> : null}
 
       {menu ? (
         <ContextMenu

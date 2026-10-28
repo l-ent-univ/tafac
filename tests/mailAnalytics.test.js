@@ -41,6 +41,8 @@ test('folders, composers and actions are named by enum, never by what they hold'
   assert.equal(toFolderKind(undefined), 'folder')
   assert.equal(toComposeKind('reply-all'), 'reply_all')
   assert.equal(toComposeKind('forward'), 'forward')
+  assert.equal(toComposeKind('grade'), 'grade')
+  assert.equal(toComposeKind('course'), 'course')
   assert.equal(toComposeKind('???'), 'new')
   assert.equal(toMailVia('swipe'), 'swipe')
   assert.equal(toMailVia('hand'), null)

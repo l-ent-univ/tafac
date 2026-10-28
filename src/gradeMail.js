@@ -8,7 +8,8 @@
 // on (the caret's), then a summary box (the grade in text: what « Mes
 // notes » shows of it) and the grade's image (src/gradeCardImage.js) inline.
 // To the subject's teacher when the relevé names exactly one, else to no
-// one: an address is never guessed.
+// one: an address is never guessed. Who teaches the module in the planning
+// is offered under À by the composer, never put there (src/moduleTeachers.js).
 
 import { isValidAddress } from './mailCompose.js'
 import { formatScore } from './gradesSubjects.js'
@@ -119,7 +120,8 @@ export async function prepareGradeImage({ report, module, evaluation }) {
 
 // The composer's `restore` for a grade (App's handleComposeMail): its
 // recipient, subject, text and image (prepareGradeImage), full screen from
-// 1024 px (a phone's composer is already).
+// 1024 px (a phone's composer is already); its module's code, for the
+// composer to offer who teaches it (src/moduleTeachers.js, never in À).
 // `report`: buildGradesReport's; `absences`: the relevé payload's.
 export async function prepareGradeMail({ report, module, evaluation, absences = null }) {
   const rows = buildGradeSummaryRows(module, evaluation, { showPromoStats: Boolean(report?.showPromoStats) })
@@ -127,11 +129,14 @@ export async function prepareGradeMail({ report, module, evaluation, absences = 
   const { html, focusBlock } = buildGradeMailHtml(module, evaluation, rows, image)
   const teacher = findModuleTeacher(absences, module)
   return {
+    kind: 'grade',
     to: teacher ? [teacher] : [],
     subject: buildGradeMailSubject(module, evaluation),
     html,
     focusBlock,
     inlineImages: image ? [image] : [],
+    // Its module's teachers in the planning, offered by the composer.
+    moduleCode: module?.code ?? null,
     isFullscreen: true,
   }
 }

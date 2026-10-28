@@ -355,12 +355,13 @@ test('planning_action keeps only the properties of its action, never a class or 
 
 test('page_viewed accepts the Messagerie with its own sources', () => {
   const opts = { hasSession: true }
-  for (const source of ['nav', 'tabbar', 'tile', 'dashboard_card', 'launch_card', 'grades', 'history', 'other']) {
+  for (const source of ['nav', 'tabbar', 'tile', 'dashboard_card', 'launch_card', 'grades', 'planning', 'history', 'other']) {
     assert.deepEqual(sanitizeAnalyticsEvent({ event: 'page_viewed', properties: { page: 'mail', source, view: 'week' } }, opts)?.properties, { page: 'mail', source })
   }
   // `sidebar_card` is « Mes notes »'s alone.
   assert.equal(sanitizeAnalyticsEvent({ event: 'page_viewed', properties: { page: 'mail', source: 'sidebar_card' } }, opts), null)
   assert.equal(sanitizeAnalyticsEvent({ event: 'page_viewed', properties: { page: 'grades', source: 'grades' } }, opts), null)
+  assert.equal(sanitizeAnalyticsEvent({ event: 'page_viewed', properties: { page: 'planning', source: 'planning' } }, opts), null)
 })
 
 test('mail_loaded only carries a status, a duration bucket and the error kind of an error', () => {
@@ -382,6 +383,10 @@ test('mail_action keeps only the properties of its action, never a subject, an a
   assert.deepEqual(keep({ action: 'folder_changed', folder_kind: 'folder', ...leaks }), { action: 'folder_changed', folder_kind: 'folder' })
   assert.deepEqual(keep({ action: 'search', scope: 'server', ...leaks }), { action: 'search', scope: 'server' })
   assert.deepEqual(keep({ action: 'compose_opened', kind: 'grade', ...leaks }), { action: 'compose_opened', kind: 'grade' })
+  // A class's mail: never its course, room, teacher or day.
+  const courseLeaks = { course: 'R5.12 Développement back-end', room: 'A08', teacher: 'M. Lemoine', day: '2026-11-03', title: 'R5.12' }
+  assert.deepEqual(keep({ action: 'compose_opened', kind: 'course', ...leaks, ...courseLeaks }), { action: 'compose_opened', kind: 'course' })
+  assert.deepEqual(keep({ action: 'course_attached', ...leaks, ...courseLeaks }), { action: 'course_attached' })
   assert.deepEqual(
     keep({ action: 'sent', result: 'partial', attachments: '2-3', inline_images: true, ...leaks }),
     { action: 'sent', result: 'partial', attachments: '2-3', inline_images: true },
@@ -391,7 +396,7 @@ test('mail_action keeps only the properties of its action, never a subject, an a
   }
   assert.deepEqual(keep({ action: 'pdf', result: 'error' }), { action: 'pdf', result: 'error' })
   assert.deepEqual(keep({ action: 'empty_folder', folder_kind: 'trash', ...leaks }), { action: 'empty_folder', folder_kind: 'trash' })
-  for (const action of ['thread_expanded', 'refresh', 'draft_saved', 'draft_discarded', 'grade_attached', 'print', 'attachment_downloaded']) {
+  for (const action of ['thread_expanded', 'refresh', 'draft_saved', 'draft_discarded', 'grade_attached', 'course_attached', 'print', 'attachment_downloaded']) {
     assert.deepEqual(keep({ action, via: 'toolbar', from: 'list', result: 'ok', ...leaks }), { action })
   }
   // Context properties stay.

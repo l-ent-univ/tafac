@@ -752,10 +752,13 @@ function MailListItem({ message, fallbackHref, now, onOpen, onContextMenu, onHov
 // sign-out, then its login page).
 // `sender`: the student's { name, email } (App's account), the composer's
 // « De : ». `composeRequest`: a mail another page asks to write (App's,
-// « Écrire au sujet de cette note » in « Mes notes »: the composer's
-// `restore`), opened once, then handed back (onComposeRequestHandled).
+// « Écrire au sujet de cette note » in « Mes notes », « … de ce cours » in
+// the Planning, its `kind` 'grade' or 'course': the composer's `restore`),
+// opened once, then handed back (onComposeRequestHandled).
 // `canAttachGrades`: the composer's « Une note… » (« Mes notes » in the app).
-function MailPage({ onReaderOpenChange, onSignInAgain, sender = null, composeRequest = null, onComposeRequestHandled = () => {}, arrivalSource = 'other', canAttachGrades = false }) {
+// `planning`: { selection, user }, the composer's « Un cours… » (the
+// Planning in the app), null without.
+function MailPage({ onReaderOpenChange, onSignInAgain, sender = null, composeRequest = null, onComposeRequestHandled = () => {}, arrivalSource = 'other', canAttachGrades = false, planning = null }) {
   // nextOffset: where the next page starts on the server.
   // `folder`: the folder the list is of (the one shown until another's
   // first page arrives).
@@ -1405,7 +1408,8 @@ function MailPage({ onReaderOpenChange, onSignInAgain, sender = null, composeReq
   useEffect(() => {
     if (!composeRequest || handledComposeRef.current === composeRequest) return
     handledComposeRef.current = composeRequest
-    trackMailAction('compose_opened', { kind: 'grade' })
+    // About a class (the Planning) or a grade (« Mes notes »).
+    trackMailAction('compose_opened', { kind: composeRequest.kind === 'course' ? 'course' : 'grade' })
     showComposer({ key: Date.now(), kind: 'new', message: null, saver: newDraftSaver(), restore: composeRequest })
     onComposeRequestHandled()
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -2306,6 +2310,7 @@ function MailPage({ onReaderOpenChange, onSignInAgain, sender = null, composeReq
             restore={composer.restore ?? null}
             sendError={composer.sendError ?? null}
             canAttachGrades={canAttachGrades}
+            planning={planning}
             ref={composerApiRef}
             onClose={closeComposer}
             onSend={sendComposed}

@@ -155,7 +155,8 @@ const DEMO_SCHEDULE_TEMPLATES = [
     startMinute: 0,
     durationMinutes: 180,
     title: 'SAE Prototype interactif',
-    teacher: 'Mme Le Fur',
+    // Two teachers, as ADE joins them.
+    teacher: 'Mme Le Fur - M. Lemoine',
     location: 'C12 - FabLab',
   },
   {

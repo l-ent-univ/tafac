@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
 import { flushPlanningNavigation, trackPlanningAction, trackPlanningNavigation, usePlanningPageReport } from '../analytics'
 import { describePlanningLoad, toPlanningPageSource, toPlanningView } from '../planningAnalytics'
 import { addDays, daysBetween, startOfWeek, toDayKey } from '../planningDates'
@@ -6,6 +6,7 @@ import { weekColumns } from '../planningEvents'
 import { usePlanningWeeks, useEventAccents } from '../usePlanningWeeks'
 import { useHistorySheet } from '../useHistorySheet'
 import { classCopyText } from '../contextMenuItems'
+import { prepareCourseMail } from '../courseMail'
 import { copyToClipboard, useContextMenu } from '../useContextMenu'
 import PlanningDayPage from './PlanningDayPage'
 import PlanningEventSheet from './PlanningEventSheet'
@@ -106,8 +107,10 @@ function useFontsReady() {
 // ("YYYY-MM-DD", the dashboard's "Prochain cours"), handed back with
 // onInitialDayHandled once taken. `arrivalSource`: how the student got here,
 // for the anonymous analytics (src/planningAnalytics.js); the page mounts
-// once per arrival.
-function PlanningPage({ selection = null, user = null, showWeekend = false, onOpenAccount = null, initialDay = null, onInitialDayHandled = () => {}, arrivalSource = 'other' }) {
+// once per arrival. `onComposeMail(request)`: App's, the mail page opened
+// on a prefilled composer (« Écrire au sujet de ce cours »); null without
+// the in-app mail page, and the action isn't offered.
+function PlanningPage({ selection = null, user = null, showWeekend = false, onOpenAccount = null, initialDay = null, onInitialDayHandled = () => {}, arrivalSource = 'other', onComposeMail = null }) {
   const now = useNow()
   const todayKey = toDayKey(now)
   const isWide = useWideLayout()
@@ -194,14 +197,29 @@ function PlanningPage({ selection = null, user = null, showWeekend = false, onOp
     if (!isList) setWideView('day')
   }
 
+  // « Écrire au sujet de ce cours »: the mail made from the class (its
+  // image drawn first, src/courseMail.js), then the mail page. Once at a
+  // time: a second press while the image is drawn does nothing.
+  const composingRef = useRef(false)
+  const writeAboutCourse = useMemo(() => (onComposeMail ? async (event) => {
+    if (composingRef.current) return
+    composingRef.current = true
+    try {
+      onComposeMail(await prepareCourseMail({ event, accent: accentFor(event.title) }))
+    } finally {
+      composingRef.current = false
+    }
+  } : null), [onComposeMail, accentFor])
+
   // A class's right-click menu (a long press; `key`: its id): its sheet,
-  // its day on its own (from the week), the class as text.
+  // its day on its own (from the week), a mail about it, the class as text.
   const eventMenuProps = useContextMenu((id) => {
     const event = events.find((entry) => entry.id === id)
     if (!event) return null
     return [
       { id: 'open', label: 'Voir le détail', icon: 'carbon:view', onSelect: () => openSheet(event) },
       isWeek ? { id: 'day', label: 'Afficher le jour', icon: 'carbon:calendar', onSelect: () => openDay(event.day) } : null,
+      writeAboutCourse ? { id: 'write', label: 'Écrire au sujet de ce cours', icon: 'carbon:email', onSelect: () => void writeAboutCourse(event) } : null,
       'separator',
       { id: 'copy', label: 'Copier', icon: 'carbon:copy', onSelect: () => void copyToClipboard(classCopyText(event)) },
     ]
@@ -316,6 +334,7 @@ function PlanningPage({ selection = null, user = null, showWeekend = false, onOp
           todayKey={todayKey}
           searching={occurrenceWeeks.some((monday) => statusOn(monday) === 'loading')}
           onClose={sheet.close}
+          onWrite={writeAboutCourse ? () => void writeAboutCourse(openEvent) : null}
           onPickDay={(day) => {
             trackPlanningAction('occurrence_opened')
             sheet.close()

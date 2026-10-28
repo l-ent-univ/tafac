@@ -1968,15 +1968,18 @@ function App() {
     }
     handleNavigatePage('mail', 'dashboard_card')
   }, [showPage, handleNavigatePage])
-  // « Écrire au sujet de cette note » (« Mes notes »): the mail page, its
-  // composer open on that mail (`request`: the composer's `restore`, see
-  // MailComposer), taken once by the page as it mounts.
+  // « Écrire au sujet de cette note » (« Mes notes ») or « … de ce cours »
+  // (the Planning): the mail page, its composer open on that mail
+  // (`request`: the composer's `restore`, see MailComposer; its `kind`
+  // 'course' from the Planning), taken once by the page as it mounts.
   const [pendingMailCompose, setPendingMailCompose] = useState(null)
   const handleComposeMail = useCallback((request) => {
     setPendingMailCompose(request)
-    handleNavigatePage('mail', 'grades')
+    handleNavigatePage('mail', request?.kind === 'course' ? 'planning' : 'grades')
   }, [handleNavigatePage])
   const clearPendingMailCompose = useCallback(() => setPendingMailCompose(null), [])
+  // The composer's « Un cours… »: the Planning's weeks, where it's in the app.
+  const mailPlanning = useMemo(() => (hasPlanningPage ? { selection: selectedTp, user: sessionState.user } : null), [hasPlanningPage, selectedTp, sessionState.user])
 
   // The current entry says which page it is (the first one included); the
   // app sets scroll positions itself. Back and forward show the entry's page
@@ -2665,12 +2668,12 @@ function App() {
             ) : null}
             {isPlanningPage ? (
               <div className="page-enter flex-1 min-h-0 4xl:flex-none 4xl:min-h-0">
-                <PlanningPage selection={selectedTp} user={sessionState.user} showWeekend={showPlanningWeekend} onOpenAccount={handleOpenAccountModal} initialDay={pendingPlanningDay} onInitialDayHandled={clearPendingPlanningDay} arrivalSource={planningArrivalSource} />
+                <PlanningPage selection={selectedTp} user={sessionState.user} showWeekend={showPlanningWeekend} onOpenAccount={handleOpenAccountModal} initialDay={pendingPlanningDay} onInitialDayHandled={clearPendingPlanningDay} arrivalSource={planningArrivalSource} onComposeMail={hasMailPage ? handleComposeMail : null} />
               </div>
             ) : null}
             {isMailPage ? (
               <div className="page-enter flex-1 min-h-0 4xl:flex-none 4xl:min-h-0">
-                <MailPage onReaderOpenChange={handleMailReaderOpenChange} onSignInAgain={() => void handleSignInAgain()} sender={mailSender} composeRequest={pendingMailCompose} onComposeRequestHandled={clearPendingMailCompose} arrivalSource={mailArrivalSource} canAttachGrades={hasGradesPage} />
+                <MailPage onReaderOpenChange={handleMailReaderOpenChange} onSignInAgain={() => void handleSignInAgain()} sender={mailSender} composeRequest={pendingMailCompose} onComposeRequestHandled={clearPendingMailCompose} arrivalSource={mailArrivalSource} canAttachGrades={hasGradesPage} planning={mailPlanning} />
               </div>
             ) : null}
             <div className="4xl:mt-auto">

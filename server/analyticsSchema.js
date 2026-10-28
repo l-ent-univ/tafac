@@ -23,8 +23,8 @@ const GRADES_ACTIONS = ['semester_changed', 'ue_view_opened', 'grade_detail_open
 // How the student arrived on the Planning page (see src/planningAnalytics.js).
 const PLANNING_PAGE_SOURCES = ['nav', 'tabbar', 'tile', 'dashboard_card', 'launch_card', 'history', 'other']
 // And on the Messagerie (see src/mailAnalytics.js): `grades` is « Écrire au
-// sujet de cette note ».
-const MAIL_PAGE_SOURCES = ['nav', 'tabbar', 'tile', 'dashboard_card', 'launch_card', 'grades', 'history', 'other']
+// sujet de cette note », `planning` « Écrire au sujet de ce cours ».
+const MAIL_PAGE_SOURCES = ['nav', 'tabbar', 'tile', 'dashboard_card', 'launch_card', 'grades', 'planning', 'history', 'other']
 const PAGE_SOURCES = { grades: GRADES_PAGE_SOURCES, planning: PLANNING_PAGE_SOURCES, mail: MAIL_PAGE_SOURCES }
 const PLANNING_VIEWS = ['day', 'two_days', 'week', 'list']
 const PLANNING_ACTIONS = [
@@ -48,7 +48,7 @@ const PLANNING_ACTION_REQUIRED = {
 }
 const MAIL_ACTIONS = [
   'mail_opened', 'thread_expanded', 'folder_changed', 'search', 'refresh',
-  'compose_opened', 'sent', 'draft_saved', 'draft_discarded', 'grade_attached',
+  'compose_opened', 'sent', 'draft_saved', 'draft_discarded', 'grade_attached', 'course_attached',
   'trash', 'spam', 'move', 'restore', 'delete_forever', 'flag', 'read_toggle', 'empty_folder', 'mark_folder_read',
   'print', 'pdf', 'attachment_downloaded',
 ]
@@ -319,7 +319,7 @@ export const ANALYTICS_EVENTS = {
       from: oneOf('list', 'widget', 'history'),
       folder_kind: oneOf(...MAIL_FOLDER_KINDS),
       scope: oneOf('local', 'server'),
-      kind: oneOf('new', 'reply', 'reply_all', 'forward', 'draft', 'grade'),
+      kind: oneOf('new', 'reply', 'reply_all', 'forward', 'draft', 'grade', 'course'),
       result: oneOf('ok', 'partial', 'error', 'undone'),
       attachments: oneOf('0', '1', '2-3', '4+'),
       inline_images: boolean,

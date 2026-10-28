@@ -7,6 +7,7 @@ import { accentStyle } from '../eventAccents'
 import { FULL_BLOCK_HEIGHT } from '../eventBlockLayout'
 import PlanningEventBlock from './PlanningEventBlock'
 import CloseButton from './CloseButton'
+import Tooltip from './Tooltip'
 import { GROUP_CARD_CLASSES, GroupRow } from './GroupCard'
 
 function linkHost(href) {
@@ -22,8 +23,9 @@ function linkHost(href) {
 // its top, the class's block, a card with its hours, its day and length and
 // its group, then the same course's next classes over 30 days (each one
 // takes the planning to its day). `searching`: those weeks are still on
-// their way.
-function PlanningEventSheet({ event, accent, events, todayKey, searching, onClose, onPickDay }) {
+// their way. `onWrite`: « Écrire au sujet de ce cours » (a mail about it,
+// in the Messagerie), null without the in-app mail page.
+function PlanningEventSheet({ event, accent, events, todayKey, searching, onWrite = null, onClose, onPickDay }) {
   const dialogRef = useRef(null)
   const scrollRef = useRef(null)
   // Content under the header: its blur shows.
@@ -89,7 +91,21 @@ function PlanningEventSheet({ event, accent, events, todayKey, searching, onClos
                 <span /><span /><span /><span /><span />
               </span>
               <span className="gd-grabber relative mx-auto hidden h-[4px] w-9 rounded-full bg-text-30 max-sm:block max-sm:translate-y-2" aria-hidden="true" />
-              <div className="relative flex justify-end px-6 pt-4 pb-2 max-sm:px-4 max-sm:pt-[14px]">
+              {/* « Écrire au sujet de ce cours » beside the close button, a
+                  round glass button of its own (its name in a tooltip), as
+                  a grade's sheet has. */}
+              <div className="relative flex items-center justify-end gap-2 px-6 pt-4 pb-2 max-sm:px-4 max-sm:pt-[14px]">
+                {onWrite ? (
+                  <button
+                    type="button"
+                    aria-label="Écrire au sujet de ce cours"
+                    onClick={onWrite}
+                    className="close-button glass-close-button group relative inline-flex size-[34px] shrink-0 cursor-pointer items-center justify-center rounded-full border-0 p-0 text-text focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-text"
+                  >
+                    <Icon icon="carbon:email" className="size-[16px]" aria-hidden="true" />
+                    <Tooltip title="Écrire au sujet de ce cours" side="bottom-end" className="max-4xl:hidden" />
+                  </button>
+                ) : null}
                 <CloseButton glass onClick={onClose} />
               </div>
             </header>
