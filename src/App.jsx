@@ -59,7 +59,8 @@ import { getStoredTheme, persistTheme, watchTheme } from './theme'
 import MobileTabBar from './components/MobileTabBar'
 import { getMobileTabItems } from './navItems'
 import { getAvailableWidgets } from './dashboardWidgets'
-import { readHistoryNav, writeHistoryNav } from './appHistory'
+import { bindHistorySession, readHistoryNav, writeHistoryNav } from './appHistory'
+import { clearMailReadCache } from './mailReadCache'
 import useGradesFormation from './useGradesFormation'
 import { clearStoredCustomBackground, getStoredCustomBackground, saveCustomBackground } from './customBackground'
 import {
@@ -923,6 +924,8 @@ function App() {
   // Compact sidebar (icons alone): kept for the device, like its width.
   // Toggled from the sidebar's handle and the settings.
   const [sidebarCompact, setSidebarCompact] = useState(getStoredSidebarCompact)
+  const [mailReaderOpen, setMailReaderOpen] = useState(false)
+  const [sidebarAutoCompactDismissed, setSidebarAutoCompactDismissed] = useState(false)
   const [showPlanningWeekend, setShowPlanningWeekend] = useState(() => getStoredShowPlanningWeekend())
   const [anonymousAnalytics, setAnonymousAnalytics] = useState(() => getStoredAnonymousAnalytics())
   const isAnalyticsAvailable = useAnalyticsAvailable()
@@ -1795,6 +1798,8 @@ function App() {
     () => activePage === 'mail' && getMobileTabItems(establishment, { gradesSupported }).some((item) => item.page === 'mail'),
     [activePage, establishment, gradesSupported],
   )
+  // Folded for a mail open beside the list (handleMailReaderOpenChange).
+  const isSidebarAutoCompact = isMailPage && mailReaderOpen && !sidebarCompact && !sidebarAutoCompactDismissed
   // The page the sidebar and the tab bar show as selected.
   const shownPage = isGradesPage ? 'grades' : isPlanningPage ? 'planning' : isMailPage ? 'mail' : 'dashboard'
   // Being on « Mes notes » is having seen its launch, however the student
@@ -1970,6 +1975,15 @@ function App() {
   const handleSidebarCompactChange = useCallback((compact, { persist = true } = {}) => {
     setSidebarCompact(compact)
     if (persist) persistSidebarCompact(compact)
+    // Unfolded by hand while a mail is open: it stays so until it closes.
+    if (!compact) setSidebarAutoCompactDismissed(true)
+  }, [])
+
+  // A mail open in the side panel folds the sidebar for the list's room
+  // (unless already folded by hand); it unfolds over the page on hover.
+  const handleMailReaderOpenChange = useCallback((open) => {
+    setMailReaderOpen(open)
+    setSidebarAutoCompactDismissed(false)
   }, [])
 
   const handleShowAppDescriptionsChange = useCallback((show) => {
@@ -2321,6 +2335,10 @@ function App() {
     try {
       const result = await logoutFromEnt()
       clearLegacySensitiveClientCaches()
+      // No reload follows: the mails read and the history's mail entries
+      // must not carry over to whoever signs in next in this tab.
+      clearMailReadCache()
+      bindHistorySession(null)
       setActivePage('dashboard')
       writeHistoryNav({ page: 'dashboard' }, { replace: true })
       setSessionState({
@@ -2346,6 +2364,17 @@ function App() {
       }))
       commitDebugState('Deconnexion', null, message)
     }
+  }
+
+  // The mail page's « Se reconnecter » (its session expired: the app's own,
+  // or only the server's CAS sign-in behind the webmail, which a new
+  // sign-in alone renews). Signed out as by the header's button, then
+  // straight to the login form rather than the landing page an expiry
+  // otherwise leads to (wasAuthenticatedRef's effect above).
+  async function handleSignInAgain() {
+    wasAuthenticatedRef.current = false
+    await handleLogout()
+    navigate(LOGIN_PATH, { replace: true })
   }
 
   function handleHeaderAction() {
@@ -2383,6 +2412,12 @@ function App() {
     setDebugOpen(false)
   }, [sessionState.authenticated, sessionState.user])
 
+  // The signed-in student owns the mail page's history entries and read
+  // cache (see appHistory.js, mailReadCache.js). Done while rendering, not in
+  // an effect: the mail page reads its entry and the cache in its own first
+  // render, which comes before any effect of this one. Idempotent.
+  if (sessionState.authenticated && sessionState.user && bindHistorySession(sessionState.user)) clearMailReadCache()
+
   const shouldHoldInitialRender = !hasCheckedInitialSession && sessionState.checking
   const isProfileSwitching = sessionState.authenticated && profileUser !== sessionState.user
   const shouldShowTpSetup = sessionState.authenticated && !selectedTp
@@ -2396,6 +2431,27 @@ function App() {
     sessionState.givenName,
   )
   const simpleLoadingDots = <LoadingDots className="text-text-muted" />
+  // The composer's « De : » (MailPage): the account's name and address,
+  // and its automatic signature's lines: the name, the group picked for the
+  // planning (its year and TP, or TD, when there's one), the establishment
+  // (the student's composante, when it has its own entry) and the
+  // university, and their logos (each with its dark version).
+  const mailSenderName = [accountDisplayInfo.firstName, accountDisplayInfo.lastName].filter(Boolean).join(' ')
+  const ownEstablishment = universityConfig.establishments?.byId?.[establishment] ?? null
+  const mailSender = {
+    name: mailSenderName,
+    email: accountDisplayInfo.email,
+    signature: {
+      name: mailSenderName,
+      group: HAS_PERSONAL_PLANNING ? null : [selectedTp?.yearLabel, selectedTp?.tpLabel ?? selectedTp?.tdLabel].filter(Boolean).join(' · ') || selectedTp?.label || null,
+      establishment: ownEstablishment?.label ?? null,
+      university: universityConfig.university?.name ?? null,
+      logos: [
+        ownEstablishment?.logo ? { src: ownEstablishment.logo, srcDark: ownEstablishment.logoDark ?? null, alt: ownEstablishment.logoAlt ?? ownEstablishment.label ?? '' } : null,
+        universityConfig.branding?.logo ? { src: universityConfig.branding.logo, srcDark: universityConfig.branding.logoDark ?? null, alt: universityConfig.university?.name ?? '' } : null,
+      ].filter(Boolean),
+    },
+  }
 
   return (
     <main className="relative min-h-screen flex flex-col bg-bg overflow-x-clip">
@@ -2453,10 +2509,11 @@ function App() {
             activePage={shownPage}
             onNavigatePage={handleNavigatePage}
             onOpenLatestGrade={universityConfig.features?.sidebarLatestGrade === true && sessionState.authenticated && hasGradesPage ? handleOpenSidebarGrade : null}
-            compact={sidebarCompact}
+            compact={sidebarCompact || isSidebarAutoCompact}
+            canPeek={isSidebarAutoCompact}
             onCompactChange={handleSidebarCompactChange}
           />
-          <div ref={dashboardColumnRef} className={`app-column relative isolate flex flex-col flex-1 min-w-0 4xl:h-screen 4xl:overflow-y-auto 4xl:pl-[calc(var(--sidebar-width,280px)+12px)] ${hasMobileTabBar ? 'max-4xl:pb-[calc(env(safe-area-inset-bottom)+84px)]' : ''}`}>
+          <div ref={dashboardColumnRef} className={`app-column relative isolate flex flex-col flex-1 min-w-0 4xl:h-screen 4xl:overflow-y-auto 4xl:pl-[calc(var(--sidebar-width,280px)+12px)] ${hasMobileTabBar ? (isMailPage && mailReaderOpen ? 'max-4xl:pb-[calc(env(safe-area-inset-bottom)+148px)]' : 'max-4xl:pb-[calc(env(safe-area-inset-bottom)+84px)]') : ''}`}>
             {/* Hero image behind the header and widget cards, fading into the solid background. */}
             {isWallpaperShown ? (
               <div
@@ -2535,7 +2592,7 @@ function App() {
             ) : null}
             {isMailPage ? (
               <div className="page-enter flex-1 min-h-0 4xl:flex-none 4xl:min-h-0">
-                <MailPage />
+                <MailPage onReaderOpenChange={handleMailReaderOpenChange} onSignInAgain={() => void handleSignInAgain()} sender={mailSender} />
               </div>
             ) : null}
             <div className="4xl:mt-auto">

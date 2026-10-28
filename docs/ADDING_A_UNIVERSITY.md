@@ -125,6 +125,7 @@ Un feature à `false` : le serveur répond `{ disabled: true }` sur les endpoint
 - `services.isUnavailableApplication(app)` — masque complètement certaines applications.
 - `grades.serviceUrl` (client) — URL publique du service de notes (ScoDoc), ouverte via `/__ent_auth/launch` depuis les widgets et le lien « Mes notes » quand `features.grades === true`.
 - `mailWebmailUrl` (shared) — URL publique du webmail (« Messagerie »), réutilisée par `mail.webmailUrl` côté serveur ; le widget l'ouvre via `/__ent_auth/launch`.
+- `mail.ownDomains` (optionnel, `client.js`) — domaines mail de l'université, sous-domaines compris (Rennes : `['univ-rennes.fr', 'univ-rennes1.fr']`). Dans la page Messagerie, le lecteur affiche toujours le domaine de l'expéditeur à côté de son nom ; la liste ne l'affiche que pour un domaine hors de cette liste, pour repérer un nom d'affichage qui imite l'université (`src/mailDomain.js`). Sans lui, les domaines des `origins` (deux derniers labels) en tiennent lieu.
 - `grades` (copy) — `unavailableTitle`, `unavailableDetail`, `disabledPillLabel` quand `features.grades === 'disabled'` ; `unavailableTitle`/`unavailableDetail` servent aussi de message d'erreur serveur quand ScoDoc ne répond pas.
 
 ### Serveur uniquement (`server.js`)

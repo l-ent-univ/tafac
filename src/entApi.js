@@ -5,6 +5,7 @@ import { readDistributionCounts } from './evaluationDistribution'
 import { pickAdeGroupForAlias } from './adeGroupMatch'
 import { buildParcoursTpAliases } from './scodocParcoursGroups'
 import { getLoadedUniversityId, getUniversityRequestHeaders } from './universityRuntime'
+import { buildUploadDisposition, normalizeAttachmentType, readAttachmentLimits, sanitizeAttachmentName } from './mailAttachments'
 
 // Null on the neutral page (no university picked yet).
 export const ENT_ORIGIN = universityConfig.origins.ent
@@ -434,14 +435,57 @@ export async function downloadSchoolCertificate() {
   window.setTimeout(() => URL.revokeObjectURL(url), 10_000)
 }
 
-export async function getRecentMail({ offset = 0 } = {}) {
+// The mail routes' answers when the session is gone: 401 (the app's own
+// session missing), the list's 200 { authenticated: false } (likewise), or
+// a 500 { error: 'mail_session_expired' } (the server's CAS sign-in behind
+// the webmail expired: sendMailRouteError). Each call below reports it
+// here, before it returns or throws, so the mail page can tell « Session
+// expirée » from an outage, its failure notices included (mailAction only
+// answers true or false).
+const mailSessionExpiredListeners = new Set()
+
+export function onMailSessionExpired(listener) {
+  mailSessionExpiredListeners.add(listener)
+  return () => mailSessionExpiredListeners.delete(listener)
+}
+
+function reportMailSessionExpired() {
+  for (const listener of mailSessionExpiredListeners) listener()
+}
+
+function isMailSessionExpired(response, payload) {
+  return response.status === 401 || payload?.error === 'mail_session_expired'
+}
+
+// For the calls that answer true or false: their failure's body read for
+// the reason, then reported if it's the session.
+async function checkMailSession(response) {
+  if (response.ok) return
+  const payload = await response.json().catch(() => null)
+  if (isMailSessionExpired(response, payload)) reportMailSessionExpired()
+}
+
+// `query`: the mail page's search, the server's matches over the whole
+// folder instead of its newest mails (no unread count then). `folder`: a
+// folder id (getMailFolders), the inbox by default. `fresh`: past the
+// server's short cache of the inbox (a refresh asked for).
+// `signal`: an AbortSignal, for a search the typing has made pointless; an
+// aborted request answers { status: 'aborted' }, for the caller to ignore.
+export async function getRecentMail({ offset = 0, query = '', folder = null, fresh = false, signal } = {}) {
   if (!universityConfig.features?.mail) {
     return { status: 'disabled', unreadCount: null, webmailHref: null, messages: [] }
   }
 
   try {
-    const response = await fetch(`${ENT_AUTH_PREFIX}/mail/recent${offset > 0 ? `?offset=${offset}` : ''}`, {
+    const params = new URLSearchParams()
+    if (offset > 0) params.set('offset', String(offset))
+    if (query) params.set('q', query)
+    if (folder) params.set('folder', folder)
+    if (fresh) params.set('fresh', '1')
+    const search = params.toString()
+    const response = await fetch(`${ENT_AUTH_PREFIX}/mail/recent${search ? `?${search}` : ''}`, {
       credentials: 'same-origin',
+      signal,
     })
     const payload = await response.json().catch(() => null)
 
@@ -449,12 +493,13 @@ export async function getRecentMail({ offset = 0 } = {}) {
       return { status: 'disabled', unreadCount: null, webmailHref: null, messages: [] }
     }
 
-    if (!response.ok || !payload) {
-      throw createHttpError(payload?.error || `Mail request failed (${response.status}).`, response.status)
+    if (isMailSessionExpired(response, payload) || (response.ok && payload && !payload.authenticated)) {
+      reportMailSessionExpired()
+      return { status: 'unauthenticated', unreadCount: null, webmailHref: null, messages: [] }
     }
 
-    if (!payload.authenticated || !payload.mail) {
-      return { status: 'unauthenticated', unreadCount: null, webmailHref: null, messages: [] }
+    if (!response.ok || !payload?.mail) {
+      throw createHttpError(payload?.error || `Mail request failed (${response.status}).`, response.status)
     }
 
     return {
@@ -465,6 +510,10 @@ export async function getRecentMail({ offset = 0 } = {}) {
       hasMore: payload.mail.hasMore === true,
     }
   } catch (error) {
+    // Aborted mid-answer too (its body unread, then « failed »): not an error.
+    if (signal?.aborted) {
+      return { status: 'aborted', unreadCount: null, webmailHref: null, messages: [] }
+    }
     return {
       status: 'error',
       unreadCount: null,
@@ -473,6 +522,212 @@ export async function getRecentMail({ offset = 0 } = {}) {
       error: error instanceof Error ? error.message : String(error),
       errorKind: getRequestErrorKind(error),
     }
+  }
+}
+
+// One message for the mail page's reader (GET /__ent_auth/mail/message?id=…):
+//   200 { message: { id, subject, from, replyTo, to, cc, receivedAt, unread,
+//                    format: 'html' | 'text', html (already cleaned),
+//                    remoteImages: number, truncated: boolean,
+//                    attachments: [{ part, name, type, size, href }] } }
+//   404 no such message, 401 no session, 500 { error }
+// Throws an Error with `status` on any failure.
+export async function getMailMessage(id) {
+  const response = await fetch(`${ENT_AUTH_PREFIX}/mail/message?id=${encodeURIComponent(id)}`, {
+    credentials: 'same-origin',
+  })
+  const payload = await response.json().catch(() => null)
+  if (isMailSessionExpired(response, payload)) reportMailSessionExpired()
+  if (!response.ok || !payload?.message) {
+    throw createHttpError(payload?.error || `Message request failed (${response.status}).`, response.status)
+  }
+  return payload.message
+}
+
+// One thread for the mail page's reader (GET /__ent_auth/mail/thread):
+// its mails, oldest first, as list rows ({ id, from, to, subject, snippet,
+// receivedAt, unread, flagged, folder }). `folder`: the one it's read from
+// (its trash or junk mails shown only there). Throws on a failure.
+export async function getMailThread(id, { folder = null } = {}) {
+  const params = new URLSearchParams({ id })
+  if (folder) params.set('folder', folder)
+  const response = await fetch(`${ENT_AUTH_PREFIX}/mail/thread?${params}`, { credentials: 'same-origin' })
+  const payload = await response.json().catch(() => null)
+  if (isMailSessionExpired(response, payload)) reportMailSessionExpired()
+  if (!response.ok || !Array.isArray(payload?.messages)) {
+    throw createHttpError(payload?.error || `Thread request failed (${response.status}).`, response.status)
+  }
+  return payload.messages
+}
+
+// The mailbox's folders (GET /__ent_auth/mail/folders): [{ id, kind
+// ('inbox', 'sent', 'drafts', 'junk', 'trash' or 'folder'), name, unread,
+// count, parentId, path, depth }], the whole tree with parents before their
+// children, the system ones first. `parentId` null and `depth` 0 at the
+// top; `path` the webmail's names from the top (« Inbox/Moodle »). Null
+// when they can't be read.
+export async function getMailFolders() {
+  try {
+    const response = await fetch(`${ENT_AUTH_PREFIX}/mail/folders`, { credentials: 'same-origin' })
+    const payload = await response.json().catch(() => null)
+    if (isMailSessionExpired(response, payload)) reportMailSessionExpired()
+    return response.ok && Array.isArray(payload?.folders) ? payload.folders : null
+  } catch {
+    return null
+  }
+}
+
+// Acts on a whole folder (POST /__ent_auth/mail/folder-action { folder,
+// action }): `read` marks all its mails read, `empty` deletes them for good
+// (the trash, 3, and the junk folder, 4, only: the server refuses any
+// other). Never throws: false when the webmail didn't take it.
+export async function mailFolderAction(folder, action) {
+  try {
+    const response = await fetch(`${ENT_AUTH_PREFIX}/mail/folder-action`, {
+      method: 'POST',
+      credentials: 'same-origin',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ folder, action }),
+    })
+    await checkMailSession(response)
+    return response.ok
+  } catch {
+    return false
+  }
+}
+
+// The webmail preferences the mail page follows (GET /__ent_auth/mail/prefs):
+// { markRead, attachments } — the seconds an open mail waits before it's
+// marked read, -1 never, 0 at once; the composer's attachment limits
+// ({ maxFileBytes, maxTotalBytes }, readAttachmentLimits). The webmail's
+// default (at once) and the fallback limits when they can't be read.
+export async function getMailPrefs() {
+  try {
+    const response = await fetch(`${ENT_AUTH_PREFIX}/mail/prefs`, { credentials: 'same-origin' })
+    const payload = await response.json().catch(() => null)
+    const markRead = Number(payload?.markRead)
+    return {
+      markRead: response.ok && Number.isFinite(markRead) ? markRead : 0,
+      attachments: readAttachmentLimits(response.ok ? payload?.attachments : null),
+    }
+  } catch {
+    return { markRead: 0, attachments: readAttachmentLimits(null) }
+  }
+}
+
+// One file for the composer (POST /__ent_auth/mail/upload), sent as it is
+// (the raw body, its name in Content-Disposition), relayed by the server to
+// the webmail as it comes. An XMLHttpRequest, for its upload progress
+// (fetch has none). `onProgress(sent, total)` as it goes. → { promise,
+// abort }: the promise never rejects, it resolves to { status: 'ok',
+// attachment: { aid, name, size, contentType } }, { status: 'aborted' }, or
+// { status: 'error', code, retryAfter, maxBytes } (code: 'too-large',
+// 'rate', 'retry' — the webmail session was renewed, try once more —,
+// 'expired', 'failed').
+export function uploadMailAttachment(file, { name, onProgress } = {}) {
+  const xhr = new XMLHttpRequest()
+  let settled = false
+  const promise = new Promise((resolve) => {
+    const finish = (result) => {
+      if (settled) return
+      settled = true
+      resolve(result)
+    }
+    xhr.open('POST', `${ENT_AUTH_PREFIX}/mail/upload`)
+    xhr.withCredentials = true
+    xhr.responseType = 'text'
+    xhr.setRequestHeader('Content-Type', normalizeAttachmentType(file.type))
+    xhr.setRequestHeader('Content-Disposition', buildUploadDisposition(name ?? file.name))
+    xhr.upload.addEventListener('progress', (event) => {
+      if (event.lengthComputable) onProgress?.(event.loaded, event.total)
+    })
+    xhr.addEventListener('abort', () => finish({ status: 'aborted' }))
+    xhr.addEventListener('error', () => finish({ status: 'error', code: 'failed' }))
+    xhr.addEventListener('timeout', () => finish({ status: 'error', code: 'failed' }))
+    xhr.addEventListener('load', () => {
+      let payload = null
+      try {
+        payload = JSON.parse(xhr.responseText)
+      } catch {
+        payload = null
+      }
+      const status = xhr.status
+      const attachment = payload?.attachment
+      if (status === 200 && typeof attachment?.aid === 'string' && attachment.aid) {
+        finish({
+          status: 'ok',
+          attachment: {
+            aid: attachment.aid,
+            name: sanitizeAttachmentName(attachment.name ?? name ?? file.name),
+            size: Number.isSafeInteger(attachment.size) ? attachment.size : file.size,
+            contentType: normalizeAttachmentType(attachment.contentType ?? file.type),
+          },
+        })
+        return
+      }
+      if (isMailSessionExpired({ status }, payload)) {
+        reportMailSessionExpired()
+        finish({ status: 'error', code: 'expired' })
+        return
+      }
+      const code = status === 413 ? 'too-large'
+        : status === 429 ? 'rate'
+          : payload?.error === 'mail_upload_retry' ? 'retry'
+            : 'failed'
+      const retryAfter = Number(xhr.getResponseHeader('Retry-After')) || null
+      finish({ status: 'error', code, retryAfter, maxBytes: Number.isSafeInteger(payload?.maxBytes) ? payload.maxBytes : null })
+    })
+    xhr.send(file)
+  })
+  return {
+    promise,
+    abort: () => {
+      if (!settled) xhr.abort()
+    },
+  }
+}
+
+// Recipient suggestions for the composer's fields (GET
+// /__ent_auth/mail/autocomplete?q=…): [{ name, email, kind ('contact',
+// 'recent', 'directory' or 'group') }], best first. `query`: the text typed,
+// normalizeRecipientQuery's (src/mailCompose.js). `signal`: an AbortSignal,
+// for a query the typing has moved past. Never throws: { status: 'ok' |
+// 'error' | 'aborted' | 'disabled', suggestions }. Not kept anywhere: the
+// composer holds them in memory for as long as it's open.
+export async function getMailRecipientSuggestions(query, { signal } = {}) {
+  if (!universityConfig.features?.mail) return { status: 'disabled', suggestions: [] }
+  try {
+    const response = await fetch(`${ENT_AUTH_PREFIX}/mail/autocomplete?${new URLSearchParams({ q: query })}`, {
+      credentials: 'same-origin',
+      signal,
+    })
+    const payload = await response.json().catch(() => null)
+    if (isMailSessionExpired(response, payload)) reportMailSessionExpired()
+    if (signal?.aborted) return { status: 'aborted', suggestions: [] }
+    if (!response.ok || !Array.isArray(payload?.suggestions)) return { status: 'error', suggestions: [] }
+    return { status: 'ok', suggestions: payload.suggestions }
+  } catch {
+    return { status: signal?.aborted ? 'aborted' : 'error', suggestions: [] }
+  }
+}
+
+// Acts on messages (POST /__ent_auth/mail/action { ids, action }): read,
+// unread, flag, unflag, trash, spam, inbox (back from the trash or the junk
+// folder, a trashed mail restored), move (to `folder`), delete (for good,
+// mails in the trash or the junk folder only). `ids`: one id or a list.
+// Never throws: false when the webmail didn't take it.
+export async function mailAction(ids, action, { folder = null } = {}) {
+  try {
+    const response = await fetch(`${ENT_AUTH_PREFIX}/mail/action`, {
+      method: 'POST',
+      credentials: 'same-origin',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ids: [].concat(ids), action, ...(folder ? { folder } : null) }),
+    })
+    await checkMailSession(response)
+    return response.ok
+  } catch {
+    return false
   }
 }
 

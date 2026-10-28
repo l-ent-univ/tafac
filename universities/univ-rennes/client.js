@@ -78,6 +78,16 @@ export default {
     moodle: moodleOrigin,
   },
 
+  // The mail page (features.mail): the university's own mail domains,
+  // sub-domains included (etudiant.univ-rennes.fr, listes.…). A sender from
+  // any other domain has it shown next to their name in the list, so a
+  // display name copying the university's stands out (src/mailDomain.js).
+  // univ-rennes1.fr: Rennes 1's, before the merger, still on its older
+  // services (ScoDoc, the docs).
+  mail: {
+    ownDomains: ['univ-rennes.fr', 'univ-rennes1.fr'],
+  },
+
   auth: {
     portalEntryPath,
   },

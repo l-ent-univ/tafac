@@ -94,6 +94,13 @@ export default {
   // no in-app mail page yet.
   mail: {
     page: false,
+    // For the mail page, once it's on: the university's own mail domains,
+    // sub-domains included (etudiant.univ-rennes2.fr…). A sender from any
+    // other domain has it shown next to their name in the list, so a
+    // display name copying the university's stands out (src/mailDomain.js).
+    // uhb.fr: Rennes 2's former name (Université Haute-Bretagne), still on
+    // some of its hosts (shibboleth.uhb.fr).
+    ownDomains: ['univ-rennes2.fr', 'uhb.fr'],
   },
 
   // One establishment for everyone, with the "Prochain cours" card.
