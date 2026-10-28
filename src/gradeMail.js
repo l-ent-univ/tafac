@@ -12,8 +12,7 @@
 
 import { isValidAddress } from './mailCompose.js'
 import { formatScore } from './gradesSubjects.js'
-import { escapeHtml } from './mailText.js'
-import { createInlineCid, inlineImageKey } from './mailInlineImages.js'
+import { buildAboutMailHtml, makeInlineImageItem, shortenMailText as shorten } from './mailAboutBlocks.js'
 
 const MAX_SUBJECT_TITLE_LENGTH = 90
 const MAIL_DATE_FORMAT = new Intl.DateTimeFormat('fr-FR', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'Europe/Paris' })
@@ -28,11 +27,6 @@ export function formatMailScore(value) {
 // (« Absent », « Excusé », « En attente »).
 export function describeMailGrade(grade) {
   return grade?.kind === 'number' ? `${formatMailScore(grade.value)}/20` : String(grade?.label ?? '').trim()
-}
-
-function shorten(text, max) {
-  const value = String(text ?? '').replace(/\s+/g, ' ').trim()
-  return value.length > max ? `${value.slice(0, max - 1).trimEnd()}…` : value
 }
 
 // « Note de R5.01 – Contrôle TP1 », the evaluation's name cut short.
@@ -79,12 +73,7 @@ export function buildGradeMailHtml(module, evaluation, rows, image = null) {
   const subject = String(module?.title ?? module?.code ?? '').trim()
   const name = String(evaluation?.description ?? '').trim()
   const about = name ? `Je vous écris au sujet de ma note de ${name}${subject ? ` en ${subject}` : ''}.` : `Je vous écris au sujet de ma note${subject ? ` en ${subject}` : ''}.`
-  const summary = `<table data-mail-summary=""><tbody>${rows.map((row) => `<tr><th>${escapeHtml(row.label)}</th><td>${escapeHtml(row.value)}</td></tr>`).join('')}</tbody></table>`
-  const picture = image
-    ? `<img data-inline-cid="${escapeHtml(image.cid)}" alt="${escapeHtml(image.alt)}" width="${image.width}" height="${image.height}">`
-    : ''
-  const blocks = ['<p>Bonjour,</p>', '<p></p>', `<p>${escapeHtml(about)}</p>`, '<p></p>', '<p></p>', summary, picture].filter(Boolean)
-  return { html: blocks.join(''), focusBlock: 3 }
+  return buildAboutMailHtml({ about, rows, image })
 }
 
 // The subject's teacher, as the relevé's absences name them (the
@@ -121,21 +110,8 @@ export async function prepareGradeImage({ report, module, evaluation }) {
   try {
     const { renderGradeCardImage } = await import('./gradeCardImage.js')
     const drawn = await renderGradeCardImage({ report, module, evaluation })
-    const cid = createInlineCid()
     const name = `note-${String(module.code ?? 'evaluation').replace(/[^\w.-]+/g, '-')}.png`
-    return {
-      key: inlineImageKey(cid),
-      cid,
-      source: 'upload',
-      file: new File([drawn.blob], name, { type: 'image/png' }),
-      name,
-      size: drawn.blob.size,
-      contentType: 'image/png',
-      width: drawn.width,
-      height: drawn.height,
-      alt: gradeImageAlt(module, evaluation),
-      status: 'queued',
-    }
+    return makeInlineImageItem({ blob: drawn.blob, width: drawn.width, height: drawn.height, name, alt: gradeImageAlt(module, evaluation) })
   } catch {
     return null
   }

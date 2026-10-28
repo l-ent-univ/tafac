@@ -5,7 +5,7 @@
 // drawer's list, where the blocks go, what fills the empty fields.
 
 import { buildGradeMailSubject, buildGradeSummaryRows, gradeImageAlt } from './gradeMail.js'
-import { MAX_INLINE_IMAGES } from './mailInlineImages.js'
+import { buildAboutInsertion, pickAboutInsertIndex } from './mailAboutBlocks.js'
 import { foldMailSearchText } from './mailSearch.js'
 
 // The grades worth a mail: a number, or what stands in its place (an
@@ -39,46 +39,17 @@ export function filterRecentGrades(grades, query) {
   })
 }
 
-// Where the grade's blocks go, among the text's top-level blocks (`blocks`:
-// [{ type, empty }], the editor's doc children). `caretIndex`: the block
-// the caret is in, when the student has been in the text (null else).
-// - after the caret's block, an empty line under them to go on writing
-//   (`withLine`, the caret moved there); in an empty line, before it (the
-//   caret stays there, under them);
-// - else, or with the caret in a reply's quote, under the text: before the
-//   signature, or before the line introducing the quote, or at the end.
-// → { index, withLine }.
-export function pickGradeInsertIndex(blocks, caretIndex = null) {
-  const list = Array.isArray(blocks) ? blocks : []
-  const signature = list.findIndex((block) => block.type === 'mailSignature')
-  const quote = list.findIndex((block) => block.type === 'blockquote')
-  let end = list.length
-  if (signature >= 0) end = signature
-  else if (quote >= 1) {
-    // The header introducing the quote, and the empty line above it.
-    end = quote - 1
-    if (end >= 1 && list[end - 1].type === 'paragraph' && list[end - 1].empty) end -= 1
-  }
-  if (Number.isInteger(caretIndex) && caretIndex >= 0 && caretIndex < end) {
-    const block = list[caretIndex]
-    if (block.type === 'paragraph' && block.empty) return { index: caretIndex, withLine: false }
-    return { index: caretIndex + 1, withLine: true }
-  }
-  return { index: end, withLine: false }
-}
+// Where the grade's blocks go: at the caret or under the text, as a
+// class's do (src/mailAboutBlocks.js).
+export const pickGradeInsertIndex = pickAboutInsertIndex
 
 // The editor's nodes for a grade: its summary box (the rows « Mes notes »
 // shows), then its image (`image`: { cid, width, height } or null). Past
 // the server's MAX_INLINE_IMAGES (`imagesInText`: those the text shows
-// already), the box alone (`capped`). → { nodes, capped }.
+// already, classes' included), the box alone (`capped`). → { nodes, capped }.
 export function buildGradeInsertion({ module, evaluation, showPromoStats = false, image = null, imagesInText = 0 }) {
   const rows = buildGradeSummaryRows(module, evaluation, { showPromoStats })
-  const capped = imagesInText >= MAX_INLINE_IMAGES
-  const nodes = [{ type: 'mailSummary', attrs: { rows } }]
-  if (image && !capped) {
-    nodes.push({ type: 'mailInlineImage', attrs: { cid: image.cid, alt: gradeImageAlt(module, evaluation), width: image.width ?? null, height: image.height ?? null } })
-  }
-  return { nodes, capped }
+  return buildAboutInsertion({ rows, alt: gradeImageAlt(module, evaluation), image, imagesInText })
 }
 
 // What the grade fills of the fields left empty, never over what the
