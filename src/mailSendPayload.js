@@ -1,5 +1,6 @@
 import { attachmentReferences } from './mailAttachments.js'
 import { isValidAddress } from './mailCompose.js'
+import { inlineImageKey, inlineImageReferences } from './mailInlineImages.js'
 import { isSignatureKind } from './mailSignatureChoice.js'
 
 // What the composer sends to POST /__ent_auth/mail/send and /mail/draft
@@ -23,9 +24,10 @@ const recipientsOf = (list) => (Array.isArray(list) ? list : [])
   .map((address) => ({ name: address.name || '', email: address.email }))
 
 // `state`: the draft as the composer holds it ({ to, cc, bcc, subject,
-// html, attachments (its items), origin, identityId, signature }), `refs`
-// a Map of item key → { messageId, part }: what a saved draft made of its
-// files (createDraftSaver), named instead of their uploads. A token marked
+// html, attachments (its items), inlineImages (the text's images' items,
+// src/mailInlineImages.js), origin, identityId, signature }), `refs` a Map
+// of item key → { messageId, part }: what a saved draft made of its files
+// and images (createDraftSaver), named instead of their uploads. A token marked
 // invalid isn't sent (a send refuses it before, a draft leaves it out).
 export function buildComposePayload(state, { refs = null, draftId = null, sendUid = null } = {}) {
   const ready = (Array.isArray(state.attachments) ? state.attachments : []).filter((item) => item.status === 'ready')
@@ -40,6 +42,7 @@ export function buildComposePayload(state, { refs = null, draftId = null, sendUi
     subject: String(state.subject ?? ''),
     html: String(state.html ?? ''),
     attachments: references,
+    inlineImages: inlineImageReferences(state.inlineImages, state.html, refs),
     origin: state.origin ?? null,
     identityId: state.identityId ?? null,
     signature: {
@@ -63,6 +66,7 @@ export function draftStateKey(state) {
     recipientsOf(state.to), recipientsOf(state.cc), recipientsOf(state.bcc),
     String(state.subject ?? ''), String(state.html ?? ''),
     (state.attachments ?? []).filter((item) => item.status === 'ready').map((item) => item.key),
+    inlineImageReferences(state.inlineImages, state.html).map((image) => inlineImageKey(image.cid)),
     state.origin ?? null, state.identityId ?? null, state.signature ?? null,
   ])
 }

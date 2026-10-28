@@ -877,6 +877,43 @@
   white-space: pre-wrap;
 }
 
+/* A summary box (src/mailSummaryNode.js): a light card of label and value
+   rows, as the sent mail has it (server/mailSend.js). Not typed into: a
+   click selects it whole (its outline), Backspace takes it out. */
+.mail-composer-body table[data-mail-summary] {
+  margin: 4px 0 12px;
+  padding: 6px 0;
+  border-collapse: separate;
+  border-spacing: 0;
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  background: var(--color-bg-subtle);
+  font-size: 14px;
+  line-height: 1.45;
+  cursor: default;
+  user-select: none;
+}
+
+.mail-composer-body table[data-mail-summary] th {
+  padding: 4px 18px 4px 14px;
+  text-align: left;
+  vertical-align: top;
+  font-weight: 500;
+  color: var(--color-text-muted);
+  white-space: nowrap;
+}
+
+.mail-composer-body table[data-mail-summary] td {
+  padding: 4px 14px 4px 0;
+  vertical-align: top;
+  font-weight: 600;
+}
+
+.mail-composer-body table[data-mail-summary].ProseMirror-selectednode {
+  outline: 2px solid var(--color-text);
+  outline-offset: 2px;
+}
+
 /* The header's Tafac wordmark (not its chocolate mark) in white over the
    photo, as the university's logo, for it to read; its own colours on the
    plain page (white in dark mode, as LogoBut1 has it). */

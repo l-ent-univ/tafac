@@ -19,9 +19,9 @@
 //     did (send: the draft it replaces) | id (save: the draft saved over),
 //     mp: [{ ct: 'multipart/alternative', mp: [
 //       { ct: 'text/plain', content: { _content } },
-//       { ct: 'multipart/related', mp: [            (the signature's logos)
-//         { ct: 'text/html', content: { _content } },
-//         { ci: '<…@tafac.fr>', attach: { aid } } ] } ] }],
+//       { ct: 'multipart/related', mp: [            (the signature's logos,
+//         { ct: 'text/html', content: { _content } },  the text's images)
+//         { ci: '…@tafac.fr', attach: { aid } | { mp: [{ mid, part }] } } ] } ] }],
 //     attach: { aid: 'a,b', mp: [{ mid, part }] } }
 import sanitizeHtml from 'sanitize-html'
 import {
@@ -45,6 +45,15 @@ const SEND_UID_PATTERN = /^[A-Za-z0-9-]{8,64}$/
 const IDENTITY_ID_PATTERN = /^[A-Za-z0-9:._-]{1,64}$/
 const ESTABLISHMENT_ID_PATTERN = /^[a-z0-9-]{1,40}$/
 const PART_ID_PATTERN = /^\d+(?:\.\d+)*$/
+// The images inside the text (an image of a grade, src/gradeMail.js): a few
+// per mail, each its own inline part (multipart/related), named by a cid
+// the page makes (src/mailInlineImages.js's createInlineCid), shown at most
+// MAX_INLINE_IMAGE_WIDTH wide (a mail's usual column).
+export const MAX_INLINE_IMAGES = 3
+export const MAX_INLINE_IMAGE_WIDTH = 560
+export const INLINE_CID_PATTERN = /^tafac-img-[0-9a-f-]{8,64}@tafac\.fr$/
+export const INLINE_IMAGE_TYPES = new Set(['image/png', 'image/jpeg', 'image/gif'])
+const MAX_IMAGE_ALT_LENGTH = 200
 // The composer's kinds of answer, as the page names them, and Zimbra's
 // reply type for each (rt: 'r' replied, 'w' forwarded).
 const ORIGIN_KINDS = { reply: 'r', replyAll: 'r', forward: 'w' }
@@ -67,7 +76,27 @@ const BLOCK_STYLES = { 'margin-left': [INDENT] }
 // placeholder (src/mailSignatureNode.js: an empty div[data-mail-signature],
 // one at most). Any other div (a resumed draft's wrapper) gives way to its
 // content (sanitizeComposerHtml); anything else goes, its text kept.
-const COMPOSER_TAGS = ['p', 'br', 'strong', 'b', 'em', 'i', 'u', 's', 'ul', 'ol', 'li', 'h2', 'h3', 'blockquote', 'a', 'span', 'mark', 'div']
+// A summary box (src/mailSummaryNode.js): a table of text, label and value
+// a row, no attribute but its mark (a draft read back may have lost it).
+// An image only as a reference to one of the mail's inline parts
+// (img[data-inline-cid], src/mailInlineImageNode.js), never a source:
+// remote, data: and blob: images all go (selectInlineImages keeps those the
+// payload lists).
+const COMPOSER_TAGS = ['p', 'br', 'strong', 'b', 'em', 'i', 'u', 's', 'ul', 'ol', 'li', 'h2', 'h3', 'blockquote', 'a', 'span', 'mark', 'div', 'table', 'tbody', 'tr', 'th', 'td', 'img']
+const IMAGE_SIZE = /^\d{1,4}$/
+
+function cleanImageAttributes(attribs) {
+  const cid = String(attribs['data-inline-cid'] ?? '').trim().toLowerCase()
+  if (!INLINE_CID_PATTERN.test(cid)) return {}
+  const alt = capLength(decodeEntities(String(attribs.alt ?? '')).replace(CONTROL_CHARACTERS, ' ').replace(/\s+/g, ' ').trim(), MAX_IMAGE_ALT_LENGTH).trim()
+  return {
+    'data-inline-cid': cid,
+    ...(alt ? { alt } : null),
+    ...(IMAGE_SIZE.test(attribs.width ?? '') ? { width: attribs.width } : null),
+    ...(IMAGE_SIZE.test(attribs.height ?? '') ? { height: attribs.height } : null),
+  }
+}
+
 const COMPOSER_SANITIZE_OPTIONS = {
   allowedTags: COMPOSER_TAGS,
   allowedAttributes: {
@@ -79,6 +108,8 @@ const COMPOSER_SANITIZE_OPTIONS = {
     h3: ['style'],
     ol: ['start'],
     div: ['data-mail-signature'],
+    table: ['data-mail-summary'],
+    img: ['data-inline-cid', 'alt', 'width', 'height'],
   },
   allowedStyles: {
     span: SPAN_STYLES,
@@ -96,14 +127,17 @@ const COMPOSER_SANITIZE_OPTIONS = {
   nonTextTags: ['script', 'style', 'textarea', 'option', 'noscript', 'title', 'head', 'template', 'svg', 'math', 'iframe', 'object'],
   transformTags: {
     div: (tagName, attribs) => ({ tagName, attribs: Object.hasOwn(attribs, 'data-mail-signature') ? { 'data-mail-signature': '' } : {} }),
+    table: (tagName, attribs) => ({ tagName, attribs: Object.hasOwn(attribs, 'data-mail-summary') ? { 'data-mail-summary': '' } : {} }),
+    img: (tagName, attribs) => ({ tagName, attribs: cleanImageAttributes(attribs) }),
     ol: (tagName, attribs) => ({ tagName, attribs: /^\d{1,4}$/.test(attribs.start ?? '') && attribs.start !== '1' ? { start: attribs.start } : {} }),
     a: (tagName, attribs) => {
       const href = String(attribs.href ?? '').trim()
       return { tagName, attribs: /^(?:https?:\/\/|mailto:)/i.test(href) ? { href } : {} }
     },
   },
-  // A signature placeholder holds nothing.
-  exclusiveFilter: (frame) => frame.tag === 'div' && 'data-mail-signature' in frame.attribs && Boolean(frame.text?.trim()),
+  // A signature placeholder holds nothing; an image is a reference or goes.
+  exclusiveFilter: (frame) => (frame.tag === 'div' && 'data-mail-signature' in frame.attribs && Boolean(frame.text?.trim()))
+    || (frame.tag === 'img' && !frame.attribs['data-inline-cid']),
 }
 
 // The placeholder, set aside while the other divs are unwrapped: sanitized
@@ -121,6 +155,30 @@ export function sanitizeComposerHtml(html) {
 }
 
 export const SIGNATURE_PLACEHOLDER = '<div data-mail-signature></div>'
+
+// The images the mail takes, from sanitizeComposerHtml's HTML and the
+// payload's references (normalizeComposePayload's `inlineImages`, by cid):
+// an image whose cid isn't listed goes, as does a second one of a cid
+// (each part once in the mail). → { html, images } (`images`: the listed
+// ones the text holds, in its order, each with its alt from the text).
+export function selectInlineImages(cleanHtml, references = []) {
+  const byCid = new Map(references.map((entry) => [entry.cid, entry]))
+  const images = []
+  const html = sanitizeHtml(cleanHtml, {
+    allowedTags: COMPOSER_TAGS,
+    allowedAttributes: false,
+    transformTags: {
+      img: (tagName, attribs) => {
+        const reference = byCid.get(attribs['data-inline-cid'])
+        if (!reference || images.some((image) => image.cid === reference.cid)) return { tagName, attribs: {} }
+        images.push({ ...reference, alt: attribs.alt ?? '' })
+        return { tagName, attribs }
+      },
+    },
+    exclusiveFilter: (frame) => frame.tag === 'img' && !frame.attribs['data-inline-cid'],
+  })
+  return { html, images }
+}
 
 // ── The mail as sent: inline styles ────────────────────────────────────────
 
@@ -141,6 +199,10 @@ const ELEMENT_STYLES = {
   li: 'margin:0',
   blockquote: `margin:0.4em 0 0;padding:0 0 0 12px;border-left:2px solid #d9d2cc;color:${MUTED_COLOR}`,
   a: 'color:#1a73e8',
+  // The summary box: a light card of label and value rows.
+  table: 'margin:4px 0 12px;padding:6px 0;border-collapse:separate;border-spacing:0;border:1px solid #e8e1da;border-radius:12px;background:#f8f5f1;font-size:14px;line-height:1.45',
+  th: `padding:4px 18px 4px 14px;text-align:left;vertical-align:top;font-weight:500;color:${MUTED_COLOR};white-space:nowrap`,
+  td: `padding:4px 14px 4px 0;text-align:left;vertical-align:top;font-weight:600;color:${TEXT_COLOR}`,
 }
 
 function withStyle(base, own) {
@@ -150,14 +212,34 @@ function withStyle(base, own) {
 // The sanitized HTML (sanitizeComposerHtml) with its styles inline: an empty
 // paragraph (an empty line) keeps its height with a <br>; an indent
 // becomes the paragraph's left margin; the editor's Inter, the default font.
+// `images`: Map(cid → { src, width, height, alt }), the mail's inline
+// images (src: their cid: URL, or a data: URL for the demo's copy); an
+// image not in it goes.
 const HIGHLIGHT_TEXT = '#1f1f1f'
 
-export function inlineComposerStyles(cleanHtml) {
+function inlineImageTag(image) {
+  return {
+    src: image.src,
+    width: String(image.width),
+    height: String(image.height),
+    alt: image.alt ?? '',
+    style: `display:block;width:${image.width}px;max-width:100%;height:auto;margin:0 0 4px;border:0;outline:none;border-radius:16px`,
+  }
+}
+
+export function inlineComposerStyles(cleanHtml, { images = new Map() } = {}) {
   const styled = sanitizeHtml(cleanHtml, {
     allowedTags: COMPOSER_TAGS,
     allowedAttributes: false,
+    allowedSchemesByTag: { img: ['cid', 'data'] },
+    exclusiveFilter: (frame) => frame.tag === 'img' && !frame.attribs.src,
     transformTags: {
       '*': (tagName, attribs) => {
+        if (tagName === 'img') {
+          const image = images.get(attribs['data-inline-cid'])
+          return { tagName, attribs: image ? inlineImageTag(image) : {} }
+        }
+        if (tagName === 'table') return { tagName, attribs: { cellpadding: '0', cellspacing: '0', style: ELEMENT_STYLES.table } }
         const base = ELEMENT_STYLES[tagName]
         if (tagName === 'span' && attribs.style) {
           return { tagName, attribs: { style: attribs.style.replace(/font-family:\s*"?Inter Variable"?, system-ui, sans-serif/, `font-family:${DEFAULT_FONT}`) } }
@@ -180,8 +262,8 @@ export function inlineComposerStyles(cleanHtml) {
 // where the editor had its placeholder. A draft keeps the placeholder
 // (`keepPlaceholder`): empty, it shows nothing in the webmail, and the
 // composer puts the signature back there when the draft is resumed.
-export function buildMailHtml(cleanHtml, { signatureHtml = '', keepPlaceholder = false } = {}) {
-  const styled = inlineComposerStyles(cleanHtml)
+export function buildMailHtml(cleanHtml, { signatureHtml = '', keepPlaceholder = false, images = new Map() } = {}) {
+  const styled = inlineComposerStyles(cleanHtml, { images })
   const body = keepPlaceholder ? styled : styled.replace(SIGNATURE_DIV, () => signatureHtml)
   return `<html><head><meta charset="utf-8"></head><body><div style="${WRAPPER_STYLE}">${body}</div></body></html>`
 }
@@ -190,8 +272,10 @@ export function buildMailHtml(cleanHtml, { signatureHtml = '', keepPlaceholder =
 
 // The sanitized HTML as plain text (the multipart/alternative's other
 // part): a paragraph or a heading a line, lists as « - » or « 1. », a quote
-// as « > » lines, a link as « text (url) » unless its text is the url, the
-// signature (`signatureText`) where its placeholder was. The HTML is
+// as « > » lines, a link as « text (url) » unless its text is the url, a
+// summary box as « label : value » lines set apart, an image as « [Image :
+// its alt] », the signature (`signatureText`) where its placeholder was.
+// The HTML is
 // sanitize-html's output (tags of the allowlist, quoted attributes), which
 // a plain tokenizer reads safely.
 export function composerHtmlToText(cleanHtml, { signatureText = '' } = {}) {
@@ -234,6 +318,26 @@ export function composerHtmlToText(cleanHtml, { signatureText = '' } = {}) {
     if (tag === 'br') {
       open()
       close()
+      continue
+    }
+    if (tag === 'img') {
+      close()
+      const alt = decodeEntities(/alt="([^"]*)"/.exec(attributes)?.[1] ?? '').trim()
+      lines.push(`${prefix()}[Image${alt ? ` : ${alt}` : ''}]`)
+      continue
+    }
+    if (tag === 'table') {
+      close()
+      // Set apart by an empty line on each side.
+      if (lines.length && lines[lines.length - 1] !== prefix().trimEnd()) lines.push(prefix().trimEnd())
+      continue
+    }
+    if (tag === 'tr') {
+      close()
+      continue
+    }
+    if (tag === 'th' && closing) {
+      if (line) line.text = `${line.text.replace(/\s+$/, '')} : `
       continue
     }
     if (tag === 'div' && !closing && /data-mail-signature/.test(attributes)) {
@@ -350,13 +454,52 @@ function readRecipientList(value) {
   }))
 }
 
+// A file as a send names it: an upload of the session's, or a part of a
+// mail of its mailbox (a forwarded mail's, a draft's). Null for any other.
+function readPartReference(entry, isValidMessageId, isValidUploadId) {
+  if (entry?.source === 'upload' && isValidUploadId(entry.aid)) return { source: 'upload', aid: entry.aid }
+  if (entry?.source === 'message' && isValidMessageId(entry.messageId) && !String(entry.messageId).startsWith('-')
+    && typeof entry.part === 'string' && entry.part.length <= 40 && PART_ID_PATTERN.test(entry.part)) {
+    return { source: 'message', messageId: entry.messageId, part: entry.part }
+  }
+  return null
+}
+
+const referenceKey = (reference) => (reference.source === 'upload' ? reference.aid : `${reference.messageId}/${reference.part}`)
+
+// The text's images (`inlineImages`): MAX_INLINE_IMAGES at most, each a
+// cid of the page's kind, a file reference (readPartReference) and the
+// size it shows at, MAX_INLINE_IMAGE_WIDTH wide at most (its height in
+// proportion). → [{ cid, source, aid | messageId + part, width, height }],
+// or null when malformed.
+function readInlineImages(value, isValidMessageId, isValidUploadId) {
+  if (value === undefined || value === null) return []
+  if (!Array.isArray(value) || value.length > MAX_INLINE_IMAGES) return null
+  const images = []
+  for (const entry of value) {
+    const cid = typeof entry?.cid === 'string' ? entry.cid.toLowerCase() : ''
+    const reference = readPartReference(entry, isValidMessageId, isValidUploadId)
+    const width = Number(entry?.width)
+    const height = Number(entry?.height)
+    if (!INLINE_CID_PATTERN.test(cid) || !reference || !Number.isInteger(width) || !Number.isInteger(height)
+      || width < 1 || height < 1 || width > 4000 || height > 4000) return null
+    if (images.some((image) => image.cid === cid || referenceKey(image) === referenceKey(reference))) return null
+    const scale = Math.min(1, MAX_INLINE_IMAGE_WIDTH / width)
+    images.push({ cid, ...reference, width: Math.round(width * scale), height: Math.max(1, Math.round(height * scale)) })
+  }
+  return images
+}
+
 // A send's or a draft's body, checked. `isValidMessageId(id)`,
 // `isValidUploadId(aid)`: the session's own kinds of ids (a real one's
 // Zimbra ids, the demo's). A draft takes what a send would refuse
 // (no recipient, an address not yet right: left out of the saved draft).
-// → { ok: true, value: { to, cc, bcc, subject, html, attachments, origin,
-//      identityId, draftId, sendUid, signature: { include, mode, group,
-//      establishment } } }
+// The text keeps only the images listed in `inlineImages`
+// (selectInlineImages), and `inlineImages` only those the text shows.
+// → { ok: true, value: { to, cc, bcc, subject, html, attachments,
+//      inlineImages: [{ cid, source, aid | messageId + part, width, height,
+//      alt }], origin, identityId, draftId, sendUid, signature: { include,
+//      mode, group, establishment } } }
 //   or { ok: false, error, invalid? } (error: a fixed code for the page).
 export function normalizeComposePayload(body, { draft = false, isValidMessageId, isValidUploadId }) {
   if (!body || typeof body !== 'object' || Array.isArray(body)) return { ok: false, error: 'mail_send_invalid' }
@@ -399,19 +542,18 @@ export function normalizeComposePayload(body, { draft = false, isValidMessageId,
   const attachments = []
   const attachmentKeys = new Set()
   for (const entry of rawAttachments) {
-    let reference = null
-    if (entry?.source === 'upload' && isValidUploadId(entry.aid)) {
-      reference = { source: 'upload', aid: entry.aid }
-    } else if (entry?.source === 'message' && isValidMessageId(entry.messageId) && !String(entry.messageId).startsWith('-')
-      && typeof entry.part === 'string' && entry.part.length <= 40 && PART_ID_PATTERN.test(entry.part)) {
-      reference = { source: 'message', messageId: entry.messageId, part: entry.part }
-    }
+    const reference = readPartReference(entry, isValidMessageId, isValidUploadId)
     if (!reference) return { ok: false, error: 'mail_send_invalid' }
-    const key = reference.source === 'upload' ? reference.aid : `${reference.messageId}/${reference.part}`
+    const key = referenceKey(reference)
     if (attachmentKeys.has(key)) continue
     attachmentKeys.add(key)
     attachments.push(reference)
   }
+
+  // The text's images, none of them a file attached as well.
+  const listedImages = readInlineImages(body.inlineImages, isValidMessageId, isValidUploadId)
+  if (!listedImages || listedImages.some((image) => attachmentKeys.has(referenceKey(image)))) return { ok: false, error: 'mail_send_invalid' }
+  const { html, images: inlineImages } = selectInlineImages(sanitizeComposerHtml(body.html ?? ''), listedImages)
 
   let origin = null
   if (body.origin !== undefined && body.origin !== null) {
@@ -447,8 +589,9 @@ export function normalizeComposePayload(body, { draft = false, isValidMessageId,
     value: {
       ...recipients,
       subject: sanitizeSubject(body.subject),
-      html: sanitizeComposerHtml(body.html ?? ''),
+      html,
       attachments,
+      inlineImages,
       origin,
       identityId,
       draftId,
@@ -546,8 +689,9 @@ export function pickIdentity(identities, identityId) {
 // `ci` goes bare: Zimbra puts the angle brackets around it itself (sent
 // with them, the header came out « <<…>> », which Partage's webmail can't
 // match to the <img src="cid:…">: broken images, listed as attachments).
-// `identity`: pickIdentity's; `inlineParts`: [{ cid, aid }] (the signature's
-// logos); `attachments`: normalizeComposePayload's references; `origin`:
+// `identity`: pickIdentity's; `inlineParts`: [{ cid, aid } | { cid,
+// messageId, part }] (the signature's logos, the text's images: uploads, or
+// parts of a saved draft); `attachments`: normalizeComposePayload's references; `origin`:
 // { messageId, replyType, messageIdHeader } (the original's Message-ID, read
 // by the server, for In-Reply-To); `draftId`: a send's draft to delete
 // (did), a save's draft to replace (id).
@@ -574,7 +718,10 @@ export function buildZimbraMessage({ identity, to = [], cc = [], bcc = [], subje
     mp: [
       { ct: 'text/plain', content: { _content: text } },
       inlineParts.length
-        ? { ct: 'multipart/related', mp: [htmlPart, ...inlineParts.map((part) => ({ ci: part.cid.replace(/^<|>$/g, ''), attach: { aid: part.aid } }))] }
+        ? { ct: 'multipart/related', mp: [htmlPart, ...inlineParts.map((part) => ({
+          ci: part.cid.replace(/^<|>$/g, ''),
+          attach: part.aid ? { aid: part.aid } : { mp: [{ mid: part.messageId, part: part.part }] },
+        }))] }
         : htmlPart,
     ],
   }]
@@ -606,12 +753,51 @@ export function readDraftAttachmentParts(message) {
   if (!root || String(root.ct ?? '').toLowerCase() !== 'multipart/mixed' || !Array.isArray(root.mp)) return []
   return root.mp.slice(1)
     .filter((part) => typeof part?.part === 'string' && PART_ID_PATTERN.test(part.part))
+    // An image of the text, should Zimbra have put it there: not a file.
+    .filter((part) => !INLINE_CID_PATTERN.test(String(part.ci ?? '').trim().replace(/^<|>$/g, '').toLowerCase()))
     .map((part) => ({
       part: part.part,
       name: sanitizeAttachmentName(part.filename),
       size: Number.isSafeInteger(Number(part.s)) && Number(part.s) > 0 ? Number(part.s) : null,
       contentType: String(part.ct ?? 'application/octet-stream').toLowerCase(),
     }))
+}
+
+// A saved draft's inline images: the parts anywhere in it with a Content-ID
+// of the composer's kind (INLINE_CID_PATTERN) → [{ cid, part, name, size,
+// contentType }], once each.
+export function readDraftInlineParts(message) {
+  const found = []
+  const walk = (parts) => {
+    for (const part of Array.isArray(parts) ? parts : []) {
+      if (!part || typeof part !== 'object') continue
+      if (Array.isArray(part.mp)) walk(part.mp)
+      const cid = String(part.ci ?? '').trim().replace(/^<|>$/g, '').toLowerCase()
+      const contentType = String(part.ct ?? '').toLowerCase()
+      if (!INLINE_CID_PATTERN.test(cid) || !INLINE_IMAGE_TYPES.has(contentType) || typeof part.part !== 'string' || !PART_ID_PATTERN.test(part.part)) continue
+      if (found.some((entry) => entry.cid === cid)) continue
+      found.push({
+        cid,
+        part: part.part,
+        name: sanitizeAttachmentName(part.filename),
+        size: Number.isSafeInteger(Number(part.s)) && Number(part.s) > 0 ? Number(part.s) : null,
+        contentType,
+      })
+    }
+  }
+  walk(message?.mp)
+  return found
+}
+
+// After a save, the text's images as parts of the draft, by their cid
+// (Zimbra keeps the Content-ID it was given): [{ cid, messageId, part } |
+// null], in the page's order, and the uploads now parts of it (`used`: to
+// forget, as settleDraftAttachments).
+export function settleDraftInlineImages(images, draftId, parts) {
+  const byCid = new Map(parts.map((part) => [part.cid, part]))
+  const mapped = images.map((image) => (byCid.has(image.cid) ? { cid: image.cid, messageId: draftId, part: byCid.get(image.cid).part } : null))
+  const used = images.filter((image, index) => image.source === 'upload' && mapped[index]).map((image) => image.aid)
+  return { inlineImages: mapped, used }
 }
 
 // After a save, each of the page's references as a part of the draft (its
@@ -843,11 +1029,42 @@ function findBodyParts(parts, found = []) {
   return found
 }
 
+// The draft's HTML with its images as the editor holds them: an <img
+// src="cid:…"> of one of its inline parts (`cids`) becomes an
+// img[data-inline-cid] (sanitizeComposerHtml keeps it), any other <img>
+// goes. → { html, used (the cids shown, in order), dropped (images left
+// out: one Partage lost the part of) }.
+function readDraftImages(html, cids) {
+  const used = []
+  let dropped = 0
+  const out = sanitizeHtml(html, {
+    allowedTags: false,
+    allowedAttributes: false,
+    allowVulnerableTags: true,
+    transformTags: {
+      img: (tagName, attribs) => {
+        const cid = String(attribs.src ?? '').trim().replace(/^cid:/i, '').replace(/^<|>$/g, '').toLowerCase()
+        if (!/^cid:/i.test(String(attribs.src ?? '').trim()) || !cids.has(cid) || used.includes(cid)) {
+          if (/^cid:tafac-img-/i.test(String(attribs.src ?? '').trim())) dropped += 1
+          return { tagName, attribs: {} }
+        }
+        used.push(cid)
+        const { width, height, alt } = attribs
+        return { tagName, attribs: { 'data-inline-cid': cid, ...(alt ? { alt } : null), ...(width ? { width } : null), ...(height ? { height } : null) } }
+      },
+    },
+  })
+  return { html: out, used, dropped }
+}
+
 // A draft as GetMsgRequest gives it (html: 1, neuter: 0: its HTML as
 // saved) → what the composer opens with: { id, to, cc, bcc, subject, html
 // (sanitizeComposerHtml's: what the editor itself may hold), attachments:
-// [{ part, name, size, contentType }], identityId (one of `identities`, else
-// null), origin: { kind, messageId } (the mail it answers or forwards) }.
+// [{ part, name, size, contentType }], inlineImages: [{ cid, part, name,
+// size, contentType, width, height }] (the text's, by their part),
+// droppedImages (how many of the composer's images came back without
+// their part), identityId (one of `identities`, else null), origin: {
+// kind, messageId } (the mail it answers or forwards) }.
 export function readDraftForComposer(message, identities = []) {
   const addresses = Array.isArray(message?.e) ? message.e : []
   const pick = (type) => {
@@ -860,7 +1077,14 @@ export function readDraftForComposer(message, identities = []) {
   const bodies = findBodyParts(message?.mp)
   const htmlBody = bodies.find((body) => body.type === 'text/html')
   const textBody = bodies.find((body) => body.type === 'text/plain')
-  const html = htmlBody ? sanitizeComposerHtml(htmlBody.content) : sanitizeComposerHtml(plainTextToComposerHtml(textBody?.content ?? ''))
+  const inlineParts = readDraftInlineParts(message)
+  const images = htmlBody ? readDraftImages(htmlBody.content, new Set(inlineParts.map((part) => part.cid))) : { html: '', used: [], dropped: 0 }
+  const html = htmlBody ? sanitizeComposerHtml(images.html) : sanitizeComposerHtml(plainTextToComposerHtml(textBody?.content ?? ''))
+  // Each image's size as the text has it (its <img>'s width and height).
+  const sizes = new Map([...html.matchAll(/<img\b[^>]*>/g)].map(([tag]) => {
+    const read = (name) => new RegExp(`\\s${name}="([^"]*)"`).exec(tag)?.[1] ?? null
+    return [read('data-inline-cid'), { width: Number(read('width')) || null, height: Number(read('height')) || null }]
+  }))
   const identityId = identities.some((identity) => identity.id === message?.idnt) ? message.idnt : null
   const originId = String(message?.origid ?? '')
   const origin = /^\d{1,10}$/.test(originId) && (message?.rt === 'r' || message?.rt === 'w')
@@ -874,6 +1098,8 @@ export function readDraftForComposer(message, identities = []) {
     subject: sanitizeSubject(message?.su ?? ''),
     html,
     attachments: readDraftAttachmentParts(message),
+    inlineImages: images.used.map((cid) => ({ ...inlineParts.find((part) => part.cid === cid), ...sizes.get(cid) })),
+    droppedImages: images.dropped,
     identityId,
     origin,
   }

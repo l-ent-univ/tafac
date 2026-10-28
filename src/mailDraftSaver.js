@@ -1,3 +1,4 @@
+import { inlineImageKey } from './mailInlineImages.js'
 import { buildComposePayload, draftStateKey } from './mailSendPayload.js'
 
 // One draft's saves to the webmail's Drafts folder (POST
@@ -8,8 +9,8 @@ import { buildComposePayload, draftStateKey } from './mailSendPayload.js'
 //
 // Saves go one after the other, never two at once; one whose content is
 // what the last save had (draftStateKey) doesn't go. Once saved, the
-// draft's files are parts of it (Zimbra deletes an upload once used): the
-// saver keeps, by item key, the part each became (`refs`), which the next
+// draft's files and images are parts of it (Zimbra deletes an upload once
+// used): the saver keeps, by item key, the part each became (`refs`), which the next
 // save and the send name instead (buildComposePayload). `listener(status,
 // failure)`: 'saving', 'saved' or 'error', for the composer's quiet line,
 // with the failed save's result (saveMailDraft's: an 'upload-expired' one
@@ -51,6 +52,10 @@ export function createDraftSaver({ draftId = null, refs = null, save, discardDra
     result.draft.attachments.forEach((reference, index) => {
       if (reference && ready[index]) partRefs.set(ready[index].key, reference)
     })
+    // The text's images, by their cid.
+    for (const reference of result.draft.inlineImages ?? []) {
+      if (reference) partRefs.set(inlineImageKey(reference.cid), { messageId: reference.messageId, part: reference.part })
+    }
     setStatus('saved')
   }
 

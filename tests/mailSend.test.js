@@ -17,10 +17,12 @@ import {
   pickIdentity,
   readDraftAttachmentParts,
   readDraftForComposer,
+  readDraftInlineParts,
   readPngSize,
   sanitizeComposerHtml,
   sanitizeSubject,
   settleDraftAttachments,
+  settleDraftInlineImages,
   submitZimbraSend,
 } from '../server/mailSend.js'
 import { isValidMailMessageId } from '../server/mailMessage.js'
@@ -46,7 +48,9 @@ test('the editor HTML: its allowlist and nothing more', () => {
     '<mark data-color="#fff3a3" style="background-color: #fff3a3; color: inherit">surligné</mark>',
     '<div data-mail-signature=""></div><div data-mail-signature=""></div><div data-mail-signature="">texte</div>',
     '<img src="https://track.example/p.gif"><script>alert(1)</script><style>p{}</style><iframe src="x"></iframe>',
-    '<div class="wrapper"><p>dans un div</p></div><table><tr><td>cellule</td></tr></table>',
+    '<div class="wrapper"><p>dans un div</p></div><table class="x" style="color:red"><tr bgcolor="red"><td onclick="x()">cellule</td></tr></table>',
+    '<img data-inline-cid="tafac-img-0123abcd-4567@tafac.fr" alt="Note" width="520" height="300" src="https://x/y.png" onerror="x()">',
+    '<img data-inline-cid="ailleurs@example.org"><img src="data:image/png;base64,AAAA"><img src="blob:https://tafac.fr/1">',
   ].join(''))
   assert.equal(clean, [
     '<p>Bonjour <strong>Camille</strong> <em>et</em> <u>tous</u> <s>non</s></p>',
@@ -59,7 +63,10 @@ test('the editor HTML: its allowlist and nothing more', () => {
     '<span>rien</span>',
     '<mark style="background-color:#fff3a3;color:inherit">surligné</mark>',
     '<div data-mail-signature></div>',
-    '<p>dans un div</p>cellule',
+    // A summary box's table, without an attribute; an image as a reference
+    // to an inline part only, never a source of its own.
+    '<p>dans un div</p><table><tr><td>cellule</td></tr></table>',
+    '<img data-inline-cid="tafac-img-0123abcd-4567@tafac.fr" alt="Note" width="520" height="300" />',
   ].join(''))
   assert.equal(sanitizeComposerHtml(null), '')
   assert.equal(sanitizeComposerHtml(42), '')
@@ -372,6 +379,8 @@ test('a draft back into the composer', () => {
     subject: 'Brouillon',
     html: '<p>Salut </p><div data-mail-signature></div>',
     attachments: [],
+    inlineImages: [],
+    droppedImages: 0,
     identityId: 'persona-2',
     origin: { kind: 'forward', messageId: '257' },
   })
@@ -444,6 +453,7 @@ test('the page\'s payload: references, no From, the signature\'s choices only', 
     subject: 'Objet',
     html: '<p>x</p><div data-mail-signature=""></div>',
     attachments: [{ source: 'message', messageId: '400', part: '3' }, { source: 'message', messageId: '257', part: '2' }],
+    inlineImages: [],
     origin: { kind: 'replyAll', messageId: '257' },
     identityId: 'acct-1',
     signature: { include: true, group: 'MMI 2', establishment: 'iutlan' },
@@ -646,4 +656,169 @@ test('the send and draft bodies: the mail bucket before a byte is read, counted 
   assert.equal(blocked.headers.get('connection'), 'close')
   // Past the bucket: a send's body isn't read either (not its 400).
   assert.equal((await post(base, 'send', cookie, '{not json')).status, 429)
+}))
+
+test('the demo is bounded: its mails\' size, its sends counted by address too', () => withApp(async ({ base, signIn }) => {
+  const first = await signIn()
+  const mail = { to: [{ email: 'leo@univ.fr' }], subject: 'Borne', html: '<p>x</p>' }
+  let uid = 0
+  const send = (cookie, body = {}) => post(base, 'send', cookie, { ...mail, sendUid: `uid-bound-${String((uid += 1)).padStart(4, '0')}`, ...body })
+  // Past the demo's size, a mail or a draft is refused (nothing kept).
+  const huge = `<p>${'x'.repeat(300 * 1024)}</p>`
+  assert.deepEqual((await send(first, { html: huge })).body, { error: 'mail_send_too_large', maxBytes: 256 * 1024 })
+  assert.equal((await post(base, 'draft', first, { ...mail, html: huge })).status, 413)
+  // A new demo session from the same address doesn't start a new count.
+  const statuses = []
+  for (let index = 0; index < 5; index += 1) statuses.push((await send(first)).status)
+  assert.deepEqual(statuses, [200, 200, 200, 200, 200])
+  const second = await signIn()
+  assert.equal((await send(second)).status, 429)
+}))
+
+// ── The text's images (an image of a grade, src/gradeMail.js) ──
+
+const IMAGE_CID = 'tafac-img-0123abcd-4567-89ab@tafac.fr'
+const OTHER_CID = 'tafac-img-fedcba98-7654-3210@tafac.fr'
+const checkIds = { isValidMessageId: (id) => /^\d+$/.test(id), isValidUploadId: (aid) => /^aid-\d+$/.test(aid) }
+const imageMail = (body = {}) => ({
+  to: [{ email: 'prof@univ.fr' }],
+  sendUid: 'uid-00000001',
+  html: `<p>x</p><img data-inline-cid="${IMAGE_CID}" alt="Note de TP"><img data-inline-cid="${OTHER_CID}"><img src="https://track.example/p.gif"><img data-inline-cid="${IMAGE_CID}">`,
+  inlineImages: [{ cid: IMAGE_CID, source: 'upload', aid: 'aid-1', width: 1040, height: 600 }],
+  ...body,
+})
+
+test('the text\'s images: only those listed, once, their size capped', () => {
+  const { value } = normalizeComposePayload(imageMail(), checkIds)
+  // An image not listed (another cid, a remote one) goes; a cid twice, once.
+  assert.equal(value.html, `<p>x</p><img data-inline-cid="${IMAGE_CID}" alt="Note de TP" />`)
+  assert.deepEqual(value.inlineImages, [{ cid: IMAGE_CID, source: 'upload', aid: 'aid-1', width: 560, height: 323, alt: 'Note de TP' }])
+  // Listed but not in the text: not sent.
+  assert.deepEqual(normalizeComposePayload(imageMail({ html: '<p>x</p>' }), checkIds).value.inlineImages, [])
+  // A draft's part, by reference.
+  const part = normalizeComposePayload(imageMail({ inlineImages: [{ cid: IMAGE_CID, source: 'message', messageId: '400', part: '2.2', width: 520, height: 300 }] }), checkIds)
+  assert.deepEqual(part.value.inlineImages, [{ cid: IMAGE_CID, source: 'message', messageId: '400', part: '2.2', width: 520, height: 300, alt: 'Note de TP' }])
+  // Refused: more than MAX_INLINE_IMAGES, a cid not the composer's, an id
+  // not the session's kind, a size out of range, a cid or a file twice, an
+  // upload both attached and in the text.
+  const refused = [
+    [1, 2, 3, 4].map((index) => ({ cid: `tafac-img-0000000${index}-0000@tafac.fr`, source: 'upload', aid: `aid-${index}`, width: 10, height: 10 })),
+    [{ cid: 'logo@example.org', source: 'upload', aid: 'aid-1', width: 10, height: 10 }],
+    [{ cid: IMAGE_CID, source: 'upload', aid: '../etc', width: 10, height: 10 }],
+    [{ cid: IMAGE_CID, source: 'upload', aid: 'aid-1', width: 0, height: 10 }],
+    [{ cid: IMAGE_CID, source: 'upload', aid: 'aid-1', width: 10, height: 99999 }],
+    [{ cid: IMAGE_CID, source: 'upload', aid: 'aid-1', width: 10, height: 10 }, { cid: IMAGE_CID, source: 'upload', aid: 'aid-2', width: 10, height: 10 }],
+    [{ cid: IMAGE_CID, source: 'upload', aid: 'aid-1', width: 10, height: 10 }, { cid: OTHER_CID, source: 'upload', aid: 'aid-1', width: 10, height: 10 }],
+    'pas une liste',
+  ]
+  for (const inlineImages of refused) assert.deepEqual(normalizeComposePayload(imageMail({ inlineImages }), checkIds), { ok: false, error: 'mail_send_invalid' }, JSON.stringify(inlineImages))
+  assert.deepEqual(normalizeComposePayload(imageMail({ attachments: [{ source: 'upload', aid: 'aid-1' }] }), checkIds), { ok: false, error: 'mail_send_invalid' })
+})
+
+test('the text\'s images in the mail: inline parts by a bare cid, <img src="cid:…"> sized', () => {
+  const { value } = normalizeComposePayload(imageMail(), checkIds)
+  const images = new Map(value.inlineImages.map((image) => [image.cid, { src: `cid:${image.cid}`, width: image.width, height: image.height, alt: image.alt }]))
+  const html = buildMailHtml(value.html, { images })
+  assert.match(html, new RegExp(`<img src="cid:${IMAGE_CID}" width="560" height="323" alt="Note de TP" style="display:block;width:560px;max-width:100%;height:auto;`))
+  assert.doesNotMatch(html, /data-inline-cid|track\.example/)
+  // An image the map doesn't have goes.
+  assert.doesNotMatch(buildMailHtml(value.html), /<img/)
+  const message = buildZimbraMessage({
+    identity: { id: 'default', name: '', email: 'me@univ.fr' },
+    to: value.to,
+    html,
+    text: 't',
+    inlineParts: [
+      { cid: '<tafac-logo-1.x@tafac.fr>', aid: 'logo-aid' },
+      { cid: IMAGE_CID, aid: 'aid-1' },
+      { cid: OTHER_CID, messageId: '400', part: '2.2' },
+    ],
+  })
+  assert.deepEqual(message.mp[0].mp[1], {
+    ct: 'multipart/related',
+    mp: [
+      { ct: 'text/html', content: { _content: html } },
+      { ci: 'tafac-logo-1.x@tafac.fr', attach: { aid: 'logo-aid' } },
+      { ci: IMAGE_CID, attach: { aid: 'aid-1' } },
+      { ci: OTHER_CID, attach: { mp: [{ mid: '400', part: '2.2' }] } },
+    ],
+  })
+  assert.equal(message.attach, undefined)
+})
+
+test('a saved draft\'s images: found by their cid, mapped, back into the composer', () => {
+  const draft = {
+    id: '400',
+    l: '6',
+    mp: [{ ct: 'multipart/mixed', mp: [
+      { ct: 'multipart/alternative', part: '1', mp: [
+        { ct: 'text/plain', part: '1.1', body: true, content: 'x' },
+        { ct: 'multipart/related', part: '1.2', mp: [
+          { ct: 'text/html', part: '1.2.1', body: true, content: `<div><p>x</p><img src="cid:${IMAGE_CID}" width="520" height="300" alt="Note"><img src="cid:${OTHER_CID}"><img src="https://x.example/y.png"></div>` },
+          { ct: 'image/png', part: '1.2.2', ci: `<${IMAGE_CID.toUpperCase()}>`, filename: 'note.png', s: 80000 },
+        ] },
+      ] },
+      { ct: 'application/pdf', part: '2', filename: 'a.pdf', s: 10 },
+    ] }],
+  }
+  assert.deepEqual(readDraftInlineParts(draft), [{ cid: IMAGE_CID, part: '1.2.2', name: 'note.png', size: 80000, contentType: 'image/png' }])
+  const read = readDraftForComposer(draft)
+  assert.equal(read.html, `<p>x</p><img data-inline-cid="${IMAGE_CID}" alt="Note" width="520" height="300" />`)
+  assert.deepEqual(read.inlineImages, [{ cid: IMAGE_CID, part: '1.2.2', name: 'note.png', size: 80000, contentType: 'image/png', width: 520, height: 300 }])
+  // The other image of the composer's lost its part: said, not shown.
+  assert.equal(read.droppedImages, 1)
+  assert.deepEqual(read.attachments.map((file) => file.part), ['2'])
+  // After a save: each image's part, the uploads used.
+  const images = [{ cid: IMAGE_CID, source: 'upload', aid: 'aid-1' }, { cid: OTHER_CID, source: 'upload', aid: 'aid-2' }]
+  assert.deepEqual(settleDraftInlineImages(images, '400', readDraftInlineParts(draft)), {
+    inlineImages: [{ cid: IMAGE_CID, messageId: '400', part: '1.2.2' }, null],
+    used: ['aid-1'],
+  })
+})
+
+const uploadDemoImage = (base, cookie, type = 'image/png') => fetch(`${base}/__ent_auth/mail/upload`, {
+  method: 'POST',
+  headers: { cookie, 'Content-Type': type, 'Content-Disposition': 'attachment; filename="note.png"' },
+  body: Buffer.from('89504e470d0a1a0a0000000d49484452000000010000000108060000001f15c4890000000d49444154789c6360000000000200013e5d3a8a0000000049454e44ae426082', 'hex'),
+}).then((response) => response.json())
+
+test('the demo\'s images of the text: its own uploads only, an image, inline in « Envoyés »', () => withApp(async ({ base, signIn }) => {
+  const cookie = await signIn()
+  const html = `<p>x</p><img data-inline-cid="${IMAGE_CID}" alt="Note de TP">`
+  let uid = 0
+  const send = (who, inlineImages) => post(base, 'send', who, { to: [{ email: 'leo@univ.fr' }], subject: 'Image', html, inlineImages, sendUid: `uid-image-${String((uid += 1)).padStart(4, '0')}` })
+  // Another session's upload: not this one's (to upload again).
+  const other = await signIn()
+  const foreign = (await uploadDemoImage(base, other)).attachment
+  const refused = await send(cookie, [{ cid: IMAGE_CID, source: 'upload', aid: foreign.aid, width: 520, height: 300 }])
+  assert.deepEqual([refused.status, refused.body], [409, { error: 'mail_send_upload_expired', aids: [foreign.aid] }])
+  // A file that isn't an image: refused as one of the text.
+  const text = (await uploadDemoFile(base, cookie)).attachment
+  assert.equal((await send(cookie, [{ cid: IMAGE_CID, source: 'upload', aid: text.aid, width: 520, height: 300 }])).status, 409)
+  // Its own image: sent, inline (the demo's copy by a data: URL), no file attached.
+  const image = (await uploadDemoImage(base, cookie)).attachment
+  const sent = await send(cookie, [{ cid: IMAGE_CID, source: 'upload', aid: image.aid, width: 520, height: 300 }])
+  assert.deepEqual([sent.status, sent.body], [200, { ok: true }])
+  const list = await fetch(`${base}/__ent_auth/mail/recent?folder=5`, { headers: { cookie } }).then((response) => response.json())
+  const copy = await fetch(`${base}/__ent_auth/mail/message?id=${list.mail.messages[0].id}`, { headers: { cookie } }).then((response) => response.json())
+  assert.match(copy.message.html, /<img width="520" height="300" alt="Note de TP" style="[^"]+" src="data:image\/png;base64,[^"]+"/)
+  assert.deepEqual(copy.message.attachments, [])
+  assert.match(list.mail.messages[0].snippet, /\[Image : Note de TP\]/)
+  // Used: a new send naming it is refused (to upload again).
+  assert.equal((await send(cookie, [{ cid: IMAGE_CID, source: 'upload', aid: image.aid, width: 520, height: 300 }])).status, 409)
+
+  // A draft keeps it as a part, read back with where it shows from.
+  const again = (await uploadDemoImage(base, cookie)).attachment
+  const saved = await post(base, 'draft', cookie, { to: [], subject: 'Brouillon', html, inlineImages: [{ cid: IMAGE_CID, source: 'upload', aid: again.aid, width: 520, height: 300 }] })
+  assert.equal(saved.status, 200)
+  const { id } = saved.body.draft
+  assert.deepEqual(saved.body.draft.inlineImages, [{ cid: IMAGE_CID, messageId: id, part: '2' }])
+  const read = await fetch(`${base}/__ent_auth/mail/draft?id=${id}`, { headers: { cookie } }).then((response) => response.json())
+  assert.equal(read.draft.html, `<p>x</p><img data-inline-cid="${IMAGE_CID}" alt="Note de TP" />`)
+  assert.equal(read.draft.inlineImages.length, 1)
+  assert.match(read.draft.inlineImages[0].href, /^data:image\/png;base64,/)
+  assert.equal(read.draft.inlineImages[0].bytes, undefined)
+  // Sent from the draft's part.
+  const fromDraft = await post(base, 'send', cookie, { to: [{ email: 'leo@univ.fr' }], subject: 'Brouillon', html, draftId: id, inlineImages: [{ cid: IMAGE_CID, source: 'message', messageId: id, part: '2', width: 520, height: 300 }], sendUid: 'uid-image-draft' })
+  assert.deepEqual([fromDraft.status, fromDraft.body], [200, { ok: true }])
 }))

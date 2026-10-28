@@ -17,6 +17,7 @@ import PageEmptyState from './PageEmptyState'
 import { useListTransitions } from '../useListTransitions'
 import { foldMailSearchText, parseMailSearchWords } from '../mailSearch'
 import { normalizeRecipient } from '../mailCompose'
+import { draftInlineImageItems } from '../mailInlineImages'
 import { useContextMenu } from '../useContextMenu'
 import {
   SHIMMER_CLASSES,
@@ -1423,6 +1424,8 @@ function MailPage({ onReaderOpenChange, onSignInAgain, sender = null }) {
             contentType: file.contentType,
             status: 'ready',
           })),
+          inlineImages: draftInlineImageItems(draft),
+          droppedImages: draft.droppedImages ?? 0,
           identityId: draft.identityId,
           origin: draft.origin,
         },

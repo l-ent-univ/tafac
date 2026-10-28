@@ -45,6 +45,7 @@ import {
 import { createLaunchTargetPolicy } from './launchTargets.js'
 import {
   buildMailMessage,
+  buildMailPartHref,
   dropOwnMailCopies,
   getMailPartDisposition,
   isValidDemoMailMessageId,
@@ -73,6 +74,7 @@ import {
   composerHtmlToText,
   createSendLimiter,
   createSendOnce,
+  INLINE_IMAGE_TYPES,
   mapDraftAttachments,
   mapZimbraSendFault,
   normalizeComposePayload,
@@ -80,10 +82,12 @@ import {
   pickIdentity,
   readDraftAttachmentParts,
   readDraftForComposer,
+  readDraftInlineParts,
   readIdentitySignatureIds,
   readPngSize,
   sanitizeComposerHtml,
   settleDraftAttachments,
+  settleDraftInlineImages,
   submitZimbraSend,
 } from './mailSend.js'
 import {
@@ -274,6 +278,18 @@ const MAIL_COMPOSE_MAX_BODY_BYTES = 2 * 1024 * 1024
 // The uploads a session's sends may name (runtimeMailUploads), the oldest
 // forgotten past this.
 const MAIL_UPLOADS_KEPT = 200
+// A demo session's uploaded image, kept (its other files are dropped) for
+// its copy in « Envoyés » and its drafts to show it, up to this size.
+const DEMO_IMAGE_KEPT_BYTES = 1024 * 1024
+// The demo account is public and shared: every visitor gets their own demo
+// mailbox in this server's memory (runtimeDemoMail, its kept images in
+// runtimeMailUploads). Bounded so a script opening demo sessions can't fill
+// the memory: so many demo mailboxes at most (the oldest forgotten first),
+// so many bytes of images kept per session, and a demo mail's or draft's
+// text this long at most (a real one goes to Partage, nothing kept here).
+const DEMO_MAILBOXES_MAX = 200
+const DEMO_IMAGES_KEPT_PER_SESSION = 4 * 1024 * 1024
+const DEMO_MAIL_HTML_MAX = 256 * 1024
 // Domains the webmail sign-in chain may visit (webmail, SAML SP, IdP, CAS).
 // Anything else — or any non-HTTPS URL — aborts the chain.
 function buildSignInDomains(extraDomains, urls) {
@@ -2488,13 +2504,17 @@ app.post('/__ent_auth/mail/upload', async (req, res) => {
       abortAfter(MAIL_PART_IDLE_TIMEOUT_MS, new UploadIdleError('Upload went idle.'))
       const reader = countedBody(length).getReader()
       controller.signal.addEventListener('abort', () => reader.cancel().catch(() => {}), { once: true })
-      while (!(await reader.read()).done) {
-        // Read and dropped.
+      // Read and dropped, but a small image (one the text may show).
+      const keep = INLINE_IMAGE_TYPES.has(contentType) && length <= DEMO_IMAGE_KEPT_BYTES
+        && demoKeptImageBytes(session.id) + length <= DEMO_IMAGES_KEPT_PER_SESSION
+      const chunks = []
+      for (let chunk = await reader.read(); !chunk.done; chunk = await reader.read()) {
+        if (keep) chunks.push(Buffer.from(chunk.value))
       }
       clearTimeout(deadline)
       if (controller.signal.aborted) throw controller.signal.reason ?? new UploadIdleError('Upload ended early.')
       const aid = `demo-upload-${randomUUID()}`
-      rememberMailUpload(session.id, aid, { size: received, name, contentType })
+      rememberMailUpload(session.id, aid, { size: received, name, contentType, ...(keep ? { bytes: Buffer.concat(chunks) } : null) })
       setSessionCookie(res, session)
       return res.status(200).json({ attachment: { aid, name, size: received, contentType } })
     }
@@ -4560,7 +4580,7 @@ function rememberMailUpload(sessionId, aid, entry) {
     runtimeMailUploads.set(sessionId, uploads)
   }
   uploads.delete(aid)
-  uploads.set(aid, { size: Number(entry.size) || 0, name: entry.name, contentType: entry.contentType })
+  uploads.set(aid, { size: Number(entry.size) || 0, name: entry.name, contentType: entry.contentType, ...(entry.bytes ? { bytes: entry.bytes } : null) })
   while (uploads.size > MAIL_UPLOADS_KEPT) uploads.delete(uploads.keys().next().value)
 }
 
@@ -4757,15 +4777,30 @@ async function readOriginalMessage(context, id) {
 
 // The uploads named, each one this session made, and all of a mail's
 // together within the account's limit (the files of other mails aren't
-// counted: Partage checks the mail as a whole anyway).
-function checkMailUploads(session, attachments, limits) {
+// counted: Partage checks the mail as a whole anyway). The text's images
+// (`inlineImages`) are uploads as the files are, of an image type besides.
+function checkMailUploads(session, attachments, limits, inlineImages = []) {
   const uploads = runtimeMailUploads.get(session.id)
-  const aids = attachments.filter((entry) => entry.source === 'upload').map((entry) => entry.aid)
+  const imageAids = inlineImages.filter((entry) => entry.source === 'upload').map((entry) => entry.aid)
+  const aids = [...attachments.filter((entry) => entry.source === 'upload').map((entry) => entry.aid), ...imageAids]
   const unknown = aids.filter((aid) => !uploads?.has(aid))
   if (unknown.length) throw new MailSendRefusal(409, 'mail_send_upload_expired', { aids: unknown })
+  if (imageAids.some((aid) => !INLINE_IMAGE_TYPES.has(uploads.get(aid)?.contentType))) throw new MailSendRefusal(400, 'mail_send_invalid')
   const total = aids.reduce((sum, aid) => sum + (uploads.get(aid)?.size ?? 0), 0)
   if (total > limits.maxTotalBytes) throw new MailSendRefusal(413, 'mail_send_too_large', { maxBytes: limits.maxTotalBytes })
   return aids
+}
+
+// The text's images as inline parts of the mail (buildZimbraMessage) and as
+// its HTML shows them (buildMailHtml's `images`: by their cid: URL).
+function inlineImageParts(images) {
+  return images.map((image) => (image.source === 'upload'
+    ? { cid: image.cid, aid: image.aid }
+    : { cid: image.cid, messageId: image.messageId, part: image.part }))
+}
+
+function inlineImageSources(images, src = (image) => `cid:${image.cid}`) {
+  return new Map(images.map((image) => [image.cid, { src: src(image), width: image.width, height: image.height, alt: image.alt }]))
 }
 
 // A send through Partage: SendMsgRequest with the identity's address as
@@ -4778,7 +4813,7 @@ async function sendZimbraMail(context, session, payload) {
   const [identities, limits] = await Promise.all([readZimbraIdentities(context), readZimbraAttachmentLimits(context)])
   const identity = pickIdentity(identities, payload.identityId)
   if (!identity) throw new MailSendRefusal(400, 'mail_send_invalid_identity')
-  const aids = checkMailUploads(session, payload.attachments, limits)
+  const aids = checkMailUploads(session, payload.attachments, limits, payload.inlineImages)
   const ownSignature = payload.signature.include && payload.signature.mode !== 'auto'
   const signature = ownSignature ? null : resolveMailSignature(payload.signature, identity, session)
   const [original, logoParts, signatures] = await Promise.all([
@@ -4797,9 +4832,9 @@ async function sendZimbraMail(context, session, payload) {
     cc: payload.cc,
     bcc: payload.bcc,
     subject: payload.subject,
-    html: buildMailHtml(payload.html, { signatureHtml: built.html }),
+    html: buildMailHtml(payload.html, { signatureHtml: built.html, images: inlineImageSources(payload.inlineImages) }),
     text: composerHtmlToText(payload.html, { signatureText: built.text }),
-    inlineParts: logoParts,
+    inlineParts: [...logoParts, ...inlineImageParts(payload.inlineImages)],
     attachments: payload.attachments,
     origin,
     draftId: payload.draftId,
@@ -4813,13 +4848,14 @@ async function sendZimbraMail(context, session, payload) {
 
 // A draft saved to Partage's Drafts folder (SaveDraftRequest): the same
 // mail, without the signature (its placeholder kept for the composer) nor
-// In-Reply-To; `id` replaces the draft saved before. → { id, attachments }:
-// each of the page's references as a part of the draft now (its uploads
-// are gone once used), in the page's order.
+// In-Reply-To; `id` replaces the draft saved before. → { id, attachments,
+// inlineImages }: each of the page's references (files, the text's images)
+// as a part of the draft now (its uploads are gone once used), in the
+// page's order.
 async function saveZimbraDraft(context, session, payload) {
   const [identities, limits] = await Promise.all([readZimbraIdentities(context), readZimbraAttachmentLimits(context)])
   const identity = pickIdentity(identities, payload.identityId) ?? identities[0] ?? null
-  checkMailUploads(session, payload.attachments, limits)
+  checkMailUploads(session, payload.attachments, limits, payload.inlineImages)
   // The uploads' names, for their parts to be found by name when the
   // draft's count of them isn't what was sent (mapDraftAttachments).
   const uploads = runtimeMailUploads.get(session.id)
@@ -4830,8 +4866,9 @@ async function saveZimbraDraft(context, session, payload) {
     cc: payload.cc,
     bcc: payload.bcc,
     subject: payload.subject,
-    html: buildMailHtml(payload.html, { keepPlaceholder: true }),
+    html: buildMailHtml(payload.html, { keepPlaceholder: true, images: inlineImageSources(payload.inlineImages) }),
     text: composerHtmlToText(payload.html),
+    inlineParts: inlineImageParts(payload.inlineImages),
     attachments: payload.attachments,
     origin: payload.origin,
     draftId: payload.draftId,
@@ -4852,7 +4889,7 @@ async function saveZimbraDraft(context, session, payload) {
   // Its parts, when the answer didn't list them. Saved already: a failure
   // here still gives the page the draft's id (else its next save makes
   // another draft), its files then unmapped.
-  if (payload.attachments.length && !Array.isArray(draft?.mp)) {
+  if ((payload.attachments.length || payload.inlineImages.length) && !Array.isArray(draft?.mp)) {
     try {
       const read = await zimbraSoapRequest(context, 'GetMsgRequest', { m: { id, max: 1 } })
       draft = Array.isArray(read.m) ? read.m[0] : read.m
@@ -4864,8 +4901,9 @@ async function saveZimbraDraft(context, session, payload) {
   // Only the uploads now known as parts of the draft are forgotten
   // (settleDraftAttachments).
   const { attachments, used } = settleDraftAttachments(payload.attachments, id, readDraftAttachmentParts(draft), names)
-  forgetMailUploads(session.id, used)
-  return { id, attachments }
+  const images = settleDraftInlineImages(payload.inlineImages, id, readDraftInlineParts(draft))
+  forgetMailUploads(session.id, [...used, ...images.used])
+  return { id, attachments, inlineImages: images.inlineImages }
 }
 
 // ── The demo account: the same checks, nothing leaves ──
@@ -4875,8 +4913,30 @@ function getDemoMailState(sessionId) {
   if (!state) {
     state = { drafts: new Map(), sent: [], flags: new Map(), next: 1, customSignature: '' }
     runtimeDemoMail.set(sessionId, state)
+    // Past DEMO_MAILBOXES_MAX, the oldest demo mailbox goes (a Map keeps
+    // its insertion order), its kept images with it.
+    while (runtimeDemoMail.size > DEMO_MAILBOXES_MAX) {
+      const oldest = runtimeDemoMail.keys().next().value
+      runtimeDemoMail.delete(oldest)
+      runtimeMailUploads.delete(oldest)
+    }
   }
   return state
+}
+
+// The bytes of images a demo session keeps (its uploads with their bytes).
+function demoKeptImageBytes(sessionId) {
+  let total = 0
+  for (const entry of runtimeMailUploads.get(sessionId)?.values() ?? []) total += entry.bytes?.length ?? 0
+  return total
+}
+
+// A demo mail or draft's text past DEMO_MAIL_HTML_MAX: refused, as Partage
+// refuses a mail too big.
+function checkDemoMailSize(payload) {
+  if (String(payload.html ?? '').length > DEMO_MAIL_HTML_MAX) {
+    throw new MailSendRefusal(413, 'mail_send_too_large', { maxBytes: DEMO_MAIL_HTML_MAX })
+  }
 }
 
 // A demo reference's file, or null when there's none: a demo mail's
@@ -4918,13 +4978,41 @@ function resolveDemoAttachments(session, state, attachments) {
   return files
 }
 
+// The demo's images of the text, with their bytes: an upload kept by
+// /mail/upload, or a part of one of its drafts. The same checks as a real
+// send's (checkMailUploads), then their size against the account's limit
+// with the files'.
+function resolveDemoInlineImages(session, state, payload, files) {
+  const uploads = runtimeMailUploads.get(session.id)
+  const images = payload.inlineImages.map((image) => {
+    const file = image.source === 'upload'
+      ? uploads?.get(image.aid)
+      : state.drafts.get(image.messageId)?.draft.inlineImages?.find((entry) => entry.part === image.part)
+    return file?.bytes && INLINE_IMAGE_TYPES.has(file.contentType) ? { ...image, name: file.name, size: file.size, contentType: file.contentType, bytes: file.bytes } : null
+  })
+  if (images.some((image) => !image)) throw new MailSendRefusal(409, 'mail_send_missing_reference')
+  const total = [...files.filter((file, index) => payload.attachments[index].source === 'upload'), ...images].reduce((sum, file) => sum + file.size, 0)
+  const limits = deriveAttachmentLimits(null)
+  if (total > limits.maxTotalBytes) throw new MailSendRefusal(413, 'mail_send_too_large', { maxBytes: limits.maxTotalBytes })
+  return images
+}
+
+// The uploads a send or a save names: its files' and its images'.
+const payloadUploadAids = (payload) => [
+  ...payload.attachments.filter((entry) => entry.source === 'upload').map((entry) => entry.aid),
+  ...payload.inlineImages.filter((entry) => entry.source === 'upload').map((entry) => entry.aid),
+]
+
 function sendDemoMail(session, payload) {
+  checkDemoMailSize(payload)
   const state = getDemoMailState(session.id)
   const identity = pickIdentity(DEMO_MAIL_IDENTITIES, payload.identityId)
   if (!identity) throw new MailSendRefusal(400, 'mail_send_invalid_identity')
-  const unknown = payload.attachments.filter((entry) => entry.source === 'upload' && !runtimeMailUploads.get(session.id)?.has(entry.aid)).map((entry) => entry.aid)
+  const unknown = payloadUploadAids(payload).filter((aid) => !runtimeMailUploads.get(session.id)?.has(aid))
   if (unknown.length) throw new MailSendRefusal(409, 'mail_send_upload_expired', { aids: unknown })
   const files = resolveDemoAttachments(session, state, payload.attachments)
+  // In the demo's copy, by data: URLs (a real mail has them by cid).
+  const images = resolveDemoInlineImages(session, state, payload, files)
   // The signature with its logos as data: URLs, for the demo's copy in
   // « Envoyés » to show them (a real mail has them inline, by cid).
   const ownSignature = payload.signature.include && payload.signature.mode !== 'auto'
@@ -4950,7 +5038,7 @@ function sendDemoMail(session, payload) {
       receivedAt: new Date(now).toISOString(),
       unread: false,
       format: 'html',
-      html: sanitizeMailHtml(buildMailHtml(payload.html, { signatureHtml: built.html })).html,
+      html: sanitizeMailHtml(buildMailHtml(payload.html, { signatureHtml: built.html, images: inlineImageSources(images, (image) => `data:${image.contentType};base64,${image.bytes.toString('base64')}`) })).html,
       remoteImages: 0,
       truncated: false,
       attachments: files.map((file, index) => ({ part: String(index + 2), name: file.name, type: file.contentType, size: file.size, href: null })),
@@ -4959,16 +5047,18 @@ function sendDemoMail(session, payload) {
   state.sent.length = Math.min(state.sent.length, 50)
   if (payload.origin) state.flags.set(payload.origin.messageId, payload.origin.replyType)
   if (payload.draftId) state.drafts.delete(payload.draftId)
-  forgetMailUploads(session.id, payload.attachments.filter((entry) => entry.source === 'upload').map((entry) => entry.aid))
+  forgetMailUploads(session.id, payloadUploadAids(payload))
   return { partial: null }
 }
 
 function saveDemoDraft(session, payload) {
+  checkDemoMailSize(payload)
   const state = getDemoMailState(session.id)
   const identity = pickIdentity(DEMO_MAIL_IDENTITIES, payload.identityId) ?? DEMO_MAIL_IDENTITIES[0]
-  const unknown = payload.attachments.filter((entry) => entry.source === 'upload' && !runtimeMailUploads.get(session.id)?.has(entry.aid)).map((entry) => entry.aid)
+  const unknown = payloadUploadAids(payload).filter((aid) => !runtimeMailUploads.get(session.id)?.has(aid))
   if (unknown.length) throw new MailSendRefusal(409, 'mail_send_upload_expired', { aids: unknown })
   const files = resolveDemoAttachments(session, state, payload.attachments)
+  const images = resolveDemoInlineImages(session, state, payload, files)
   let id = payload.draftId && state.drafts.has(payload.draftId) ? payload.draftId : null
   if (!id) {
     if (state.drafts.size >= 20) throw new MailSendRefusal(413, 'mail_send_quota')
@@ -4978,6 +5068,18 @@ function saveDemoDraft(session, payload) {
   // As Zimbra numbers them: the uploads first, then the other mails' files.
   const order = [...payload.attachments.keys()].sort((left, right) => Number(payload.attachments[left].source !== 'upload') - Number(payload.attachments[right].source !== 'upload'))
   const attachments = order.map((index, position) => ({ part: String(position + 2), ...files[index] }))
+  // The text's images after them, each its part (a real draft's sit in its
+  // multipart/related, their cid kept).
+  const inlineImages = images.map((image, index) => ({
+    cid: image.cid,
+    part: String(attachments.length + 2 + index),
+    name: image.name,
+    size: image.size,
+    contentType: image.contentType,
+    width: image.width,
+    height: image.height,
+    bytes: image.bytes,
+  }))
   const now = Date.now()
   state.drafts.set(id, {
     row: demoMailRow(id, identity, payload, composerHtmlToText(payload.html), now),
@@ -4989,12 +5091,17 @@ function saveDemoDraft(session, payload) {
       subject: payload.subject,
       html: payload.html,
       attachments,
+      inlineImages,
       identityId: identity.id,
       origin: payload.origin ? { kind: payload.origin.replyType === 'w' ? 'forward' : 'reply', messageId: payload.origin.messageId } : null,
     },
   })
-  forgetMailUploads(session.id, payload.attachments.filter((entry) => entry.source === 'upload').map((entry) => entry.aid))
-  return { id, attachments: mapDraftAttachments(payload.attachments, id, attachments) }
+  forgetMailUploads(session.id, payloadUploadAids(payload))
+  return {
+    id,
+    attachments: mapDraftAttachments(payload.attachments, id, attachments),
+    inlineImages: inlineImages.map((image) => ({ cid: image.cid, messageId: id, part: image.part })),
+  }
 }
 
 // The demo's list rows with what its composer did: replied to, forwarded
@@ -5084,10 +5191,10 @@ app.post('/__ent_auth/mail/send', async (req, res) => {
   const payload = readComposePayload(req, res, session, { draft: false })
   if (!payload) return undefined
   const recipients = [...payload.to, ...payload.cc, ...payload.bcc].map((entry) => entry.email)
-  const aids = payload.attachments.filter((entry) => entry.source === 'upload').map((entry) => entry.aid)
+  const aids = payloadUploadAids(payload)
   // The demo account's user is shared by every demo session: its own
-  // session only.
-  const keys = [`session:${session.id}`, ...(!isDemoSession(session) && session.user ? [`user:${String(session.user).toLowerCase()}`] : [])]
+  // session, and its address (new demo sessions don't start a new count).
+  const keys = [`session:${session.id}`, ...(isDemoSession(session) ? [`demo-ip:${getLoginRequesterIp(req)}`] : session.user ? [`user:${String(session.user).toLowerCase()}`] : [])]
   // The page's retry of a send whose answer it never got (the same uid):
   // the first one's answer, nothing checked or counted again (mailSendOnce).
   const repeated = mailSendOnce.has(session.id, payload.sendUid)
@@ -5126,7 +5233,7 @@ app.post('/__ent_auth/mail/draft', async (req, res) => {
   if (!session) return undefined
   const payload = readComposePayload(req, res, session, { draft: true })
   if (!payload) return undefined
-  const slot = mailDraftLimiter.take([`session:${session.id}`])
+  const slot = mailDraftLimiter.take([`session:${session.id}`, ...(isDemoSession(session) ? [`demo-ip:${getLoginRequesterIp(req)}`] : [])])
   if (!slot.ok) {
     res.setHeader('Retry-After', String(slot.retryAfter))
     return res.status(429).json({ error: 'mail_send_rate_limited' })
@@ -5139,16 +5246,19 @@ app.post('/__ent_auth/mail/draft', async (req, res) => {
     setSessionCookie(res, session)
     return res.status(200).json({ draft })
   } catch (error) {
-    return sendMailComposeError(res, 'draft', error, { aids: payload.attachments.filter((entry) => entry.source === 'upload').map((entry) => entry.aid) })
+    return sendMailComposeError(res, 'draft', error, { aids: payloadUploadAids(payload) })
   }
 })
 
 // 6m. A draft, to resume it in the composer (readDraftForComposer): its
-// recipients, subject, HTML (cleaned to what the editor holds), files (as
-// parts of the draft), identity and the mail it answers. Only a mail of the
-// Drafts folder.
+// recipients, subject, HTML (cleaned to what the editor holds), files and
+// images of its text (as parts of the draft; an image with where the
+// composer shows it from: the part proxy, a data: URL for the demo's),
+// identity and the mail it answers. Only a mail of the Drafts folder.
 //   200 { draft: { id, to, cc, bcc, subject, html, attachments: [{ part,
-//   name, size, contentType }], identityId, origin } }, 404, 401.
+//   name, size, contentType }], inlineImages: [{ cid, part, name, size,
+//   contentType, width, height, href }], droppedImages, identityId, origin } },
+//   404, 401.
 app.get('/__ent_auth/mail/draft', async (req, res) => {
   res.setHeader('Cache-Control', 'no-store')
   const session = getMailMessageSession(req, res)
@@ -5177,7 +5287,11 @@ app.get('/__ent_auth/mail/draft', async (req, res) => {
     }
     if (!draft) return res.status(404).json({ error: 'No such draft.' })
     setSessionCookie(res, session)
-    return res.status(200).json({ draft: { ...draft, html: sanitizeComposerHtml(draft.html) } })
+    const inlineImages = (draft.inlineImages ?? []).map(({ bytes, ...image }) => ({
+      ...image,
+      href: bytes ? `data:${image.contentType};base64,${bytes.toString('base64')}` : buildMailPartHref(draft.id, image.part),
+    }))
+    return res.status(200).json({ draft: { ...draft, html: sanitizeComposerHtml(draft.html), inlineImages, droppedImages: draft.droppedImages ?? 0 } })
   } catch (error) {
     return sendMailRouteError(res, 'draft', error)
   }

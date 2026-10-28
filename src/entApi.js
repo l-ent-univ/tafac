@@ -735,8 +735,8 @@ export async function sendMail(body) {
 }
 
 // Saves the composer's draft (POST /__ent_auth/mail/draft): { status: 'ok',
-// draft: { id, attachments: [{ messageId, part } | null] } } or a send's
-// errors.
+// draft: { id, attachments: [{ messageId, part } | null], inlineImages: [{
+// cid, messageId, part } | null] } } or a send's errors.
 export async function saveMailDraft(body, { signal } = {}) {
   const result = await postMailCompose('draft', body, { signal })
   if (result.status !== 'ok') return result
@@ -749,6 +749,9 @@ export async function saveMailDraft(body, { signal } = {}) {
       attachments: Array.isArray(draft.attachments)
         ? draft.attachments.map((entry) => (typeof entry?.messageId === 'string' && typeof entry?.part === 'string' ? { messageId: entry.messageId, part: entry.part } : null))
         : [],
+      inlineImages: Array.isArray(draft.inlineImages)
+        ? draft.inlineImages.map((entry) => (typeof entry?.cid === 'string' && typeof entry?.messageId === 'string' && typeof entry?.part === 'string' ? { cid: entry.cid, messageId: entry.messageId, part: entry.part } : null))
+        : [],
     },
   }
 }
@@ -756,7 +759,9 @@ export async function saveMailDraft(body, { signal } = {}) {
 // A draft to resume in the composer (GET /__ent_auth/mail/draft?id=…):
 // { id, to, cc, bcc, subject, html (cleaned by the server to what the
 // editor holds), attachments: [{ part, name, size, contentType }],
-// identityId, origin: { kind, messageId } | null }. Throws on a failure.
+// inlineImages: [{ cid, part, name, size, contentType, width, height,
+// href }], droppedImages, identityId, origin: { kind, messageId } | null }.
+// Throws on a failure.
 export async function getMailDraft(id) {
   const response = await fetch(`${ENT_AUTH_PREFIX}/mail/draft?id=${encodeURIComponent(id)}`, { credentials: 'same-origin' })
   const payload = await response.json().catch(() => null)

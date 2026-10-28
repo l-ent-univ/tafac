@@ -11,6 +11,11 @@ import { withViewTransition } from '../viewTransition'
 import { MailSignature } from '../mailSignatureNode'
 import { MailSignatureContext } from '../mailSignatureContext'
 import { useComposerSignature, useSignatureNodeSync } from '../useComposerSignature'
+import { MailSummary } from '../mailSummaryNode'
+import { MailInlineImage } from '../mailInlineImageNode'
+import { MailInlineImageContext } from '../mailInlineImageContext'
+import { inlineImageCids } from '../mailInlineImages'
+import { useInlineImages } from '../useInlineImages'
 import CloseButton from './CloseButton'
 import ConfirmDialog from './ConfirmDialog'
 import ContextMenu from './ContextMenu'
@@ -130,6 +135,8 @@ const EMPTY_FORMAT = { bold: false, italic: false, underline: false, strikeThrou
 // The editor (Tiptap, on ProseMirror): what the text may hold, no more than
 // the format bar offers. Links typed or pasted become links, never opened by
 // a click while writing. No code, code blocks or rules: nothing for them.
+// A summary box and the images of the text come only with the mail (a
+// grade's, src/gradeMail.js): nothing pasted makes one.
 const EDITOR_EXTENSIONS = [
   StarterKit.configure({
     code: false,
@@ -148,6 +155,8 @@ const EDITOR_EXTENSIONS = [
   Highlight.extend({ priority: 110 }).configure({ multicolor: true }),
   Indent,
   MailSignature,
+  MailSummary,
+  MailInlineImage,
 ]
 
 // The switch's label, by the signature's kind (Réglages › Messagerie).
@@ -1123,9 +1132,13 @@ function readInitialFields(restore, sendError, kind, message, ownEmails) {
 // `attachmentLimits`: { maxFileBytes, maxTotalBytes } from the webmail
 // (getMailPrefs), the fallback's until they're known. `saver`: the draft's
 // saves (createDraftSaver, MailPage's). `restore`: the composer as it was
-// (a draft resumed, an undo, a failed send: { to, cc, bcc, subject,
-// content (the editor's JSON) or html, attachments, files, identityId,
-// origin, dirty }), `sendError` why a send failed (sendMail's). `onSend(
+// (a draft resumed, an undo, a failed send, a mail written from « Mes
+// notes »: { to, cc, bcc, subject, content (the editor's JSON) or html,
+// attachments, files, inlineImages (useInlineImages's items), identityId,
+// origin, dirty, focusBlock (the top-level block whose end takes the caret
+// when À has someone: a prefilled mail's line to write on), droppedImages
+// (a draft's images Partage lost) }), `sendError` why a send failed
+// (sendMail's). `onSend(
 // snapshot)`: « Envoyer », MailPage closes it and sends (src/useMailSend.js);
 // false when it can't (a send already waiting). `ref` gets { isDirty,
 // saveNow }, for MailPage to save it before another draft takes its place.
@@ -1153,11 +1166,18 @@ function MailComposer({ initialKind = 'new', message = null, sender = null, iden
   const [subject, setSubject] = useState(initialFields.subject)
   const limits = readAttachmentLimits(attachmentLimits)
   const { items: attachments, add: addAttachments, remove: removeAttachment, retry: retryAttachment, setMessageItems, markExpired, filesRef: attachmentFilesRef } = useAttachments(initialFields.attachments, limits, restore?.files)
-  // A save refusing uploads gone from Partage: those files to attach again.
+  // The text's images (src/useInlineImages.js).
+  const inlineImages = useInlineImages(restore?.inlineImages, sendError?.aids)
+  const { markExpired: markImagesExpired, isUploading: isImageUploading } = inlineImages
+  // A save refusing uploads gone from Partage: those files to attach again
+  // (an image of the text uploads again by itself).
   useEffect(() => saver?.subscribe((status, failure) => {
     setDraftStatus(status)
-    if (failure?.code === 'upload-expired' && failure.aids?.length) markExpired(failure.aids)
-  }), [saver, markExpired])
+    if (failure?.code === 'upload-expired' && failure.aids?.length) {
+      markExpired(failure.aids)
+      markImagesExpired(failure.aids)
+    }
+  }), [saver, markExpired, markImagesExpired])
   const fileInputRef = useRef(null)
   // A file dragged over the composer (the drop zone shows), counted by the
   // elements entered and left on its way.
@@ -1237,7 +1257,7 @@ function MailComposer({ initialKind = 'new', message = null, sender = null, iden
       if (initialSnapshotRef.current === null) {
         initialSnapshotRef.current = restore?.dirty
           ? 'unsent'
-          : JSON.stringify([initialFields.to, initialFields.cc, initialFields.bcc, '', '', '', initialFields.subject.trim(), created.getText(), initialFields.attachments.map((item) => item.key)])
+          : JSON.stringify([initialFields.to, initialFields.cc, initialFields.bcc, '', '', '', initialFields.subject.trim(), created.getText().trimEnd(), initialFields.attachments.map((item) => item.key)])
       }
     },
     onUpdate: () => scheduleAutosaveRef.current(),
@@ -1250,16 +1270,20 @@ function MailComposer({ initialKind = 'new', message = null, sender = null, iden
   // shows changes).
   const format = useEditorState({ editor, selector: ({ editor: current }) => readFormatState(current) }) ?? EMPTY_FORMAT
 
+  // A prefilled mail (« Mes notes ») with its recipient known: the caret on
+  // its line to write on (restore.focusBlock), else at À as any new mail.
+  const [bodyFocusBlock] = useState(() => (Number.isInteger(restore?.focusBlock) && restore.focusBlock >= 0 && initialFields.to.length ? restore.focusBlock : null))
+  const startsInText = initialKind === 'reply' || initialKind === 'reply-all' || bodyFocusBlock !== null
   // In at À for a new mail or a forward, at the top of the text for a
   // reply (its recipients are there already); back where it was on close.
   useEffect(() => {
     const previous = document.activeElement
-    if (initialKind !== 'reply' && initialKind !== 'reply-all') toInputRef.current?.focus({ preventScroll: true })
+    if (!startsInText) toInputRef.current?.focus({ preventScroll: true })
     return () => {
       window.clearTimeout(noticeTimerRef.current)
       if (previous instanceof HTMLElement && previous.isConnected) previous.focus({ preventScroll: true })
     }
-  }, [initialKind])
+  }, [startsInText])
   // A reply's caret, once the editor is in the page: until then it has no
   // commands (Tiptap mounts it a moment later, which a phone made visible:
   // the reply crashed), so on its « create » if it isn't ready yet. Set by
@@ -1268,12 +1292,18 @@ function MailComposer({ initialKind = 'new', message = null, sender = null, iden
   // transaction »).
   const focusedStartRef = useRef(false)
   useEffect(() => {
-    if (focusedStartRef.current || !editor || (initialKind !== 'reply' && initialKind !== 'reply-all')) return undefined
+    if (focusedStartRef.current || !editor || !startsInText) return undefined
     const focusStart = () => {
       if (editor.isDestroyed || focusedStartRef.current) return
       focusedStartRef.current = true
       const { state, view } = editor
-      view.dispatch(state.tr.setSelection(Selection.atStart(state.doc)))
+      let selection = Selection.atStart(state.doc)
+      if (bodyFocusBlock !== null && bodyFocusBlock < state.doc.childCount) {
+        let end = 0
+        for (let index = 0; index <= bodyFocusBlock; index += 1) end += state.doc.child(index).nodeSize
+        selection = Selection.near(state.doc.resolve(end - 1), -1)
+      }
+      view.dispatch(state.tr.setSelection(selection).scrollIntoView())
       view.focus()
     }
     if (editor.isInitialized) {
@@ -1282,7 +1312,7 @@ function MailComposer({ initialKind = 'new', message = null, sender = null, iden
     }
     editor.on('create', focusStart)
     return () => editor.off('create', focusStart)
-  }, [editor, initialKind])
+  }, [editor, startsInText, bodyFocusBlock])
 
   // While the composer is open, a file dropped beside it (on the page under
   // the floating window) isn't opened by the browser in the draft's place.
@@ -1300,7 +1330,9 @@ function MailComposer({ initialKind = 'new', message = null, sender = null, iden
 
   const isDirty = useCallback(() => {
     const current = editorRef.current
-    const text = current && !current.isDestroyed && current.schema ? current.getText() : ''
+    // Its end trimmed: the empty paragraph Tiptap adds after a closing block
+    // (the signature, an image), once the editor is made, isn't a change.
+    const text = current && !current.isDestroyed && current.schema ? current.getText().trimEnd() : ''
     // The attachments by key: one added or taken out changes the draft
     // (one refused before it went doesn't count).
     const attached = attachments.filter((item) => !isRefusedAttachment(item)).map((item) => item.key)
@@ -1326,11 +1358,12 @@ function MailComposer({ initialKind = 'new', message = null, sender = null, iden
       subject,
       html: current && !current.isDestroyed && current.schema ? current.getHTML() : '',
       attachments,
+      inlineImages: inlineImages.items,
       origin,
       identityId,
       signature: signature.payload,
     }
-  }, [to, cc, bcc, toInput, ccInput, bccInput, subject, attachments, origin, identityId, signature.payload])
+  }, [to, cc, bcc, toInput, ccInput, bccInput, subject, attachments, inlineImages.items, origin, identityId, signature.payload])
 
   const saveNow = useCallback(() => saver?.save(getDraftState()), [saver, getDraftState])
 
@@ -1350,7 +1383,7 @@ function MailComposer({ initialKind = 'new', message = null, sender = null, iden
   }, [saver, isDirty, getDraftState])
   useEffect(() => {
     scheduleAutosaveRef.current()
-  }, [to, cc, bcc, subject, attachments, identityId, signature.payload])
+  }, [to, cc, bcc, subject, attachments, inlineImages.items, identityId, signature.payload])
   useEffect(() => () => window.clearTimeout(autosaveTimerRef.current), [])
   const resumedRef = useRef(false)
   useEffect(() => {
@@ -1384,11 +1417,12 @@ function MailComposer({ initialKind = 'new', message = null, sender = null, iden
     onClose()
   }, [saver, onClose])
 
-  // A failed send reopened: its reason, the field to fix in focus.
+  // A failed send reopened: its reason, the field to fix in focus. A draft
+  // whose image Partage lost: said once.
   useEffect(() => {
-    if (!sendError) return
-    showNotice(sendFailureText(sendError))
-  }, [sendError, showNotice])
+    if (sendError) showNotice(sendFailureText(sendError))
+    else if (restore?.droppedImages) showNotice(restore.droppedImages > 1 ? 'Des images du brouillon n’ont pas pu être reprises' : 'L’image du brouillon n’a pas pu être reprise')
+  }, [sendError, restore, showNotice])
 
   // What was typed in À, Cc and Cci becomes tokens first, one field after
   // the other (none adding what another has); then what a send would
@@ -1419,6 +1453,9 @@ function MailComposer({ initialKind = 'new', message = null, sender = null, iden
     else if (!all.length) showNotice('Aucun destinataire')
     else if (attachments.some((item) => item.status === 'uploading' || item.status === 'queued')) showNotice('Pièces jointes en cours de chargement')
     else if (attachments.some((item) => item.status === 'error' && !isRefusedAttachment(item))) showNotice('Une pièce jointe n’est pas chargée')
+    // An image still uploading waits; a failed one goes without (its view
+    // says so; the summary above it has the same in text).
+    else if (isImageUploading(inlineImageCids(editorRef.current?.getHTML()))) showNotice('Image en cours de chargement')
     else {
       const current = editorRef.current
       sendingRef.current = true
@@ -1432,6 +1469,7 @@ function MailComposer({ initialKind = 'new', message = null, sender = null, iden
         content: current?.getJSON() ?? null,
         attachments,
         files: new Map(attachmentFilesRef.current),
+        inlineImages: inlineImages.items,
         identityId,
         origin,
         isFullscreen,
@@ -1444,7 +1482,7 @@ function MailComposer({ initialKind = 'new', message = null, sender = null, iden
         showNotice('Un message part déjà, réessaie dans un instant')
       }
     }
-  }, [to, cc, bcc, toInput, ccInput, bccInput, attachments, showNotice, onSend, kind, message, subject, identityId, origin, isFullscreen, saver, getDraftState, attachmentFilesRef])
+  }, [to, cc, bcc, toInput, ccInput, bccInput, attachments, inlineImages.items, isImageUploading, showNotice, onSend, kind, message, subject, identityId, origin, isFullscreen, saver, getDraftState, attachmentFilesRef])
 
   // A format command on the text: back in it first, at the selection it
   // had (the editor keeps it while a select or a picker has the focus).
@@ -1922,7 +1960,9 @@ function MailComposer({ initialKind = 'new', message = null, sender = null, iden
           </div>
 
         <MailSignatureContext.Provider value={signature.value}>
-          <EditorContent editor={editor} className="flex min-h-0 flex-1 flex-col [&>.mail-composer-body]:flex-1" />
+          <MailInlineImageContext.Provider value={inlineImages.context}>
+            <EditorContent editor={editor} className="flex min-h-0 flex-1 flex-col [&>.mail-composer-body]:flex-1" />
+          </MailInlineImageContext.Provider>
         </MailSignatureContext.Provider>
       </div>
 
