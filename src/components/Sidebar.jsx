@@ -263,14 +263,37 @@ function Sidebar({
     peekWasOpenRef.current = isPeekOpen
   })
 
+  // Which way the pending timer goes (true: unfolding), so a pointer moving
+  // over the folded sidebar doesn't restart it on every move.
+  const peekPendingRef = useRef(null)
   const schedulePeek = (open, delay) => {
     window.clearTimeout(peekTimerRef.current)
-    peekTimerRef.current = window.setTimeout(() => setIsPeekOpen(open), delay)
+    peekPendingRef.current = open
+    peekTimerRef.current = window.setTimeout(() => {
+      peekPendingRef.current = null
+      setIsPeekOpen(open)
+    }, delay)
   }
   const handlePeekEnter = (event) => {
     if (canPeek && event.pointerType === 'mouse') schedulePeek(true, isPeekOpen ? 0 : SIDEBAR_PEEK_DELAY_MS)
   }
   const handlePeekLeave = () => schedulePeek(false, SIDEBAR_PEEK_CLOSE_DELAY_MS)
+  // On the folded sidebar: it unfolds from its navigation, not from its foot
+  // (account, sign out). The unfolded panel lays its foot out on one row:
+  // the button aimed at would move from under the pointer (the account down
+  // by 42px, « Se déconnecter » to the right, the account in its place).
+  // There the folded buttons are used as they are.
+  const handleFoldedPointer = (event) => {
+    if (!canPeek || event.pointerType !== 'mouse' || isPeekOpen) return
+    if (event.target.closest?.('[data-sidebar-foot]')) {
+      if (peekPendingRef.current === true) {
+        window.clearTimeout(peekTimerRef.current)
+        peekPendingRef.current = null
+      }
+      return
+    }
+    if (peekPendingRef.current !== true) schedulePeek(true, SIDEBAR_PEEK_DELAY_MS)
+  }
 
   const [activeSection, setActiveSection] = useState('applications')
   const navItems = buildNavItems(establishment, { gradesSupported })
@@ -465,7 +488,8 @@ function Sidebar({
         <aside
           className="sidebar-panel sidebar-panel--compact hidden 4xl:flex flex-col items-start justify-between px-4 py-5 w-[var(--sidebar-width,72px)] fixed top-3 left-3 bottom-3 z-30 card-corners border overflow-visible"
           aria-label="Navigation principale"
-          onPointerEnter={handlePeekEnter}
+          onPointerEnter={handleFoldedPointer}
+          onPointerMove={handleFoldedPointer}
           onPointerLeave={handlePeekLeave}
         >
           {/* A 40px column at a fixed left: the icons stay put while the
@@ -519,7 +543,7 @@ function Sidebar({
             </nav>
           </div>
   
-          <div className="flex flex-col items-center gap-3 w-10 sidebar-swap">
+          <div className="flex flex-col items-center gap-3 w-10 sidebar-swap" data-sidebar-foot="">
             {hasPendingUpdate ? <CompactUpdateButton onUpdateClick={onUpdateClick} /> : null}
             {authenticated ? (
               <>
