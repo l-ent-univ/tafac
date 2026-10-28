@@ -13,6 +13,7 @@
 //   any other URL in them goes (rewriteCssUrls);
 // - a plain text body becomes escaped HTML with its links clickable.
 import sanitizeHtml from 'sanitize-html'
+import { escapeHtml } from '../src/mailText.js'
 
 const MAIL_PART_PATH = '/__ent_auth/mail/part'
 const PART_ID_PATTERN = /^\d+(?:\.\d+)*$/
@@ -272,10 +273,6 @@ export function sanitizeMailHtml(html, { resolveCid = () => null } = {}) {
   })
 
   return { html: styled, remoteImages }
-}
-
-function escapeHtml(value) {
-  return value.replace(/[&<>"']/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[char])
 }
 
 const TEXT_LINK_PATTERN = /\bhttps?:\/\/[^\s<>"']+/gi

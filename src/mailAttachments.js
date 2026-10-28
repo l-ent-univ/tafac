@@ -8,6 +8,7 @@
 // <mp mid part/></attach>` for one already in the mailbox (source
 // 'message', a forwarded mail's). The file's bytes never sit on the app's
 // server: an upload goes through it as a stream, straight to Partage.
+import { CONTROL_CHARACTERS } from './mailText.js'
 
 // Partage's own limit is the whole mail's (Zimbra GetInfo's attSizeLimit,
 // zimbraMtaMaxMessageSize), counted on the mail as sent: attachments in
@@ -46,9 +47,6 @@ export function readAttachmentLimits(value) {
   return maxFileBytes && maxTotalBytes ? { maxFileBytes, maxTotalBytes } : { maxFileBytes: fallback.maxFileBytes, maxTotalBytes: fallback.maxTotalBytes }
 }
 
-// Control and format characters (CR, LF, NUL, the bidi overrides that turn
-// « gpj.exe » around…), line and paragraph separators.
-const CONTROL_CHARACTERS = /[\p{Cc}\p{Cf}\p{Co}\p{Cn}\u2028\u2029]/gu
 export const MAX_ATTACHMENT_NAME_LENGTH = 180
 export const DEFAULT_ATTACHMENT_NAME = 'piece-jointe'
 

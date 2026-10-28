@@ -4,6 +4,8 @@
 //   'drupal': the entry page renders with the `user-logged-in` body class,
 //     which Drupal core adds for every signed-in user. A lapsed session
 //     redirects to the CAS instead (the portal forces the login).
+import { decodeEntities } from '../src/mailText.js'
+
 export const PORTAL_KINDS = ['uportal', 'drupal']
 
 export function resolvePortalKind(auth) {
@@ -12,17 +14,6 @@ export function resolvePortalKind(auth) {
     throw new Error(`Unknown auth.portal "${kind}". Expected one of: ${PORTAL_KINDS.join(', ')}.`)
   }
   return kind
-}
-
-function decodeEntities(text) {
-  return text
-    .replace(/&#(\d+);/g, (_, code) => String.fromCodePoint(Number(code)))
-    .replace(/&#x([0-9a-f]+);/gi, (_, code) => String.fromCodePoint(Number.parseInt(code, 16)))
-    .replace(/&quot;/g, '"')
-    .replace(/&lt;/g, '<')
-    .replace(/&gt;/g, '>')
-    .replace(/&nbsp;/g, ' ')
-    .replace(/&amp;/g, '&')
 }
 
 // Name on the Drupal profile page (/user → /user/<uid>): one "Prénom Nom"

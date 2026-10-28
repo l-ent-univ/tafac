@@ -1,4 +1,5 @@
 import { formatAttachmentSize } from './mailAttachments.js'
+import { escapeHtml } from './mailText.js'
 
 // What « Imprimer » and « Enregistrer en PDF » put on paper (src/mailPrint.js,
 // src/mailPdf.js): a mail or a whole thread, oldest first, each mail's
@@ -17,9 +18,8 @@ const printDateFormatter = new Intl.DateTimeFormat('fr-FR', { dateStyle: 'full',
 // the server); nothing else is let in, as in the reader's frame.
 const MAIL_PART_PATH = '/__ent_auth/mail/part'
 
-export function escapeHtml(value) {
-  return String(value ?? '').replace(/[&<>"']/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[char])
-}
+// The shared one (src/mailText.js), named here as before.
+export { escapeHtml }
 
 // « Camille Martin <camille.martin@univ.fr> », or whichever of the two is known.
 export function formatPrintAddress(address) {

@@ -33,6 +33,7 @@ import {
 } from '../src/mailCompose.js'
 import { MAX_ATTACHMENTS, sanitizeAttachmentName } from '../src/mailAttachments.js'
 import { isSignatureKind, signatureLogin, signatureLoginLine } from '../src/mailSignatureChoice.js'
+import { CONTROL_CHARACTERS, capLength, decodeEntities, escapeHtml } from '../src/mailText.js'
 
 export const MAX_SUBJECT_LENGTH = 255
 // The editor's HTML, a long thread quoted under a reply included: more is
@@ -44,21 +45,9 @@ const SEND_UID_PATTERN = /^[A-Za-z0-9-]{8,64}$/
 const IDENTITY_ID_PATTERN = /^[A-Za-z0-9:._-]{1,64}$/
 const ESTABLISHMENT_ID_PATTERN = /^[a-z0-9-]{1,40}$/
 const PART_ID_PATTERN = /^\d+(?:\.\d+)*$/
-const CONTROL_CHARACTERS = /[\p{Cc}\p{Cf}\p{Co}\p{Cn}\u2028\u2029]/gu
 // The composer's kinds of answer, as the page names them, and Zimbra's
 // reply type for each (rt: 'r' replied, 'w' forwarded).
 const ORIGIN_KINDS = { reply: 'r', replyAll: 'r', forward: 'w' }
-
-const capLength = (text, max) => (text.length > max ? Array.from(text).slice(0, max).join('') : text)
-
-export function escapeHtml(value) {
-  return String(value ?? '')
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#39;')
-}
 
 // ── The editor's HTML ──────────────────────────────────────────────────────
 
@@ -198,18 +187,6 @@ export function buildMailHtml(cleanHtml, { signatureHtml = '', keepPlaceholder =
 }
 
 // ── The text/plain alternative ─────────────────────────────────────────────
-
-const ENTITIES = { amp: '&', lt: '<', gt: '>', quot: '"', apos: "'", nbsp: ' ', '#39': "'" }
-
-export function decodeEntities(text) {
-  return text.replace(/&(#x[0-9a-f]+|#\d+|[a-z]+\d*);/gi, (match, name) => {
-    if (name[0] === '#') {
-      const code = name[1] === 'x' || name[1] === 'X' ? Number.parseInt(name.slice(2), 16) : Number(name.slice(1))
-      return Number.isInteger(code) && code > 0 && code <= 0x10ffff ? String.fromCodePoint(code) : ''
-    }
-    return ENTITIES[name.toLowerCase()] ?? match
-  })
-}
 
 // The sanitized HTML as plain text (the multipart/alternative's other
 // part): a paragraph or a heading a line, lists as « - » or « 1. », a quote

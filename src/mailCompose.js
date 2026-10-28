@@ -1,4 +1,5 @@
 import { messageAttachmentItems } from './mailAttachments.js'
+import { CONTROL_CHARACTERS, capLength } from './mailText.js'
 
 // The composer's prefill (MailComposer): who a reply goes to, its subject,
 // the line over the quoted mail. Pure, so it can be tested without a DOM;
@@ -26,13 +27,6 @@ export const MAX_RECIPIENTS = 100
 // What one paste or one field's text is read up to (MAX_RECIPIENTS
 // addresses, named, fit in it many times over).
 export const MAX_RECIPIENT_TEXT_LENGTH = 20_000
-
-// Control and format characters (CR, LF, tabs, NUL, the bidi overrides that
-// can turn « moc.vinu » around…), the line and paragraph separators.
-const CONTROL_CHARACTERS = /[\p{Cc}\p{Cf}\p{Co}\p{Cn}\u2028\u2029]/gu
-
-// At most `max` characters, never cutting a surrogate pair in half.
-const capLength = (text, max) => (text.length > max ? Array.from(text).slice(0, max).join('') : text)
 
 export function isValidAddress(email) {
   const value = String(email ?? '').trim().normalize('NFC')

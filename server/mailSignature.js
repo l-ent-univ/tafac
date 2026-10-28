@@ -15,7 +15,7 @@
 //   { signature: [{ id, name, content: [{ type: 'text/plain' | 'text/html',
 //     _content }] }] }   (content a lone object on some versions)
 import sanitizeHtml from 'sanitize-html'
-import { decodeEntities, escapeHtml } from './mailSend.js'
+import { CONTROL_CHARACTERS, capLength, cleanTextLines, decodeEntities, escapeHtml } from '../src/mailText.js'
 import { CUSTOM_SIGNATURE_NAME } from '../src/mailSignatureChoice.js'
 
 // Zimbra's own limit is 20 signatures (zimbraSignatureMaxNumEntries).
@@ -28,10 +28,6 @@ export const MAX_SIGNATURE_TEXT_LENGTH = 4000
 const MAX_SIGNATURE_NAME_LENGTH = 80
 // The webmail's « no signature » (ZmIdentity.SIG_ID_NONE).
 const NO_SIGNATURE_ID = '11111111-1111-1111-1111-111111111111'
-const CONTROL_CHARACTERS = /[\p{Cc}\p{Cf}\p{Co}\p{Cn}\u2028\u2029]/gu
-
-const capLength = (text, max) => (text.length > max ? Array.from(text).slice(0, max).join('') : text)
-
 // ── The webmail's HTML ─────────────────────────────────────────────────────
 
 const COLOR = /^(?:#[0-9a-f]{3,8}|rgba?\(\s*\d{1,3}\s*,\s*\d{1,3}\s*,\s*\d{1,3}\s*(?:,\s*(?:0|1|0?\.\d+)\s*)?\)|[a-z]{3,20})$/i
@@ -125,17 +121,9 @@ export function plainSignatureToHtml(text) {
   return String(text ?? '').split('\n').map((line) => `<div>${line ? escapeHtml(line) : '<br />'}</div>`).join('')
 }
 
-function cleanSignatureText(text) {
-  const clean = String(text ?? '')
-    .replace(/\r\n?/g, '\n')
-    .replace(/\t/g, ' ')
-    .split('\n')
-    .map((line) => line.replace(CONTROL_CHARACTERS, '').replace(/\s+$/u, ''))
-    .join('\n')
-    .replace(/\n{3,}/g, '\n\n')
-    .replace(/^\n+|\n+$/g, '')
-  return capLength(clean, MAX_SIGNATURE_TEXT_LENGTH)
-}
+// A webmail signature's text, cleaned as a custom one is (cleanTextLines),
+// cut to length.
+const cleanSignatureText = (text) => capLength(cleanTextLines(text), MAX_SIGNATURE_TEXT_LENGTH)
 
 // A signature's content (its HTML and/or its text, as the webmail keeps
 // them) → { html, text, hasImages }: the HTML cleaned, its text made from

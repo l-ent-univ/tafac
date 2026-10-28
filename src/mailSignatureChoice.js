@@ -8,6 +8,8 @@
 // 'custom', their own text, written in Réglages and kept in the webmail as
 // one more of their signatures (CUSTOM_SIGNATURE_NAME), so it follows them
 // to every device and into the webmail itself.
+import { cleanTextLines } from './mailText.js'
+
 export const SIGNATURE_KINDS = ['auto', 'partage', 'custom']
 
 // The webmail signature Tafac writes, the only one it ever changes.
@@ -17,10 +19,6 @@ export const CUSTOM_SIGNATURE_NAME = 'Tafac'
 // the student sees what's kept).
 export const CUSTOM_SIGNATURE_MAX_LENGTH = 2000
 export const CUSTOM_SIGNATURE_MAX_LINES = 30
-
-// Invisible characters and the like, kept out (a tab is a space, a line
-// break stays).
-const CONTROL_CHARACTERS = /[\p{Cc}\p{Cf}\p{Co}\p{Cn}\u2028\u2029]/gu
 
 export const isSignatureKind = (value) => SIGNATURE_KINDS.includes(value)
 
@@ -32,15 +30,7 @@ export function normalizeCustomSignatureText(value) {
   if (typeof value !== 'string') return { ok: false, error: 'mail_signature_invalid' }
   // Far past the limit: refused before the work below.
   if (value.length > CUSTOM_SIGNATURE_MAX_LENGTH * 4) return { ok: false, error: 'mail_signature_too_long' }
-  const text = value
-    .normalize('NFC')
-    .replace(/\r\n?/g, '\n')
-    .replace(/\t/g, ' ')
-    .split('\n')
-    .map((line) => line.replace(CONTROL_CHARACTERS, '').replace(/\s+$/u, ''))
-    .join('\n')
-    .replace(/\n{3,}/g, '\n\n')
-    .replace(/^\n+|\n+$/g, '')
+  const text = cleanTextLines(value)
   if (Array.from(text).length > CUSTOM_SIGNATURE_MAX_LENGTH || text.split('\n').length > CUSTOM_SIGNATURE_MAX_LINES) {
     return { ok: false, error: 'mail_signature_too_long' }
   }
