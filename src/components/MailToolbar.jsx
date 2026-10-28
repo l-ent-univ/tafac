@@ -6,11 +6,22 @@ import Tooltip from './Tooltip'
 // (MailComposer) is built of the same.
 export const TOOLBAR_BUTTON_CLASSES = 'mobile-tab-bar-item group relative inline-flex h-9 w-10 max-sm:w-9 items-center justify-center rounded-full border-0 bg-transparent text-text cursor-pointer transition-[background-color] duration-150 ease-out disabled:cursor-default disabled:opacity-45'
 
-function ToolbarButton({ label, icon, iconClassName = '', onClick, disabled = false, pressed, tooltipSide = 'bottom' }) {
+// `showLabel`: the label written beside the icon (« Nouveau message »), no
+// tooltip then; while the reader's panel (container « reader ») is too
+// narrow for the whole bar on one line (570px inside), the icon alone and
+// its tooltip, as the others.
+// `primary`: the app's primary button (dark fill, as the composer's send),
+// on its own rather than in a glass pill, at the pills' height.
+export const PRIMARY_COMPOSE_CLASSES = 'group relative inline-flex shrink-0 items-center justify-center gap-2 rounded-full border-0 bg-text text-bg cursor-pointer shadow-[0_1px_2px_rgb(52_18_0/0.12),0_6px_16px_-8px_rgb(52_18_0/0.45)] transition-[transform,filter] duration-100 ease-out hover:brightness-110 active:scale-[0.96] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-text'
+
+function ToolbarButton({ label, icon, iconClassName = '', onClick, disabled = false, pressed, tooltipSide = 'bottom', showLabel = false, primary = false }) {
+  const classes = primary
+    ? `${PRIMARY_COMPOSE_CLASSES} h-[42px] pl-3.5 pr-4 @max-[569px]/reader:w-[42px] @max-[569px]/reader:px-0`
+    : showLabel ? `${TOOLBAR_BUTTON_CLASSES} !w-auto gap-2 pl-3 pr-3.5 @max-[569px]/reader:!w-10 @max-[569px]/reader:px-0` : TOOLBAR_BUTTON_CLASSES
   return (
     <button
       type="button"
-      className={TOOLBAR_BUTTON_CLASSES}
+      className={classes}
       aria-label={label}
       aria-pressed={pressed}
       disabled={disabled}
@@ -18,8 +29,14 @@ function ToolbarButton({ label, icon, iconClassName = '', onClick, disabled = fa
     >
       {/* The icon gives when pressed, not the button: its tooltip would too. */}
       <Icon icon={icon} className={`size-[18px] shrink-0 transition-transform duration-100 ease-out group-active:scale-[0.86] ${iconClassName}`} aria-hidden="true" />
+      {/* Its text on a span: a <button> takes its font from index.css. */}
+      {showLabel ? <span className="whitespace-nowrap text-[14px] font-semibold leading-none @max-[569px]/reader:hidden" aria-hidden="true">{label}</span> : null}
       {/* Desktop only: on a phone the bar is at the screen's foot. */}
-      <Tooltip title={label} side={tooltipSide} className="max-4xl:hidden" />
+      {showLabel ? (
+        <span className="hidden @max-[569px]/reader:contents">
+          <Tooltip title={label} side={tooltipSide} className="max-4xl:hidden" />
+        </span>
+      ) : <Tooltip title={label} side={tooltipSide} className="max-4xl:hidden" />}
     </button>
   )
 }
@@ -59,7 +76,7 @@ function MailToolbar({ message, multiple = false, folderKind = 'inbox', onCompos
     move,
   ]
   const groups = [
-    [{ id: 'compose', label: 'Nouveau message', icon: 'carbon:edit', onClick: onCompose }],
+    [{ id: 'compose', label: 'Nouveau message', icon: 'carbon:edit', onClick: onCompose, showLabel: true, primary: true }],
     [
       { id: 'reply', label: 'Répondre', icon: 'carbon:reply', onClick: onReply, disabled: multiple },
       { id: 'reply-all', label: 'Répondre à tous', icon: 'carbon:reply-all', onClick: onReplyAll, disabled: multiple },
@@ -91,7 +108,9 @@ function MailToolbar({ message, multiple = false, folderKind = 'inbox', onCompos
     <div role="toolbar" aria-label="Actions du mail" className={`flex items-center gap-2 4xl:flex-wrap ${className}`}>
       {/* Keyed by place: a folder's own buttons swap in without a remount. */}
       {groups.map((group, index) => (
-        <div key={index} className={`mobile-tab-bar pointer-events-auto flex items-center rounded-full p-[3px] ${index === 0 ? 'mr-auto max-4xl:hidden' : ''}`}>
+        // The first group, « Nouveau message » alone, a primary button
+        // rather than a glass pill.
+        <div key={index} className={`pointer-events-auto flex items-center rounded-full ${index === 0 ? 'mr-auto max-4xl:hidden' : 'mobile-tab-bar p-[3px]'}`}>
           {group.map((item, itemIndex) => (
             <Fragment key={item.id}>
               {itemIndex > 0 ? <span className="mail-toolbar-divider mx-[1px] h-[18px] w-px shrink-0" aria-hidden="true" /> : null}
