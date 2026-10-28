@@ -54,6 +54,7 @@ import {
   readContentDispositionFilename,
   sanitizeMailHtml,
 } from './mailMessage.js'
+import { MailAuthError, forgetContextRequest, isZimbraSessionRefusal, readContextAttachmentLimits, runWithMailContext, shareContextRequest } from './mailContext.js'
 import { isEmptiableMailFolder, normalizeZimbraFolderTree, parseZimbraMarkReadPref } from './mailFolders.js'
 import { buildZimbraAutoCompleteRequest, normalizeZimbraAutoComplete, searchDemoMailContacts } from './mailAutocomplete.js'
 import {
@@ -2520,7 +2521,7 @@ app.post('/__ent_auth/mail/upload', async (req, res) => {
     if (httpStatus === 401 || httpStatus === 403 || isRedirectStatus(httpStatus) || parsed?.status === 401) {
       // A lapsed webmail session (or a CSRF refusal): signed in again on the
       // page's next try. The body is gone, so not retried here.
-      runtimeMailContexts.delete(session.id)
+      dropZimbraContext(session.id, context)
       console.error(`[mail] upload failed: Zimbra rejected the session (HTTP ${httpStatus}, ${parsed?.status ?? 'no status'}${context.csrfToken ? '' : ', no CSRF token'})`)
       return res.status(502).json({ error: 'mail_upload_retry' })
     }
@@ -3460,8 +3461,6 @@ app.get('/__ent_auth/grades/report.pdf', async (req, res) => {
 // Still unverified: the per-message deep link (?view=msg&id=…) surviving the
 // SAML login when opened in the browser.
 
-class MailAuthError extends Error {}
-
 const MAIL_ACCEPT_HTML = 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8'
 
 function buildMailLaunchHref(targetUrl) {
@@ -3636,7 +3635,9 @@ async function zimbraSoapRequest(context, requestName, requestBody, namespace = 
 
   if (fault || !response.ok || !payload?.Body) {
     const code = fault?.Detail?.Error?.Code ?? `HTTP ${response.status}`
-    const error = /AUTH_(REQUIRED|EXPIRED)/.test(code) || response.status === 401
+    // Only a refused session drops the context (withZimbraContext): a fault
+    // or an outage keeps it.
+    const error = isZimbraSessionRefusal({ code, status: response.status, json: Boolean(payload) })
       ? new MailAuthError(`Zimbra ${requestName} rejected the session (${code}).`)
       : new Error(`Zimbra ${requestName} failed (${code}).`)
     // For the routes that tell the page why (mapZimbraSendFault): the code
@@ -3865,13 +3866,28 @@ function searchDemoMail(payload, words, offset) {
   return { ...payload, messages, hasMore: false }
 }
 
-async function getZimbraContext(session, { fresh = false } = {}) {
-  let context = fresh ? null : runtimeMailContexts.get(session.id)
-  if (!context) {
+// The session's context, signed in when there's none. `replacing`: one the
+// webmail just refused, signed in again unless another request already did.
+async function getZimbraContext(session, { replacing = null } = {}) {
+  let context = runtimeMailContexts.get(session.id)
+  if (!context || context === replacing) {
     context = await establishZimbraContext(session)
     runtimeMailContexts.set(session.id, context)
   }
   return context
+}
+
+// Forgets a refused context, unless another request has replaced it since.
+function dropZimbraContext(sessionId, context) {
+  if (runtimeMailContexts.get(sessionId) === context) runtimeMailContexts.delete(sessionId)
+}
+
+// The account's GetInfo, one per webmail sign-in however many routes ask
+// at once (shareContextRequest): its name (fetchMailAddress), its
+// attachment limit (readZimbraAttachmentLimits), its addresses
+// (readZimbraIdentities).
+function readZimbraInfo(context) {
+  return shareContextRequest(context, 'info', () => zimbraSoapRequest(context, 'GetInfoRequest', { sections: 'mbox,attrs' }, 'urn:zimbraAccount'))
 }
 
 // The mail address of the account, as the webmail knows it (Zimbra
@@ -3888,8 +3904,8 @@ async function fetchMailAddress(session) {
   let address = null
   try {
     const context = await getZimbraContext(session)
-    const info = await zimbraSoapRequest(context, 'GetInfoRequest', { sections: 'mbox' }, 'urn:zimbraAccount')
     // The same answer gives the attachment limits (readZimbraAttachmentLimits).
+    const info = await readZimbraInfo(context)
     context.attachmentLimits ??= deriveAttachmentLimits(info?.attSizeLimit)
     const name = String(info?.name ?? '').trim()
     address = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(name) ? name : null
@@ -3900,26 +3916,8 @@ async function fetchMailAddress(session) {
   return address
 }
 
-async function fetchZimbraRecentMail(session, options) {
-  for (let attempt = 0; attempt < 2; attempt += 1) {
-    let context = attempt === 0 ? runtimeMailContexts.get(session.id) : null
-
-    if (!context) {
-      context = await establishZimbraContext(session)
-      runtimeMailContexts.set(session.id, context)
-    }
-
-    try {
-      return await queryZimbraInbox(context, options)
-    } catch (error) {
-      runtimeMailContexts.delete(session.id)
-      if (!(error instanceof MailAuthError) || attempt > 0) {
-        throw error
-      }
-    }
-  }
-
-  throw new Error('Unable to load mail.')
+function fetchZimbraRecentMail(session, options) {
+  return withZimbraContext(session, (context) => queryZimbraInbox(context, options))
 }
 
 const MAIL_PROVIDERS = {
@@ -3974,18 +3972,14 @@ app.get('/__ent_auth/mail/open', async (req, res) => {
 })
 
 // Runs `fn(context)` with the session's Zimbra context; a rejected session is
-// signed in again once.
-async function withZimbraContext(session, fn) {
-  for (let attempt = 0; attempt < 2; attempt += 1) {
-    const context = await getZimbraContext(session, { fresh: attempt > 0 })
-    try {
-      return await fn(context)
-    } catch (error) {
-      runtimeMailContexts.delete(session.id)
-      if (!(error instanceof MailAuthError) || attempt > 0) throw error
-    }
-  }
-  throw new Error('Unable to reach the webmail.')
+// signed in again once (runWithMailContext). Any other failure keeps the
+// context: a fault or a timeout doesn't mean it's signed out, and parallel
+// requests may be using it.
+function withZimbraContext(session, fn) {
+  return runWithMailContext({
+    get: (replacing) => getZimbraContext(session, { replacing }),
+    drop: (context) => dropZimbraContext(session.id, context),
+  }, fn)
 }
 
 class MailNotFoundError extends Error {}
@@ -4174,19 +4168,12 @@ async function readZimbraMailFolders(context, { fresh = false } = {}) {
 // The account's attachment limits (deriveAttachmentLimits) from Zimbra
 // GetInfo's attSizeLimit (zimbraMtaMaxMessageSize), kept on the context:
 // read once per webmail sign-in (by /mail/prefs, /mail/upload or
-// fetchMailAddress, whichever comes first). A GetInfo that fails for
-// another reason than the session leaves the fallback limits.
-async function readZimbraAttachmentLimits(context) {
-  if (context.attachmentLimits) return context.attachmentLimits
-  let messageLimit = null
-  try {
-    const info = await zimbraSoapRequest(context, 'GetInfoRequest', { sections: 'mbox' }, 'urn:zimbraAccount')
-    messageLimit = info?.attSizeLimit
-  } catch (error) {
-    if (error instanceof MailAuthError) throw error
-  }
-  context.attachmentLimits = deriveAttachmentLimits(messageLimit)
-  return context.attachmentLimits
+// fetchMailAddress, whichever comes first; readZimbraInfo's one GetInfo).
+// A GetInfo that fails for another reason than the session gives the
+// fallback limits, not kept: the next request reads them again
+// (readContextAttachmentLimits).
+function readZimbraAttachmentLimits(context) {
+  return readContextAttachmentLimits(context, readZimbraInfo)
 }
 
 // Same-origin only; the session cookie is SameSite=Lax as well.
@@ -4582,13 +4569,19 @@ class MailSendRefusal extends Error {
 // The account's identities (normalizeZimbraIdentities), kept on the Zimbra
 // context as its other account data: read once per webmail sign-in, by
 // /mail/prefs (for « De : ») or the first send. GetInfo's same answer gives
-// the attachment limits. A GetIdentitiesRequest that fails (not for the
-// session) leaves the account's own address.
-async function readZimbraIdentities(context) {
+// the attachment limits (readZimbraInfo's one GetInfo, shared with
+// readZimbraAttachmentLimits). A GetIdentitiesRequest that fails (not for
+// the session) leaves the account's own address. `fresh`: both read again
+// (Réglages, an identity changed in the webmail meanwhile).
+async function readZimbraIdentities(context, { fresh = false } = {}) {
+  if (fresh) {
+    context.mailIdentities = null
+    forgetContextRequest(context, 'info')
+  }
   if (Array.isArray(context.mailIdentities)) return context.mailIdentities
   const [identities, info] = await Promise.allSettled([
     zimbraSoapRequest(context, 'GetIdentitiesRequest', {}, 'urn:zimbraAccount'),
-    zimbraSoapRequest(context, 'GetInfoRequest', { sections: 'mbox,attrs' }, 'urn:zimbraAccount'),
+    readZimbraInfo(context),
   ])
   for (const result of [identities, info]) {
     if (result.status === 'rejected' && result.reason instanceof MailAuthError) throw result.reason
@@ -5224,8 +5217,7 @@ app.get('/__ent_auth/mail/signatures', async (req, res) => {
     const { signatures, identities, signatureIds } = isDemoSession(session)
       ? { signatures: readDemoSignatures(session), identities: DEMO_MAIL_IDENTITIES, signatureIds: DEMO_SIGNATURE_IDS }
       : await withZimbraContext(session, async (context) => {
-        if (req.query.fresh === '1') context.mailIdentities = null
-        const [list, accountIdentities] = await Promise.all([readZimbraSignatureList(context), readZimbraIdentities(context)])
+        const [list, accountIdentities] = await Promise.all([readZimbraSignatureList(context), readZimbraIdentities(context, { fresh: req.query.fresh === '1' })])
         return { signatures: list, identities: accountIdentities, signatureIds: context.mailIdentitySignatureIds }
       })
     setSessionCookie(res, session)
