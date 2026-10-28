@@ -1,5 +1,7 @@
 import { Icon } from '@iconify/react'
 import { buildUeWash, formatGradeDay as formatDay } from '../gradesSubjects'
+import { gradeCopyText } from '../contextMenuItems'
+import { copyToClipboard, useContextMenu } from '../useContextMenu'
 import { NewBadge, TypeBadge } from './SubjectsList'
 
 // Always one row, scrolling sideways when the cards don't fit (snap, no
@@ -79,9 +81,24 @@ export function LatestGradeCardBody({ moduleTitle, moduleCode, day, title, value
 // subject's icon (src/subjectIcons.js) leads its name. A card opens the
 // grade itself (onOpen): GradesPage takes it to its UE and subject.
 function LatestGradesList({ grades, ueColors = {}, subjectIcon = () => null, onOpen = null }) {
+  // A card's right-click menu (a long press; `key`: its index): the grade
+  // opened, and as text.
+  const menuProps = useContextMenu((key) => {
+    const grade = grades[Number(key)]
+    if (!grade) return null
+    return [
+      onOpen ? { id: 'open', label: 'Voir la note', icon: 'carbon:view', onSelect: () => onOpen(grade) } : null,
+      {
+        id: 'copy',
+        label: 'Copier',
+        icon: 'carbon:copy',
+        onSelect: () => void copyToClipboard(gradeCopyText({ title: grade.description || grade.moduleTitle, value: grade.grade.value, subject: grade.moduleTitle })),
+      },
+    ]
+  })
   return (
     <ul className={LIST_CLASSES}>
-      {grades.map((grade) => {
+      {grades.map((grade, index) => {
         const day = formatDay(grade.date)
         const value = String(parseFloat(grade.grade.value.toFixed(2)))
         const title = grade.description || grade.moduleTitle
@@ -94,6 +111,7 @@ function LatestGradesList({ grades, ueColors = {}, subjectIcon = () => null, onO
               className={CARD_CLASSES}
               onClick={onOpen ? () => onOpen(grade) : undefined}
               disabled={!onOpen}
+              {...menuProps(index)}
               aria-label={`${title}${grade.typeLabel ? `, ${grade.typeLabel.toLowerCase()}` : ''} : ${value} sur 20${day ? `, le ${day}` : ''} (${grade.moduleTitle}). Voir la note`}
             >
               <LatestGradeCardBody

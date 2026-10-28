@@ -5,6 +5,8 @@ import { addDays, daysBetween, startOfWeek, toDayKey } from '../planningDates'
 import { weekColumns } from '../planningEvents'
 import { usePlanningWeeks, useEventAccents } from '../usePlanningWeeks'
 import { useHistorySheet } from '../useHistorySheet'
+import { classCopyText } from '../contextMenuItems'
+import { copyToClipboard, useContextMenu } from '../useContextMenu'
 import PlanningDayPage from './PlanningDayPage'
 import PlanningEventSheet from './PlanningEventSheet'
 import PlanningHeader from './PlanningHeader'
@@ -192,6 +194,19 @@ function PlanningPage({ selection = null, user = null, showWeekend = false, onOp
     if (!isList) setWideView('day')
   }
 
+  // A class's right-click menu (a long press; `key`: its id): its sheet,
+  // its day on its own (from the week), the class as text.
+  const eventMenuProps = useContextMenu((id) => {
+    const event = events.find((entry) => entry.id === id)
+    if (!event) return null
+    return [
+      { id: 'open', label: 'Voir le détail', icon: 'carbon:view', onSelect: () => openSheet(event) },
+      isWeek ? { id: 'day', label: 'Afficher le jour', icon: 'carbon:calendar', onSelect: () => openDay(event.day) } : null,
+      'separator',
+      { id: 'copy', label: 'Copier', icon: 'carbon:copy', onSelect: () => void copyToClipboard(classCopyText(event)) },
+    ]
+  })
+
   const stepDays = useCallback((day, count) => addDays(day, count * dayCount), [dayCount])
   // The week's columns, for its pages and their headers alike.
   const shownDay = isWeek ? null : selectedDay
@@ -271,6 +286,7 @@ function PlanningPage({ selection = null, user = null, showWeekend = false, onOp
               todayKey={todayKey}
               active={active}
               onOpen={openSheet}
+              menuProps={eventMenuProps}
               onRetry={retry}
               onOpenAccount={onOpenAccount}
             />
@@ -285,6 +301,7 @@ function PlanningPage({ selection = null, user = null, showWeekend = false, onOp
               todayKey={todayKey}
               weekBlocks={isWide}
               onOpen={openSheet}
+              menuProps={eventMenuProps}
               onRetry={retry}
               onOpenAccount={onOpenAccount}
             />

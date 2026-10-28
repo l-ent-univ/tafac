@@ -34,7 +34,7 @@ function MetaLabel({ icon, text }) {
 // course's wash, its accent bar): its hours and length, its title, then its
 // room, teacher and group. On a wide screen the hours stand in a column of
 // their own, as an agenda's. A button opening the class's sheet.
-function PlanningListCard({ event, accent, ongoing, onOpen }) {
+function PlanningListCard({ event, accent, ongoing, onOpen, menuProps = null }) {
   const hours = `${formatTime(event.start)} – ${formatTime(event.end)}`
   const duration = durationText(event.start, event.end)
   const meta = [
@@ -48,6 +48,7 @@ function PlanningListCard({ event, accent, ongoing, onOpen }) {
       className="planning-list-card widget-card widget-card-visible isolate relative flex w-full min-w-0 items-stretch gap-3 overflow-hidden card-corners-sm border bg-widget-bg p-[13px] text-left text-text cursor-pointer 4xl:gap-4 4xl:px-4"
       style={accentStyle(accent)}
       onClick={() => onOpen(event)}
+      {...menuProps?.(event.id)}
       aria-label={`${formatTime(event.start)} à ${formatTime(event.end)}, ${event.title}${meta.map((part) => `, ${part.text}`).join('')}, ${duration}${ongoing ? ', en cours' : ''}`}
     >
       <span className="latest-grade-wash planning-accent-fill" aria-hidden="true" />
@@ -107,7 +108,7 @@ function DayHeading({ day, todayKey, count }) {
 // a day then picked in it (the strip, "Aujourd’hui") is scrolled to just
 // under the page's top (`active`: the page in view, not a neighbour in
 // the pager).
-function PlanningListView({ monday, selectedDay, events, statusOn, accentFor, now, todayKey, active, onOpen, onRetry = null, onOpenAccount = null }) {
+function PlanningListView({ monday, selectedDay, events, statusOn, accentFor, now, todayKey, active, onOpen, menuProps = null, onRetry = null, onOpenAccount = null }) {
   const days = listWeekDays(events, monday, { todayKey, selectedDay })
   const listRef = useRef(null)
   // The day last scrolled for: only another one picked scrolls to it (the
@@ -166,7 +167,7 @@ function PlanningListView({ monday, selectedDay, events, statusOn, accentFor, no
             <ul className="m-0 grid min-w-0 list-none gap-2 p-0 4xl:gap-2.5">
               {dayEvents.map((event) => (
                 <li key={event.id} className="flex min-w-0">
-                  <PlanningListCard event={event} accent={accentFor(event.title)} ongoing={isOngoing(event, now)} onOpen={onOpen} />
+                  <PlanningListCard event={event} accent={accentFor(event.title)} ongoing={isOngoing(event, now)} onOpen={onOpen} menuProps={menuProps} />
                 </li>
               ))}
             </ul>

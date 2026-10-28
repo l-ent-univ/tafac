@@ -10,6 +10,7 @@ import { withViewTransition } from '../viewTransition'
 import UeBadge from './UeBadge'
 import UeLink from './UeLink'
 import { useUeColor } from '../useUeColor'
+import { useContextMenu } from '../useContextMenu'
 
 // UE tiles side by side, as many ≥320px as fit a row (one on a phone), in
 // UE order, a row's tiles at one height. Wrapping boxes, not grid columns:
@@ -570,6 +571,18 @@ function UeSubjectsList({ report, subjectIcon = () => null, newEvaluationIds = n
     requestCollapse()
   }
 
+  // A tile's right-click menu (a long press; `key`: its UE): its view, and
+  // its first subject with news (the tile's foot) when it has some.
+  const tileMenuProps = useContextMenu((code) => {
+    const ue = groups.find((group) => group.code === code)
+    if (!ue) return null
+    const news = ue.modules.filter(hasUnread)
+    return [
+      { id: 'open', label: 'Ouvrir', icon: 'carbon:maximize', onSelect: () => openFromTile(code) },
+      news.length ? { id: 'news', label: 'Voir les nouvelles notes', icon: 'carbon:arrow-right', onSelect: () => openFromTile(code, news[0]) } : null,
+    ]
+  })
+
   if (expanded) {
     return (
       <UeFullView
@@ -619,6 +632,7 @@ function UeSubjectsList({ report, subjectIcon = () => null, newEvaluationIds = n
               style={ue.code === morphCode ? morph('card', ue.code) : undefined}
               aria-labelledby={`${headingId}-${ue.code}`}
               aria-describedby={`${headingId}-${ue.code}-state`}
+              {...tileMenuProps(ue.code)}
             >
               {/* News only: while the UE has grades marked "Nouveau", its colour
                   washes the top of the card (the "Dernières notes" wash, a

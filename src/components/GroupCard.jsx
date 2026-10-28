@@ -13,8 +13,9 @@ export const GROUP_CARD_CLASSES = 'widget-card widget-card-visible m-0 list-none
 // a word in the chevron's place (« Afficher »). `wrap`: a title that may run
 // over several lines (a note, a file's long name). `hint`: the hover's
 // tooltip (a shortened title in full). `compact`: tighter, the icon bare
-// (no box), as a mail's attachments.
-export function GroupRow({ icon, title, detail, onClick, href, download, trailing = null, wrap = false, hint, compact = false }) {
+// (no box), as a mail's attachments. `menuProps`: its right-click menu's
+// (useContextMenu), on the link or the button.
+export function GroupRow({ icon, title, detail, onClick, href, download, trailing = null, wrap = false, hint, compact = false, menuProps = null }) {
   const trailingIcon = href ? (download ? 'carbon:download' : 'carbon:launch') : onClick ? 'carbon:chevron-right' : null
   const content = (
     <>
@@ -45,6 +46,7 @@ export function GroupRow({ icon, title, detail, onClick, href, download, trailin
           href={href}
           title={hint}
           {...(download ? { download } : { target: '_blank', rel: 'noopener noreferrer' })}
+          {...menuProps}
         >
           {content}
         </a>
@@ -52,6 +54,6 @@ export function GroupRow({ icon, title, detail, onClick, href, download, trailin
     )
   }
   return onClick
-    ? <li><button type="button" className={`${className} is-link cursor-pointer border-0 bg-transparent p-0 pl-3`} title={hint} onClick={onClick}>{content}</button></li>
+    ? <li><button type="button" className={`${className} is-link cursor-pointer border-0 bg-transparent p-0 pl-3`} title={hint} onClick={onClick} {...menuProps}>{content}</button></li>
     : <li className={className} title={hint}>{content}</li>
 }

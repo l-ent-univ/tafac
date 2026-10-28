@@ -6,6 +6,8 @@ import { publishBriefingSource } from '../briefingSources'
 import { ENT_AUTH_PREFIX, getRecentEntLoginAgeMs, getRequestErrorKind } from '../entApi'
 import { accentStyle } from '../eventAccents'
 import { toDayKey } from '../planningDates'
+import { classCopyText } from '../contextMenuItems'
+import { copyToClipboard, useContextMenu } from '../useContextMenu'
 import { useEventAccents } from '../usePlanningWeeks'
 import {
   NEXT_CLASS_LOOKAHEAD_DAYS,
@@ -751,6 +753,12 @@ function WidgetNextClass({
     event.preventDefault()
     openPlanning()
   }, [openPlanning])
+  // Its right-click menu (a long press): what a click does, and the class
+  // as text.
+  const menuProps = useContextMenu(preview ? null : () => [
+    { id: 'open', label: opensInApp ? 'Voir le planning' : `Ouvrir ${PLANNING_PROVIDER}`, icon: 'carbon:calendar', disabled: !opensInApp && !ADE_HREF, onSelect: openPlanning },
+    showsClass ? { id: 'copy', label: 'Copier', icon: 'carbon:copy', onSelect: () => void copyToClipboard(classCopyText(nextClass)) } : null,
+  ])
 
   // Hidden when the planning can't be loaded; the background refresh brings
   // the card back once ADE answers again.
@@ -767,6 +775,7 @@ function WidgetNextClass({
       onKeyDown={preview ? undefined : handleKeyDown}
       role={preview ? undefined : opensInApp ? 'button' : 'link'}
       tabIndex={preview ? undefined : 0}
+      {...(preview ? null : menuProps())}
     >
       {/* The course's wash, as the planning's blocks wear it, in a layer of
           its own clipped to the card's corners (the card lets its date

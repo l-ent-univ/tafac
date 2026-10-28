@@ -67,8 +67,9 @@ function NowLine({ now, todayKey, column, week }) {
 
 // One page of the planning: its `days` side by side (one, two, or a week's
 // five or seven). `onRetry(monday)`: a failed week asked again;
-// `onOpenAccount`: Mon compte, where the group is chosen.
-function PlanningDayPage({ days, width, events, statusOn, accentFor, now, todayKey, weekBlocks = false, onOpen, onRetry = null, onOpenAccount = null }) {
+// `onOpenAccount`: Mon compte, where the group is chosen. `menuProps`: a
+// block's right-click menu (PlanningPage's useContextMenu).
+function PlanningDayPage({ days, width, events, statusOn, accentFor, now, todayKey, weekBlocks = false, onOpen, menuProps = null, onRetry = null, onOpenAccount = null }) {
   const dayCount = days.length
   const week = dayCount > 2
   const perDay = days.map((day) => eventsOnDay(events, day))
@@ -95,6 +96,7 @@ function PlanningDayPage({ days, width, events, statusOn, accentFor, now, todayK
               height={block.height}
               style={{ position: 'absolute', left: block.x, top: block.y }}
               onOpen={onOpen}
+              menuProps={menuProps}
             />
           ))}
           {pageKind ? (
