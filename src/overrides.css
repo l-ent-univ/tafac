@@ -2102,6 +2102,158 @@
   }
 }
 
+/* ── Landing showcase (LandingShowcase) ──
+   The tab list wears the app's phone tab bar (.mobile-tab-bar), its tabs
+   sharing it equally; the selected one's lens slides under the tab picked
+   (--tab-index of --tab-count, inside the bar's 6px padding and 4px gaps). */
+.landing-tabs-lens {
+  --tab-width: calc((100% - 12px - (var(--tab-count) - 1) * 4px) / var(--tab-count));
+  top: 6px;
+  bottom: 6px;
+  left: calc(6px + var(--tab-index) * (var(--tab-width) + 4px));
+  width: var(--tab-width);
+  transition: left 420ms cubic-bezier(0.32, 0.72, 0, 1);
+}
+
+/* The lens is the selected tab's: no hover tint over it. */
+.landing-tabs .mobile-tab-bar-item[aria-selected="true"] {
+  background-color: transparent;
+}
+
+/* A panel: its title and list on the left, the preview on the right; on
+   narrower screens the preview between the title and the list. */
+.landing-showcase-panel:not([hidden]) {
+  display: grid;
+  grid-template-columns: minmax(0, 380px) minmax(0, 1fr);
+  grid-template-areas:
+    "head preview"
+    "items preview";
+  grid-template-rows: auto 1fr;
+  column-gap: 56px;
+  row-gap: 24px;
+  align-items: start;
+}
+
+.landing-showcase-head {
+  grid-area: head;
+  align-self: end;
+}
+
+.landing-showcase-items {
+  grid-area: items;
+}
+
+.landing-showcase-frame {
+  grid-area: preview;
+  align-self: center;
+}
+
+@media (width < 1024px) {
+  .landing-showcase-panel:not([hidden]) {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas:
+      "head"
+      "preview"
+      "items";
+    grid-template-rows: auto;
+    row-gap: 24px;
+    max-width: 640px;
+    margin-inline: auto;
+  }
+}
+
+/* Each preview on the login page's sky, the app's cards frosted over it as
+   on the dashboard's wallpaper; as tall on every tab, so the page doesn't
+   jump when one is picked (on phones, as tall as its preview). */
+.landing-showcase-frame {
+  box-shadow: 0 1px 3px rgb(52 18 0 / 0.08), 0 28px 64px -30px rgb(52 18 0 / 0.4);
+}
+
+:where([data-theme="dark"]) .landing-showcase-frame {
+  box-shadow: 0 1px 3px rgb(0 0 0 / 0.4), 0 28px 64px -30px rgb(0 0 0 / 0.8);
+}
+
+.landing-showcase-stage {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  align-content: center;
+  min-height: 500px;
+  padding: 28px;
+}
+
+@media (width < 1024px) {
+  .landing-showcase-stage {
+    min-height: 0;
+    padding: 24px;
+  }
+}
+
+@media (width < 640px) {
+  .landing-showcase-stage {
+    padding: 14px;
+  }
+}
+
+/* The mail list, solid as the mail page is; the composer of « Écrire au
+   sujet de cette note » over it as the app's composer window is over the
+   page (.mail-composer). */
+.landing-preview-sheet {
+  background-color: var(--color-bg);
+  border-color: rgb(255 255 255 / 0.8);
+  box-shadow: 0 1px 3px rgb(52 18 0 / 0.06), 0 10px 28px -14px rgb(52 18 0 / 0.16);
+}
+
+:where([data-theme="dark"]) .landing-preview-sheet {
+  background-color: #141414;
+  border-color: rgb(255 255 255 / 0.08);
+  box-shadow: 0 1px 3px rgb(0 0 0 / 0.3);
+}
+
+.landing-preview-composer {
+  background-color: #ffffff;
+  border-color: rgb(52 18 0 / 0.08);
+  box-shadow: 0 1px 3px rgb(52 18 0 / 0.08), 0 32px 80px -20px rgb(52 18 0 / 0.36);
+}
+
+:where([data-theme="dark"]) .landing-preview-composer {
+  background-color: #1c1c1c;
+  border-color: rgb(255 255 255 / 0.1);
+  box-shadow: 0 1px 3px rgb(0 0 0 / 0.4), 0 32px 80px -20px rgb(0 0 0 / 0.8);
+}
+
+/* A panel comes in as its tab is picked, its preview a beat after. With
+   reduced motion they're simply there, and the lens jumps. */
+@media (prefers-reduced-motion: no-preference) {
+  .landing-showcase-panel:not([hidden]) {
+    animation: landing-panel-in 520ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  }
+
+  .landing-showcase-stage > * {
+    animation: landing-stage-in 700ms cubic-bezier(0.16, 1, 0.3, 1) 80ms both;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .landing-tabs-lens {
+    transition: none;
+  }
+}
+
+@keyframes landing-panel-in {
+  from {
+    opacity: 0;
+    translate: 0 12px;
+  }
+}
+
+@keyframes landing-stage-in {
+  from {
+    opacity: 0;
+    translate: 0 20px;
+    scale: 0.98;
+  }
+}
+
 /* The landing's last card (free, the team, the contact) rises in once on
    screen (LandingContact: data-revealed). */
 @media (prefers-reduced-motion: no-preference) {

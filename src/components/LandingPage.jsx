@@ -5,6 +5,8 @@ import loginClouds from '../assets/login/login-clouds.webp'
 import loginSky from '../assets/login/login-sky.webp'
 import { buildLandingPreview } from '../landingPreview'
 import { copy, copyText } from '../landingCopy'
+import { scrollToSection } from '../landingMotion'
+import { listShowcaseTabs, pickShowcaseAnnouncement, showcaseTabId } from '../landingShowcase'
 import { getPapillonUrl, readPapillonDebugOverride } from '../papillon'
 import FeatureShowcase from './FeatureShowcase'
 import FloatingWidgets from './FloatingWidgets'
@@ -14,6 +16,7 @@ import LandingContact from './LandingContact'
 import LandingFaq from './LandingFaq'
 import LandingFooter from './LandingFooter'
 import LandingHeader from './LandingHeader'
+import LandingShowcase, { ShowcaseAnnouncement } from './LandingShowcase'
 import LaptopMockup from './LaptopMockup'
 import LentButton from './LentButton'
 import PapillonVision from './PapillonVision'
@@ -29,6 +32,9 @@ import WidgetRecentMail from './WidgetRecentMail'
 // Papillon's block at the end instead of the free/contact one (the same
 // switch as every other mention, src/papillon.js).
 const IS_PART_OF_PAPILLON = getPapillonUrl(universityConfig.branding, readPapillonDebugOverride()) !== null
+// The app's pages the showcase presents: all of them on the neutral page, a
+// university's own on its page (src/landingShowcase.js).
+const SHOWCASE_TABS = listShowcaseTabs(universityConfig)
 
 // The widgets move on to their next demo frame together: each frame stays
 // HOLD_MS, then its text leaves upwards (OUT_MS) and the next one comes in
@@ -100,11 +106,15 @@ function ShowcaseRow({ wide = false, mirrored = false, className = '', children 
   )
 }
 
-// The public home page, shown at / while signed out: for now the dashboard's
-// widgets on demo data, as WidgetContainer lays them out.
+// The public home page, shown at / while signed out: the dashboard's
+// widgets on demo data, as WidgetContainer lays them out, then the app page
+// by page (LandingShowcase), on a computer and a phone, its privacy, the
+// questions students ask and who makes it.
 function LandingPage({ onLogin }) {
   const [preview] = useState(() => buildLandingPreview())
   const [areWidgetsVisible, setAreWidgetsVisible] = useState(false)
+  const [selectedShowcaseTab, setShowcaseTabId] = useState(SHOWCASE_TABS[0]?.id ?? null)
+  const [announcement] = useState(() => pickShowcaseAnnouncement({ config: universityConfig, tabs: SHOWCASE_TABS }))
   const { step, phase } = useFrameCycle()
   const greeting = frameAt(preview.greetings, step)
   const isComputer = useIsComputer()
@@ -113,6 +123,23 @@ function LandingPage({ onLogin }) {
     const timeoutId = window.setTimeout(() => setAreWidgetsVisible(true), 140)
     return () => window.clearTimeout(timeoutId)
   }, [])
+
+  // An address to a page's panel (/#messagerie): that tab, scrolled to
+  // once shown (a hidden panel can't be scrolled to by the browser).
+  useEffect(() => {
+    const id = decodeURIComponent(window.location.hash.slice(1))
+    if (!SHOWCASE_TABS.some((tab) => tab.id === id)) return
+    setShowcaseTabId(id)
+    window.requestAnimationFrame(() => document.getElementById('fonctionnalites')?.scrollIntoView({ block: 'start' }))
+  }, [])
+
+  // « Nouveau » at the top: its tab picked, the showcase scrolled to, the
+  // focus on the tab (without a jump), so the keyboard goes on from there.
+  const openShowcaseTab = (event, id) => {
+    setShowcaseTabId(id)
+    scrollToSection(event, 'fonctionnalites')
+    document.getElementById(showcaseTabId(id))?.focus({ preventScroll: true })
+  }
 
   return (
     <>
@@ -182,6 +209,7 @@ function LandingPage({ onLogin }) {
             <p className="m-0 mt-5 max-w-[40ch] text-balance text-center text-lg font-medium leading-snug text-text-muted font-body max-md:mt-4 max-md:text-base">
               {copyText(copy.hero.subtitle)}
             </p>
+            <ShowcaseAnnouncement announcement={announcement} onOpen={openShowcaseTab} className="mt-5 max-md:mt-4" />
             <LentButton className="mt-7 min-h-[60px]! px-9! text-[19px]! max-md:mt-6" onClick={onLogin}>
               {copyText(copy.hero.cta)}
             </LentButton>
@@ -193,16 +221,23 @@ function LandingPage({ onLogin }) {
           </div>
         </div>
       </div>
-      {/* The first device (the one in hand: the laptop on a computer, the
-          phone otherwise) with what the app does, then the other one with
-          other sides of it, mirrored. The top padding clears the first
-          device's flower (and its scroll parallax) from the first screen. The
-          second device shows the app in its dark theme. */}
+      {/* What the app does, page by page. */}
+      <LandingShowcase
+        tabs={SHOWCASE_TABS}
+        selectedId={selectedShowcaseTab}
+        onSelect={setShowcaseTabId}
+        preview={preview}
+        className="pt-24 pb-8 max-md:pt-16 max-md:pb-4"
+      />
+      {/* The device in hand first (the laptop on a computer, the phone
+          otherwise) with what it brings, then the other one, mirrored, in
+          the app's dark theme. The top padding leaves room for the first
+          device's flower (and its scroll parallax). */}
       {isComputer ? (
         <>
           <ShowcaseRow wide className="pt-24 pb-24 max-md:pt-20 max-md:pb-16">
             <LaptopMockup decorated className="w-[min(700px,58%)] shrink-0 max-4xl:w-full max-4xl:max-w-[760px]" />
-            <FeatureShowcase className="min-w-0 flex-1" />
+            <FeatureShowcase variant="computer" className="min-w-0 flex-1" />
           </ShowcaseRow>
           <ShowcaseRow mirrored className="pt-8 pb-28 max-md:pt-4 max-md:pb-20">
             <div className="landing-device w-[min(300px,72vw)] shrink-0">
@@ -215,7 +250,7 @@ function LandingPage({ onLogin }) {
         <>
           <ShowcaseRow className="pt-24 pb-24 max-md:pt-20 max-md:pb-16">
             <PhoneMockup className="w-[min(300px,72vw)] shrink-0" />
-            <FeatureShowcase className="min-w-0 flex-1" />
+            <FeatureShowcase variant="phone" className="min-w-0 flex-1" />
           </ShowcaseRow>
           <ShowcaseRow wide mirrored className="pt-8 pb-28 max-md:pt-4 max-md:pb-20">
             <div className="landing-device w-[min(700px,58%)] shrink-0 max-4xl:w-full max-4xl:max-w-[760px]">

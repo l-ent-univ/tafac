@@ -3,35 +3,28 @@ import { Icon } from '@iconify/react'
 import { copy, copyText } from '../landingCopy'
 import { useRevealOnce } from '../landingMotion'
 
-// PLACEHOLDER copy, for the landing page's mockup: to rewrite before launch
-// (landingCopy.json, `features`; the icons here, item by item).
-// `main` goes with the first device, beside it; `computer` and `phone`, with
-// the other device under it, show other sides of the app.
+// What each device brings (landingCopy.json, `features`; the icons here,
+// item by item), beside its mockup: `computer` with the laptop, `phone`
+// with the phone. What each page does is the showcase's (LandingShowcase).
 const SHOWCASES = {
-  main: {
-    id: 'fonctionnalites',
-    icons: ['carbon:calendar', 'carbon:chart-pie', 'carbon:email', 'carbon:task', 'carbon:add'],
-  },
   computer: {
-    id: 'moyennes-et-planning',
-    icons: ['carbon:chart-pie', 'carbon:calculator', 'carbon:calendar', 'carbon:download'],
+    id: 'sur-ordinateur',
+    icons: ['carbon:cursor-1', 'carbon:side-panel-open', 'carbon:printer', 'carbon:side-panel-close'],
   },
   phone: {
-    id: 'application',
-    icons: ['carbon:mobile', 'carbon:asleep', 'carbon:view-off', 'carbon:code'],
+    id: 'sur-telephone',
+    icons: ['carbon:mobile', 'carbon:touch-1', 'carbon:arrows-horizontal', 'carbon:asleep'],
   },
 }
 
-// "What it does": a heading and the features as a list of pills, in the
-// dashboard's card style (solid, as with the wallpaper off): the icon, then
-// the title over a short line (`main`: the last one only "Et bien plus",
-// then a note that it all depends on the university). Beside a device
-// mockup it reads from the left; under it (below 1024 px), centred, the
-// pills still reading from the left. On narrow phones, where the text may
-// wrap, the corners round less.
+// A heading and the features as a list of pills, in the dashboard's card
+// style (solid, as with the wallpaper off): the icon, then the title over a
+// short line. Beside a device mockup it reads from the left; under it
+// (below 1024 px), centred, the pills still reading from the left. On
+// narrow phones, where the text may wrap, the corners round less.
 // Once the list is on screen, the pills come in one by one, then the note
 // (data-revealed, .landing-feature in overrides.css).
-function FeatureShowcase({ variant = 'main', className = '' }) {
+function FeatureShowcase({ variant = 'computer', className = '' }) {
   const { id, icons } = SHOWCASES[variant]
   const { title, intro, items, note } = copy.features[variant]
   const features = items.map((item, index) => ({ ...item, icon: icons[index] ?? 'carbon:checkmark' }))

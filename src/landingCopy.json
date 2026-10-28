@@ -8,80 +8,171 @@
   },
   "hero": {
     "title": "Cours, notes et services de {university}",
-    "subtitle": "Emploi du temps, notes, mails et rendus Moodle sur une seule page",
+    "subtitle": "Emploi du temps, notes, messagerie et rendus Moodle dans une seule app",
     "cta": "Se connecter à mon ENT",
     "disclaimer": "Projet étudiant indépendant, non officiel, non affilié à {university}",
-    "compatible": "Compatible avec :"
+    "compatible": "Compatible avec :",
+    "announcement": "Nouveau"
+  },
+  "showcase": {
+    "title": "Ce que regroupe {appName}",
+    "intro": "{appName} se connecte aux services de {university} et les range dans une seule app, page par page",
+    "tabsLabel": "Pages de {appName}",
+    "previewLabel": "Aperçu avec le compte de démonstration",
+    "note": "Les fonctionnalités dépendent de ce que propose l’intégration de {university}",
+    "tabs": {
+      "home": {
+        "label": "Accueil",
+        "shortLabel": "Accueil",
+        "title": "Accueil",
+        "intro": "Ce qui t’attend aujourd’hui, dès l’ouverture",
+        "previewLabel": "L’accueil : message du jour, prochain cours, dernière note, mails récents et échéances",
+        "items": [
+          {
+            "title": "Résumé du jour",
+            "body": "Tes cours et tes devoirs du jour, sous ton prénom"
+          },
+          {
+            "title": "Prochain cours",
+            "body": "Sa salle, son enseignant et dans combien de temps il commence"
+          },
+          {
+            "title": "Mails récents",
+            "body": "Un mail touché s’ouvre dans la Messagerie"
+          },
+          {
+            "title": "Échéances Moodle",
+            "body": "Les devoirs à rendre et ceux en retard"
+          },
+          {
+            "title": "Toutes les applications",
+            "body": "Les services de l’ENT, avec favoris et recherche"
+          }
+        ]
+      },
+      "grades": {
+        "label": "Mes notes",
+        "shortLabel": "Notes",
+        "title": "Mes notes",
+        "intro": "Ton relevé ScoDoc de BUT, semestre par semestre",
+        "previewLabel": "Mes notes : moyenne générale, UE validées et dernières notes",
+        "items": [
+          {
+            "title": "Moyennes et UE",
+            "body": "Ta moyenne générale, celle de la promo et chaque UE avec ses crédits ECTS"
+          },
+          {
+            "title": "Détail d’une note",
+            "body": "Son poids dans chaque UE et la répartition des notes de la promo"
+          },
+          {
+            "title": "Simuler",
+            "body": "Tes moyennes avec des notes à venir, sans toucher aux vraies"
+          },
+          {
+            "title": "Écrire au sujet d’une note",
+            "body": "Un mail prérempli avec la note, pour l’enseignant de la matière"
+          }
+        ]
+      },
+      "planning": {
+        "label": "Planning",
+        "shortLabel": "Planning",
+        "title": "Planning",
+        "intro": "Ton emploi du temps par jour, par semaine ou en liste",
+        "previewLabel": "Le Planning : les cours de la journée et le menu d’un cours",
+        "items": [
+          {
+            "title": "Fiche d’un cours",
+            "body": "Sa salle, ses enseignants, son groupe et ses prochaines séances"
+          },
+          {
+            "title": "Écrire au sujet d’un cours",
+            "body": "Un mail prérempli avec le cours, ses enseignants proposés en destinataires"
+          },
+          {
+            "title": "Export .ics",
+            "body": "Vers Google Agenda, Calendrier ou Outlook"
+          },
+          {
+            "title": "Au clavier ou au doigt",
+            "body": "Les flèches ou un glissement pour changer de jour et de semaine"
+          }
+        ]
+      },
+      "mail": {
+        "label": "Messagerie",
+        "shortLabel": "Mail",
+        "title": "Messagerie",
+        "intro": "Ta boîte mail de l’université dans l’app, sans ouvrir le webmail",
+        "previewLabel": "La Messagerie : la boîte de réception et un mail au sujet d’une note",
+        "items": [
+          {
+            "title": "Conversations",
+            "body": "Les mails d’un même fil réunis, avec recherche et dossiers"
+          },
+          {
+            "title": "Écrire",
+            "body": "Mise en forme, pièces jointes, brouillons et signature"
+          },
+          {
+            "title": "Envoi annulable",
+            "body": "5 secondes pour reprendre un mail après l’envoi"
+          },
+          {
+            "title": "Au sujet d’une note ou d’un cours",
+            "body": "Le mail prérempli avec ses informations et son image"
+          },
+          {
+            "title": "Expéditeurs repérés",
+            "body": "Le domaine d’un expéditeur extérieur à l’université s’affiche à côté de son nom"
+          }
+        ]
+      }
+    }
   },
   "features": {
-    "main": {
-      "title": "Ce que regroupe {appName}",
-      "intro": "{appName} se connecte aux services de {university} et rassemble votre emploi du temps, vos notes, vos rendus et mails sur une seule page, sur ordinateur comme sur téléphone",
-      "items": [
-        {
-          "title": "Emploi du temps",
-          "body": "Affichage du prochain cours en un clin d'œil"
-        },
-        {
-          "title": "Notes",
-          "body": "Les derniers résultats et moyenne générale"
-        },
-        {
-          "title": "Mails",
-          "body": "Les derniers mails reçus sur ton adresse universitaire"
-        },
-        {
-          "title": "Rendus Moodle",
-          "body": "Tout les devoirs à rendre et leur détails"
-        },
-        {
-          "title": "Et bien plus",
-          "body": ""
-        }
-      ],
-      "note": "Les fonctionnalités dépendent de ce que propose l’intégration de votre université"
-    },
     "computer": {
-      "title": "Moyennes et planning",
-      "intro": "La moyenne générale, et le planning à la journée",
+      "title": "Sur ordinateur",
+      "intro": "Dans le navigateur, sans rien installer",
       "items": [
         {
-          "title": "Moyennes par UE pour les BUT",
-          "body": "Avec le coefficient de chaque matière"
+          "title": "Clic droit",
+          "body": "Le menu d’une note, d’un cours ou d’un mail : ouvrir, copier, écrire, ranger"
         },
         {
-          "title": "Simulateur de notes",
-          "body": "Les moyennes avec des notes à venir"
+          "title": "Lecture à côté de la liste",
+          "body": "Le mail s’ouvre dans un panneau qui s’élargit à la souris"
         },
         {
-          "title": "Planning",
-          "body": "Par jour, par semaine ou en liste"
+          "title": "Imprimer ou enregistrer en PDF",
+          "body": "Une conversation entière, un mail par page"
         },
         {
-          "title": "Export du planning",
-          "body": "Vers Google Agenda, Calendrier ou Outlook"
+          "title": "Barre latérale",
+          "body": "Dépliée ou réduite à ses icônes"
         }
       ]
     },
     "phone": {
-      "title": "Disponible sur le tél.",
-      "intro": "{appName} s’installe sur l’écran d’accueil du téléphone, sans passer par un store",
+      "title": "Sur téléphone",
+      "intro": "{appName} s’installe sur l’écran d’accueil, sans passer par un store",
       "items": [
         {
           "title": "Sur l’écran d’accueil",
-          "body": "Raccourci accessible sur ton écran d'applications"
+          "body": "En plein écran, comme une application"
+        },
+        {
+          "title": "Appui long",
+          "body": "Le même menu qu’au clic droit, sur une note, un cours ou un mail"
+        },
+        {
+          "title": "Balayage des mails",
+          "body": "Vers la corbeille ou en lu, d’un glissement de doigt"
         },
         {
           "title": "Thème sombre",
-          "body": "Mode sombre pour préserver la vision"
-        },
-        {
-          "title": "Audience anonyme",
-          "body": "Aucune donnée personnelle collectée et aucun cookie de suivi"
-        },
-        {
-          "title": "Code source ouvert",
-          "body": "Disponible sur GitHub"
+          "body": "Automatique comme ton téléphone, ou au choix"
         }
       ]
     }
