@@ -7,175 +7,159 @@
     "login": "Se connecter"
   },
   "hero": {
-    "title": "Cours, notes et services de {university}",
-    "subtitle": "Emploi du temps, notes, messagerie et rendus Moodle dans une seule app",
-    "cta": "Se connecter à mon ENT",
+    "title": "Ta journée à la fac, en un coup d’œil.",
+    "universityTitle": "Ta journée à {university}, en un coup d’œil.",
+    "subtitle": "Consulte ton prochain cours, tes notes, tes mails et tes devoirs à rendre dans une seule app.",
+    "cta": "Me connecter avec mon ENT",
     "disclaimer": "Projet étudiant indépendant, non officiel, non affilié à {university}",
-    "compatible": "Compatible avec :",
-    "announcement": "Nouveau"
+    "compatible": "Compatible avec :"
   },
   "showcase": {
-    "title": "Ce que regroupe {appName}",
-    "intro": "{appName} se connecte aux services de {university} et les range dans une seule app, page par page",
+    "title": "Retrouve tes infos de la fac au même endroit.",
+    "intro": "Vérifie ta salle avant de partir, consulte tes résultats ou réponds à un mail sans passer d’un site à l’autre.",
     "tabsLabel": "Pages de {appName}",
     "previewLabel": "Aperçu avec le compte de démonstration",
-    "note": "Les fonctionnalités dépendent de ce que propose l’intégration de {university}",
+    "note": "Les services disponibles dépendent de ton université. Les notes sont accessibles pour les formations BUT utilisant ScoDoc.",
     "tabs": {
       "home": {
         "label": "Accueil",
         "shortLabel": "Accueil",
-        "title": "Accueil",
-        "intro": "Ce qui t’attend aujourd’hui, dès l’ouverture",
+        "title": "Ce qui t’attend aujourd’hui",
+        "intro": "Tes cours, tes derniers messages et tes devoirs à rendre dès l’ouverture de Tafac.",
         "previewLabel": "L’accueil : message du jour, prochain cours, dernière note, mails récents et échéances",
         "items": [
           {
-            "title": "Résumé du jour",
-            "body": "Tes cours et tes devoirs du jour, sous ton prénom"
+            "title": "Ta journée de cours",
+            "body": "Vois les cours qu’il te reste et l’heure à laquelle tu termines."
           },
           {
-            "title": "Prochain cours",
-            "body": "Sa salle, son enseignant et dans combien de temps il commence"
+            "title": "Ta prochaine salle",
+            "body": "Retrouve où aller, à quelle heure et avec quel enseignant."
           },
           {
-            "title": "Mails récents",
-            "body": "Un mail touché s’ouvre dans la Messagerie"
+            "title": "Les derniers mails de la fac",
+            "body": "Consulte tes messages récents depuis l’accueil."
           },
           {
-            "title": "Échéances Moodle",
-            "body": "Les devoirs à rendre et ceux en retard"
+            "title": "Tes devoirs à rendre",
+            "body": "Repère les prochaines échéances Moodle et les rendus en retard."
           },
           {
-            "title": "Toutes les applications",
-            "body": "Les services de l’ENT, avec favoris et recherche"
+            "title": "Tes services favoris",
+            "body": "Retrouve les outils de ton ENT sans chercher leur lien à chaque fois."
           }
         ]
       },
       "grades": {
         "label": "Mes notes",
         "shortLabel": "Notes",
-        "title": "Mes notes",
-        "intro": "Ton relevé ScoDoc de BUT, semestre par semestre",
+        "title": "Suis tes résultats pendant le semestre",
+        "intro": "Consulte tes notes, tes moyennes et le détail de chaque UE.",
         "previewLabel": "Mes notes : moyenne générale, UE validées et dernières notes",
         "items": [
           {
-            "title": "Moyennes et UE",
-            "body": "Ta moyenne générale, celle de la promo et chaque UE avec ses crédits ECTS"
+            "title": "Tes moyennes par UE",
+            "body": "Regarde où tu en es dans chaque UE et sur l’ensemble du semestre."
           },
           {
-            "title": "Détail d’une note",
-            "body": "Son poids dans chaque UE et la répartition des notes de la promo"
+            "title": "Le poids de chaque note",
+            "body": "Vérifie combien une évaluation compte dans tes moyennes."
           },
           {
-            "title": "Simuler",
-            "body": "Tes moyennes avec des notes à venir, sans toucher aux vraies"
+            "title": "Tes prochaines notes en simulation",
+            "body": "Essaie un 14 au prochain contrôle et regarde comment tes moyennes évoluent."
           },
           {
-            "title": "Écrire au sujet d’une note",
-            "body": "Un mail prérempli avec la note, pour l’enseignant de la matière"
+            "title": "Un message à ton enseignant",
+            "body": "Écris au sujet d’un résultat avec les informations de la note déjà ajoutées au mail."
           }
         ]
       },
       "planning": {
         "label": "Planning",
         "shortLabel": "Planning",
-        "title": "Planning",
-        "intro": "Ton emploi du temps par jour, par semaine ou en liste",
+        "title": "Prépare ta semaine de cours",
+        "intro": "Consulte tes horaires par jour, par semaine ou en liste.",
         "previewLabel": "Le Planning : les cours de la journée et le menu d’un cours",
         "items": [
           {
-            "title": "Fiche d’un cours",
-            "body": "Sa salle, ses enseignants, son groupe et ses prochaines séances"
+            "title": "Horaires, salles et enseignants",
+            "body": "Retrouve les informations de chaque cours et ses prochaines séances."
           },
           {
-            "title": "Écrire au sujet d’un cours",
-            "body": "Un mail prérempli avec le cours, ses enseignants proposés en destinataires"
+            "title": "Contacter un enseignant",
+            "body": "Prépare un mail depuis le cours, avec ses informations et les destinataires proposés."
           },
           {
-            "title": "Export .ics",
-            "body": "Vers Google Agenda, Calendrier ou Outlook"
+            "title": "Tes cours dans ton agenda",
+            "body": "Exporte ton planning vers Google Agenda, Calendrier ou Outlook."
           },
           {
-            "title": "Au clavier ou au doigt",
-            "body": "Les flèches ou un glissement pour changer de jour et de semaine"
+            "title": "Les jours à venir",
+            "body": "Parcours ton planning pour voir quand tu commences, quand tu finis et les pauses entre tes cours."
           }
         ]
       },
       "mail": {
         "label": "Messagerie",
         "shortLabel": "Mail",
-        "title": "Messagerie",
-        "intro": "Ta boîte mail de l’université dans l’app, sans ouvrir le webmail",
+        "title": "Tes mails universitaires dans Tafac",
+        "intro": "Lis et envoie tes messages avec ton adresse de la fac.",
         "previewLabel": "La Messagerie : la boîte de réception et un mail au sujet d’une note",
         "items": [
           {
-            "title": "Conversations",
-            "body": "Les mails d’un même fil réunis, avec recherche et dossiers"
+            "title": "Retrouve un message",
+            "body": "Recherche un mail de la scolarité ou reprends une conversation avec un enseignant."
           },
           {
-            "title": "Écrire",
-            "body": "Mise en forme, pièces jointes, brouillons et signature"
+            "title": "Écris depuis l’app",
+            "body": "Réponds, joins un document ou garde un brouillon pour plus tard."
           },
           {
-            "title": "Envoi annulable",
-            "body": "5 secondes pour reprendre un mail après l’envoi"
+            "title": "Cinq secondes pour annuler",
+            "body": "Reprends ton mail si tu as cliqué trop vite sur « Envoyer »."
           },
           {
-            "title": "Au sujet d’une note ou d’un cours",
-            "body": "Le mail prérempli avec ses informations et son image"
+            "title": "Le cours ou la note dans le mail",
+            "body": "Ajoute leurs informations à ton message sans les recopier."
           },
           {
-            "title": "Expéditeurs repérés",
-            "body": "Le domaine d’un expéditeur extérieur à l’université s’affiche à côté de son nom"
+            "title": "Des expéditeurs identifiables",
+            "body": "Le domaine des adresses extérieures à l’université s’affiche à côté du nom."
           }
         ]
       }
     }
   },
   "features": {
-    "computer": {
-      "title": "Sur ordinateur",
-      "intro": "Dans le navigateur, sans rien installer",
-      "items": [
-        {
-          "title": "Clic droit",
-          "body": "Le menu d’une note, d’un cours ou d’un mail : ouvrir, copier, écrire, ranger"
-        },
-        {
-          "title": "Lecture à côté de la liste",
-          "body": "Le mail s’ouvre dans un panneau qui s’élargit à la souris"
-        },
-        {
-          "title": "Imprimer ou enregistrer en PDF",
-          "body": "Une conversation entière, un mail par page"
-        },
-        {
-          "title": "Barre latérale",
-          "body": "Dépliée ou réduite à ses icônes"
-        }
-      ]
-    },
-    "phone": {
-      "title": "Sur téléphone",
-      "intro": "{appName} s’installe sur l’écran d’accueil, sans passer par un store",
-      "items": [
-        {
-          "title": "Sur l’écran d’accueil",
-          "body": "En plein écran, comme une application"
-        },
-        {
-          "title": "Appui long",
-          "body": "Le même menu qu’au clic droit, sur une note, un cours ou un mail"
-        },
-        {
-          "title": "Balayage des mails",
-          "body": "Vers la corbeille ou en lu, d’un glissement de doigt"
-        },
-        {
-          "title": "Thème sombre",
-          "body": "Automatique comme ton téléphone, ou au choix"
-        }
-      ]
-    }
+    "title": "Sur ton ordinateur et ton téléphone",
+    "intro": "Les mêmes infos dans ton navigateur, à la BU ou entre deux cours",
+    "items": [
+      {
+        "title": "Trouve ta prochaine salle",
+        "body": "Vérifie où tu as cours et à quelle heure il commence, même en chemin."
+      },
+      {
+        "title": "Prépare ta semaine",
+        "body": "Consulte tes cours et repère les créneaux libres pour travailler ou prévoir une sortie."
+      },
+      {
+        "title": "Fais le point sur tes résultats",
+        "body": "Regarde tes moyennes et simule l’effet de tes prochaines notes."
+      },
+      {
+        "title": "Réponds aux mails de la fac",
+        "body": "Lis tes échanges, rédige tes réponses et ajoute tes documents."
+      },
+      {
+        "title": "Vérifie ce qu’il reste à rendre",
+        "body": "Retrouve tes prochains devoirs Moodle et leurs dates de rendu depuis l’accueil."
+      },
+      {
+        "title": "Retrouve tes outils de cours",
+        "body": "Accède aux services de ton ENT et garde ceux que tu utilises en favoris."
+      }
+    ]
   },
   "security": {
     "title": "Sécurisé et respectueux de ta vie privée",
@@ -342,7 +326,7 @@
     },
     "latestGrade": {
       "title": "Dernière note",
-      "subject": "Développement Front",
+      "subject": "Relations presse",
       "grade": "15.5",
       "outOf": "/20"
     },
@@ -350,11 +334,11 @@
       "title": "Mails récents",
       "badge": "7",
       "from": "Thomas Lemoine",
-      "subject": "Rendu du TP React décalé"
+      "subject": "Rendu du dossier de presse décalé"
     },
     "deadlines": {
       "title": "Échéances",
-      "task": "TP 3 – API REST",
+      "task": "Dossier – communication de crise",
       "status": "En retard"
     }
   }

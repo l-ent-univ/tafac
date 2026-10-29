@@ -217,6 +217,9 @@ function Wire({ tokens }) {
 // (aria-hidden): every stop and point says it in words.
 // `id` for a link to it (the header's "Confidentialité" still opens the
 // privacy modal).
+// The mails' card is hidden for now (SHOW_MAIL_CARD), its copy kept.
+const SHOW_MAIL_CARD = false
+
 function SecurityShowcase({ className = '' }) {
   const diagramRef = useRef(null)
   const pointsRef = useRef(null)
@@ -322,37 +325,39 @@ function SecurityShowcase({ className = '' }) {
           {/* The mails' part: a card of its own, the envelope sticker by the
               title and what it means, what's kept and where beside it (under
               it, on narrow screens). */}
-          <div
-            ref={mailRef}
-            data-revealed={isMailRevealed || undefined}
-            className={`security-mail mt-24 grid w-full max-w-[1000px] grid-cols-[minmax(0,1fr)_minmax(0,1.1fr)] items-center gap-12 corners-[32px] px-12 py-12 text-left max-4xl:grid-cols-1 max-4xl:gap-8 max-md:mt-16 max-md:corners-[26px] max-md:px-5 max-md:py-8 ${CARD_CLASSES}`}
-          >
-            <div className="flex min-w-0 flex-col items-start max-4xl:items-center max-4xl:text-center">
-              <span aria-hidden="true" className={`relative mb-4 inline-flex size-20 shrink-0 items-center justify-center ${TONES.blue}`}>
-                <EnvelopeIcon className="size-16" strokeWidth={3} />
-                <Badge icon={LockIcon} accent className="-bottom-0.5 -right-0.5 size-7" ringClassName="ring-[3px] ring-white dark:ring-[#1c1c1c]" />
-              </span>
-              <h3 id="tes-mails" className="m-0 max-w-[20ch] scroll-mt-28 text-balance text-[clamp(26px,3vw,36px)] font-bold leading-[1.05] text-text">
-                {copyText(copy.security.mailTitle)}
-              </h3>
-              <p className="m-0 mt-4 max-w-[46ch] text-balance text-[17px] leading-snug text-text-secondary font-body max-md:text-base">
-                {renderCopy(copy.security.mailIntro, { strongClassName: ACCENT_CLASSES })}
-              </p>
+          {SHOW_MAIL_CARD ? (
+            <div
+              ref={mailRef}
+              data-revealed={isMailRevealed || undefined}
+              className={`security-mail mt-24 grid w-full max-w-[1000px] grid-cols-[minmax(0,1fr)_minmax(0,1.1fr)] items-center gap-12 corners-[32px] px-12 py-12 text-left max-4xl:grid-cols-1 max-4xl:gap-8 max-md:mt-16 max-md:corners-[26px] max-md:px-5 max-md:py-8 ${CARD_CLASSES}`}
+            >
+              <div className="flex min-w-0 flex-col items-start max-4xl:items-center max-4xl:text-center">
+                <span aria-hidden="true" className={`relative mb-4 inline-flex size-20 shrink-0 items-center justify-center ${TONES.blue}`}>
+                  <EnvelopeIcon className="size-16" strokeWidth={3} />
+                  <Badge icon={LockIcon} accent className="-bottom-0.5 -right-0.5 size-7" ringClassName="ring-[3px] ring-white dark:ring-[#1c1c1c]" />
+                </span>
+                <h3 id="tes-mails" className="m-0 max-w-[20ch] scroll-mt-28 text-balance text-[clamp(26px,3vw,36px)] font-bold leading-[1.05] text-text">
+                  {copyText(copy.security.mailTitle)}
+                </h3>
+                <p className="m-0 mt-4 max-w-[46ch] text-balance text-[17px] leading-snug text-text-secondary font-body max-md:text-base">
+                  {renderCopy(copy.security.mailIntro, { strongClassName: ACCENT_CLASSES })}
+                </p>
+              </div>
+              <ul className="m-0 flex min-w-0 list-none flex-col gap-5 p-0">
+                {MAIL_POINTS.map(({ kind, icon, title, body }, index) => (
+                  <li key={kind} style={{ '--reveal-index': index }} className="security-mail-point flex items-start gap-3">
+                    <span className="mt-[1px] inline-flex size-9 shrink-0 items-center justify-center rounded-full bg-[var(--security-surface)] text-[var(--security-accent)]" aria-hidden="true">
+                      <Icon icon={icon} className="size-[17px]" />
+                    </span>
+                    <span className="flex min-w-0 flex-col gap-0.5">
+                      <h4 className="m-0 text-base font-bold leading-tight text-text">{copyText(title)}</h4>
+                      <p className="m-0 text-balance text-[15px] leading-snug text-text-secondary font-body">{copyText(body)}</p>
+                    </span>
+                  </li>
+                ))}
+              </ul>
             </div>
-            <ul className="m-0 flex min-w-0 list-none flex-col gap-5 p-0">
-              {MAIL_POINTS.map(({ kind, icon, title, body }, index) => (
-                <li key={kind} style={{ '--reveal-index': index }} className="security-mail-point flex items-start gap-3">
-                  <span className="mt-[1px] inline-flex size-9 shrink-0 items-center justify-center rounded-full bg-[var(--security-surface)] text-[var(--security-accent)]" aria-hidden="true">
-                    <Icon icon={icon} className="size-[17px]" />
-                  </span>
-                  <span className="flex min-w-0 flex-col gap-0.5">
-                    <h4 className="m-0 text-base font-bold leading-tight text-text">{copyText(title)}</h4>
-                    <p className="m-0 text-balance text-[15px] leading-snug text-text-secondary font-body">{copyText(body)}</p>
-                  </span>
-                </li>
-              ))}
-            </ul>
-          </div>
+          ) : null}
 
           {copy.security.disclaimer ? (
             <p className="m-0 mt-14 max-w-[60ch] text-balance text-[13px] leading-snug text-text-secondary font-body">

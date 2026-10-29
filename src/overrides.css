@@ -1993,10 +1993,10 @@
    the clouds by an eighth and the cards by a sixteenth. Around the phone,
    as each comes onto the screen, the flower behind lags and the island in
    front leads, both settling where they're placed (`translate`, as the
-   pointer parallax holds `transform`). The laptop, when it comes first,
-   takes the same flower and island. The second device, in the row under,
-   rises a little as it comes in (.landing-device); it settles once fully
-   on screen, which the page's end always allows. */
+   pointer parallax holds `transform`). The laptop takes the same flower
+   and island. The phone in front of it rises a little as it comes in
+   (.landing-device); it settles once fully on screen, which the page's end
+   always allows. */
 @supports (animation-timeline: scroll()) {
   @media (prefers-reduced-motion: no-preference) {
     .landing-scroll-sky,
@@ -2081,9 +2081,8 @@
   }
 }
 
-/* The landing's feature pills, then the note under them, come in one by
-   one once the list is on screen (FeatureShowcase: data-revealed,
-   --reveal-index). With reduced motion they're simply there. */
+/* The landing's feature pills come in one by one once the list is on
+   screen (FeatureShowcase: data-revealed, --reveal-index). With reduced motion they're simply there. */
 @media (prefers-reduced-motion: no-preference) {
   .landing-feature {
     opacity: 0;
@@ -2115,14 +2114,83 @@
   transition: left 420ms cubic-bezier(0.32, 0.72, 0, 1);
 }
 
+/* Pinned (src/landingShowcaseScroll.js): on screens tall and wide enough
+   for a whole panel, the section stays on screen while the page scrolls
+   along its track, one stretch per tab, under the floating header, a little
+   tighter to fit; on laptops under 820px, without the intro and with a
+   smaller preview. The same media query as PINNED_QUERY. */
+@media (width >= 1024px) and (height >= 700px) {
+  .landing-showcase-track {
+    --showcase-step: 70svh;
+    height: calc(100svh + (var(--tab-count) - 1) * var(--showcase-step));
+  }
+
+  /* Its content from the top, under the header (centred, it left a band
+     of blank above the title as the section came in, on top of the
+     section's own padding, dropped here). */
+  .landing-showcase:has(> * > .landing-showcase-track) {
+    padding-top: 0;
+    margin-top: -48px;
+  }
+
+  .landing-showcase-track .landing-showcase-pin {
+    position: sticky;
+    top: 0;
+    justify-content: flex-start;
+    min-height: 100svh;
+    padding-block: 92px 12px;
+  }
+
+  .landing-showcase-track .landing-tabs {
+    margin-top: 24px;
+  }
+
+  .landing-showcase-track .landing-showcase-panels {
+    margin-top: 32px;
+  }
+
+  /* The scroll places the panels, frame by frame (placePanels: their
+     opacity and translate inline), and the lens with them (--tab-progress
+     on it): nothing of their own to ease. */
+  .landing-showcase-track .landing-showcase-panel {
+    transition: none;
+    will-change: opacity, translate;
+  }
+
+  .landing-showcase-track .landing-tabs-lens {
+    left: calc(6px + var(--tab-progress, var(--tab-index)) * (var(--tab-width) + 4px));
+    transition: none;
+  }
+}
+
+@media (width >= 1024px) and (700px <= height < 820px) {
+  .landing-showcase-track .landing-showcase-intro {
+    display: none;
+  }
+
+  .landing-showcase-track .landing-showcase-stage {
+    zoom: 0.8;
+  }
+}
+
 /* The lens is the selected tab's: no hover tint over it. */
 .landing-tabs .mobile-tab-bar-item[aria-selected="true"] {
   background-color: transparent;
 }
 
+/* The panels one over the other, the section as tall as the tallest (each
+   its own height, from the top), so nothing moves when a tab is picked: the
+   selected one shows, the others stay in the page faded out (and inert:
+   LandingShowcase). */
+.landing-showcase-panels {
+  display: grid;
+  align-items: start;
+}
+
 /* A panel: its title and list on the left, the preview on the right; on
    narrower screens the preview between the title and the list. */
-.landing-showcase-panel:not([hidden]) {
+.landing-showcase-panel {
+  grid-area: 1 / 1;
   display: grid;
   grid-template-columns: minmax(0, 380px) minmax(0, 1fr);
   grid-template-areas:
@@ -2149,7 +2217,7 @@
 }
 
 @media (width < 1024px) {
-  .landing-showcase-panel:not([hidden]) {
+  .landing-showcase-panel {
     grid-template-columns: minmax(0, 1fr);
     grid-template-areas:
       "head"
@@ -2221,36 +2289,28 @@
   box-shadow: 0 1px 3px rgb(0 0 0 / 0.4), 0 32px 80px -20px rgb(0 0 0 / 0.8);
 }
 
-/* A panel comes in as its tab is picked, its preview a beat after. With
-   reduced motion they're simply there, and the lens jumps. */
+/* The tab picked: the last panel fades out as the picked one rises into its
+   place (a beat later, so the two don't blend). With reduced motion they
+   simply swap, and the lens jumps. */
+.landing-showcase-panel:not([data-selected]) {
+  opacity: 0;
+  translate: 0 10px;
+  visibility: hidden;
+}
+
 @media (prefers-reduced-motion: no-preference) {
-  .landing-showcase-panel:not([hidden]) {
-    animation: landing-panel-in 520ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  .landing-showcase-panel {
+    transition: opacity 360ms ease-out 90ms, translate 480ms cubic-bezier(0.16, 1, 0.3, 1) 90ms, visibility 0s 90ms;
   }
 
-  .landing-showcase-stage > * {
-    animation: landing-stage-in 700ms cubic-bezier(0.16, 1, 0.3, 1) 80ms both;
+  .landing-showcase-panel:not([data-selected]) {
+    transition: opacity 180ms ease-in, translate 180ms ease-in, visibility 0s 180ms;
   }
 }
 
 @media (prefers-reduced-motion: reduce) {
   .landing-tabs-lens {
     transition: none;
-  }
-}
-
-@keyframes landing-panel-in {
-  from {
-    opacity: 0;
-    translate: 0 12px;
-  }
-}
-
-@keyframes landing-stage-in {
-  from {
-    opacity: 0;
-    translate: 0 20px;
-    scale: 0.98;
   }
 }
 
