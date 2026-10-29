@@ -1,7 +1,7 @@
 import { useEffect } from 'react'
 import { Icon } from '@iconify/react'
 import universityConfig from '@university'
-import { isPostHogAvailable, isSimpleAnalyticsAvailable } from '../analytics'
+import { isPostHogAvailable } from '../analytics'
 import lentLogo from '../assets/lent-logo.svg'
 import cloudsTexture from '../assets/privacy/clouds.webp'
 import busImage from '../assets/privacy/bus.webp'
@@ -77,11 +77,9 @@ const ANALYTICS_DOC_URL = universityConfig.branding.about?.repoUrl
   : null
 
 function getToolsSentence() {
-  const tools = []
-  if (isPostHogAvailable()) tools.push('PostHog')
-  if (isSimpleAnalyticsAvailable()) tools.push('Simple Analytics')
-  if (tools.length === 0) return 'Ces outils de mesure sont hébergés dans l’Union européenne'
-  return `${tools.length > 1 ? 'Deux outils hébergés' : 'Un seul outil'} dans l’Union européenne\u202f: ${tools.join(', et ')}.`
+  return isPostHogAvailable()
+    ? 'Un seul outil, hébergé dans l’Union européenne\u202f: PostHog, appelé par le serveur, jamais par ton navigateur'
+    : 'L’outil de mesure est hébergé dans l’Union européenne'
 }
 
 const getSections = (embedded) => [
