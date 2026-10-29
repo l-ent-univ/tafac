@@ -70,9 +70,9 @@ test('the demo address book is searched as Zimbra would', () => {
   assert.deepEqual(searchDemoMailContacts('lann').map((contact) => contact.email), [
     'scolarite-iut-lannion@univ-rennes.fr',
     'bu-lannion@univ-rennes.fr',
-    'bde.mmi.lannion@gmail.com',
-    'secretariat-mmi-lannion@univ-rennes.fr',
-    'mmi2-lannion@listes.univ-rennes.fr',
+    'bde.infocom.lannion@gmail.com',
+    'secretariat-infocom-lannion@univ-rennes.fr',
+    'infocom3-lannion@listes.univ-rennes.fr',
   ])
   assert.deepEqual(searchDemoMailContacts('lea mo').map((contact) => contact.name), ['Léa Moreau'])
   assert.deepEqual(searchDemoMailContacts('zzz'), [])

@@ -4090,8 +4090,8 @@ async function fetchZimbraMessage(session, id) {
 // serve the demo).
 const DEMO_MAIL_ATTACHMENTS = {
   'demo-mail-1': [
-    { part: '2', name: 'Consignes TP4 – composants et état.pdf', type: 'application/pdf', size: 248_312, href: null },
-    { part: '3', name: 'maquette-composants.png', type: 'image/png', size: 612_480, href: null },
+    { part: '2', name: 'Consignes – dossier de presse.pdf', type: 'application/pdf', size: 248_312, href: null },
+    { part: '3', name: 'exemple-communique.png', type: 'image/png', size: 612_480, href: null },
   ],
 }
 

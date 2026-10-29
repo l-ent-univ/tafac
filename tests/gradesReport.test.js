@@ -85,7 +85,7 @@ test('evaluation types carry their label, a normal one none', () => {
 test('listGradesSemesters puts the newest semester first', () => {
   const semesters = listGradesSemesters(buildDemoGradesPayload().semestres)
   assert.deepEqual(semesters.map((semester) => semester.id), ['9105', '9104', '9103', '9102', '9101'])
-  assert.deepEqual(semesters[0], { id: '9105', number: 5, title: 'BUT MMI', year: '2026/2027' })
+  assert.deepEqual(semesters[0], { id: '9105', number: 5, title: 'BUT Info-Com', year: '2026/2027' })
 })
 
 test('buildGradesReport reads the semester, UEs and modules of a BUT relevé', () => {
@@ -95,9 +95,9 @@ test('buildGradesReport reads the semester, UEs and modules of a BUT relevé', (
   const report = buildGradesReport(releve, { config: payload.config })
 
   assert.equal(report.status, 'ok')
-  assert.equal(report.department, 'MMI')
+  assert.equal(report.department, 'INFOCOM')
   assert.equal(report.semester.number, 5)
-  assert.deepEqual(report.semester.groups, ['TD B', 'TP 3', 'DWeb-DI'])
+  assert.deepEqual(report.semester.groups, ['TD B', 'TP 3', 'Com-Orga'])
   assert.equal(report.average.value, 14.5)
   assert.equal(report.average.moy, 12.44)
   assert.deepEqual(report.rank, { value: '9', total: 84 })
@@ -109,20 +109,20 @@ test('buildGradesReport reads the semester, UEs and modules of a BUT relevé', (
   assert.equal(ue.color, '#80cb3f')
   assert.deepEqual(ue.modules.map((module) => [module.code, module.coef]), [['R5.11', 4], ['R5.03', 2], ['R5.12', 3], ['SAÉ 5.01', 4]])
 
-  const ux = report.resources.find((module) => module.code === 'R5.07')
+  const strategy = report.resources.find((module) => module.code === 'R5.07')
   // (14 × 1 + 17 × 2) / 3
-  assert.equal(ux.average, 16)
-  assert.equal(ux.averageIsIndicative, true)
-  assert.deepEqual(ux.ueCoefs.map((entry) => [entry.ue, entry.coef]), [['UE5.1', 3], ['UE5.2', 2]])
-  assert.deepEqual(ux.evaluations[1].weights, [{ ue: 'UE5.1', weight: 1 }, { ue: 'UE5.2', weight: 1 }])
-  assert.deepEqual(ux.evaluations[1].promo, { min: 8, moy: 13.9, max: 19 })
+  assert.equal(strategy.average, 16)
+  assert.equal(strategy.averageIsIndicative, true)
+  assert.deepEqual(strategy.ueCoefs.map((entry) => [entry.ue, entry.coef]), [['UE5.1', 3], ['UE5.2', 2]])
+  assert.deepEqual(strategy.evaluations[1].weights, [{ ue: 'UE5.1', weight: 1 }, { ue: 'UE5.2', weight: 1 }])
+  assert.deepEqual(strategy.evaluations[1].promo, { min: 8, moy: 13.9, max: 19 })
 
   const english = report.resources.find((module) => module.code === 'R5.02')
   assert.equal(english.evaluations[2].typeLabel, 'Rattrapage')
   assert.equal(english.evaluations[2].coef, null)
 
   assert.equal(report.resources.find((module) => module.code === 'R5.04').pendingCount, 1)
-  assert.deepEqual(report.latest.slice(0, 3).map((evaluation) => evaluation.description), ['TP état et effets', 'Pitch portfolio', 'Audit RGAA'])
+  assert.deepEqual(report.latest.slice(0, 3).map((evaluation) => evaluation.description), ['Revue de presse', 'Pitch portfolio', 'Cas pratique : droit à l’image'])
   assert.ok(report.latest.every((evaluation) => evaluation.grade.kind === 'number'))
 })
 
@@ -186,7 +186,7 @@ test('buildAbsenceReport lists absences newest first with passerelle totals', ()
     ['2026-09-29', '13h30', 'justified'],
     ['2026-09-25', '8h15', 'unjustified'],
   ])
-  assert.equal(report.entries[0].subject, 'R5.11 – Développement Front')
+  assert.equal(report.entries[0].subject, 'R5.11 – Relations presse')
   assert.equal(report.entries[1].subject, 'R5.02 - Anglais')
   assert.equal(report.entries[0].teacher, 'Thomas Lemoine')
   assert.deepEqual(report.totals, { justified: '4h', unjustified: '2h', late: '1' })

@@ -582,7 +582,7 @@ test('the send and draft routes: refusals, the demo\'s fake send, its drafts', (
   assert.equal(again.body.draft.id, id)
   const read = await fetch(`${base}/__ent_auth/mail/draft?id=${id}`, { headers: { cookie } }).then((response) => response.json())
   assert.equal(read.draft.html, '<p>x</p><div data-mail-signature></div>')
-  assert.deepEqual(read.draft.attachments.map((file) => file.name), ['Consignes TP4 – composants et état.pdf'])
+  assert.deepEqual(read.draft.attachments.map((file) => file.name), ['Consignes – dossier de presse.pdf'])
   const drafts = await fetch(`${base}/__ent_auth/mail/recent?folder=6`, { headers: { cookie } }).then((response) => response.json())
   assert.deepEqual(drafts.mail.messages.map((row) => row.id), [id])
 

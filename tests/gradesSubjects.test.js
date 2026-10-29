@@ -91,10 +91,10 @@ test('listUeGroups puts each subject under the UEs it feeds, with that UE’s nu
   // Biggest coefficient first.
   assert.deepEqual(groups[0].modules.map((module) => [module.code, module.coef]), [['SAÉ 5.01', 4], ['R5.07', 3], ['R5.04', 2]])
 
-  // UX Writing feeds UE5.1 and UE5.2, with ScoDoc's average in each.
+  // Stratégie de communication (R5.07) feeds UE5.1 and UE5.2, with ScoDoc's average in each.
   const uxIn51 = groups[0].modules.find((module) => module.code === 'R5.07')
   const uxIn52 = groups[1].modules.find((module) => module.code === 'R5.07')
-  // UE5.1: (14 × 1 + 17 × 2) / 3; UE5.2, the persona at half weight: 41 / 2.5.
+  // UE5.1: (14 × 1 + 17 × 2) / 3; UE5.2, the diagnostic at half weight: 41 / 2.5.
   assert.equal(uxIn51.average, 16)
   assert.equal(uxIn52.average, 16.4)
   // Only the evaluations that count for the UE, with their weight in it.

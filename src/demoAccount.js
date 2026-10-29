@@ -19,12 +19,12 @@ const DEMO_DEFAULT_FAVORITE_IDS = [
 
 const DEMO_SCHEDULE_TEMPLATES = [
   {
-    key: 'ux-writing',
+    key: 'strategie-lun',
     dayOffset: 0,
     startHour: 9,
     startMinute: 0,
     durationMinutes: 120,
-    title: 'R5.07 UX Writing',
+    title: 'R5.07 Stratégie de communication',
     teacher: 'M. Le Goff',
     location: 'B03 - Salle Atelier',
   },
@@ -39,24 +39,24 @@ const DEMO_SCHEDULE_TEMPLATES = [
     location: 'B12 - Langues',
   },
   {
-    key: 'dev-back-lun',
+    key: 'com-interne-lun',
     dayOffset: 0,
     startHour: 14,
     startMinute: 0,
     durationMinutes: 120,
-    title: 'R5.12 Développement back-end',
+    title: 'R5.12 Communication interne',
     teacher: 'M. Lemoine',
-    location: 'A08 - Info 2',
+    location: 'B04 - TD 1',
   },
   {
-    key: 'accessibilite-mar',
+    key: 'droit-mar',
     dayOffset: 1,
     startHour: 8,
     startMinute: 30,
     durationMinutes: 90,
-    title: 'R5.03 Accessibilité numérique',
+    title: 'R5.03 Droit de l’information',
     teacher: 'Mme Riou',
-    location: 'A10 - Info 4',
+    location: 'Amphi 1',
   },
   {
     key: 'portfolio-mar',
@@ -69,14 +69,14 @@ const DEMO_SCHEDULE_TEMPLATES = [
     location: 'B03 - Salle Atelier',
   },
   {
-    key: 'sae-proto',
+    key: 'sae-campagne',
     dayOffset: 1,
     startHour: 13,
     startMinute: 30,
     durationMinutes: 180,
-    title: 'SAE Prototype interactif',
+    title: 'SAE Campagne de communication',
     teacher: 'Mme Le Fur',
-    location: 'C12 - FabLab',
+    location: 'C12 - Salle projet',
   },
   {
     key: 'gestion-projet-mer',
@@ -84,27 +84,27 @@ const DEMO_SCHEDULE_TEMPLATES = [
     startHour: 8,
     startMinute: 30,
     durationMinutes: 90,
-    title: 'R5.04 Gestion de projet',
+    title: 'R5.04 Gestion de projet événementiel',
     teacher: 'M. Guillou',
     location: 'B08 - TD 3',
   },
   {
-    key: 'dev-front',
+    key: 'presse-mer',
     dayOffset: 2,
     startHour: 10,
     startMinute: 15,
     durationMinutes: 105,
-    title: 'R5.11 Développement Front',
+    title: 'R5.11 Relations presse',
     teacher: 'M. Lemoine',
-    location: 'A08 - Info 2',
+    location: 'B04 - TD 1',
   },
   {
-    key: 'ux-writing-mer',
+    key: 'strategie-mer',
     dayOffset: 2,
     startHour: 14,
     startMinute: 0,
     durationMinutes: 120,
-    title: 'R5.07 UX Writing',
+    title: 'R5.07 Stratégie de communication',
     teacher: 'Mme Riou',
     location: 'B03 - Salle Atelier',
   },
@@ -119,45 +119,45 @@ const DEMO_SCHEDULE_TEMPLATES = [
     location: 'B12 - Langues',
   },
   {
-    key: 'dev-back-jeu',
+    key: 'com-interne-jeu',
     dayOffset: 3,
     startHour: 8,
     startMinute: 30,
     durationMinutes: 120,
-    title: 'R5.12 Développement back-end',
+    title: 'R5.12 Communication interne',
     teacher: 'M. Lemoine',
-    location: 'A08 - Info 2',
+    location: 'B04 - TD 1',
   },
   {
-    key: 'ux-writing-jeu',
+    key: 'strategie-jeu',
     dayOffset: 3,
     startHour: 10,
     startMinute: 45,
     durationMinutes: 90,
-    title: 'R5.07 UX Writing',
+    title: 'R5.07 Stratégie de communication',
     teacher: 'M. Le Goff',
     location: 'B03 - Salle Atelier',
   },
   {
-    key: 'culture-num',
+    key: 'semiologie',
     dayOffset: 3,
     startHour: 15,
     startMinute: 15,
     durationMinutes: 90,
-    title: 'R5.09 Culture numérique',
+    title: 'R5.09 Sémiologie de l’image',
     teacher: 'Mme Martin',
     location: 'Amphi 2',
   },
   {
-    key: 'sae-proto-ven',
+    key: 'sae-campagne-ven',
     dayOffset: 4,
     startHour: 9,
     startMinute: 0,
     durationMinutes: 180,
-    title: 'SAE Prototype interactif',
+    title: 'SAE Campagne de communication',
     // Two teachers, as ADE joins them.
     teacher: 'Mme Le Fur - M. Lemoine',
-    location: 'C12 - FabLab',
+    location: 'C12 - Salle projet',
   },
   {
     key: 'gestion-projet-ven',
@@ -165,19 +165,19 @@ const DEMO_SCHEDULE_TEMPLATES = [
     startHour: 13,
     startMinute: 30,
     durationMinutes: 90,
-    title: 'R5.04 Gestion de projet',
+    title: 'R5.04 Gestion de projet événementiel',
     teacher: 'M. Guillou',
     location: 'B08 - TD 3',
   },
   {
-    key: 'accessibilite-ven',
+    key: 'droit-ven',
     dayOffset: 4,
     startHour: 15,
     startMinute: 15,
     durationMinutes: 90,
-    title: 'R5.03 Accessibilité numérique',
+    title: 'R5.03 Droit de l’information',
     teacher: 'Mme Riou',
-    location: 'A10 - Info 4',
+    location: 'Amphi 1',
   },
 ]
 
@@ -269,29 +269,29 @@ const DEMO_TREE_ROOT = Object.freeze({
       children: [
         {
           id: '110',
-          name: 'BUT MMI',
-          path: 'Université de Rennes / IUT Lannion / BUT MMI',
+          name: 'BUT Info-Com',
+          path: 'Université de Rennes / IUT Lannion / BUT Info-Com',
           children: [
             {
               id: '111',
-              name: 'MMI 2',
-              path: 'Université de Rennes / IUT Lannion / BUT MMI / MMI 2',
+              name: 'Info-Com 3',
+              path: 'Université de Rennes / IUT Lannion / BUT Info-Com / Info-Com 3',
               children: [
                 {
                   id: '1111',
                   name: 'TD A',
-                  path: 'Université de Rennes / IUT Lannion / BUT MMI / MMI 2 / TD A',
+                  path: 'Université de Rennes / IUT Lannion / BUT Info-Com / Info-Com 3 / TD A',
                   children: [
                     {
                       id: '11111',
                       name: 'TP 1',
-                      path: 'Université de Rennes / IUT Lannion / BUT MMI / MMI 2 / TD A / TP 1',
+                      path: 'Université de Rennes / IUT Lannion / BUT Info-Com / Info-Com 3 / TD A / TP 1',
                       children: [],
                     },
                     {
                       id: '11112',
                       name: 'TP 2',
-                      path: 'Université de Rennes / IUT Lannion / BUT MMI / MMI 2 / TD A / TP 2',
+                      path: 'Université de Rennes / IUT Lannion / BUT Info-Com / Info-Com 3 / TD A / TP 2',
                       children: [],
                     },
                   ],
@@ -299,12 +299,12 @@ const DEMO_TREE_ROOT = Object.freeze({
                 {
                   id: '1112',
                   name: 'TD B',
-                  path: 'Université de Rennes / IUT Lannion / BUT MMI / MMI 2 / TD B',
+                  path: 'Université de Rennes / IUT Lannion / BUT Info-Com / Info-Com 3 / TD B',
                   children: [
                     {
                       id: '11121',
                       name: 'TP 3',
-                      path: 'Université de Rennes / IUT Lannion / BUT MMI / MMI 2 / TD B / TP 3',
+                      path: 'Université de Rennes / IUT Lannion / BUT Info-Com / Info-Com 3 / TD B / TP 3',
                       children: [],
                     },
                   ],
@@ -313,18 +313,18 @@ const DEMO_TREE_ROOT = Object.freeze({
             },
             {
               id: '112',
-              name: 'MMI 1',
-              path: 'Université de Rennes / IUT Lannion / BUT MMI / MMI 1',
+              name: 'Info-Com 2',
+              path: 'Université de Rennes / IUT Lannion / BUT Info-Com / Info-Com 2',
               children: [
                 {
                   id: '1121',
                   name: 'TD A',
-                  path: 'Université de Rennes / IUT Lannion / BUT MMI / MMI 1 / TD A',
+                  path: 'Université de Rennes / IUT Lannion / BUT Info-Com / Info-Com 2 / TD A',
                   children: [
                     {
                       id: '11211',
                       name: 'TP 1',
-                      path: 'Université de Rennes / IUT Lannion / BUT MMI / MMI 1 / TD A / TP 1',
+                      path: 'Université de Rennes / IUT Lannion / BUT Info-Com / Info-Com 2 / TD A / TP 1',
                       children: [],
                     },
                   ],
@@ -338,7 +338,7 @@ const DEMO_TREE_ROOT = Object.freeze({
   ],
 })
 
-const DEMO_DEFAULT_TREE_PATH = Object.freeze(['-100', '10', '110', '111', '1111', '11111'])
+const DEMO_DEFAULT_TREE_PATH = Object.freeze(['-100', '10', '110', '111', '1112', '11121'])
 
 function cloneDemoValue(value) {
   if (typeof globalThis.structuredClone === 'function') {
@@ -728,7 +728,7 @@ function getSelectionLabel(selection = null) {
   return selection?.tpLabel
     || selection?.tdLabel
     || selection?.yearLabel
-    || 'TP 1'
+    || 'TP 3'
 }
 
 function buildDemoEventsForWeek(anchorDate, selectionLabel) {
@@ -759,7 +759,7 @@ function normalizeSelectionFromResource(resourceId = '') {
 
   return {
     resourceId: selectedNode ? String(selectedNode.id) : DEMO_DEFAULT_TREE_PATH[DEMO_DEFAULT_TREE_PATH.length - 1],
-    label: selectedNode?.name ?? 'TP 1',
+    label: selectedNode?.name ?? 'TP 3',
   }
 }
 
@@ -893,8 +893,8 @@ const DEMO_MAIL_MESSAGES = Object.freeze([
     minutesAgo: 12,
     unread: true,
     from: { name: 'Thomas Lemoine', email: 'thomas.lemoine@univ-rennes.fr' },
-    subject: 'R5.11 – Rendu du TP React décalé à vendredi',
-    snippet: 'Bonjour à tous, suite aux soucis de serveur de mardi, le rendu du TP 4 (composants et état) est repoussé à vendredi 18h sur Moodle. Pensez à…',
+    subject: 'R5.11 – Rendu du dossier de presse décalé à vendredi',
+    snippet: 'Bonjour à tous, plusieurs d’entre vous attendent encore les réponses de leurs contacts : le rendu du dossier de presse est repoussé à vendredi 18h sur Moodle. Pensez à…',
   },
   {
     id: 'demo-mail-2',
@@ -909,8 +909,8 @@ const DEMO_MAIL_MESSAGES = Object.freeze([
     minutesAgo: 60 * 5 + 20,
     unread: false,
     from: { name: 'Moodle UR', email: 'noreply-moodle@univ-rennes.fr' },
-    subject: 'Nouveau devoir : SAE Prototype interactif – Livrable 2',
-    snippet: 'Mme Le Fur a publié un nouveau devoir dans le cours « SAE Prototype interactif ». Date limite : lundi 23:59. Consultez les consignes détaillées…',
+    subject: 'Nouveau devoir : SAE Campagne de communication – Livrable 2',
+    snippet: 'Mme Le Fur a publié un nouveau devoir dans le cours « SAE Campagne de communication ». Date limite : lundi 23:59. Consultez les consignes détaillées…',
   },
   {
     id: 'demo-mail-4',
@@ -918,15 +918,15 @@ const DEMO_MAIL_MESSAGES = Object.freeze([
     unread: true,
     from: { name: 'BU Lannion', email: 'bu-lannion@univ-rennes.fr' },
     subject: 'Rappel : 2 documents à rendre avant le 10/10',
-    snippet: 'Bonjour Camille, nous vous rappelons que les documents suivants arrivent à échéance : « Design emotionnel » (D. Norman), « Refactoring UI »…',
+    snippet: 'Bonjour Camille, nous vous rappelons que les documents suivants arrivent à échéance : « La Communication des organisations » (T. Libaert), « Introduction aux médias »…',
   },
   {
     id: 'demo-mail-5',
     minutesAgo: 60 * 28,
     unread: false,
-    from: { name: 'BDE MMI Lannion', email: 'bde.mmi.lannion@gmail.com' },
+    from: { name: 'BDE Info-Com Lannion', email: 'bde.infocom.lannion@gmail.com' },
     subject: 'Soirée d’intégration jeudi 🎉 dernières places',
-    snippet: 'Salut les MMI ! Il reste une vingtaine de places pour la soirée de jeudi au Quai des Bulles. Inscription et paiement sur le HelloAsso avant mercredi…',
+    snippet: 'Salut les Info-Com ! Il reste une vingtaine de places pour la soirée de jeudi au Quai des Bulles. Inscription et paiement sur le HelloAsso avant mercredi…',
   },
 ])
 
@@ -953,10 +953,10 @@ export function buildDemoMailPayload({ now = Date.now(), webmailHref = DEMO_WEBM
 // against the request time (negative = overdue) so dates always look current.
 const DEMO_MOODLE_DEADLINES = Object.freeze([
   {
-    id: 'demo-moodle-tp3-api',
+    id: 'demo-moodle-dossier-crise',
     hoursFromNow: -2 * 24 - 3,
-    title: 'TP 3 – API REST avec Express',
-    courseName: 'R5.12 Développement back-end',
+    title: 'Dossier – communication de crise',
+    courseName: 'R5.12 Communication interne',
     type: 'assign',
     submitted: false,
   },
@@ -964,31 +964,31 @@ const DEMO_MOODLE_DEADLINES = Object.freeze([
     id: 'demo-moodle-sae501-livrable2',
     hoursFromNow: 4,
     title: 'Rendu SAE 501 – Livrable 2',
-    courseName: 'SAE 5.01 Développement web',
+    courseName: 'SAE 5.01 Campagne de communication',
     type: 'assign',
     submitted: false,
   },
   {
-    id: 'demo-moodle-qcm-rgaa',
+    id: 'demo-moodle-qcm-droit-image',
     hoursFromNow: 24 + 2,
-    title: 'QCM – Accessibilité et RGAA',
-    courseName: 'R5.03 Accessibilité numérique',
+    title: 'QCM – Droit à l’image',
+    courseName: 'R5.03 Droit de l’information',
     type: 'quiz',
     submitted: false,
   },
   {
-    id: 'demo-moodle-forum-maquettes',
+    id: 'demo-moodle-forum-affiches',
     hoursFromNow: 3 * 24 + 5,
-    title: 'Forum : retours croisés sur les maquettes',
-    courseName: 'R5.07 Design d’interaction',
+    title: 'Forum : retours croisés sur les affiches',
+    courseName: 'R5.07 Stratégie de communication',
     type: 'forum',
     submitted: null,
   },
   {
-    id: 'demo-moodle-veille',
+    id: 'demo-moodle-analyse-affiche',
     hoursFromNow: 7 * 24,
-    title: 'Dossier de veille technologique',
-    courseName: 'R5.06 Culture numérique',
+    title: 'Analyse d’une affiche de campagne',
+    courseName: 'R5.09 Sémiologie de l’image',
     type: 'assign',
     submitted: true,
   },
@@ -996,7 +996,7 @@ const DEMO_MOODLE_DEADLINES = Object.freeze([
     id: 'demo-moodle-sondage-s5',
     hoursFromNow: 10 * 24 + 6,
     title: 'Questionnaire de mi-semestre S5',
-    courseName: 'BUT MMI 3 – Vie de promo',
+    courseName: 'BUT Info-Com 3 – Vie de promo',
     type: 'other',
     submitted: null,
   },

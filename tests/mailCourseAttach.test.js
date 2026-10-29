@@ -71,6 +71,6 @@ test('the demo\'s week lists in the drawer, its shared class with its two teache
   const events = mergeEvents(payload.events.map(toPlanningEvent))
   const days = listCourseDays(events, today)
   assert.ok(days.length >= 5)
-  const shared = events.find((event) => event.title === 'SAE Prototype interactif' && event.teacher.includes(' - '))
+  const shared = events.find((event) => event.title === 'SAE Campagne de communication' && event.teacher.includes(' - '))
   assert.equal(shared.teacher, 'Mme Le Fur - M. Lemoine')
 })
