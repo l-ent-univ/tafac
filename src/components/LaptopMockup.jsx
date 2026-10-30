@@ -8,8 +8,8 @@ import island from '../assets/landing/landing-island.webp'
 import { usePointerParallax, useVisiblePlayback } from '../landingMotion'
 
 // A tour of the app on a computer (demo account, light or dark theme, nothing
-// marked new: the dashboard, Mes notes, the planning's week; 1280 × 800 at
-// 1.5×, looping) in a laptop drawn here: a lid with a thin metal edge and a
+// marked new: the planning's week, a grade simulated, a reply to the
+// scolarité, the app list; 1280 × 800 at 1.5×, looping) in a laptop drawn here: a lid with a thin metal edge and a
 // black bezel (a camera dot at the top), a hinge, then the base, wider, with
 // the notch to open it, on a soft shadow (a gradient, no blur). No brand.
 // Sized in cqw, so it all scales with the laptop's width; graphite in the
@@ -43,7 +43,7 @@ function LaptopMockup({ className = '', decorated = false, darkScreen = false })
                 loop
                 playsInline
                 preload="metadata"
-                aria-label="Tafac sur un ordinateur : l’accueil, Mes notes et le planning de la semaine"
+                aria-label="Tafac sur un ordinateur : le planning de la semaine, une note simulée, une réponse avec pièce jointe et un outil ajouté aux favoris"
                 className="block w-full h-auto"
               />
             </div>

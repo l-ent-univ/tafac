@@ -17,6 +17,8 @@ import { getListedUniversities, getLoadedUniversityId, writeUniversityChoice } f
 
 const universityLogo = universityConfig.branding.logo
 const universityLogoAlt = universityConfig.branding.logoAlt ?? universityConfig.university?.name ?? ''
+// A square badge (branding.logoShape) shows taller than a wordmark.
+const universityLogoSquare = universityConfig.branding.logoShape === 'square'
 const passwordNote = universityConfig.branding.loginPasswordNote ?? null
 const repoUrl = universityConfig.branding.about?.repoUrl ?? null
 const loginLinks = universityConfig.links ?? {}
@@ -263,7 +265,7 @@ function LoginPage({
                   <div className="flex flex-col items-center gap-2">
                     <span className="text-[12px] font-medium leading-none text-text-muted font-body">Compatible avec</span>
                     <img
-                      className="block h-10 w-auto max-w-[180px] object-contain dark:invert"
+                      className={`block w-auto max-w-[180px] object-contain dark:invert ${universityLogoSquare ? 'h-[72px]' : 'h-10'}`}
                       src={universityLogo}
                       alt={universityLogoAlt}
                     />

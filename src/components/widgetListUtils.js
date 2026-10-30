@@ -1,5 +1,5 @@
 // Helpers shared by the list-style dashboard cards ("Mails récents",
-// "Échéances"): date parsing, the "14h32" clock notation, the shimmer
+// "Échéances") and the mail page: date parsing, the "14h32" clock notation, the shimmer
 // placeholder look and the last-known service URL kept for error states.
 
 export const MINUTE_MS = 60 * 1000
@@ -9,6 +9,8 @@ export const DAY_MS = 24 * HOUR_MS
 export const SHIMMER_CLASSES = 'bg-[linear-gradient(90deg,var(--color-bg-muted)_0%,var(--color-bg-subtle)_50%,var(--color-bg-muted)_100%)] bg-[length:200%_100%] animate-shimmer'
 
 const clockFormatter = new Intl.DateTimeFormat('fr-FR', { hour: '2-digit', minute: '2-digit' })
+const weekdayFormatter = new Intl.DateTimeFormat('fr-FR', { weekday: 'short' })
+const dayMonthFormatter = new Intl.DateTimeFormat('fr-FR', { day: 'numeric', month: 'short' })
 
 export function parseDate(value) {
   const date = value ? new Date(value) : null
@@ -27,6 +29,21 @@ export function calendarDayDiff(date, now = new Date()) {
 // "15h15", matching the next-class card notation.
 export function formatClockTime(date) {
   return clockFormatter.format(date).replace(':', 'h')
+}
+
+// Mail-client style timestamp, matching the "15h15" notation used by the
+// next-class card: "14h32" today, "hier", "lun." this week, "12 sept." older.
+export function formatReceivedAt(date, now = new Date()) {
+  if (!date) return ''
+  const dayDiff = -calendarDayDiff(date, now)
+  if (dayDiff <= 0) return formatClockTime(date)
+  if (dayDiff === 1) return 'hier'
+  if (dayDiff < 7) return weekdayFormatter.format(date)
+  return dayMonthFormatter.format(date)
+}
+
+export function getSenderLabel(from) {
+  return from?.name?.trim() || from?.email?.trim() || 'Expéditeur inconnu'
 }
 
 export function openInNewTab(href) {

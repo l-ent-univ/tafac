@@ -83,7 +83,8 @@ export function universityLogoPath(rawId) {
 
 // What anyone may know about a university, for the picker and the /<slug>
 // entry links: its id, names, slug (university.slug in shared.js, else the
-// id without its "univ-" prefix) and whether it's only listed on dev servers.
+// id without its "univ-" prefix), whether it's only listed on dev servers,
+// and its logo's shape ('wide' wordmark or 'square' badge, shown taller).
 export async function loadUniversityDirectoryEntry(rawId) {
   const id = resolveUniversityId(rawId)
   const { university = {} } = await loadSharedConfig(id)
@@ -93,5 +94,6 @@ export async function loadUniversityDirectoryEntry(rawId) {
     shortName: university.shortName ?? university.name ?? id,
     slug: String(university.slug ?? id.replace(/^univ-/, '')).toLowerCase(),
     devOnly: university.devOnly === true,
+    logoShape: university.logoShape === 'square' ? 'square' : 'wide',
   }
 }

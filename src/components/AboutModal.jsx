@@ -13,6 +13,8 @@ import CloseButton from './CloseButton'
 /* global __BUILD_HASH__ */
 
 const about = universityConfig.branding.about ?? {}
+// The in-app Messagerie (features.mail, without mail.page: false).
+const HAS_MAIL_PAGE = Boolean(universityConfig.features?.mail) && universityConfig.mail?.page !== false
 const papillonUrl = getPapillonUrl(universityConfig.branding, readPapillonDebugOverride())
 
 // One person, a Réglages row: their GitHub avatar, a name, a line under it,
@@ -41,6 +43,20 @@ function PersonRow({ login, name, detail }) {
       />
       <Icon icon="carbon:arrow-up-right" className="h-4 w-4 shrink-0 text-text-50" aria-hidden="true" />
     </a>
+  )
+}
+
+// « Aide »: write to the team (branding.about.contactEmail), the address
+// shown under the button. Hidden without an address.
+export function AboutHelp() {
+  if (!about.contactEmail) return null
+  return (
+    <SettingsGroup title="Aide">
+      <a href={`mailto:${about.contactEmail}`} className={`${PRESSABLE_ROW_CLASSES} no-underline`}>
+        <RowText icon="carbon:email" label="Contacter l’équipe" description={about.contactEmail} />
+        <Icon icon="carbon:arrow-up-right" className="h-4 w-4 shrink-0 text-text-50" aria-hidden="true" />
+      </a>
+    </SettingsGroup>
   )
 }
 
@@ -112,9 +128,16 @@ export function AboutContent({ demoLinkLabel = '', onDemoLinkClick = null, onPri
           {about.disclaimer}
         </p>
       ) : null}
+      {/* Where the university has the in-app Messagerie (server/entAuthApp.js's
+          mail routes: relayed, in memory only, dropped at logout). */}
+      {HAS_MAIL_PAGE ? (
+        <p className="m-0 text-text-secondary">
+          Tes mails passent par le serveur de {universityConfig.branding.appName} jusqu’au webmail de l’université, sans être écrits sur disque
+        </p>
+      ) : null}
       {isAnalyticsAvailable ? (
         <p className="m-0 text-text-secondary">
-          L'audience est mesurée de façon anonyme et sans cookie, et dans l'UE. Aucune note, aucun mail et aucun identifiant n’est collecté. Cette analyse peut être désactivée à tout moment{' '}
+          L’audience est mesurée de façon anonyme, sans cookie et dans l’UE. Elle ne contient aucune note, aucun mail ni identifiant et peut être désactivée à tout moment{' '}
           <button type="button" className="p-0 border-0 bg-transparent font-inherit text-[inherit] text-text underline underline-offset-2 cursor-pointer" onClick={() => (typeof onPrivacyClick === 'function' ? onPrivacyClick() : setPrivacyOpen(true))}>
             En savoir plus
           </button>
@@ -191,7 +214,7 @@ function AboutModal({
       role="presentation"
     >
       <section
-        className="w-[min(440px,100%)] max-h-[calc(100dvh-40px)] overflow-y-auto overscroll-contain corners-[22px] border border-[var(--color-border)] bg-[var(--color-bg)] text-[var(--color-text)] animate-modal-card-in max-sm:max-h-[calc(100dvh-28px)]"
+        className="w-[min(440px,100%)] max-h-[calc(100dvh-40px)] overflow-y-auto overscroll-contain modal-corners [--modal-inset:21px] [--modal-inner-radius:20px] border border-[var(--color-border)] bg-[var(--color-bg)] text-[var(--color-text)] animate-modal-card-in max-sm:max-h-[calc(100dvh-28px)]"
         role="dialog"
         aria-modal="true"
         aria-labelledby="about-modal-title"
@@ -206,6 +229,7 @@ function AboutModal({
           </div>
 
           <AboutContent demoLinkLabel={demoLinkLabel} onDemoLinkClick={onDemoLinkClick}>
+            <AboutHelp />
             <AboutTeam />
           </AboutContent>
         </div>

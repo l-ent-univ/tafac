@@ -7,39 +7,25 @@ import { accentStyle } from '../eventAccents'
 import { FULL_BLOCK_HEIGHT } from '../eventBlockLayout'
 import PlanningEventBlock from './PlanningEventBlock'
 import CloseButton from './CloseButton'
+import Tooltip from './Tooltip'
+import { GROUP_CARD_CLASSES, GroupRow } from './GroupCard'
 
-// A row of the sheet's cards (the iOS GroupCard's rows, in the look of
-// the evaluation rows of Mes notes): an icon box, a line and a second one,
-// parted from the next row by a hairline from the text's edge. A button with
-// a chevron when it leads somewhere.
-function SheetRow({ icon, title, detail, onClick }) {
-  const content = (
-    <>
-      <span className="inline-flex size-8 shrink-0 items-center justify-center corners-[9px] bg-brand-subtle text-text-secondary" aria-hidden="true">
-        <Icon icon={icon} className="size-[17px]" />
-      </span>
-      <span className="planning-row-text grid min-w-0 flex-1 content-center gap-[4px] self-stretch py-[17px] pr-4">
-        <span className="truncate font-body text-[14px] font-semibold leading-[1.2] text-text">{title}</span>
-        {detail ? <span className="truncate font-body text-[12.5px] font-medium leading-none text-text-muted">{detail}</span> : null}
-      </span>
-      {onClick ? <Icon icon="carbon:chevron-right" className="-ml-1 mr-4 size-[14px] shrink-0 text-text-30" aria-hidden="true" /> : null}
-    </>
-  )
-  const className = 'planning-row flex w-full min-w-0 items-center gap-3.5 pl-4 text-left text-text'
-  return onClick
-    ? <li><button type="button" className={`${className} is-link cursor-pointer border-0 bg-transparent p-0 pl-4`} onClick={onClick}>{content}</button></li>
-    : <li className={className}>{content}</li>
+function linkHost(href) {
+  try {
+    return new URL(href).hostname
+  } catch {
+    return null
+  }
 }
-
-const CARD_CLASSES = 'widget-card widget-card-visible m-0 list-none overflow-hidden border bg-widget-bg px-0 py-1 card-corners'
 
 // A class's sheet, laid out as the iOS app's (EventDetailViewController)
 // and drawn as a grade's (GradeDetailModal): the course's colour washing
 // its top, the class's block, a card with its hours, its day and length and
 // its group, then the same course's next classes over 30 days (each one
 // takes the planning to its day). `searching`: those weeks are still on
-// their way.
-function PlanningEventSheet({ event, accent, events, todayKey, searching, onClose, onPickDay }) {
+// their way. `onWrite`: « Écrire au sujet de ce cours » (a mail about it,
+// in the Messagerie), null without the in-app mail page.
+function PlanningEventSheet({ event, accent, events, todayKey, searching, onWrite = null, onClose, onPickDay }) {
   const dialogRef = useRef(null)
   const scrollRef = useRef(null)
   // Content under the header: its blur shows.
@@ -89,7 +75,7 @@ function PlanningEventSheet({ event, accent, events, todayKey, searching, onClos
       <div className="weather-modal-backdrop absolute inset-0 bg-backdrop animate-modal-backdrop-in" onClick={onClose} aria-hidden="true" />
       <section
         ref={dialogRef}
-        className="gd-dialog planning-sheet relative isolate flex max-h-[min(820px,calc(100dvh-40px))] w-[min(448px,100%)] flex-col corners-[26px] border border-border bg-bg text-text shadow-[0_24px_80px_var(--color-shadow)] outline-none max-sm:max-h-[calc(100dvh-16px)] max-sm:rounded-b-none max-sm:border-b-0"
+        className="gd-dialog planning-sheet relative isolate flex max-h-[min(820px,calc(100dvh-40px))] w-[min(448px,100%)] flex-col modal-corners [--modal-inset:24px] [--modal-inner-radius:20px] max-sm:[--modal-inset:16px] max-sm:[--modal-inner-radius:18px] border border-border bg-bg text-text shadow-[0_24px_80px_var(--color-shadow)] outline-none max-sm:max-h-[calc(100dvh-16px)] max-sm:rounded-b-none max-sm:border-b-0"
         style={accentStyle(accent)}
         role="dialog"
         aria-modal="true"
@@ -105,7 +91,21 @@ function PlanningEventSheet({ event, accent, events, todayKey, searching, onClos
                 <span /><span /><span /><span /><span />
               </span>
               <span className="gd-grabber relative mx-auto hidden h-[4px] w-9 rounded-full bg-text-30 max-sm:block max-sm:translate-y-2" aria-hidden="true" />
-              <div className="relative flex justify-end px-6 pt-4 pb-2 max-sm:px-4 max-sm:pt-[14px]">
+              {/* « Écrire au sujet de ce cours » beside the close button, a
+                  round glass button of its own (its name in a tooltip), as
+                  a grade's sheet has. */}
+              <div className="relative flex items-center justify-end gap-2 px-6 pt-4 pb-2 max-sm:px-4 max-sm:pt-[14px]">
+                {onWrite ? (
+                  <button
+                    type="button"
+                    aria-label="Écrire au sujet de ce cours"
+                    onClick={onWrite}
+                    className="close-button glass-close-button group relative inline-flex size-[34px] shrink-0 cursor-pointer items-center justify-center rounded-full border-0 p-0 text-text focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-text"
+                  >
+                    <Icon icon="carbon:email" className="size-[16px]" aria-hidden="true" />
+                    <Tooltip title="Écrire au sujet de ce cours" side="bottom-end" className="max-4xl:hidden" />
+                  </button>
+                ) : null}
                 <CloseButton glass onClick={onClose} />
               </div>
             </header>
@@ -116,10 +116,14 @@ function PlanningEventSheet({ event, accent, events, todayKey, searching, onClos
                 {contentWidth > 0 ? (
                   <PlanningEventBlock event={event} accent={accent} variant="regular" width={contentWidth} height={FULL_BLOCK_HEIGHT} style={{ position: 'relative' }} />
                 ) : <div style={{ height: FULL_BLOCK_HEIGHT }} />}
-                <ul className={CARD_CLASSES}>
-                  <SheetRow icon="carbon:time" title={`De ${formatTime(event.start)} à ${formatTime(event.end)}`} />
-                  <SheetRow icon="carbon:calendar" title={`${dayText(event.day)} · ${durationText(event.start, event.end)}`} />
-                  {event.group ? <SheetRow icon="carbon:events" title={event.group} /> : null}
+                <ul className={GROUP_CARD_CLASSES}>
+                  <GroupRow icon="carbon:time" title={`De ${formatTime(event.start)} à ${formatTime(event.end)}`} />
+                  <GroupRow icon="carbon:calendar" title={`${dayText(event.day)} · ${durationText(event.start, event.end)}`} />
+                  {event.group ? <GroupRow icon="carbon:events" title={event.group} /> : null}
+                  {event.notes ? <GroupRow icon="carbon:information" title={event.notes} wrap /> : null}
+                  {event.link ? (
+                    <GroupRow icon="carbon:link" title={event.linkLabel ?? 'Lien'} detail={linkHost(event.link)} href={event.link} />
+                  ) : null}
                 </ul>
               </div>
               {/* Titled like the sections of Mes notes. */}
@@ -130,11 +134,10 @@ function PlanningEventSheet({ event, accent, events, todayKey, searching, onClos
                   <span className="ml-auto font-body text-[13px] font-medium leading-none text-text-muted">sur 30 jours</span>
                 </div>
                 {occurrences.length ? (
-                  <ul className={CARD_CLASSES}>
+                  <ul className={GROUP_CARD_CLASSES}>
                     {occurrences.map((occurrence) => (
-                      <SheetRow
+                      <GroupRow
                         key={occurrence.id}
-                        icon="carbon:calendar"
                         title={relativeDayText(occurrence.day, todayKey)}
                         detail={[`${formatTime(occurrence.start)} – ${formatTime(occurrence.end)}`, occurrence.location].filter(Boolean).join(' · ')}
                         onClick={() => onPickDay(occurrence.day)}

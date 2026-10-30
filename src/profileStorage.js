@@ -6,6 +6,8 @@ export const HIDDEN_WIDGETS_KEY = 'l-ent:hidden-widgets'
 export const APP_DESCRIPTIONS_KEY = 'l-ent:show-app-descriptions'
 export const PLANNING_WEEKEND_KEY = 'l-ent:planning-weekend'
 export const WALLPAPER_KEY = 'l-ent:show-wallpaper'
+export const UNIVERSITY_LOGO_KEY = 'l-ent:show-university-logo'
+export const LOGO_SOURCE_KEY = 'l-ent:logo-source'
 export const ANONYMOUS_ANALYTICS_KEY = 'l-ent:anonymous-analytics'
 const STUDENT_TP_SELECTION_VERSION = 4
 
@@ -240,6 +242,41 @@ export function persistShowWallpaper(show, userId = null) {
     localStorage.setItem(WALLPAPER_KEY, JSON.stringify({
       user: userId || null,
       value: Boolean(show),
+    }))
+  } catch {
+    // Storage unavailable
+  }
+}
+
+// The logo next to Tafac's, sidebar and header (Mon compte): shown unless
+// this user hid it.
+export function getStoredShowUniversityLogo(userId = null) {
+  return readScopedStorageValue(UNIVERSITY_LOGO_KEY, userId) !== false
+}
+
+export function persistShowUniversityLogo(show, userId = null) {
+  try {
+    localStorage.setItem(UNIVERSITY_LOGO_KEY, JSON.stringify({
+      user: userId || null,
+      value: Boolean(show),
+    }))
+  } catch {
+    // Storage unavailable
+  }
+}
+
+// Whose logo that is when the student's establishment has its own (Mon
+// compte): the establishment's ('establishment') unless this user picked
+// the university's ('university').
+export function getStoredLogoSource(userId = null) {
+  return readScopedStorageValue(LOGO_SOURCE_KEY, userId) === 'university' ? 'university' : 'establishment'
+}
+
+export function persistLogoSource(source, userId = null) {
+  try {
+    localStorage.setItem(LOGO_SOURCE_KEY, JSON.stringify({
+      user: userId || null,
+      value: source === 'university' ? 'university' : 'establishment',
     }))
   } catch {
     // Storage unavailable

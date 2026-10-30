@@ -1,14 +1,10 @@
 // Anonymous audience measurement — client side (see docs/ANALYTICS.md).
 //
-// Two cookieless, EU-hosted tools, both behind the "Statistiques anonymes"
-// switch in Mon compte:
-// - PostHog: the browser never talks to it. Events are batched here and
-//   posted to our own server (/__ent_auth/analytics), which validates them
-//   against server/analyticsSchema.js and forwards them. Only when the server
-//   has a PostHog key.
-// - Simple Analytics (production builds): page views only. Its script is
-//   loaded on demand with auto-collect off, and a page view is recorded only
-//   while the switch is on.
+// PostHog, cookieless and EU-hosted, behind the "Statistiques anonymes"
+// switch in Mon compte. The browser never talks to it: events are batched
+// here and posted to our own server (/__ent_auth/analytics), which validates
+// them against server/analyticsSchema.js and forwards them. Only when the
+// server has a PostHog key. No third-party script runs in the page.
 import { useEffect, useRef, useSyncExternalStore } from 'react'
 import { ENT_AUTH_PREFIX } from './entApi'
 import { getStoredAnonymousAnalytics } from './profileStorage'
@@ -16,8 +12,6 @@ import { toFormationSlug } from './formationSlug'
 import { createNavigationReporter } from './planningAnalytics'
 
 const ANALYTICS_ENDPOINT = `${ENT_AUTH_PREFIX}/analytics`
-const SIMPLE_ANALYTICS_SCRIPT = 'https://scripts.simpleanalyticscdn.com/latest.js'
-const SIMPLE_ANALYTICS_ENABLED = import.meta.env.PROD
 const FLUSH_DELAY_MS = 2000
 const MAX_BATCH_SIZE = 20
 
@@ -27,37 +21,7 @@ let establishment = null
 let formation = null
 let queue = []
 let flushTimer = 0
-let simpleAnalyticsRequested = false
-let simpleAnalyticsPageviewSent = false
 const listeners = new Set()
-
-// Loads Simple Analytics once the switch is known to be on, and records a
-// single page view per page load. With data-auto-collect="false" it records
-// nothing by itself, so switching off stops it even after the script loaded.
-function syncSimpleAnalytics() {
-  if (!SIMPLE_ANALYTICS_ENABLED || !userEnabled || typeof document === 'undefined') return
-
-  const sendPageview = () => {
-    if (!userEnabled || simpleAnalyticsPageviewSent || typeof window.sa_pageview !== 'function') return
-    simpleAnalyticsPageviewSent = true
-    window.sa_pageview(window.location.pathname)
-  }
-
-  if (simpleAnalyticsRequested) {
-    sendPageview()
-    return
-  }
-
-  simpleAnalyticsRequested = true
-  const script = document.createElement('script')
-  script.async = true
-  script.src = SIMPLE_ANALYTICS_SCRIPT
-  script.dataset.autoCollect = 'false'
-  script.addEventListener('load', sendPageview)
-  document.head.appendChild(script)
-}
-
-syncSimpleAnalytics()
 
 function isActive() {
   return serverEnabled && userEnabled
@@ -82,7 +46,6 @@ export function setAnalyticsAvailable(enabled) {
 export function setAnalyticsUserEnabled(enabled) {
   userEnabled = Boolean(enabled)
   if (!userEnabled) dropQueue()
-  syncSimpleAnalytics()
 }
 
 export function setAnalyticsEstablishment(establishmentId) {
@@ -102,14 +65,10 @@ export function isPostHogAvailable() {
   return serverEnabled
 }
 
-export function isSimpleAnalyticsAvailable() {
-  return SIMPLE_ANALYTICS_ENABLED
-}
-
-// True when any anonymous measurement is active (drives the About copy, the
+// True when the anonymous measurement is active (drives the About copy, the
 // Mon compte switch and the privacy modal).
 export function useAnalyticsAvailable() {
-  return useSyncExternalStore(subscribe, () => serverEnabled || SIMPLE_ANALYTICS_ENABLED, () => false)
+  return useSyncExternalStore(subscribe, () => serverEnabled, () => false)
 }
 
 function getDevice() {
@@ -327,6 +286,43 @@ export function trackPlanningNavigation(action, via) {
 
 export function flushPlanningNavigation() {
   planningNavigation.flush()
+}
+
+// The Messagerie, once per arrival (MailPage's mount; refs survive
+// StrictMode's second effect run): page_viewed with how the student got
+// there (`source`, see src/mailAnalytics.js), then mail_loaded when `outcome`
+// (describeMailLoad) first settles for the folder it opens on. Other folders,
+// pages of older mails and background refreshes are never reported.
+export function useMailPageReport(source, outcome) {
+  const startedAtRef = useRef(null)
+  const reportedRef = useRef({ view: false, load: false })
+  const status = outcome?.status ?? null
+  const errorKind = outcome?.errorKind ?? null
+
+  useEffect(() => {
+    if (startedAtRef.current === null) startedAtRef.current = performance.now()
+    const reported = reportedRef.current
+    if (!reported.view) {
+      reported.view = true
+      track('page_viewed', { page: 'mail', source })
+    }
+    if (!status || reported.load) return
+
+    reported.load = true
+    track('mail_loaded', {
+      status,
+      duration_bucket: getDurationBucket(performance.now() - startedAtRef.current),
+      ...(status === 'error' ? { error_kind: errorKind ?? 'other' } : null),
+    })
+  }, [source, status, errorKind])
+}
+
+// One thing done in the Messagerie (mail_action): `action` and its own
+// properties (`from`, `via`, `kind`, `result`… see server/analyticsSchema.js).
+// Properties left null or undefined are not sent.
+export function trackMailAction(action, properties = {}) {
+  const kept = Object.fromEntries(Object.entries(properties).filter(([, value]) => value !== null && value !== undefined))
+  track('mail_action', { action, ...kept })
 }
 
 // Application ids (portal fname or local service id) as a short slug.

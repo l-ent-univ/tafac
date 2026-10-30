@@ -67,8 +67,11 @@ test('the list of universities, public fields only', () => withUniversitiesApp({
     ['univ-rennes', 'rennes', true],
     ['univ-exemple', 'exemple', true],
   ])
-  assert.deepEqual(Object.keys(payload.universities[0]).sort(), ['id', 'listed', 'logoUrl', 'name', 'shortName', 'slug'])
+  assert.deepEqual(Object.keys(payload.universities[0]).sort(), ['id', 'listed', 'logoShape', 'logoUrl', 'name', 'shortName', 'slug'])
 
+  // Versioned by the file's date, so a new logo isn't kept from the cache.
+  assert.match(payload.universities[0].logoUrl, /\/logo\?v=[0-9a-z]+$/)
+  assert.equal(payload.universities[0].logoShape, 'wide')
   const logo = await fetch(`${base}${payload.universities[0].logoUrl}`)
   assert.equal(logo.status, 200)
   assert.match(logo.headers.get('content-type'), /svg/)

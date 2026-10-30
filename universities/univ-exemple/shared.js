@@ -3,6 +3,8 @@
 // Its origins don't exist: only the demo login (demo@tafac.fr / tafac-demo)
 // works; real CAS logins fail cleanly.
 
+import { TAFAC_CONTACT_EMAIL, TAFAC_TEAM } from '../tafac.js'
+
 export const id = 'univ-exemple'
 
 export const university = {
@@ -30,6 +32,10 @@ export const branding = {
     intro: "est un client alternatif aux services numériques de l'Université Exemple. Cette instance est une démonstration : connectez-vous avec le compte démo.",
     disclaimer: "Université fictive servant à tester l'ajout d'universités. Aucun service réel n'est relayé.",
     repoUrl: 'https://github.com/l-ent-univ/tafac',
+    // « Équipe » in À propos: the same Tafac team for every university.
+    team: TAFAC_TEAM,
+    // À propos › Aide: the button to write to the team.
+    contactEmail: TAFAC_CONTACT_EMAIL,
   },
   // Part of Papillon, as every Tafac instance (see univ-rennes/shared.js).
   papillon: { url: 'https://papillon.bzh' },

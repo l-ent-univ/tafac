@@ -524,6 +524,17 @@ export default function DebugMenu({
               >
                 Planning
               </DebugButton>
+              <DebugButton
+                tone={callTone('Nouveautés : rejouer « Messagerie »')}
+                onClick={() => void runDebugAction('Nouveautés : rejouer « Messagerie »', () => (
+                  replayChangelogEntry('messagerie')
+                    ? { replayed: true }
+                    : { replayed: false, note: 'L’entrée ne s’applique pas ici : pas de page Messagerie, ou pas connecté.' }
+                ))}
+                disabled={busy}
+              >
+                Messagerie
+              </DebugButton>
             </DebugRow>
             {/* The university's outage notice (ServiceNotice), hidden on
                 this device. */}

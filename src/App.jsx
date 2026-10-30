@@ -19,7 +19,8 @@ import UpdateNotice from './components/UpdateNotice'
 import WelcomeFromLent from './components/WelcomeFromLent'
 import { settingsTransfer } from './settingsTransferBoot'
 import { appendPreviewToken, findProfilePhotoCandidate } from './profilePhoto'
-import { DEMO_CREDENTIALS, DEMO_SESSION_MODE } from './demoAccount'
+import { DEMO_CREDENTIALS, DEMO_SESSION_MODE, DEMO_SIGNATURE_LOGIN } from './demoAccount'
+import { signatureLogin } from './mailSignatureChoice'
 import { storeBrowserPasswordCredential } from './browserCredentials'
 import { syncRuntimeSeo } from './seo'
 import {
@@ -33,6 +34,8 @@ import {
   getStoredHiddenWidgets,
   getStoredShowAppDescriptions,
   getStoredShowPlanningWeekend,
+  getStoredLogoSource,
+  getStoredShowUniversityLogo,
   getStoredShowWallpaper,
   getStoredTpSelection,
   persistAdeLookaheadDays,
@@ -41,19 +44,26 @@ import {
   persistHiddenWidgets,
   persistShowAppDescriptions,
   persistShowPlanningWeekend,
+  persistLogoSource,
+  persistShowUniversityLogo,
   persistShowWallpaper,
   persistTpSelection,
 } from './profileStorage'
+import { getStoredSidebarCompact, persistSidebarCompact } from './sidebarWidth'
 import WidgetContainer from './components/WidgetContainer'
 import GradesPage from './components/GradesPage'
 import PlanningPage from './components/PlanningPage'
+import MailPage from './components/MailPage'
 import LoadingDots from './components/LoadingDots'
 import { resolveHeroImage } from './heroImage'
 import { getStoredTheme, persistTheme, watchTheme } from './theme'
 import MobileTabBar from './components/MobileTabBar'
 import { getMobileTabItems } from './navItems'
 import { getAvailableWidgets } from './dashboardWidgets'
-import { readHistoryNav, writeHistoryNav } from './appHistory'
+import { bindHistorySession, readHistoryNav, writeHistoryNav } from './appHistory'
+import { clearMailReadCache } from './mailReadCache'
+import { clearMailSignatures } from './mailSignatureStore'
+import { clearMailSends, flushMailSends } from './useMailSend'
 import useGradesFormation from './useGradesFormation'
 import { clearStoredCustomBackground, getStoredCustomBackground, saveCustomBackground } from './customBackground'
 import {
@@ -77,10 +87,14 @@ import {
   getStudentProfilePictureMeta,
   loginToEnt,
   logoutFromEnt,
+  preloadSchoolCertificateStatus,
 } from './entApi'
 
 // How far the hero photo extends below the widget row before fully fading.
 const HERO_FADE_OVERHANG_PX = 80
+
+// The planning is the student's own (TEMPO): no group to choose in Mon compte.
+const HAS_PERSONAL_PLANNING = universityConfig.planning?.personal === true
 
 const DEBUG_MENU_ENABLED = import.meta.env.DEV
 // Dev only: a constant false in production builds, so the menu's chunk is
@@ -99,6 +113,16 @@ function clearLegacySensitiveClientCaches() {
 
   clearGradesCache()
   clearAdeTimetableCache()
+}
+
+// What the mail page keeps at the module's level for the signed-in student:
+// the mails read, their webmail signatures, a send waiting or held. Logging
+// out doesn't reload the page, so it goes on logout and whenever the
+// signed-in user changes.
+function forgetMailAccount() {
+  clearMailReadCache()
+  clearMailSignatures()
+  clearMailSends()
 }
 
 // Signed in to another university than the one the page runs for (the demo
@@ -894,6 +918,8 @@ function App() {
   const [hiddenWidgets, setHiddenWidgets] = useState(() => getStoredHiddenWidgets())
   const [customBackground, setCustomBackground] = useState(() => getStoredCustomBackground())
   const [showWallpaper, setShowWallpaper] = useState(() => getStoredShowWallpaper())
+  const [showUniversityLogo, setShowUniversityLogo] = useState(() => getStoredShowUniversityLogo())
+  const [logoSource, setLogoSource] = useState(() => getStoredLogoSource())
   // Page shown next to the sidebar: 'dashboard' or 'grades'. Each switch is
   // a history entry (see appHistory.js): back and forward move between
   // pages, and a reload stays on the page.
@@ -904,10 +930,17 @@ function App() {
   const [gradesArrivalSource, setGradesArrivalSource] = useState(() => (readHistoryNav().page === 'grades' ? 'history' : 'other'))
   // Likewise for the planning page (src/planningAnalytics.js).
   const [planningArrivalSource, setPlanningArrivalSource] = useState(() => (readHistoryNav().page === 'planning' ? 'history' : 'other'))
+  // And the mail page (src/mailAnalytics.js).
+  const [mailArrivalSource, setMailArrivalSource] = useState(() => (readHistoryNav().page === 'mail' ? 'history' : 'other'))
   // Page-switch animations only once the user has switched, not on first load.
   const [hasSwitchedPage, setHasSwitchedPage] = useState(false)
   const [theme, setTheme] = useState(() => getStoredTheme())
   const [showAppDescriptions, setShowAppDescriptions] = useState(() => getStoredShowAppDescriptions())
+  // Compact sidebar (icons alone): kept for the device, like its width.
+  // Toggled from the sidebar's handle and the settings.
+  const [sidebarCompact, setSidebarCompact] = useState(getStoredSidebarCompact)
+  const [mailReaderOpen, setMailReaderOpen] = useState(false)
+  const [sidebarAutoCompactDismissed, setSidebarAutoCompactDismissed] = useState(false)
   const [showPlanningWeekend, setShowPlanningWeekend] = useState(() => getStoredShowPlanningWeekend())
   const [anonymousAnalytics, setAnonymousAnalytics] = useState(() => getStoredAnonymousAnalytics())
   const isAnalyticsAvailable = useAnalyticsAvailable()
@@ -1199,6 +1232,8 @@ function App() {
     setHiddenWidgets(getStoredHiddenWidgets(sessionState.user))
     setCustomBackground(getStoredCustomBackground(sessionState.user))
     setShowWallpaper(getStoredShowWallpaper(sessionState.user))
+    setShowUniversityLogo(getStoredShowUniversityLogo(sessionState.user))
+    setLogoSource(getStoredLogoSource(sessionState.user))
     setShowAppDescriptions(getStoredShowAppDescriptions(sessionState.user))
     setShowPlanningWeekend(getStoredShowPlanningWeekend(sessionState.user))
     // Applied to the analytics module right away (not in an effect) so the
@@ -1614,8 +1649,20 @@ function App() {
     }
   }, [sessionState.authenticated, sessionState.account])
 
+  // The school certificate's status, asked in the background a moment after
+  // sign-in (the dashboard's own data first): Réglages shows it at once.
   useEffect(() => {
-    if (!isAccountModalOpen || !sessionState.authenticated) {
+    if (!sessionState.authenticated || sessionState.checking) {
+      return undefined
+    }
+
+    const timeoutId = window.setTimeout(preloadSchoolCertificateStatus, 2000)
+    return () => window.clearTimeout(timeoutId)
+  }, [sessionState.authenticated, sessionState.checking])
+
+  useEffect(() => {
+    // A personal timetable has no group to choose (planning.personal).
+    if (!isAccountModalOpen || !sessionState.authenticated || HAS_PERSONAL_PLANNING) {
       return undefined
     }
 
@@ -1673,7 +1720,7 @@ function App() {
   const handleCloseAccountModal = useCallback(() => {
     setIsAccountModalOpen(false)
 
-    if (!sessionState.user) {
+    if (!sessionState.user || HAS_PERSONAL_PLANNING) {
       return
     }
 
@@ -1737,6 +1784,12 @@ function App() {
     () => getMobileTabItems(establishment, { gradesSupported }).some((item) => item.page === 'planning'),
     [establishment, gradesSupported],
   )
+  // The in-app mail page (features.mail, mail.page in client.js): the
+  // dashboard's mail card opens it, Réglages › Messagerie comes with it.
+  const hasMailPage = useMemo(
+    () => getMobileTabItems(establishment, { gradesSupported }).some((item) => item.page === 'mail'),
+    [establishment, gradesSupported],
+  )
   const hasMobileTabBar =useMemo(() => getMobileTabItems(establishment, { gradesSupported }).length > 0, [establishment, gradesSupported])
   // « Nouveautés » about « Mes notes » only reach students who have it: a
   // school with the page and a relevé confirmed BUT (not while unknown, so
@@ -1744,12 +1797,15 @@ function App() {
   // signed in at a school with it.
   const hasConfirmedGradesPage = hasGradesPage && gradesFormation === 'BUT'
   const hasConfirmedPlanningPage = hasPlanningPage && sessionState.authenticated
+  // And those about the Messagerie, students signed in at a school with its page.
+  const hasConfirmedMailPage = hasMailPage && sessionState.authenticated
   useEffect(() => {
     setChangelogAudience([
       ...(hasConfirmedGradesPage ? ['grades-page'] : []),
       ...(hasConfirmedPlanningPage ? ['planning-page'] : []),
+      ...(hasConfirmedMailPage ? ['mail-page'] : []),
     ])
-  }, [hasConfirmedGradesPage, hasConfirmedPlanningPage])
+  }, [hasConfirmedGradesPage, hasConfirmedPlanningPage, hasConfirmedMailPage])
   // Falls back to the dashboard if the grades item goes away (establishment
   // without grade widgets, feature switched off, a relevé that isn't BUT).
   const isGradesPage = useMemo(
@@ -1761,8 +1817,15 @@ function App() {
     () => activePage === 'planning' && getMobileTabItems(establishment, { gradesSupported }).some((item) => item.page === 'planning'),
     [activePage, establishment, gradesSupported],
   )
+  // Likewise for the mail page (features.mail).
+  const isMailPage = useMemo(
+    () => activePage === 'mail' && getMobileTabItems(establishment, { gradesSupported }).some((item) => item.page === 'mail'),
+    [activePage, establishment, gradesSupported],
+  )
+  // Folded for a mail open beside the list (handleMailReaderOpenChange).
+  const isSidebarAutoCompact = isMailPage && mailReaderOpen && !sidebarCompact && !sidebarAutoCompactDismissed
   // The page the sidebar and the tab bar show as selected.
-  const shownPage = isGradesPage ? 'grades' : isPlanningPage ? 'planning' : 'dashboard'
+  const shownPage = isGradesPage ? 'grades' : isPlanningPage ? 'planning' : isMailPage ? 'mail' : 'dashboard'
   // Being on « Mes notes » is having seen its launch, however the student
   // got there (tab, card, "Dernière note", app list, a reload on the page):
   // the dashboard card and the tab's « Nouveau » go. After the audience
@@ -1774,6 +1837,10 @@ function App() {
   useEffect(() => {
     if (isPlanningPage && hasConfirmedPlanningPage) markChangelogEntrySeen('planning')
   }, [isPlanningPage, hasConfirmedPlanningPage])
+  // And the Messagerie's.
+  useEffect(() => {
+    if (isMailPage && hasConfirmedMailPage) markChangelogEntrySeen('messagerie')
+  }, [isMailPage, hasConfirmedMailPage])
   // The other pages sit on the plain background, like with the wallpaper off.
   const isWallpaperShown = showWallpaper && shownPage === 'dashboard'
 
@@ -1802,6 +1869,15 @@ function App() {
     persistShowWallpaper(show, sessionState.user)
     setShowWallpaper(show)
     track('setting_changed', { setting: 'wallpaper', value: show ? 'on' : 'off' })
+  }, [sessionState.user])
+  const handleShowUniversityLogoChange = useCallback((show) => {
+    persistShowUniversityLogo(show, sessionState.user)
+    setShowUniversityLogo(show)
+    track('setting_changed', { setting: 'university_logo', value: show ? 'on' : 'off' })
+  }, [sessionState.user])
+  const handleLogoSourceChange = useCallback((source) => {
+    persistLogoSource(source, sessionState.user)
+    setLogoSource(source)
   }, [sessionState.user])
   const [heroHeight, setHeroHeight] = useState(null)
   const heroObserverRef = useRef(null)
@@ -1839,6 +1915,7 @@ function App() {
   const showPage = useCallback((page, source = 'other') => {
     if (page === 'grades') setGradesArrivalSource(source)
     if (page === 'planning') setPlanningArrivalSource(source)
+    if (page === 'mail') setMailArrivalSource(source)
     setActivePage(page)
     setHasSwitchedPage(true)
     window.requestAnimationFrame(() => {
@@ -1878,6 +1955,31 @@ function App() {
     handleNavigatePage('planning', 'dashboard_card')
   }, [handleNavigatePage])
   const clearPendingPlanningDay = useCallback(() => setPendingPlanningDay(null), [])
+  // The webmail's app in the app lists ('tile'): the mail page rather than
+  // the webmail.
+  const handleOpenMailPage = useCallback((source = 'tile') => handleNavigatePage('mail', source), [handleNavigatePage])
+  // The dashboard's "Mails récents": the mail page, on a mail (its history
+  // entry names it, which the page reads as it opens).
+  const handleOpenMail = useCallback((id) => {
+    if (id) {
+      writeHistoryNav({ page: 'mail', mail: id })
+      showPage('mail', 'dashboard_card')
+      return
+    }
+    handleNavigatePage('mail', 'dashboard_card')
+  }, [showPage, handleNavigatePage])
+  // « Écrire au sujet de cette note » (« Mes notes ») or « … de ce cours »
+  // (the Planning): the mail page, its composer open on that mail
+  // (`request`: the composer's `restore`, see MailComposer; its `kind`
+  // 'course' from the Planning), taken once by the page as it mounts.
+  const [pendingMailCompose, setPendingMailCompose] = useState(null)
+  const handleComposeMail = useCallback((request) => {
+    setPendingMailCompose(request)
+    handleNavigatePage('mail', request?.kind === 'course' ? 'planning' : 'grades')
+  }, [handleNavigatePage])
+  const clearPendingMailCompose = useCallback(() => setPendingMailCompose(null), [])
+  // The composer's « Un cours… »: the Planning's weeks, where it's in the app.
+  const mailPlanning = useMemo(() => (hasPlanningPage ? { selection: selectedTp, user: sessionState.user } : null), [hasPlanningPage, selectedTp, sessionState.user])
 
   // The current entry says which page it is (the first one included); the
   // app sets scroll positions itself. Back and forward show the entry's page
@@ -1922,6 +2024,21 @@ function App() {
     persistShowPlanningWeekend(show, sessionState.user)
     setShowPlanningWeekend(show)
   }, [sessionState.user])
+
+  // `persist` false: live under the pointer, stored on release.
+  const handleSidebarCompactChange = useCallback((compact, { persist = true } = {}) => {
+    setSidebarCompact(compact)
+    if (persist) persistSidebarCompact(compact)
+    // Unfolded by hand while a mail is open: it stays so until it closes.
+    if (!compact) setSidebarAutoCompactDismissed(true)
+  }, [])
+
+  // A mail open in the side panel folds the sidebar for the list's room
+  // (unless already folded by hand); it unfolds over the page on hover.
+  const handleMailReaderOpenChange = useCallback((open) => {
+    setMailReaderOpen(open)
+    setSidebarAutoCompactDismissed(false)
+  }, [])
 
   const handleShowAppDescriptionsChange = useCallback((show) => {
     persistShowAppDescriptions(show, sessionState.user)
@@ -2269,9 +2386,26 @@ function App() {
     }))
     startDebugState('Deconnexion')
 
+    // A mail sent within its « Annuler » time goes now, while the session
+    // still can send it (src/mailSendQueue.js). One that fails stops the
+    // logout: the mail page shows the composer again with why, rather than
+    // the mail being dropped with the session.
+    const unsent = await flushMailSends()
+    if (unsent) {
+      setSessionState((current) => ({ ...current, checking: false }))
+      commitDebugState('Deconnexion', null, 'Un mail n’a pas pu partir')
+      handleNavigatePage('mail')
+      return
+    }
+
     try {
       const result = await logoutFromEnt()
       clearLegacySensitiveClientCaches()
+      // No reload follows: the mails read, the signatures, any send and the
+      // history's mail entries must not carry over to whoever signs in
+      // next in this tab.
+      forgetMailAccount()
+      bindHistorySession(null)
       setActivePage('dashboard')
       writeHistoryNav({ page: 'dashboard' }, { replace: true })
       setSessionState({
@@ -2297,6 +2431,17 @@ function App() {
       }))
       commitDebugState('Deconnexion', null, message)
     }
+  }
+
+  // The mail page's « Se reconnecter » (its session expired: the app's own,
+  // or only the server's CAS sign-in behind the webmail, which a new
+  // sign-in alone renews). Signed out as by the header's button, then
+  // straight to the login form rather than the landing page an expiry
+  // otherwise leads to (wasAuthenticatedRef's effect above).
+  async function handleSignInAgain() {
+    wasAuthenticatedRef.current = false
+    await handleLogout()
+    navigate(LOGIN_PATH, { replace: true })
   }
 
   function handleHeaderAction() {
@@ -2334,6 +2479,13 @@ function App() {
     setDebugOpen(false)
   }, [sessionState.authenticated, sessionState.user])
 
+  // The signed-in student owns the mail page's history entries, read cache,
+  // signatures and sends (see appHistory.js, mailReadCache.js,
+  // mailSignatureStore.js, mailSendQueue.js). Done while rendering, not in
+  // an effect: the mail page reads its entry and the cache in its own first
+  // render, which comes before any effect of this one. Idempotent.
+  if (sessionState.authenticated && sessionState.user && bindHistorySession(sessionState.user)) forgetMailAccount()
+
   const shouldHoldInitialRender = !hasCheckedInitialSession && sessionState.checking
   const isProfileSwitching = sessionState.authenticated && profileUser !== sessionState.user
   const shouldShowTpSetup = sessionState.authenticated && !selectedTp
@@ -2347,6 +2499,35 @@ function App() {
     sessionState.givenName,
   )
   const simpleLoadingDots = <LoadingDots className="text-text-muted" />
+  // The composer's « De : » (MailPage): the account's name and address,
+  // and its automatic signature's lines: the name, the group picked for the
+  // planning (its year and TP, or TD, when there's one), the establishment
+  // (the student's composante, when it has its own entry) and the
+  // university, and their logos (each with its dark version).
+  const mailSenderName = [accountDisplayInfo.firstName, accountDisplayInfo.lastName].filter(Boolean).join(' ')
+  const ownEstablishment = universityConfig.establishments?.byId?.[establishment] ?? null
+  const mailSender = {
+    name: mailSenderName,
+    email: accountDisplayInfo.email,
+    signature: {
+      name: mailSenderName,
+      // The CAS login, where the university shows it (mail.signature.showLogin):
+      // the server writes its own copy from the session, never this one.
+      login: universityConfig.mail?.signature?.showLogin === true
+        ? signatureLogin(sessionState.user === DEMO_CREDENTIALS.username ? DEMO_SIGNATURE_LOGIN : sessionState.user)
+        : null,
+      group: HAS_PERSONAL_PLANNING ? null : [selectedTp?.yearLabel, selectedTp?.tpLabel ?? selectedTp?.tdLabel].filter(Boolean).join(' · ') || selectedTp?.label || null,
+      establishment: ownEstablishment?.label ?? null,
+      // Its id, all the server takes of it (the sent mail's signature is
+      // built there, server/mailSend.js).
+      establishmentId: ownEstablishment ? establishment : null,
+      university: universityConfig.university?.name ?? null,
+      logos: [
+        ownEstablishment?.logo ? { src: ownEstablishment.logo, srcDark: ownEstablishment.logoDark ?? null, alt: ownEstablishment.logoAlt ?? ownEstablishment.label ?? '' } : null,
+        universityConfig.branding?.logo ? { src: universityConfig.branding.logo, srcDark: universityConfig.branding.logoDark ?? null, alt: universityConfig.university?.name ?? '' } : null,
+      ].filter(Boolean),
+    },
+  }
 
   return (
     <main className="relative min-h-screen flex flex-col bg-bg overflow-x-clip">
@@ -2389,7 +2570,7 @@ function App() {
               sessionState.account?.given_name,
               sessionState.account?.family_name,
             ].filter(Boolean).join(' ') || sessionState.account?.name || sessionState.givenName || sessionState.user}
-            userSubtitle={selectedTp?.label ?? selectedTp?.tpLabel ?? selectedTp?.tdLabel ?? selectedTp?.yearLabel ?? null}
+            userSubtitle={HAS_PERSONAL_PLANNING ? null : selectedTp?.label ?? selectedTp?.tpLabel ?? selectedTp?.tdLabel ?? selectedTp?.yearLabel ?? null}
             profilePhotoSrc={accountModalPhoto}
             onLogout={handleHeaderAction}
             onAccountClick={handleOpenAccountModal}
@@ -2398,12 +2579,17 @@ function App() {
             onUpdateClick={handleApplyUpdate}
             showChangelogPill={showChangelogPill}
             establishment={establishment}
+            showUniversityLogo={showUniversityLogo}
+            logoSource={logoSource}
             gradesSupported={gradesSupported}
             activePage={shownPage}
             onNavigatePage={handleNavigatePage}
             onOpenLatestGrade={universityConfig.features?.sidebarLatestGrade === true && sessionState.authenticated && hasGradesPage ? handleOpenSidebarGrade : null}
+            compact={sidebarCompact || isSidebarAutoCompact}
+            canPeek={isSidebarAutoCompact}
+            onCompactChange={handleSidebarCompactChange}
           />
-          <div ref={dashboardColumnRef} className={`app-column relative isolate flex flex-col flex-1 min-w-0 4xl:h-screen 4xl:overflow-y-auto 4xl:pl-[calc(var(--sidebar-width,280px)+12px)] ${hasMobileTabBar ? 'max-4xl:pb-[calc(env(safe-area-inset-bottom)+84px)]' : ''}`}>
+          <div ref={dashboardColumnRef} className={`app-column relative isolate flex flex-col flex-1 min-w-0 4xl:h-screen 4xl:overflow-y-auto 4xl:pl-[calc(var(--sidebar-width,280px)+12px)] ${hasMobileTabBar ? (isMailPage && mailReaderOpen ? 'max-4xl:pb-[calc(env(safe-area-inset-bottom)+148px)]' : 'max-4xl:pb-[calc(env(safe-area-inset-bottom)+84px)]') : ''}`}>
             {/* Hero image behind the header and widget cards, fading into the solid background. */}
             {isWallpaperShown ? (
               <div
@@ -2422,6 +2608,9 @@ function App() {
               <AppHeader
                 authenticated={sessionState.authenticated}
                 checking={sessionState.checking}
+                establishment={establishment}
+                showUniversityLogo={showUniversityLogo}
+                logoSource={logoSource}
                 onPrimaryAction={handleHeaderAction}
                 onAccountAction={handleOpenAccountModal}
               />
@@ -2433,8 +2622,11 @@ function App() {
             ) : null}
             {showChangelogPill ? (
               // Right under the header buttons, eating into the space above
-              // the cards rather than pushing them down a full row.
-              <ChangelogPill className="4xl:hidden flex justify-end px-6 pt-2 -mb-2 max-md:px-3 max-md:pt-1.5" />
+              // the cards rather than pushing them down a full row: over
+              // them (relative z-10), not cut by the page's block coming up
+              // under it. On a phone, with the top bar: on the dashboard
+              // only (the other pages start with their own header).
+              <ChangelogPill className={`${shownPage !== 'dashboard' ? 'max-md:hidden ' : ''}relative z-10 4xl:hidden flex justify-end px-6 pt-2 -mb-2 max-md:px-3 max-md:pt-1.5`} />
             ) : null}
             {sessionState.warning ? (
               <div className="px-6 pt-3 max-md:px-3 4xl:pt-5">
@@ -2464,17 +2656,24 @@ function App() {
                 onOpenGradesPage={hasGradesPage ? handleOpenGradesPage : null}
                 onOpenPlanningPage={hasPlanningPage ? handleOpenPlanningPage : null}
                 onOpenPlanningDay={hasPlanningPage ? handleOpenPlanningDay : null}
+                onOpenMail={hasMailPage ? handleOpenMail : null}
+                onOpenMailPage={hasMailPage ? handleOpenMailPage : null}
                 showAppDescriptions={showAppDescriptions}
               />
             </div>
             {isGradesPage ? (
               <div className="page-enter flex-1 min-h-0 4xl:flex-none 4xl:min-h-0">
-                <GradesPage user={sessionState.user} arrivalSource={gradesArrivalSource} initialGradeRequest={pendingGradeRequest} onInitialGradeRequestHandled={clearPendingGradeRequest} />
+                <GradesPage user={sessionState.user} arrivalSource={gradesArrivalSource} initialGradeRequest={pendingGradeRequest} onInitialGradeRequestHandled={clearPendingGradeRequest} onComposeMail={hasMailPage ? handleComposeMail : null} />
               </div>
             ) : null}
             {isPlanningPage ? (
               <div className="page-enter flex-1 min-h-0 4xl:flex-none 4xl:min-h-0">
-                <PlanningPage selection={selectedTp} user={sessionState.user} showWeekend={showPlanningWeekend} onOpenAccount={handleOpenAccountModal} initialDay={pendingPlanningDay} onInitialDayHandled={clearPendingPlanningDay} arrivalSource={planningArrivalSource} />
+                <PlanningPage selection={selectedTp} user={sessionState.user} showWeekend={showPlanningWeekend} onOpenAccount={handleOpenAccountModal} initialDay={pendingPlanningDay} onInitialDayHandled={clearPendingPlanningDay} arrivalSource={planningArrivalSource} onComposeMail={hasMailPage ? handleComposeMail : null} />
+              </div>
+            ) : null}
+            {isMailPage ? (
+              <div className="page-enter flex-1 min-h-0 4xl:flex-none 4xl:min-h-0">
+                <MailPage onReaderOpenChange={handleMailReaderOpenChange} onSignInAgain={() => void handleSignInAgain()} sender={mailSender} composeRequest={pendingMailCompose} onComposeRequestHandled={clearPendingMailCompose} arrivalSource={mailArrivalSource} canAttachGrades={hasGradesPage} planning={mailPlanning} />
               </div>
             ) : null}
             <div className="4xl:mt-auto">
@@ -2524,6 +2723,11 @@ function App() {
         backgroundPreviewSrc={heroImage.src}
         showWallpaper={showWallpaper}
         onShowWallpaperChange={handleShowWallpaperChange}
+        showUniversityLogo={showUniversityLogo}
+        onShowUniversityLogoChange={handleShowUniversityLogoChange}
+        establishmentLogoLabel={universityConfig.establishments?.byId?.[establishment]?.logo ? universityConfig.establishments.byId[establishment].label : null}
+        logoSource={logoSource}
+        onLogoSourceChange={handleLogoSourceChange}
         theme={theme}
         onThemeChange={handleThemeChange}
         hasCustomBackground={Boolean(customBackground)}
@@ -2531,11 +2735,14 @@ function App() {
         onCustomBackgroundReset={handleCustomBackgroundReset}
         showAppDescriptions={showAppDescriptions}
         onShowAppDescriptionsChange={handleShowAppDescriptionsChange}
+        sidebarCompact={sidebarCompact}
+        onSidebarCompactChange={handleSidebarCompactChange}
         showPlanningWeekend={showPlanningWeekend}
         onShowPlanningWeekendChange={handleShowPlanningWeekendChange}
         planningSelection={selectedTp}
         anonymousAnalytics={anonymousAnalytics}
         onAnonymousAnalyticsChange={isAnalyticsAvailable ? handleAnonymousAnalyticsChange : null}
+        mailSignature={hasMailPage && sessionState.authenticated ? { auto: mailSenderName ? mailSender.signature : null } : null}
       />
       <WelcomeFromLent
         visible={welcomeFromLentOpen}

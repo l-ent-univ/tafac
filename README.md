@@ -13,7 +13,7 @@
   <a href="docs/ADDING_A_UNIVERSITY.md">Ajouter une université</a>
 </p>
 
-Tafac est un client web alternatif aux espaces numériques de travail universitaires (ENT). Il rassemble les applications de l’ENT, l’emploi du temps, les notes, les mails récents et les échéances Moodle dans une interface adaptée au téléphone comme à l’ordinateur.
+Tafac est un client web alternatif aux espaces numériques de travail universitaires (ENT). Il rassemble les applications de l’ENT, l’emploi du temps, les notes, la messagerie et les échéances Moodle dans une interface adaptée au téléphone comme à l’ordinateur.
 
 Tafac est un **projet étudiant libre, indépendant et non officiel**, sans affiliations aux universités. Ce projet fait partie de [Papillon](https://papillon.bzh). L’intégration réelle présente dans ce dépôt est celle de l’Université de Rennes, avec des fonctionnalités spécifiques à l’IUT de Lannion.
 
@@ -25,6 +25,7 @@ Tafac est un **projet étudiant libre, indépendant et non officiel**, sans affi
 | **Applications** | Catalogue issu de l’ENT avec les applications disponibles            |
 | **Planning** | Choix de la formation et des groupes TD/TP, différentes vues disponibles avec les détails des cours et des prochaines séances. |
 | **Export calendrier** | Téléchargement d’un fichier `.ics` couvrant 60 jours à partir du lundi de la semaine courante, importable dans un agenda. Il s’agit pour le momet d’un export ponctuel et non d’un abonnement synchronisé. |
+| **Messagerie** | Boîte mail de l’université (RENATER Partage / Zimbra) dans l’application : conversations, recherche, dossiers, actions et balayage sur téléphone ; rédaction avec mise en forme, pièces jointes, brouillons, signatures et envoi annulable ; impression et PDF d’une conversation ; mail prérempli au sujet d’une note ou d’un cours. |
 | **Mes notes** | Cette partie est spécifique aux B.U.T et supporte les relevés ScoDoc par semestre, UE, matières et SAÉ, détail des évaluations, statistiques disponibles, crédits ECTS et téléchargement du relevé PDF lorsque le département le propose. |
 | **Simulateur** | Modification de notes et ajout d’évaluations fictives pour estimer leur effet sur les moyennes et la validation des UE (Pour B.U.T uniquement). La simulation reste dans l’interface et ne modifie pas ScoDoc. |
 | **Compte** | Réglage du groupe TD/TP, quels widgets à afficher, changement du thème clair/sombre/automatique, fond personnalisé, couleurs et certificat de scolarité lorsque l’intégration est disponible. |
@@ -86,7 +87,7 @@ Pour sélectionner explicitement plusieurs configurations :
 MULTI_UNIVERSITY=1 UNIVERSITIES=univ-rennes,univ-exemple npm run dev
 ```
 
-Les liens `/rennes` et `/exemple` ouvrent la page d’accueil de l’université correspondante, si celle-ci est servie, d’où son bouton mène à sa connexion. Ces pages sont pré-rendues pour les moteurs de recherche et listées dans le sitemap (sauf les universités `devOnly`).
+Les liens `/rennes`, `/rennes2` et `/exemple` ouvrent la page d’accueil de l’université correspondante, si celle-ci est servie, d’où son bouton mène à sa connexion. Ces pages sont pré-rendues pour les moteurs de recherche et listées dans le sitemap (sauf les universités `devOnly`).
 
 **Un seul build frontend contient les configurations clientes de toutes les universités.** Le navigateur télécharge celle qui lui est attribuée au démarrage. Il n’est pas nécessaire de construire un `dist/` par université ; `build:all` est actuellement un alias de `build`.
 
@@ -171,16 +172,19 @@ Après connexion, Tafac conserve les cookies nécessaires aux services universit
 
 Il n’y a pas de base de données applicative à installer. Les sessions actives et les caches des services sont en mémoire serveur ; les choix d’icônes des applications sont persistés dans `DATA_DIR`. Le navigateur conserve des préférences et certains caches locaux. Les réglages liés à l’université sont séparés lors d’un changement d’établissement.
 
+La messagerie passe par le serveur Tafac, qui relaie chaque requête au webmail de l’université (Zimbra) avec la session de l’étudiant : rien n’est écrit sur disque, les pièces jointes sont transmises en flux. La connexion au webmail et la dernière liste de mails restent en mémoire pour la session et sont effacées à la déconnexion. Les brouillons et la signature personnalisée sont enregistrés dans le compte de messagerie, pas par Tafac.
+
 Sans secret en développement, une clé temporaire est créée : redémarrer le serveur invalide les sessions. En production, conserver un secret stable. Pour le renouveler sans déconnecter immédiatement les sessions existantes, placer l’ancien dans `SESSION_SECRET_PREVIOUS`.
 
 ### Statistiques et services externes
 
-Deux dispositifs distincts sont présents :
+La mesure d’audience passe par **PostHog**, facultatif et appelé par le serveur : événements filtrés par une liste de propriétés autorisées, sans SDK PostHog ni autre script tiers dans le navigateur. Sans clé PostHog, aucune mesure n’a lieu.
 
-- **PostHog**, facultatif et appelé par le serveur : événements filtrés par une liste de propriétés autorisées, sans SDK PostHog dans le navigateur.
-- **Simple Analytics**, chargé côté navigateur dans les builds de production pour compter les pages vues lorsque le réglage de statistiques est activé. L’absence de clé PostHog ne désactive donc pas toute mesure d’audience.
+Le réglage **Statistiques anonymes**, activé par défaut, permet de la désactiver. Le fonctionnement détaillé et les propriétés autorisées sont décrits dans [`docs/ANALYTICS.md`](docs/ANALYTICS.md) (écrit à l'aide d'IAg).
 
-Le réglage **Statistiques anonymes**, activé par défaut, permet de désactiver les deux. Le fonctionnement détaillé et les propriétés autorisées sont décrits dans [`docs/ANALYTICS.md`](docs/ANALYTICS.md) (écrit à l'aide d'IAg).
+### Vérifier ce que sert tafac.fr
+
+Chaque release signe la provenance de l’image Docker et de chaque fichier du frontend (Sigstore). `node scripts/verify-deployment.mjs` compare ce que sert le site à ce que GitHub Actions a compilé. Le fonctionnement et ses limites sont décrits dans [`docs/VERIFYING.md`](docs/VERIFYING.md).
 
 D’autres fonctionnalités font appel à des services externes : GitHub pour les contributeurs et Iconify pour les icônes. Une instance auto-hébergée conserve ces dépendances tant que leur code ou leur configuration n’est pas adapté.
 

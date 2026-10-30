@@ -7,7 +7,7 @@ import { ScoreText } from './SubjectsList'
 import UeBadge from './UeBadge'
 
 const DAY_FORMAT = new Intl.DateTimeFormat('fr-FR', { day: 'numeric', month: 'short' })
-const CARD_CLASSES = 'widget-card widget-card-visible shadow-md border border-white card-corners bg-widget-bg text-text p-2 min-w-0'
+const CARD_CLASSES = 'widget-card widget-card-visible shadow-md border border-white modal-inner-corners bg-widget-bg text-text p-2 min-w-0'
 
 function formatDay(date) {
   const time = Date.parse(date)
@@ -182,7 +182,7 @@ function SubjectRow({ subject, icon, overrides, onOverride, customs, onAddCustom
   ].filter(Boolean).join(' · ')
 
   return (
-    <li className={`subject-row corners-[16px] ${isOpen ? 'subject-row--open' : ''}`}>
+    <li className={`subject-row modal-nested-corners ${isOpen ? 'subject-row--open' : ''}`}>
       <button
         id={`${id}-button`}
         type="button"
@@ -190,7 +190,7 @@ function SubjectRow({ subject, icon, overrides, onOverride, customs, onAddCustom
         aria-controls={`${id}-panel`}
         aria-label={`${subject.title}, ${progress}, moyenne dans l’UE ${spokenAverage(subject.average)}`}
         onClick={onToggle}
-        className="subject-row-toggle flex w-full min-w-0 cursor-pointer items-center gap-3 corners-[16px] border-0 bg-transparent px-2 py-2 text-left text-text max-md:gap-[10px]"
+        className="subject-row-toggle flex w-full min-w-0 cursor-pointer items-center gap-3 modal-nested-corners border-0 bg-transparent px-2 py-2 text-left text-text max-md:gap-[10px]"
       >
         <span className="inline-flex size-10 shrink-0 items-center justify-center corners-[12px] bg-brand-subtle max-md:size-9 max-md:corners-[11px]" aria-hidden="true">
           {icon ? <Icon icon={icon} className="size-5 text-text max-md:size-[18px]" /> : null}

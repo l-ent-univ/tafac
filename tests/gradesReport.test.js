@@ -85,7 +85,7 @@ test('evaluation types carry their label, a normal one none', () => {
 test('listGradesSemesters puts the newest semester first', () => {
   const semesters = listGradesSemesters(buildDemoGradesPayload().semestres)
   assert.deepEqual(semesters.map((semester) => semester.id), ['9105', '9104', '9103', '9102', '9101'])
-  assert.deepEqual(semesters[0], { id: '9105', number: 5, title: 'BUT MMI', year: '2026/2027' })
+  assert.deepEqual(semesters[0], { id: '9105', number: 5, title: 'BUT Info-Com', year: '2026/2027' })
 })
 
 test('buildGradesReport reads the semester, UEs and modules of a BUT relevé', () => {
@@ -95,9 +95,9 @@ test('buildGradesReport reads the semester, UEs and modules of a BUT relevé', (
   const report = buildGradesReport(releve, { config: payload.config })
 
   assert.equal(report.status, 'ok')
-  assert.equal(report.department, 'MMI')
+  assert.equal(report.department, 'INFOCOM')
   assert.equal(report.semester.number, 5)
-  assert.deepEqual(report.semester.groups, ['TD B', 'TP 3', 'DWeb-DI'])
+  assert.deepEqual(report.semester.groups, ['TD B', 'TP 3', 'Com-Orga'])
   assert.equal(report.average.value, 14.5)
   assert.equal(report.average.moy, 12.44)
   assert.deepEqual(report.rank, { value: '9', total: 84 })
@@ -109,20 +109,20 @@ test('buildGradesReport reads the semester, UEs and modules of a BUT relevé', (
   assert.equal(ue.color, '#80cb3f')
   assert.deepEqual(ue.modules.map((module) => [module.code, module.coef]), [['R5.11', 4], ['R5.03', 2], ['R5.12', 3], ['SAÉ 5.01', 4]])
 
-  const ux = report.resources.find((module) => module.code === 'R5.07')
+  const strategy = report.resources.find((module) => module.code === 'R5.07')
   // (14 × 1 + 17 × 2) / 3
-  assert.equal(ux.average, 16)
-  assert.equal(ux.averageIsIndicative, true)
-  assert.deepEqual(ux.ueCoefs.map((entry) => [entry.ue, entry.coef]), [['UE5.1', 3], ['UE5.2', 2]])
-  assert.deepEqual(ux.evaluations[1].weights, [{ ue: 'UE5.1', weight: 1 }, { ue: 'UE5.2', weight: 1 }])
-  assert.deepEqual(ux.evaluations[1].promo, { min: 8, moy: 13.9, max: 19 })
+  assert.equal(strategy.average, 16)
+  assert.equal(strategy.averageIsIndicative, true)
+  assert.deepEqual(strategy.ueCoefs.map((entry) => [entry.ue, entry.coef]), [['UE5.1', 3], ['UE5.2', 2]])
+  assert.deepEqual(strategy.evaluations[1].weights, [{ ue: 'UE5.1', weight: 1 }, { ue: 'UE5.2', weight: 1 }])
+  assert.deepEqual(strategy.evaluations[1].promo, { min: 8, moy: 13.9, max: 19 })
 
   const english = report.resources.find((module) => module.code === 'R5.02')
   assert.equal(english.evaluations[2].typeLabel, 'Rattrapage')
   assert.equal(english.evaluations[2].coef, null)
 
   assert.equal(report.resources.find((module) => module.code === 'R5.04').pendingCount, 1)
-  assert.deepEqual(report.latest.slice(0, 3).map((evaluation) => evaluation.description), ['TP état et effets', 'Pitch portfolio', 'Audit RGAA'])
+  assert.deepEqual(report.latest.slice(0, 3).map((evaluation) => evaluation.description), ['Revue de presse', 'Pitch portfolio', 'Cas pratique : droit à l’image'])
   assert.ok(report.latest.every((evaluation) => evaluation.grade.kind === 'number'))
 })
 
@@ -132,6 +132,17 @@ test('buildGradesReport honours ScoDoc display options and publication', () => {
   assert.equal(hidden.rank, null)
   assert.equal(hidden.ects, null)
   assert.ok(hidden.ues.every((ue) => ue.rank === null))
+
+  // The promo stats are in the relevé whatever show_minmax says.
+  const noMinmax = buildGradesReport({ ...releve, options: { show_minmax: false, show_moypromo: false } })
+  assert.equal(noMinmax.showPromoStats, true)
+  const withoutStats = structuredClone(releve)
+  for (const section of [withoutStats.ressources, withoutStats.saes]) {
+    for (const module of Object.values(section)) {
+      for (const evaluation of module.evaluations) evaluation.note = { value: evaluation.note.value }
+    }
+  }
+  assert.equal(buildGradesReport(withoutStats).showPromoStats, false)
 
   assert.deepEqual(
     buildGradesReport({ publie: false, message: '<b>Relevé</b> bloqué' }),
@@ -175,7 +186,7 @@ test('buildAbsenceReport lists absences newest first with passerelle totals', ()
     ['2026-09-29', '13h30', 'justified'],
     ['2026-09-25', '8h15', 'unjustified'],
   ])
-  assert.equal(report.entries[0].subject, 'R5.11 – Développement Front')
+  assert.equal(report.entries[0].subject, 'R5.11 – Relations presse')
   assert.equal(report.entries[1].subject, 'R5.02 - Anglais')
   assert.equal(report.entries[0].teacher, 'Thomas Lemoine')
   assert.deepEqual(report.totals, { justified: '4h', unjustified: '2h', late: '1' })
@@ -360,6 +371,9 @@ test('computeGeneralAverage uses ScoDoc’s average, else the UEs weighted by EC
   assert.equal(official.source, 'semestre.notes')
   assert.equal(official.average, 14.5)
   assert.equal(official.promoAverage, 12.44)
+  // show_moypromo only hides it from the passerelle's page.
+  const hiddenPromo = computeGeneralAverage({ ...buildDemoGradesPayload()['relevé'], options: { show_moypromo: false } })
+  assert.equal(hiddenPromo.promoAverage, 12.44)
 
   // A department that blocks the general average and the promo one: ScoDoc
   // sends "~" (and a placeholder promo average), the UE averages stay.
@@ -367,17 +381,24 @@ test('computeGeneralAverage uses ScoDoc’s average, else the UEs weighted by EC
     options: { block_moyenne_generale: true, show_moypromo: false },
     semestre: { notes: { value: '~', min: '12.78', moy: '12.78', max: '12.78' } },
     ues: {
-      'UE 1': { moyenne: { value: '13.50' }, ECTS: { total: 4 } },
-      'UE 2': { moyenne: { value: '12.00' }, ECTS: { total: 4 } },
-      'UE 3': { moyenne: { value: '~' }, ECTS: { total: 8 } },
-      'UE 4': { moyenne: { value: '15.00' }, ECTS: { total: 6 } },
+      'UE 1': { moyenne: { value: '13.50', moy: '11.00' }, ECTS: { total: 4 } },
+      'UE 2': { moyenne: { value: '12.00', moy: '12.50' }, ECTS: { total: 4 } },
+      'UE 3': { moyenne: { value: '~', moy: '10.00' }, ECTS: { total: 8 } },
+      'UE 4': { moyenne: { value: '15.00', moy: '13.00' }, ECTS: { total: 6 } },
     },
   })
   assert.equal(blocked.source, 'ues-ects')
   assert.deepEqual(computeAverageHistory({ ues: {} }), [])
   // (13.5 × 4 + 12 × 4 + 15 × 6) / 14; UE 3 has no average yet.
   assert.equal(blocked.average, 192 / 14)
-  assert.equal(blocked.promoAverage, null)
+  // The promo's, over the same UEs: (11 × 4 + 12.5 × 4 + 13 × 6) / 14.
+  assert.equal(blocked.promoAverage, 172 / 14)
+
+  const noPromoStats = computeGeneralAverage({
+    semestre: { notes: { value: '~' } },
+    ues: { 'UE 1': { moyenne: { value: '13.50' }, ECTS: { total: 4 } } },
+  })
+  assert.equal(noPromoStats.promoAverage, null)
 })
 
 test('findNewGrades only flags grades unseen in a semester already visited', () => {

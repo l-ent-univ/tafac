@@ -3,6 +3,8 @@ import { useWidgetLoadReport } from '../analytics'
 import { GRADES_LAUNCH_HREF, getLatestGrade, getRequestErrorKind, openGradesService } from '../entApi'
 import universityConfig from '@university'
 import { buildUeWash, formatGradeDay } from '../gradesSubjects'
+import { gradeCopyText } from '../contextMenuItems'
+import { copyToClipboard, useContextMenu } from '../useContextMenu'
 import { assignSubjectIcons } from '../subjectIcons'
 import { readSeenEvaluationIds } from '../seenGrades'
 import { useUeColor } from '../useUeColor'
@@ -151,6 +153,25 @@ function LiveWidgetLatestGrade({ visible, user = null, onOpenGrade = null, previ
     ? assignSubjectIcons(grade.subjectTitles, universityConfig.appIconStyle)(grade.resourceTitle)
     : null), [grade])
 
+  const opensInApp = Boolean(onOpenGrade)
+  const canOpen = !preview && (opensInApp || Boolean(GRADES_LAUNCH_HREF))
+  const open = () => (opensInApp ? onOpenGrade(grade) : openGradesService())
+  // Its right-click menu (a long press): what a click does, the grade as
+  // text.
+  const menuProps = useContextMenu(grade && !preview ? () => [
+    canOpen ? { id: 'open', label: 'Voir la note', icon: 'carbon:view', onSelect: open } : null,
+    {
+      id: 'copy',
+      label: 'Copier',
+      icon: 'carbon:copy',
+      onSelect: () => void copyToClipboard(gradeCopyText({
+        title: grade.description || grade.resourceTitle,
+        value: Number.isFinite(parseFloat(grade.note)) ? parseFloat(grade.note) : grade.note,
+        subject: grade.resourceTitle,
+      })),
+    },
+  ] : null)
+
   if (!grade) {
     return null
   }
@@ -162,9 +183,6 @@ function LiveWidgetLatestGrade({ visible, user = null, onOpenGrade = null, previ
   // Read on each render: coming back from "Mes notes", the badge follows.
   const seen = grade.id != null && !preview ? readSeenEvaluationIds(user, grade.semesterId) : null
   const isNew = Array.isArray(seen) && !seen.map(String).includes(String(grade.id))
-  const opensInApp = Boolean(onOpenGrade)
-  const canOpen = !preview && (opensInApp || Boolean(GRADES_LAUNCH_HREF))
-  const open = () => (opensInApp ? onOpenGrade(grade) : openGradesService())
   const handleKeyDown = (event) => {
     if (event.key === 'Enter' || event.key === ' ') {
       event.preventDefault()
@@ -180,6 +198,7 @@ function LiveWidgetLatestGrade({ visible, user = null, onOpenGrade = null, previ
       tabIndex={canOpen ? 0 : undefined}
       onClick={canOpen ? open : undefined}
       onKeyDown={canOpen ? handleKeyDown : undefined}
+      {...(preview ? null : menuProps())}
     >
       <LatestGradeCardBody
         moduleTitle={grade.resourceTitle}

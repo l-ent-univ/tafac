@@ -71,8 +71,8 @@ test('relayed counts are checked again', () => {
 
 test('findReleveEvaluation looks in ressources and SAÉs', () => {
   const releve = buildDemoSemesterGradesPayload(9105)['relevé']
-  assert.equal(findReleveEvaluation(releve, '70111')?.description, 'Composants React')
-  assert.equal(findReleveEvaluation(releve, 70201)?.description, 'Sprint review')
+  assert.equal(findReleveEvaluation(releve, '70111')?.description, 'Communiqué de presse')
+  assert.equal(findReleveEvaluation(releve, 70201)?.description, 'Point d’étape')
   assert.equal(findReleveEvaluation(releve, '30104'), null)
   assert.equal(findReleveEvaluation(null, '1'), null)
 })

@@ -2,6 +2,8 @@
 // Pure data only: this file is imported by Node at runtime, so it must not
 // import assets (images, CSS) or browser-only modules.
 
+import { TAFAC_CONTACT_EMAIL, TAFAC_TEAM } from '../tafac.js'
+
 export const id = 'univ-rennes'
 
 export const university = {
@@ -9,6 +11,12 @@ export const university = {
   shortName: 'Rennes',
   // /rennes: this university's landing page (its button to its login).
   slug: 'rennes',
+}
+
+// The establishments' names (client.js's establishments.byId, and the sent
+// mail's signature in server.js), by their ids.
+export const establishmentNames = {
+  iutlan: 'IUT de Lannion',
 }
 
 // Branding text (no assets here — the logo lives in client.js so this file
@@ -20,9 +28,9 @@ export const branding = {
   // link previews, the installed app).
   seoTitle: "Tafac – Ton ENT de l'Université de Rennes en une app",
   seoDescription:
-    "Emploi du temps ADE, notes ScoDoc, mails et rendus Moodle de l'Université de Rennes sur une seule page. Projet étudiant libre, non affilié à l'université.",
+    "Emploi du temps ADE, notes ScoDoc, messagerie Partage et rendus Moodle de l'Université de Rennes dans une seule app. Projet étudiant libre, non affilié à l'université.",
   pwaDescription:
-    "Emploi du temps, notes ScoDoc, mails et rendus Moodle sur une seule page. Projet étudiant non affilié à l'Université de Rennes.",
+    "Emploi du temps, notes ScoDoc, messagerie et rendus Moodle dans une seule app. Projet étudiant non affilié à l'Université de Rennes.",
   // Former names, for search engines (the site's name in results).
   alternateNames: ["l'ent"],
   // How the landing's copy names the university mid-sentence ({university}
@@ -39,11 +47,10 @@ export const branding = {
     disclaimer:
       "Tafac est un projet étudiant indépendant, non officiel et non affilié à l'Université de Rennes. Tes identifiants servent uniquement à te connecter et ne sont jamais stockés.",
     repoUrl: 'https://github.com/l-ent-univ/tafac',
-    // « Équipe » in À propos: a name and a GitHub login each.
-    team: [
-      { name: 'Tom', login: 'tom-things' },
-      { name: 'Lucas Lavajo', login: 'tryon-dev' },
-    ],
+    // « Équipe » in À propos: the same Tafac team for every university.
+    team: TAFAC_TEAM,
+    // À propos › Aide: the button to write to the team.
+    contactEmail: TAFAC_CONTACT_EMAIL,
   },
   // Tafac is part of Papillon (same team). The one switch for every mention
   // of it (src/papillon.js): delete the block and they all go. Branding
@@ -95,8 +102,9 @@ export const gradesServiceUrl = `${gradesOrigin}/services/doAuth.php?href=${enco
 // in there for the "Échéances Moodle" widget.
 export const moodleOrigin = 'https://foad.univ-rennes.fr'
 
-// Webmail ("Messagerie"): RENATER Partage (Zimbra), behind Shibboleth → CAS.
-// Opened through /__ent_auth/launch by the "Mails récents" widget.
+// Webmail: RENATER Partage (Zimbra), behind Shibboleth → CAS. The app's
+// own Messagerie reads and sends through it (server.js's `mail`), and the
+// webmail's tiles open that page (client.js's mail.webmailUrls).
 export const mailWebmailUrl = 'https://partage.univ-rennes.fr/'
 
 // Fallback copy shown when the upstream grade service is unavailable.

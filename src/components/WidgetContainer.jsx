@@ -5,6 +5,7 @@ import AvailableApplications from './AvailableApplications'
 import CloseButton from './CloseButton'
 import GradesLaunchCard from './GradesLaunchCard'
 import GreetingCard from './GreetingCard'
+import MailLaunchCard from './MailLaunchCard'
 import PlanningLaunchCard from './PlanningLaunchCard'
 import ServiceNotice from './ServiceNotice'
 import WidgetDeadlines from './WidgetDeadlines'
@@ -15,6 +16,7 @@ import WidgetRecentMail from './WidgetRecentMail'
 import { trackDashboardView } from '../analytics'
 import { isWidgetAvailable } from '../dashboardWidgets'
 import { useListCardOrder } from '../listCardOrder'
+import { useWidgetLayoutMotion } from '../useWidgetLayoutMotion'
 import {
   NEXT_CLASS_LOOKAHEAD_DAYS,
   buildNextClassCacheEntryKey,
@@ -71,6 +73,8 @@ function WidgetContainer({
   onOpenGradesPage = null,
   onOpenPlanningPage = null,
   onOpenPlanningDay = null,
+  onOpenMail = null,
+  onOpenMailPage = null,
 }) {
   const displayName = userName?.trim() || ' '
   const [, setWeatherState] = useState(INITIAL_WEATHER_STATE)
@@ -81,6 +85,8 @@ function WidgetContainer({
   const [locationQuery, setLocationQuery] = useState('')
   const [locationError, setLocationError] = useState('')
   const hasReportedViewRef = useRef(false)
+  const widgetRowRef = useRef(null)
+  useWidgetLayoutMotion(widgetRowRef)
   const showGreeting = !hiddenWidgets.includes('greeting')
 
   // Anonymous analytics: one dashboard_viewed per dashboard mount.
@@ -233,7 +239,7 @@ function WidgetContainer({
   // moves the cards instead of remounting (and refetching) them.
   const listCardsFirst = useListCardOrder()
   const listCards = [
-    { label: 'Mails récents', card: <WidgetRecentMail key="mail" visible={areWidgetsVisible} /> },
+    { label: 'Mails récents', card: <WidgetRecentMail key="mail" visible={areWidgetsVisible} onOpenMail={onOpenMail} /> },
     { label: 'Échéances', card: <WidgetDeadlines key="deadlines" visible={areWidgetsVisible} /> },
   ]
   if (listCardsFirst === 'deadlines') listCards.reverse()
@@ -249,12 +255,12 @@ function WidgetContainer({
   ), [nextClassLookaheadDays, selectedPlanningSelection, sessionUser])
 
   return (
-    <section className="w-full grid gap-10 pt-4 px-6 pb-6 4xl:pt-5 max-md:px-3 max-md:pt-3 max-md:pb-5 max-md:gap-8" aria-label="Widgets">
+    <section className="dashboard-widgets w-full grid gap-10 pt-4 px-6 pb-6 4xl:pt-5 max-md:px-3 max-md:pt-3 max-md:pb-5 max-md:gap-8" aria-label="Widgets">
       {/* The page's top on a band edge to edge (.page-top-band, as on "Mes
           notes"): the greeting and the widgets, set apart from the apps. */}
       <div className="page-top-band -mx-6 -mt-4 px-6 pt-4 pb-7 4xl:-mt-5 4xl:pt-5 max-md:-mx-3 max-md:-mt-3 max-md:px-3 max-md:pt-3 max-md:pb-5">
       <ServiceNotice className="mb-4 max-md:mb-3" />
-      <div className="widget-row flex flex-wrap gap-3 items-stretch max-md:gap-2 overflow-visible p-2 -m-2">
+      <div ref={widgetRowRef} className="widget-row flex flex-wrap gap-3 items-stretch max-md:gap-2 overflow-visible p-2 -m-2">
         {showGreeting ? (
           <GreetingCard
             displayName={displayName}
@@ -292,7 +298,7 @@ function WidgetContainer({
           // cards become a swipeable strip there (WidgetListStrip).
           <div
             id={showGradeWidgets ? 'sidebar-section-grades' : undefined}
-            className={pairListWidgets ? 'contents' : 'flex-[1_1_100%] min-w-0 flex flex-wrap items-stretch gap-3 max-md:gap-2 empty:hidden 2xl:contents max-xs:contents'}
+            className={pairListWidgets ? 'contents' : 'widget-row-group flex-[1_1_100%] min-w-0 flex flex-wrap items-stretch gap-3 max-md:gap-2 empty:hidden 2xl:contents max-xs:contents'}
           >
             {/* Bloc « Moyenne Générale » masqué pour l'instant — réimporter
                 WidgetAverageGrade et le rendre ici pour le réactiver. */}
@@ -303,7 +309,7 @@ function WidgetContainer({
               </WidgetListStrip>
             ) : (
               <>
-                {showMailWidget ? <WidgetRecentMail visible={areWidgetsVisible} /> : null}
+                {showMailWidget ? <WidgetRecentMail visible={areWidgetsVisible} onOpenMail={onOpenMail} /> : null}
                 {showDeadlinesWidget ? <WidgetDeadlines visible={areWidgetsVisible} /> : null}
               </>
             )}
@@ -313,10 +319,11 @@ function WidgetContainer({
       </div>
 
       <div>
-        {/* A page just launched (the Planning, « Mes notes »): a compact
+        {/* A page just launched (the Messagerie, the Planning, « Mes notes »): a compact
             card under the widgets, out of the band, until it's seen. One at
             a time, the newest first: the others render nothing
             (LaunchCard). */}
+        <MailLaunchCard onOpen={onOpenMailPage} />
         <PlanningLaunchCard onOpen={onOpenPlanningPage} />
         <GradesLaunchCard onOpen={onOpenGradesPage} />
         <div id="sidebar-section-applications">
@@ -327,6 +334,7 @@ function WidgetContainer({
             showDescriptions={showAppDescriptions}
             onOpenGradesPage={onOpenGradesPage}
             onOpenPlanningPage={onOpenPlanningPage}
+            onOpenMailPage={onOpenMailPage}
           />
         </div>
       </div>

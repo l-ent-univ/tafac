@@ -1,10 +1,12 @@
-import { useEffect, useState, useSyncExternalStore } from 'react'
+import { useEffect, useState } from 'react'
 import universityConfig from '@university'
 import appIcon from '../assets/landing/app-icon.webp'
 import loginClouds from '../assets/login/login-clouds.webp'
 import loginSky from '../assets/login/login-sky.webp'
 import { buildLandingPreview } from '../landingPreview'
 import { copy, copyText } from '../landingCopy'
+import { listShowcaseTabs } from '../landingShowcase'
+import { scrollToShowcaseTab } from '../landingShowcaseScroll'
 import { getPapillonUrl, readPapillonDebugOverride } from '../papillon'
 import FeatureShowcase from './FeatureShowcase'
 import FloatingWidgets from './FloatingWidgets'
@@ -14,11 +16,10 @@ import LandingContact from './LandingContact'
 import LandingFaq from './LandingFaq'
 import LandingFooter from './LandingFooter'
 import LandingHeader from './LandingHeader'
-import LaptopMockup from './LaptopMockup'
+import LandingShowcase from './LandingShowcase'
 import LentButton from './LentButton'
 import PapillonVision from './PapillonVision'
 import UniversityMarquee from './UniversityMarquee'
-import PhoneMockup from './PhoneMockup'
 import SecurityShowcase from './SecurityShowcase'
 import WidgetDeadlines from './WidgetDeadlines'
 import WidgetLatestGrade from './WidgetLatestGrade'
@@ -29,6 +30,9 @@ import WidgetRecentMail from './WidgetRecentMail'
 // Papillon's block at the end instead of the free/contact one (the same
 // switch as every other mention, src/papillon.js).
 const IS_PART_OF_PAPILLON = getPapillonUrl(universityConfig.branding, readPapillonDebugOverride()) !== null
+// The app's pages the showcase presents: all of them on the neutral page, a
+// university's own on its page (src/landingShowcase.js).
+const SHOWCASE_TABS = listShowcaseTabs(universityConfig)
 
 // The widgets move on to their next demo frame together: each frame stays
 // HOLD_MS, then its text leaves upwards (OUT_MS) and the next one comes in
@@ -65,60 +69,41 @@ function useFrameCycle() {
   return cycle
 }
 
-// A computer: a mouse or trackpad that hovers (whatever the window's
-// width). It shows the laptop with the features, then the phone; a phone or
-// tablet the other way round. Followed if it changes (a tablet's keyboard
-// with a trackpad).
-const COMPUTER_QUERY = '(hover: hover) and (pointer: fine)'
-
-function subscribeToComputerQuery(onChange) {
-  const query = window.matchMedia(COMPUTER_QUERY)
-  query.addEventListener('change', onChange)
-  return () => query.removeEventListener('change', onChange)
-}
-
-function useIsComputer() {
-  return useSyncExternalStore(subscribeToComputerQuery, () => window.matchMedia(COMPUTER_QUERY).matches, () => false)
-}
-
 function frameAt(frames, step) {
   return frames.length > 0 ? frames[step % frames.length] : undefined
 }
 
-// A device mockup and a FeatureShowcase side by side: the device on the
-// left, or on the right when `mirrored`; one under the other below 1024 px,
-// the device first. As wide as the two (the device, the gap, the features'
-// widest line), so the pair sits centred on the page: `wide` for the
-// laptop, which takes more room than the phone.
-function ShowcaseRow({ wide = false, mirrored = false, className = '', children }) {
-  return (
-    <div className={`relative z-20 flex justify-center px-6 max-md:px-4 ${className}`}>
-      <div className={`flex w-full items-center max-4xl:flex-col max-4xl:gap-12 ${wide ? 'max-w-[1240px] gap-14' : 'max-w-[920px] gap-16'} ${mirrored ? 'flex-row-reverse' : ''}`}>
-        {children}
-      </div>
-    </div>
-  )
-}
-
-// The public home page, shown at / while signed out: for now the dashboard's
-// widgets on demo data, as WidgetContainer lays them out.
+// The public home page, shown at / while signed out: the dashboard's
+// widgets on demo data, as WidgetContainer lays them out, then the app page
+// by page (LandingShowcase), on a computer and a phone, its privacy, the
+// questions students ask and who makes it.
 function LandingPage({ onLogin }) {
   const [preview] = useState(() => buildLandingPreview())
   const [areWidgetsVisible, setAreWidgetsVisible] = useState(false)
+  const [selectedShowcaseTab, setShowcaseTabId] = useState(SHOWCASE_TABS[0]?.id ?? null)
   const { step, phase } = useFrameCycle()
   const greeting = frameAt(preview.greetings, step)
-  const isComputer = useIsComputer()
 
   useEffect(() => {
     const timeoutId = window.setTimeout(() => setAreWidgetsVisible(true), 140)
     return () => window.clearTimeout(timeoutId)
   }, [])
 
+  // An address to a page's panel (/#messagerie): that tab, scrolled to
+  // once shown (a hidden panel can't be scrolled to by the browser).
+  useEffect(() => {
+    const id = decodeURIComponent(window.location.hash.slice(1))
+    const index = SHOWCASE_TABS.findIndex((tab) => tab.id === id)
+    if (index < 0) return
+    setShowcaseTabId(id)
+    window.requestAnimationFrame(() => scrollToShowcaseTab(index, { smooth: false }))
+  }, [])
+
   return (
     <>
-      {/* The first screen: at least the window's height, so the device mockups
-          (and the phone's flower) start below the fold, never peeking in on load. */}
-      <div className="flex min-h-svh flex-col">
+      {/* The first screen: the showcase follows straight on (no longer held
+          a window's height: on tall screens that left a band of blank). */}
+      <div className="flex flex-col">
         {/* The header, then the dashboard's frosted cards (as over its wallpaper),
             on a band of sky. */}
         <section
@@ -176,7 +161,7 @@ function LandingPage({ onLogin }) {
                 />
               </div>
               <h1 className="m-0 max-w-[24ch] text-balance text-center text-[clamp(36px,5vw,64px)] font-bold leading-[0.95] text-text">
-                {copyText(copy.hero.title)}
+                {copyText(universityConfig.neutral ? copy.hero.title : copy.hero.universityTitle)}
               </h1>
             </div>
             <p className="m-0 mt-5 max-w-[40ch] text-balance text-center text-lg font-medium leading-snug text-text-muted font-body max-md:mt-4 max-md:text-base">
@@ -193,38 +178,16 @@ function LandingPage({ onLogin }) {
           </div>
         </div>
       </div>
-      {/* The first device (the one in hand: the laptop on a computer, the
-          phone otherwise) with what the app does, then the other one with
-          other sides of it, mirrored. The top padding clears the first
-          device's flower (and its scroll parallax) from the first screen. The
-          second device shows the app in its dark theme. */}
-      {isComputer ? (
-        <>
-          <ShowcaseRow wide className="pt-24 pb-24 max-md:pt-20 max-md:pb-16">
-            <LaptopMockup decorated className="w-[min(700px,58%)] shrink-0 max-4xl:w-full max-4xl:max-w-[760px]" />
-            <FeatureShowcase className="min-w-0 flex-1" />
-          </ShowcaseRow>
-          <ShowcaseRow mirrored className="pt-8 pb-28 max-md:pt-4 max-md:pb-20">
-            <div className="landing-device w-[min(300px,72vw)] shrink-0">
-              <PhoneMockup decorated={false} darkScreen />
-            </div>
-            <FeatureShowcase variant="phone" className="min-w-0 flex-1" />
-          </ShowcaseRow>
-        </>
-      ) : (
-        <>
-          <ShowcaseRow className="pt-24 pb-24 max-md:pt-20 max-md:pb-16">
-            <PhoneMockup className="w-[min(300px,72vw)] shrink-0" />
-            <FeatureShowcase className="min-w-0 flex-1" />
-          </ShowcaseRow>
-          <ShowcaseRow wide mirrored className="pt-8 pb-28 max-md:pt-4 max-md:pb-20">
-            <div className="landing-device w-[min(700px,58%)] shrink-0 max-4xl:w-full max-4xl:max-w-[760px]">
-              <LaptopMockup darkScreen />
-            </div>
-            <FeatureShowcase variant="computer" className="min-w-0 flex-1" />
-          </ShowcaseRow>
-        </>
-      )}
+      {/* What the app does, page by page. */}
+      <LandingShowcase
+        tabs={SHOWCASE_TABS}
+        selectedId={selectedShowcaseTab}
+        onSelect={setShowcaseTabId}
+        preview={preview}
+        className="pt-24 pb-8 max-md:pt-16 max-md:pb-4"
+      />
+      {/* The app on a computer and a phone at once, what each brings. */}
+      <FeatureShowcase className="pt-24 pb-28 max-md:pt-16 max-md:pb-20" />
       {/* What happens to the password and the data, then who makes Tafac:
           Papillon's team and vision while it shows it's part of Papillon,
           otherwise free, the team and how to reach them. */}
