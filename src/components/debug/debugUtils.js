@@ -7,6 +7,7 @@ const LOCAL_STORAGE_ACCOUNT_KEYS = [ESTABLISHMENT_KEY, STUDENT_TP_KEY]
 const LOCAL_STORAGE_SETTINGS_KEYS = [
   'l-ent:favorites-order',
   'l-ent:local-pins',
+  'l-ent:local-favorites',
   'l-ent:weather-city',
   'l-ent:grade-colors',
   'l-ent:visit-count',

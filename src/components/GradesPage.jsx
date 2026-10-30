@@ -7,6 +7,8 @@ import { advanceSimulatorReach, describeGradesLoad, toGradesPageSource } from '.
 import { buildGradesReport, canDownloadReportPdf, summarizeAverage } from '../gradesReport'
 import { hasSimulatableEvaluation } from '../gradeSimulation'
 import { findNewEvaluationIds, formatReportUpdate, listGradedEvaluationIds } from '../gradesSubjects'
+import { findEvaluation } from '../gradeDetail'
+import { prepareGradeMail } from '../gradeMail'
 import { readSeenEvaluationIds, writeSeenEvaluationIds } from '../seenGrades'
 import { SECONDARY_BUTTON } from '../scodocPageUtils'
 import { assignSubjectIcons } from '../subjectIcons'
@@ -20,6 +22,7 @@ import GradeSimulatorModal from './GradeSimulatorModal'
 import GradesNotices from './GradesNotice'
 import LatestGradesList from './LatestGradesList'
 import LoadingDots from './LoadingDots'
+import Material from './Material'
 import PageEmptyState from './PageEmptyState'
 import SemesterSelect from './SemesterSelect'
 import SubjectsList from './SubjectsList'
@@ -100,44 +103,22 @@ function ReportPdfButton({ semesterId, semester, releveType }) {
   )
 }
 
-// Next to the PDF, tinted: opens the simulation sheet (GradeSimulatorModal).
-// On a phone an icon in a round button like the PDF's (touch area 44px).
-// `colors`: the semester's UE colours, washed softly up from the bottom of
-// the button and drifting (.simulate-button-wash in overrides.css); none,
-// the brand's. With a mouse, the wash leans towards the pointer: its offset
-// from the middle, -1 to 1, as --simulate-shift (set on the element, no
-// re-render).
-function followPointer(event) {
-  const rect = event.currentTarget.getBoundingClientRect()
-  const shift = ((event.clientX - rect.left) / rect.width) * 2 - 1
-  event.currentTarget.style.setProperty('--simulate-shift', Math.max(-1, Math.min(1, shift)).toFixed(3))
-}
-
-function releasePointer(event) {
-  event.currentTarget.style.removeProperty('--simulate-shift')
-}
-
+// Next to the PDF, in the same material with the semester's UE colours as
+// its rainbow (none: the brand's): opens the simulation sheet
+// (GradeSimulatorModal). On a phone an icon in a round button like the
+// PDF's (touch area 44px).
 function SimulateButton({ onClick, colors = [] }) {
-  const wash = colors.length > 0
-    ? `linear-gradient(100deg, ${[...colors, colors[0]].join(', ')})`
-    : null
   return (
-    <button
-      type="button"
+    <Material
+      rainbow={colors}
       onClick={onClick}
       aria-haspopup="dialog"
       aria-label="Simuler mes notes"
-      className="simulate-button relative isolate inline-flex items-center gap-1.5 rounded-full border px-3.5 py-2 font-body text-[14px] font-semibold cursor-pointer focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand max-md:size-10 max-md:justify-center max-md:p-0 max-md:after:absolute max-md:after:-inset-[3px]"
-      style={wash ? { '--simulate-wash': wash } : undefined}
-      onPointerMove={followPointer}
-      onPointerLeave={releasePointer}
+      className="inline-flex items-center gap-1.5 rounded-full px-3.5 py-2 font-body text-[14px] font-semibold cursor-pointer focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand max-md:size-10 max-md:justify-center max-md:p-0 max-md:after:absolute max-md:after:-inset-[3px]"
     >
-      <span className="simulate-button-wash-frame rounded-[inherit]" aria-hidden="true">
-        <span className="simulate-button-wash" />
-      </span>
       <Icon icon="carbon:calculator" className="size-4 max-md:size-[18px]" aria-hidden="true" />
       <span className="max-md:hidden">Simuler</span>
-    </button>
+    </Material>
   )
 }
 
@@ -172,7 +153,10 @@ function OpenGradeDetail({ request, onHandled }) {
 // "Dernière note"), handed back with onInitialGradeRequestHandled once taken.
 // `arrivalSource`: how the student got here, for the anonymous analytics
 // (src/gradesAnalytics.js); the page mounts once per arrival.
-function GradesPage({ user = null, arrivalSource = 'other', initialGradeRequest = null, onInitialGradeRequestHandled = () => {} }) {
+// `onComposeMail(request)`: App's, the mail page opened on a prefilled
+// composer (« Écrire au sujet de cette note »); null without the in-app
+// mail page, and the action isn't offered.
+function GradesPage({ user = null, arrivalSource = 'other', initialGradeRequest = null, onInitialGradeRequestHandled = () => {}, onComposeMail = null }) {
   const { base, semesters, activeId, activeSemester, selectSemester, entry, releve, config, department, departmentMessage } = useScodocReleve()
   const status = base.status === 'error' ? base : entry
   const empty = useMemo(() => (status.status === 'ok' ? readEmptyReason(releve, config) : null), [status.status, releve, config])
@@ -250,6 +234,21 @@ function GradesPage({ user = null, arrivalSource = 'other', initialGradeRequest 
     const timer = window.setTimeout(() => setGradeRequest(null), 0)
     return () => window.clearTimeout(timer)
   }, [gradeRequest])
+  // « Écrire au sujet de cette note »: the mail made from the grade (its
+  // image drawn first, src/gradeMail.js), then the mail page. Once at a
+  // time: a second press while the image is drawn does nothing.
+  const absences = entry.payload?.absences ?? null
+  const composingRef = useRef(false)
+  const writeAboutGrade = useMemo(() => (onComposeMail && report ? async ({ moduleCode, evaluationId }) => {
+    const found = findEvaluation(report, moduleCode, evaluationId)
+    if (!found || composingRef.current) return
+    composingRef.current = true
+    try {
+      onComposeMail(await prepareGradeMail({ report, module: found.module, evaluation: found.evaluation, absences }))
+    } finally {
+      composingRef.current = false
+    }
+  } : null), [onComposeMail, report, absences])
   const latestGrades = report?.latest ?? []
   // UE code → ScoDoc colour (as painted: lifted on the dark theme), to tint
   // each grade with the UEs it counts for.
@@ -321,7 +320,7 @@ function GradesPage({ user = null, arrivalSource = 'other', initialGradeRequest 
       // While a UE is open full page, everything else steps aside (null
       // slots, so the list keeps its place in the tree and its state).
       // Any evaluation row opens its grade's detail sheet.
-      <GradeDetailProvider report={report} semesterId={activeId} subjectIcon={subjectIcon}>
+      <GradeDetailProvider report={report} semesterId={activeId} subjectIcon={subjectIcon} onWrite={writeAboutGrade}>
         <OpenGradeDetail request={detailRequest} onHandled={() => setDetailRequest(null)} />
         <div key={activeId} className="semester-fade grid gap-8 max-md:gap-6">
           {/* Titled like the dashboard's sections. */}
@@ -379,7 +378,7 @@ function GradesPage({ user = null, arrivalSource = 'other', initialGradeRequest 
   ) : null
 
   return (
-    <section className="w-full grid gap-4 pt-4 px-6 pb-6 4xl:pt-5 max-md:px-3 max-md:pt-3 max-md:pb-5 max-md:gap-3" aria-labelledby="grades-page-title">
+    <section className="grades-page w-full grid gap-4 pt-4 px-6 pb-6 4xl:pt-5 max-md:px-3 max-md:pt-3 max-md:pb-5 max-md:gap-3" aria-labelledby="grades-page-title">
       {/* The page's top, tinted apart from the detail below: title, the
           semester's overview and its notices. Plain (no box) while a UE is
           open full page, where it holds only the hidden title. On a phone it

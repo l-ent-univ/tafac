@@ -9,6 +9,8 @@ import {
   sortEvaluations,
 } from '../gradesSubjects'
 import { useGradeDetail } from '../gradeDetailContext'
+import { gradeCopyText } from '../contextMenuItems'
+import { copyToClipboard, useContextMenu } from '../useContextMenu'
 import CardInfoTip from './CardInfoTip'
 import UeLink from './UeLink'
 
@@ -121,6 +123,19 @@ export function EvaluationRow({ evaluation, moduleCode = null, showPromoStats, w
     place ? `promo de ${formatScore(evaluation.promo.min)} à ${formatScore(evaluation.promo.max)}` : null,
   ].filter(Boolean).join(', ')
   const canOpen = Boolean(gradeDetail && moduleCode != null)
+  const open = () => gradeDetail.open({ moduleCode, evaluationId: evaluation.id, isNew, from: openFrom })
+  // Its right-click menu (a long press): the detail sheet, a mail about it,
+  // the grade as text.
+  const menuProps = useContextMenu(() => [
+    canOpen ? { id: 'open', label: 'Voir la note', icon: 'carbon:view', onSelect: open } : null,
+    canOpen && gradeDetail.write ? { id: 'write', label: 'Écrire au sujet de cette note', icon: 'carbon:email', onSelect: () => void gradeDetail.write({ moduleCode, evaluationId: evaluation.id }) } : null,
+    {
+      id: 'copy',
+      label: 'Copier',
+      icon: 'carbon:copy',
+      onSelect: () => void copyToClipboard(gradeCopyText({ title: evaluation.description, value: isNumber ? evaluation.grade.value : evaluation.grade.label })),
+    },
+  ])
 
   const content = (
     <>
@@ -145,7 +160,7 @@ export function EvaluationRow({ evaluation, moduleCode = null, showPromoStats, w
 
   if (!canOpen) {
     return (
-      <li className="subject-evaluation flex items-center gap-3 px-3 py-[10px] min-w-0" aria-label={spoken} data-evaluation-id={evaluation.id}>
+      <li className="subject-evaluation flex items-center gap-3 px-3 py-[10px] min-w-0" aria-label={spoken} data-evaluation-id={evaluation.id} {...menuProps()}>
         {content}
       </li>
     )
@@ -159,7 +174,8 @@ export function EvaluationRow({ evaluation, moduleCode = null, showPromoStats, w
         className="subject-evaluation-button flex w-full min-w-0 items-center gap-3 corners-[15px] border-0 bg-transparent px-3 py-[10px] text-left text-text cursor-pointer"
         aria-haspopup="dialog"
         aria-label={`${spoken}. Voir le détail`}
-        onClick={() => gradeDetail.open({ moduleCode, evaluationId: evaluation.id, isNew, from: openFrom })}
+        onClick={open}
+        {...menuProps()}
       >
         {content}
         <Icon icon="carbon:chevron-right" className="subject-evaluation-chevron -ml-1 -mr-[2px] size-[14px] shrink-0 text-text-30" aria-hidden="true" />
@@ -209,6 +225,24 @@ function SubjectRow({ module, isOpen, onToggle, icon, wash, ueTitles, showPromoS
   // progress already says "Aucune évaluation".
   const isEmpty = evaluations.length === 0
   const Header = isEmpty ? 'div' : 'button'
+  // Its right-click menu (a long press): its evaluations shown or hidden,
+  // and the subject in each UE it counts for (its « Compte pour » links).
+  const menuProps = useContextMenu(() => [
+    isEmpty ? null : {
+      id: 'toggle',
+      label: isOpen ? 'Masquer les évaluations' : 'Afficher les évaluations',
+      icon: isOpen ? 'carbon:chevron-up' : 'carbon:chevron-down',
+      onSelect: onToggle,
+    },
+    'separator',
+    ...(onOpenUe ? module.ueCoefs.map((link) => ({
+      id: `ue-${link.ue}`,
+      label: `Voir dans ${link.ue}`,
+      icon: 'carbon:arrow-right',
+      hint: ueTitles[link.ue] || undefined,
+      onSelect: () => onOpenUe(link.ue, module.code),
+    })) : []),
+  ])
 
   return (
     <li className={`subject-row corners-[16px] ${isOpen && !isEmpty ? 'subject-row--open' : ''}`}>
@@ -217,6 +251,7 @@ function SubjectRow({ module, isOpen, onToggle, icon, wash, ueTitles, showPromoS
         {...(isEmpty
           ? { 'aria-label': `${module.title}, ${module.code}, ${progress}` }
           : { type: 'button', 'aria-expanded': isOpen, 'aria-controls': panelId, 'aria-label': `${module.title}, ${module.code}, ${progress}${average}`, onClick: onToggle })}
+        {...menuProps()}
         className={`${isEmpty ? '' : 'subject-row-toggle cursor-pointer '}flex w-full min-w-0 items-center gap-3 corners-[16px] border-0 bg-transparent px-2 py-2 text-left text-text max-md:gap-[10px]`}
       >
         {/* The wash of the UEs the subject feeds, as on the grade cards. */}

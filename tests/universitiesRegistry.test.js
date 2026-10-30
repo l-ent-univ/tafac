@@ -39,7 +39,7 @@ test('the neutral config is not a university', () => {
 
 test('directory entries: slug and dev-only flag from shared.js', async () => {
   assert.deepEqual(await loadUniversityDirectoryEntry('univ-rennes'), {
-    id: 'univ-rennes', name: 'Université de Rennes', shortName: 'Rennes', slug: 'rennes', devOnly: false,
+    id: 'univ-rennes', name: 'Université de Rennes', shortName: 'Rennes', slug: 'rennes', devOnly: false, logoShape: 'wide',
   })
   const exemple = await loadUniversityDirectoryEntry('univ-exemple')
   assert.equal(exemple.slug, 'exemple')

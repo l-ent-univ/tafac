@@ -217,8 +217,24 @@ function sendAppShell(req, res, next) {
 }
 
 app.get('/', sendAppShell)
-// The page under its file name would come out unfilled: the home page.
-app.get('/index.html', (req, res) => res.redirect(301, '/'))
+// The page under its file name: what the service worker caches (Workbox's
+// precache of index.html) and serves on every visit, signed in or not. So
+// the bare app, filled, never the landing: a redirect to / cached the
+// landing when the worker installed signed out, and a signed-in student saw
+// it flash on each reload. Not for search engines, the home page is at /.
+app.get('/index.html', (req, res, next) => {
+  try {
+    shells ??= readShells()
+  } catch (error) {
+    next(error)
+    return
+  }
+
+  const origin = getSafePublicOrigin(req)
+  res.setHeader('X-Robots-Tag', 'noindex')
+  if (origin) res.setHeader('Link', `<${origin}/>; rel="canonical"`)
+  res.type('html').send(fillPublicOrigin(shells.app, origin))
+})
 
 // Serve the built static files
 app.use(express.static(DIST_DIR))

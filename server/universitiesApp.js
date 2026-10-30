@@ -20,6 +20,7 @@
 // GET /__ent_auth/universities tells the page which universities there are
 // and which one it's signed in to; /__ent_auth/universities/<id>/logo serves
 // their logos.
+import { statSync } from 'node:fs'
 import express from 'express'
 import cookieParser from 'cookie-parser'
 import { createEntAuthApp } from './entAuthApp.js'
@@ -169,13 +170,28 @@ export async function createUniversitiesApp({
     return { id: defaultUniversityId, source: 'default' }
   }
 
+  // The logo's address, versioned by the file's date: browsers keep it a
+  // day, and a new logo must show at once.
+  function buildLogoUrl(id) {
+    const file = universityLogoPath(id)
+    if (!file) return null
+    let version = ''
+    try {
+      version = `?v=${Math.round(statSync(file).mtimeMs).toString(36)}`
+    } catch {
+      // Unreadable now: the plain address.
+    }
+    return `/__ent_auth/universities/${id}/logo${version}`
+  }
+
   function publicEntry(entry) {
     return {
       id: entry.id,
       name: entry.name,
       shortName: entry.shortName,
       slug: entry.slug,
-      logoUrl: universityLogoPath(entry.id) ? `/__ent_auth/universities/${entry.id}/logo` : null,
+      logoUrl: buildLogoUrl(entry.id),
+      logoShape: entry.logoShape ?? 'wide',
       listed: listDevOnly || !entry.devOnly,
     }
   }

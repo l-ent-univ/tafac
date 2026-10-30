@@ -21,7 +21,8 @@
 // university's students get; App.jsx says what this student has
 // (setChangelogAudience): 'grades-page' for a BUT student of a school with
 // « Mes notes », 'planning-page' for a signed-in student of a school with
-// the Planning page (features.planning, as its nav item). Where an entry doesn't apply, it's invisible: no pill, not in
+// the Planning page (features.planning, as its nav item), 'mail-page' for a
+// signed-in student of a school with the in-app mail page. Where an entry doesn't apply, it's invisible: no pill, not in
 // the list. Copy rules: ’ apostrophes, a narrow no-break space (`\u202f`)
 // before : ! ? » and after «, and no app name (each university brands its own).
 //
@@ -32,13 +33,23 @@
 //
 // A `spotlight` entry is a launch: instead of lighting the pill, it gets its
 // own card on the dashboard (LaunchCard: GradesLaunchCard for « Mes notes »,
-// PlanningLaunchCard for the Planning) and a « Nouveau » mark on its tab
+// PlanningLaunchCard for the Planning, MailLaunchCard for the Messagerie) and a « Nouveau » mark on its tab
 // (navItems' `announcedBy`), until the card is closed or the page visited.
 // One card at a time, the newest first: the next one waits for the next
 // visit (getLaunchId). It still shows in the list, as new if the list opens
 // first.
 
 export const CHANGELOG = [
+  {
+    id: 'messagerie',
+    date: '2026-10-28',
+    title: 'Ta messagerie dans l’appli',
+    body: 'Lis tes mails en conversations, cherche et passe d’un dossier à l’autre. Écris avec de la mise en forme, des pièces jointes, des brouillons et ta signature, réponds ou transfère, imprime ou enregistre en PDF. Les mails récents de l’accueil et les tuiles du webmail l’ouvrent directement.',
+    icon: 'carbon:email',
+    features: ['mail'],
+    audience: ['mail-page'],
+    spotlight: true,
+  },
   {
     id: 'planning',
     date: '2026-10-19',

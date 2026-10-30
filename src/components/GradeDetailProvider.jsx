@@ -27,7 +27,9 @@ function readOpenId(state) {
 // Gives the evaluation rows below it a way to open the grade detail sheet
 // (useGradeDetail), and shows it. `semesterId`: the relevé's, for the
 // promo's histogram. `subjectIcon`: the page's icon for a subject title.
-function GradeDetailProvider({ report, semesterId, subjectIcon = () => null, children }) {
+// `onWrite({ moduleCode, evaluationId })`: a mail about a grade (the
+// sheet's button, the rows' menus, as `write`), null where there's none.
+function GradeDetailProvider({ report, semesterId, subjectIcon = () => null, onWrite = null, children }) {
   const [request, setRequest] = useState(null)
   // Read by the history handlers, which outlive a render.
   const requestRef = useRef(null)
@@ -88,7 +90,7 @@ function GradeDetailProvider({ report, semesterId, subjectIcon = () => null, chi
     if (request && !found) setRequest(null)
   }, [request, found])
 
-  const value = useMemo(() => ({ open }), [open])
+  const value = useMemo(() => ({ open, write: onWrite }), [open, onWrite])
 
   return (
     <GradeDetailContext.Provider value={value}>
@@ -102,6 +104,7 @@ function GradeDetailProvider({ report, semesterId, subjectIcon = () => null, chi
           semesterId={semesterId}
           icon={subjectIcon(found.module.title)}
           isNew={request.isNew}
+          onWrite={onWrite ? () => onWrite({ moduleCode: found.module.code, evaluationId: found.evaluation.id }) : null}
           onClose={close}
         />
       ) : null}

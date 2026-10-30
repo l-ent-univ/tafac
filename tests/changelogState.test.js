@@ -195,11 +195,11 @@ test('the seed entries follow each university’s features', () => {
   const exemple = { id: 'univ-exemple', features: { ade: true, planning: true, moodle: false, grades: 'disabled', mail: false, moodleDeadlines: false } }
 
   const needAudience = CHANGELOG.filter((entry) => entry.audience).map((entry) => entry.id)
-  assert.deepEqual(needAudience, ['planning', 'simulateur-fluide', 'mes-notes'])
+  assert.deepEqual(needAudience, ['messagerie', 'planning', 'simulateur-fluide', 'mes-notes'])
   assert.equal(ids(rennes).length, CHANGELOG.length - needAudience.length, 'all but the ones for « Mes notes » and the Planning, which need their audience')
   assert.ok(!ids(rennes).includes('mes-notes'))
   assert.ok(!ids(rennes).includes('planning'))
-  assert.equal(getApplicableEntries(CHANGELOG, rennes, ['grades-page', 'planning-page']).length, CHANGELOG.length)
+  assert.equal(getApplicableEntries(CHANGELOG, rennes, ['grades-page', 'planning-page', 'mail-page']).length, CHANGELOG.length)
   assert.ok(!ids(exemple).includes('mes-notes'))
   assert.ok(!ids(exemple).includes('certificat-de-scolarite'))
   assert.ok(!ids(exemple).includes('raccourcis-messagerie-moodle'))
@@ -239,13 +239,13 @@ test('the pill leaves spotlight entries to their own card', () => {
   assert.deepEqual(getPillIds([GLOBAL], ['global']), ['global'])
 })
 
-test('the Planning and « Mes notes » are the changelog’s spotlight entries', () => {
-  assert.deepEqual(CHANGELOG.filter((entry) => entry.spotlight).map((entry) => entry.id), ['planning', 'mes-notes'])
+test('the Messagerie, the Planning and « Mes notes » are the changelog’s spotlight entries', () => {
+  assert.deepEqual(CHANGELOG.filter((entry) => entry.spotlight).map((entry) => entry.id), ['messagerie', 'planning', 'mes-notes'])
 })
 
 // The shipped entries, at a school with both pages (Rennes's features).
 const RENNES_FULL = { id: 'univ-rennes', features: { ade: true, planning: true, moodle: true, grades: true, mail: true, moodleDeadlines: true, schoolCertificate: true } }
-const BOTH_PAGES = ['grades-page', 'planning-page']
+const BOTH_PAGES = ['grades-page', 'planning-page', 'mail-page']
 
 test('the Planning’s launch only reaches students with the page', () => {
   const planning = CHANGELOG.find((entry) => entry.id === 'planning')
@@ -253,6 +253,14 @@ test('the Planning’s launch only reaches students with the page', () => {
   assert.equal(isEntryApplicable(planning, RENNES_FULL, ['planning-page']), true, 'no « Mes notes » needed')
   assert.equal(isEntryApplicable(planning, { id: 'univ-exemple', features: { planning: true, grades: 'disabled' } }, ['planning-page']), true)
   assert.equal(isEntryApplicable(planning, { id: 'example-minimal', features: { planning: false } }, ['planning-page']), false, 'no planning feature: never')
+})
+
+test('the Messagerie’s launch only reaches students with the mail page', () => {
+  const mail = CHANGELOG.find((entry) => entry.id === 'messagerie')
+  assert.equal(isEntryApplicable(mail, RENNES_FULL), false, 'audience unknown yet (not signed in): hidden')
+  assert.equal(isEntryApplicable(mail, RENNES_FULL, ['mail-page']), true)
+  assert.equal(isEntryApplicable(mail, { id: 'example-minimal', features: { mail: false } }, ['mail-page']), false, 'no mail feature: never')
+  assert.equal(isEntryApplicable(mail, RENNES_FULL, ['planning-page']), false, 'another page’s audience is not enough')
 })
 
 test('a fresh device records the launches as seen: no card, no tab mark', () => {

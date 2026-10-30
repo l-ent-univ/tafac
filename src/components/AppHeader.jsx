@@ -2,7 +2,7 @@ import { Icon } from '@iconify/react'
 import LentButton from './LentButton'
 import UniversityLockup from './UniversityLockup'
 
-function AppHeader({ authenticated, checking, onPrimaryAction, onAccountAction }) {
+function AppHeader({ authenticated, checking, establishment = null, showUniversityLogo = true, logoSource = 'establishment', onPrimaryAction, onAccountAction }) {
   const actionLabel = checking
     ? 'Chargement...'
     : authenticated
@@ -10,10 +10,12 @@ function AppHeader({ authenticated, checking, onPrimaryAction, onAccountAction }
       : 'Se connecter'
 
   return (
-    <header className="w-full pt-5 px-6 max-xl:pt-4 max-md:pt-3 max-md:px-3">
+    // Above what follows (relative z-[1]): the cards' area paints over the
+    // buttons' soft shadow otherwise, cut in a straight line under them.
+    <header className="relative z-[1] w-full pt-5 px-6 max-xl:pt-4 max-md:pt-3 max-md:px-3">
       <div className="w-full flex items-center justify-between gap-6 max-xl:gap-[0.9rem] max-md:items-start max-md:gap-3">
         <a className="inline-flex items-center no-underline min-w-0 max-md:self-start" href="/" aria-label="Retour">
-          <UniversityLockup variant="header" />
+          <UniversityLockup variant="header" establishment={establishment} showLogo={showUniversityLogo} logoSource={logoSource} />
         </a>
 
         <div className="flex items-center gap-2 justify-end max-md:ml-auto max-md:items-start max-md:gap-[0.4rem]">

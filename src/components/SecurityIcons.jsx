@@ -179,6 +179,19 @@ export function DatabaseIcon(props) {
   )
 }
 
+// A mail: an envelope, tilted, its flap shaded.
+export function EnvelopeIcon(props) {
+  return (
+    <Glyph {...props}>
+      <g transform="rotate(-6 24 24)">
+        <rect x="5" y="11" width="38" height="27" rx="5" fill={TINT} />
+        <path d="M7 13.5 21.6 25.4a3.8 3.8 0 0 0 4.8 0L41 13.5Z" fill={SHADE} />
+        <path d="M7.5 36 18.6 26.6M40.5 36 29.4 26.6" strokeWidth="2" />
+      </g>
+    </Glyph>
+  )
+}
+
 // A bar chart, three bars.
 export function ChartIcon(props) {
   return (

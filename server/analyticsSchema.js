@@ -22,7 +22,10 @@ const GRADES_PAGE_SOURCES = ['nav', 'tabbar', 'tile', 'dashboard_card', 'sidebar
 const GRADES_ACTIONS = ['semester_changed', 'ue_view_opened', 'grade_detail_opened', 'pdf_downloaded', 'explainer_opened', 'department_message_expanded']
 // How the student arrived on the Planning page (see src/planningAnalytics.js).
 const PLANNING_PAGE_SOURCES = ['nav', 'tabbar', 'tile', 'dashboard_card', 'launch_card', 'history', 'other']
-const PAGE_SOURCES = { grades: GRADES_PAGE_SOURCES, planning: PLANNING_PAGE_SOURCES }
+// And on the Messagerie (see src/mailAnalytics.js): `grades` is « Écrire au
+// sujet de cette note », `planning` « Écrire au sujet de ce cours ».
+const MAIL_PAGE_SOURCES = ['nav', 'tabbar', 'tile', 'dashboard_card', 'launch_card', 'grades', 'planning', 'history', 'other']
+const PAGE_SOURCES = { grades: GRADES_PAGE_SOURCES, planning: PLANNING_PAGE_SOURCES, mail: MAIL_PAGE_SOURCES }
 const PLANNING_VIEWS = ['day', 'two_days', 'week', 'list']
 const PLANNING_ACTIONS = [
   'view_changed', 'day_changed', 'week_changed', 'today', 'calendar_picked', 'day_opened',
@@ -42,6 +45,51 @@ const PLANNING_ACTION_REQUIRED = {
   day_changed: ['via'],
   week_changed: ['via'],
   ics_exported: ['from', 'result'],
+}
+const MAIL_ACTIONS = [
+  'mail_opened', 'thread_expanded', 'folder_changed', 'search', 'refresh',
+  'compose_opened', 'sent', 'draft_saved', 'draft_discarded', 'grade_attached', 'course_attached',
+  'trash', 'spam', 'move', 'restore', 'delete_forever', 'flag', 'read_toggle', 'empty_folder', 'mark_folder_read',
+  'print', 'pdf', 'attachment_downloaded',
+]
+const MAIL_FOLDER_KINDS = ['inbox', 'sent', 'drafts', 'junk', 'trash', 'folder']
+// mail_action's own properties, by action (any other is dropped), and
+// those an action can't go without.
+const MAIL_ACTION_PROPERTIES = {
+  mail_opened: ['from'],
+  folder_changed: ['folder_kind'],
+  search: ['scope'],
+  compose_opened: ['kind'],
+  sent: ['result', 'attachments', 'inline_images'],
+  trash: ['via'],
+  spam: ['via'],
+  move: ['via'],
+  restore: ['via'],
+  delete_forever: ['via'],
+  flag: ['via'],
+  read_toggle: ['via'],
+  empty_folder: ['folder_kind'],
+  mark_folder_read: ['folder_kind'],
+  pdf: ['result'],
+}
+const MAIL_ACTION_REQUIRED = {
+  mail_opened: ['from'],
+  folder_changed: ['folder_kind'],
+  search: ['scope'],
+  compose_opened: ['kind'],
+  sent: ['result'],
+  trash: ['via'],
+  spam: ['via'],
+  move: ['via'],
+  restore: ['via'],
+  delete_forever: ['via'],
+  flag: ['via'],
+  read_toggle: ['via'],
+  pdf: ['result'],
+}
+const SETTING_VALUES = {
+  theme: ['auto', 'light', 'dark'],
+  mail_signature_kind: ['auto', 'partage', 'custom'],
 }
 const SIMULATOR_STEPS = ['opened', 'ue_picked', 'reveal_shown', 'back_to_edit', 'closed']
 // The simulator's outcome, sent with reveal_shown only. Never a grade, an
@@ -105,17 +153,18 @@ export const ANALYTICS_EVENTS = {
   },
   setting_changed: {
     properties: {
-      setting: oneOf('widget_visibility', 'app_descriptions', 'custom_background', 'wallpaper', 'theme', 'analytics'),
-      value: oneOf('on', 'off', 'auto', 'light', 'dark'),
+      setting: oneOf('widget_visibility', 'app_descriptions', 'custom_background', 'wallpaper', 'university_logo', 'theme', 'analytics', 'mail_signature', 'mail_signature_kind'),
+      value: oneOf('on', 'off', 'auto', 'light', 'dark', 'partage', 'custom'),
       widget: oneOf(...WIDGET_IDS),
     },
     required: ['setting', 'value'],
     refine: (props) => {
       // Turning analytics off must not be reported at all.
       if (props.setting === 'analytics' && props.value === 'off') return null
-      // The theme reports which one was picked; every other setting is on/off.
-      const isThemeValue = ['auto', 'light', 'dark'].includes(props.value)
-      if ((props.setting === 'theme') !== isThemeValue) return null
+      // The theme reports which one was picked, the signature's kind which
+      // one (auto, partage, custom); every other setting is on/off.
+      const allowed = SETTING_VALUES[props.setting] ?? ['on', 'off']
+      if (!allowed.includes(props.value)) return null
       if (props.setting === 'widget_visibility') {
         return props.widget ? props : null
       }
@@ -144,13 +193,13 @@ export const ANALYTICS_EVENTS = {
     required: ['has_settings'],
     allowWithoutSession: true,
   },
-  // « Mes notes » and the Planning: one per arrival on the page (not per
-  // re-render), each with its own sources. The planning's also says the
-  // view it opens in.
+  // « Mes notes », the Planning and the Messagerie: one per arrival on the
+  // page (not per re-render), each with its own sources. The planning's
+  // also says the view it opens in.
   page_viewed: {
     properties: {
-      page: oneOf('grades', 'planning'),
-      source: oneOf(...new Set([...GRADES_PAGE_SOURCES, ...PLANNING_PAGE_SOURCES])),
+      page: oneOf('grades', 'planning', 'mail'),
+      source: oneOf(...new Set([...GRADES_PAGE_SOURCES, ...PLANNING_PAGE_SOURCES, ...MAIL_PAGE_SOURCES])),
       view: oneOf(...PLANNING_VIEWS),
     },
     required: ['page', 'source'],
@@ -244,14 +293,58 @@ export const ANALYTICS_EVENTS = {
       return props
     },
   },
-  // A page's launch announcement (« Mes notes », the Planning: `launch`):
+  // The folder the Messagerie opens on, once per arrival: the mails came
+  // (`ok`), none (`empty`), the mail didn't answer (`error`, with its
+  // error_kind) or the session is gone (`session_expired`). Never how many
+  // mails nor the folder.
+  mail_loaded: {
+    properties: {
+      status: oneOf('ok', 'empty', 'error', 'session_expired'),
+      duration_bucket: oneOf(...DURATION_BUCKETS),
+      error_kind: oneOf(...ERROR_KINDS),
+    },
+    required: ['status'],
+    refine: (props) => {
+      if (props.status !== 'error') delete props.error_kind
+      return props
+    },
+  },
+  // One thing done in the Messagerie. Only enums, booleans and buckets, each
+  // action keeping its own properties: never a subject, an address, a
+  // folder's name, a search text, a file name nor a message id. A search
+  // comes once per burst of typing, with its scope only.
+  mail_action: {
+    properties: {
+      action: oneOf(...MAIL_ACTIONS),
+      from: oneOf('list', 'widget', 'history'),
+      folder_kind: oneOf(...MAIL_FOLDER_KINDS),
+      scope: oneOf('local', 'server'),
+      kind: oneOf('new', 'reply', 'reply_all', 'forward', 'draft', 'grade', 'course'),
+      result: oneOf('ok', 'partial', 'error', 'undone'),
+      attachments: oneOf('0', '1', '2-3', '4+'),
+      inline_images: boolean,
+      via: oneOf('toolbar', 'context_menu', 'swipe', 'keyboard'),
+    },
+    required: ['action'],
+    refine: (props) => {
+      const kept = MAIL_ACTION_PROPERTIES[props.action] ?? []
+      for (const name of Object.keys(props)) {
+        if (name !== 'action' && !kept.includes(name) && !Object.hasOwn(CONTEXT_PROPERTIES, name)) delete props[name]
+      }
+      if ((MAIL_ACTION_REQUIRED[props.action] ?? []).some((name) => !Object.hasOwn(props, name))) return null
+      // A pdf is saved or fails: nothing partial or undone.
+      if (props.action === 'pdf' && !['ok', 'error'].includes(props.result)) return null
+      return props
+    },
+  },
+  // A page's launch announcement (« Mes notes », the Planning, the Messagerie: `launch`):
   // the dashboard card (shown, its button, its close button) and the nav
   // item's « Nouveau » marker clicked. Versions from before the Planning's
   // only announced « Mes notes » and don't say which: counted as `grades`.
   launch_card: {
     properties: {
       action: oneOf('shown', 'cta', 'dismissed', 'tab_marker'),
-      launch: oneOf('grades', 'planning'),
+      launch: oneOf('grades', 'planning', 'mail'),
     },
     required: ['action'],
     refine: (props) => {

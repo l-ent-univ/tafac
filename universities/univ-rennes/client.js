@@ -2,9 +2,11 @@
 // Everything in this file is bundled into the browser build: no secrets here.
 // This is the reference implementation forks should copy (see docs/ADDING_A_UNIVERSITY.md).
 import logo from './assets/logo.svg'
-import heroLannionBrelevenez from './assets/hero/lannion-brelevenez.webp'
+import iutLannionLogo from './assets/establishments/iutlan.svg'
+import iutLannionLogoDark from './assets/establishments/iutlan-dark.svg'
 import heroLannionIut from './assets/hero/lannion-iut.webp'
-import heroLannionLeguer from './assets/hero/lannion-leguer.webp'
+import heroLannionQuais from './assets/hero/lannion-quais.webp'
+import heroLannionRochers from './assets/hero/lannion-rochers.webp'
 import heroRennesBeaulieu1 from './assets/hero/rennes-beaulieu-1.webp'
 import heroRennesBeaulieu2 from './assets/hero/rennes-beaulieu-2.webp'
 import {
@@ -13,10 +15,12 @@ import {
   branding,
   casOrigin,
   entOrigin,
+  establishmentNames,
   features,
   gradesCopy,
   gradesServiceUrl,
   moodleOrigin,
+  mailWebmailUrl,
   planningServiceUrl,
   portalEntryPath,
   university,
@@ -76,6 +80,19 @@ export default {
     moodle: moodleOrigin,
   },
 
+  // The mail page (features.mail): the university's own mail domains,
+  // sub-domains included (etudiant.univ-rennes.fr, listes.…). A sender from
+  // any other domain has it shown next to their name in the list, so a
+  // display name copying the university's stands out (src/mailDomain.js).
+  // univ-rennes1.fr: Rennes 1's, before the merger, still on its older
+  // services (ScoDoc, the docs).
+  mail: {
+    ownDomains: ['univ-rennes.fr', 'univ-rennes1.fr'],
+    // The webmail's links (its public entry, where its sign-in lands): the
+    // app lists' tiles leading there open the mail page (mailPortalApp.js).
+    webmailUrls: [mailWebmailUrl],
+  },
+
   auth: {
     portalEntryPath,
   },
@@ -115,7 +132,12 @@ export default {
     fallbackId: 'other',
     byId: {
       iutlan: {
-        label: 'IUT de Lannion',
+        label: establishmentNames.iutlan,
+        // Next to Tafac's in the sidebar and header, instead of the
+        // university's: a square badge, its letters light in dark mode.
+        logo: iutLannionLogo,
+        logoDark: iutLannionLogoDark,
+        logoShape: 'square',
         heroImages: [
           {
             src: heroLannionIut,
@@ -125,19 +147,19 @@ export default {
             },
           },
           {
-            src: heroLannionBrelevenez,
+            src: heroLannionRochers,
             credit: {
-              author: 'Laurent',
-              license: 'CC BY-SA 3.0',
-              url: 'https://commons.wikimedia.org/wiki/File:VueDeLannionEtBrelevenez.jpg',
+              author: 'Erwan Martin',
+              license: 'Unsplash',
+              url: 'https://unsplash.com/photos/xWTIf4LJIwQ',
             },
           },
           {
-            src: heroLannionLeguer,
+            src: heroLannionQuais,
             credit: {
-              author: 'Kev22',
-              license: 'CC BY-SA 4.0',
-              url: 'https://commons.wikimedia.org/wiki/File:Lannion_-_Le_L%C3%A9guer_03.jpg',
+              author: 'Pascal Bernardon',
+              license: 'Unsplash',
+              url: 'https://unsplash.com/photos/D1y7P9tyPrI',
             },
           },
         ],

@@ -195,3 +195,20 @@ test('a wide screen draws a day’s classes as its week does', () => {
   assert.deepEqual([day.variant, day.stackFirst], ['regular', false])
   assert.deepEqual([wideDay.variant, wideDay.stackFirst], ['compact', true])
 })
+
+test('a class keeps its note and its web link, the link label in plain case', () => {
+  const tempo = toPlanningEvent({ uid: 'tempo-1', title: 'Atelier', startMs: at(19, 9), endMs: at(19, 11), notes: ' Salle changée ', link: 'https://pix.example.fr/planning', linkLabel: 'VOTRE PLANNING' })
+  assert.equal(tempo.notes, 'Salle changée')
+  assert.equal(tempo.link, 'https://pix.example.fr/planning')
+  assert.equal(tempo.linkLabel, 'Votre planning')
+
+  const ade = toPlanningEvent({ uid: '501', title: 'Anglais', startMs: at(19, 9), endMs: at(19, 11), link: null })
+  assert.equal(ade.notes, null)
+  assert.equal(ade.link, null)
+  assert.equal(ade.linkLabel, null)
+
+  const unsafe = toPlanningEvent({ uid: '2', title: 'x', startMs: at(19, 9), endMs: at(19, 10), link: 'javascript:alert(1)', linkLabel: 'Ouvrir' })
+  assert.equal(unsafe.link, null)
+  assert.equal(unsafe.linkLabel, null)
+  assert.equal(toPlanningEvent({ uid: '3', title: 'x', startMs: at(19, 9), endMs: at(19, 10), link: 'https://a.example', linkLabel: 'BU' }).linkLabel, 'BU')
+})

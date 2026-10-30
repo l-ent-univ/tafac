@@ -30,6 +30,61 @@
   border-color: rgba(255, 255, 255, 0.08);
 }
 
+/* ── Concentric modal corners ──
+   A modal holding cards or lists rounds its corners on theirs: the cards'
+   radius plus the inset between them (--modal-inner-radius and
+   --modal-inset, set on the modal), so the two curves run parallel instead
+   of the card's corner bulging towards the modal's. .modal-corners on the
+   modal, .modal-inner-corners on its cards (20px outside a modal, the
+   settings cards' own), .modal-corners-bottom on a footer flush with its
+   bottom edge, inside its 1px border. In the round-corner units of
+   corners-*: the superellipse scales them all alike. In the components
+   layer, so a sheet's utilities (max-sm:rounded-b-none) still win. */
+@layer components {
+  .modal-corners {
+    --modal-radius: calc(var(--modal-inner-radius, 20px) + var(--modal-inset, 24px));
+    border-radius: var(--modal-radius);
+  }
+
+  .modal-inner-corners {
+    border-radius: var(--modal-inner-radius, 20px);
+  }
+
+  /* A row inside one of those cards (the simulator's subjects), inset by
+     --modal-nested-inset: the same rule one level down. */
+  .modal-nested-corners {
+    border-radius: calc(var(--modal-inner-radius, 20px) - var(--modal-nested-inset, 8px));
+  }
+
+  .modal-corners-bottom {
+    border-bottom-left-radius: calc(var(--modal-radius) - 1px);
+    border-bottom-right-radius: calc(var(--modal-radius) - 1px);
+  }
+
+  @supports (corner-shape: superellipse(1.3)) {
+    .modal-corners {
+      border-radius: calc(var(--modal-radius) / 0.853);
+      corner-shape: superellipse(1.3);
+    }
+
+    .modal-inner-corners {
+      border-radius: calc(var(--modal-inner-radius, 20px) / 0.853);
+      corner-shape: superellipse(1.3);
+    }
+
+    .modal-nested-corners {
+      border-radius: calc((var(--modal-inner-radius, 20px) - var(--modal-nested-inset, 8px)) / 0.853);
+      corner-shape: superellipse(1.3);
+    }
+
+    .modal-corners-bottom {
+      border-bottom-left-radius: calc((var(--modal-radius) - 1px) / 0.853);
+      border-bottom-right-radius: calc((var(--modal-radius) - 1px) / 0.853);
+      corner-shape: superellipse(1.3);
+    }
+  }
+}
+
 /* ── Widget corners ──
    The cards' corners: a smooth curve (corner-shape: superellipse(1.3)) where
    the browser draws it (Chrome, Edge), else the round corner closest to it
@@ -128,6 +183,764 @@
   box-shadow: 0 1px 3px rgb(52 18 0 / 0.06), 0 16px 40px -14px rgb(52 18 0 / 0.24);
 }
 
+/* The mail reader's side panel (MailPage, from 4xl): the sidebar's frame
+   on a solid white, sliding in from the right edge and back out. */
+.mail-reader-panel {
+  --mail-panel-bg: #ffffff;
+  background-color: var(--mail-panel-bg);
+  border-color: rgb(52 18 0 / 0.08);
+  box-shadow: 0 1px 3px rgb(52 18 0 / 0.06), 0 16px 40px -14px rgb(52 18 0 / 0.24);
+  animation: mail-reader-panel-in 340ms cubic-bezier(0.32, 0.72, 0, 1) both;
+}
+
+.mail-reader-panel.is-closing {
+  animation: mail-reader-panel-out 240ms cubic-bezier(0.32, 0.72, 0, 1) both;
+}
+
+:where([data-theme="dark"]) .mail-reader-panel {
+  --mail-panel-bg: #1c1c1c;
+  background-color: var(--mail-panel-bg);
+  border-color: rgb(255 255 255 / 0.1);
+  box-shadow: 0 1px 3px rgb(0 0 0 / 0.4), 0 16px 40px -14px rgb(0 0 0 / 0.7);
+}
+
+@keyframes mail-reader-panel-in {
+  from {
+    opacity: 0;
+    transform: translateX(calc(100% + 12px));
+  }
+}
+
+@keyframes mail-reader-panel-out {
+  to {
+    opacity: 0;
+    transform: translateX(calc(100% + 12px));
+  }
+}
+
+/* A mail coming into the reader (another one picked in the list, or its
+   header once loaded): a short fade. */
+.mail-reader-enter {
+  animation: mail-reader-enter 220ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+
+@keyframes mail-reader-enter {
+  from {
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mail-reader-enter {
+    animation: none;
+  }
+}
+
+/* The mail list's rows coming and going (MailPage, useListTransitions):
+   their height opening from or shutting to nothing (a one-row grid from
+   1fr to 0fr, clipped vertically only: the hover tint bleeds sideways) as
+   they fade, the rows below sliding along. */
+.mail-row-enter,
+.mail-row-exit {
+  display: grid;
+  overflow: visible clip;
+}
+
+.mail-row-enter > *,
+.mail-row-exit > * {
+  min-height: 0;
+}
+
+.mail-row-enter {
+  animation: mail-row-in 300ms cubic-bezier(0.32, 0.72, 0, 1) both;
+}
+
+.mail-row-exit {
+  animation: mail-row-out 260ms cubic-bezier(0.32, 0.72, 0, 1) both;
+}
+
+@keyframes mail-row-in {
+  from {
+    grid-template-rows: 0fr;
+    opacity: 0;
+  }
+  to {
+    grid-template-rows: 1fr;
+  }
+}
+
+@keyframes mail-row-out {
+  from {
+    grid-template-rows: 1fr;
+  }
+  to {
+    grid-template-rows: 0fr;
+    opacity: 0;
+    border-bottom-color: transparent;
+  }
+}
+
+/* Still a (near-instant) animation: a gone row's end removes it. */
+@media (prefers-reduced-motion: reduce) {
+  .mail-row-enter,
+  .mail-row-exit {
+    animation-duration: 1ms;
+  }
+}
+
+/* A mail row swiped sideways (SwipeableRow, on a touch screen): the row
+   slides over (vertical pans stay the page's, pinches too), its actions
+   filling the room it leaves on either side. Clipped only while they show,
+   to the row's rounded tint: at rest a selected row still runs 1px over
+   the line below it. No long-press callout or text selection on the row,
+   the long press being its menu. */
+.mail-swipe {
+  position: relative;
+  border-radius: 10px;
+}
+
+.mail-swipe.is-revealed {
+  overflow: hidden;
+}
+
+.mail-swipe-content {
+  touch-action: pan-y pinch-zoom;
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+.mail-swipe.is-revealed .mail-swipe-content {
+  will-change: transform;
+}
+
+.mail-swipe-actions {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  display: flex;
+  width: 0;
+  overflow: hidden;
+}
+
+/* Listed from the edge inwards: the first at the row's edge. */
+.mail-swipe-actions--leading {
+  left: 0;
+}
+
+.mail-swipe-actions--trailing {
+  right: 0;
+  flex-direction: row-reverse;
+}
+
+/* Each shares the room; a full swipe (or a removing one tapped) gives it
+   all to one, the others folding away, its label kept by the row's edge. */
+.mail-swipe-action {
+  display: flex;
+  flex: 1 1 0;
+  min-width: 0;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  padding: 0;
+  border: 0;
+  color: #ffffff;
+  cursor: pointer;
+  transition: flex-grow 220ms cubic-bezier(0.32, 0.72, 0, 1);
+}
+
+.mail-swipe-action:focus-visible {
+  outline: 2px solid #ffffff;
+  outline-offset: -4px;
+}
+
+.mail-swipe-actions[data-expanding] > .mail-swipe-action:not([data-expanded]) {
+  flex-grow: 0;
+}
+
+.mail-swipe-action-inner {
+  transition: opacity 120ms ease;
+}
+
+.mail-swipe-actions[data-expanding] > .mail-swipe-action:not([data-expanded]) .mail-swipe-action-inner {
+  opacity: 0;
+}
+
+.mail-swipe-actions--trailing > .mail-swipe-action[data-expanded] {
+  justify-content: flex-start;
+}
+
+.mail-swipe-actions--leading > .mail-swipe-action[data-expanded] {
+  justify-content: flex-end;
+}
+
+.mail-swipe-action-inner {
+  display: flex;
+  flex: 0 0 76px;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding-inline: 4px;
+  text-align: center;
+}
+
+/* A button narrower than its label (the row partly open, or folding away
+   beside a full swipe) shows its icon alone: no label cut off on both
+   sides, running into the next one. */
+.mail-swipe-action {
+  container-type: inline-size;
+}
+
+.mail-swipe-action-label {
+  transition: opacity 120ms ease;
+}
+
+@container (max-width: 64px) {
+  .mail-swipe-action-label {
+    opacity: 0;
+  }
+}
+
+/* Crossing the full-swipe point: the icon gives a little jump, the snap a
+   haptic would be. */
+.mail-swipe-action[data-expanded] .mail-swipe-action-icon {
+  animation: mail-swipe-snap 280ms cubic-bezier(0.32, 0.72, 0, 1);
+}
+
+@keyframes mail-swipe-snap {
+  40% {
+    transform: scale(1.22);
+  }
+}
+
+.mail-swipe-action--blue {
+  background-color: #1a73e8;
+}
+
+.mail-swipe-action--orange {
+  background-color: #f0932b;
+}
+
+.mail-swipe-action--red {
+  background-color: #d1342f;
+}
+
+.mail-swipe-action--gray {
+  background-color: #8e8e93;
+}
+
+:where([data-theme="dark"]) .mail-swipe-action--blue {
+  background-color: #2f7cf0;
+}
+
+:where([data-theme="dark"]) .mail-swipe-action--red {
+  background-color: #e5443d;
+}
+
+:where([data-theme="dark"]) .mail-swipe-action--gray {
+  background-color: #636366;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mail-swipe-action {
+    transition: none;
+  }
+
+  .mail-swipe-action[data-expanded] .mail-swipe-action-icon {
+    animation: none;
+  }
+}
+
+/* The reader panel's toolbar, held at its top (MailPage, from 4xl): the
+   mail scrolling under it fades into the panel's colour behind the pills,
+   up to the panel's edge, instead of showing between them. */
+@media (min-width: 1024px) {
+  .mail-toolbar-veil::before {
+    content: '';
+    position: absolute;
+    inset: -20px -20px -16px;
+    z-index: -1;
+    background: linear-gradient(to bottom, var(--mail-panel-bg) 62%, transparent);
+    pointer-events: none;
+  }
+}
+
+/* The mail search's input: the field around it shows the focus (rounded,
+   MailSearchField), not index.css's square ring on the input itself. */
+.mail-search-input:focus-visible {
+  outline: none;
+}
+
+/* The mail list swapped for another folder's (keyed by folder): a short
+   fade in, from the dimmed list it replaces. Backwards only: once played
+   it lets go of the opacity, so the next switch's dimming eases. */
+.mail-list-swap {
+  animation: mail-reader-enter 220ms ease-out backwards;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mail-list-swap {
+    animation: none;
+  }
+}
+
+/* The mail page's refresh button while it reloads: its arrows turn. */
+.mail-refresh-spin {
+  animation: mail-refresh-spin 700ms cubic-bezier(0.45, 0, 0.25, 1) infinite;
+}
+
+@keyframes mail-refresh-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mail-refresh-spin {
+    animation-duration: 1.6s;
+  }
+}
+
+/* On a phone (the reader in the list's place, under 1024px), as iOS pushes
+   a screen: a mail opened slides in from the right, the list back from the
+   left (its block shown again replays it). The desktop's panel has its own
+   slide. Backwards only: no transform left on them once played. */
+@media (max-width: 1023px) {
+  .mail-push-in {
+    animation: mail-push-in 360ms cubic-bezier(0.32, 0.72, 0, 1) backwards;
+  }
+
+  .mail-pop-in {
+    animation: mail-pop-in 320ms cubic-bezier(0.32, 0.72, 0, 1) backwards;
+  }
+}
+
+@keyframes mail-push-in {
+  from {
+    opacity: 0;
+    transform: translateX(32px);
+  }
+}
+
+@keyframes mail-pop-in {
+  from {
+    opacity: 0;
+    transform: translateX(-24px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mail-push-in,
+  .mail-pop-in {
+    animation: none;
+  }
+}
+
+/* The mail page's skeletons and loading dots (the list, a mail, a search):
+   none for a quick answer, faded in past a short wait, so they don't flash. */
+.mail-skeleton-delayed {
+  animation: mail-skeleton-in 220ms ease-out 180ms both;
+}
+
+@keyframes mail-skeleton-in {
+  from {
+    opacity: 0;
+  }
+}
+
+/* The mail page's notice coming and going (MailToast): rising in with a
+   little spring, sinking back out. */
+.mail-toast-in {
+  animation: mail-toast-in 420ms cubic-bezier(0.34, 1.4, 0.64, 1) both;
+}
+
+.mail-toast-out {
+  animation: mail-toast-out 220ms cubic-bezier(0.4, 0, 1, 1) both;
+}
+
+@keyframes mail-toast-in {
+  from {
+    opacity: 0;
+    transform: translateY(18px) scale(0.94);
+  }
+}
+
+@keyframes mail-toast-out {
+  to {
+    opacity: 0;
+    transform: translateY(12px) scale(0.96);
+  }
+}
+
+/* Still animations (near-instant): the way out's end removes it. */
+@media (prefers-reduced-motion: reduce) {
+  .mail-toast-in,
+  .mail-toast-out {
+    animation-duration: 1ms;
+  }
+}
+
+/* The mail page's notice (MailToast): the stroke round « Annuler », drawn
+   over the time left to undo; its end closes the notice. The rect sits
+   inside the 28px pill, its stroke on the edge. */
+.mail-toast-ring {
+  x: 0.75px;
+  y: 0.75px;
+  width: calc(100% - 1.5px);
+  height: calc(100% - 1.5px);
+  rx: 13.25px;
+  stroke-dasharray: 1;
+  stroke-dashoffset: 1;
+  animation: mail-toast-ring var(--toast-duration, 6s) linear forwards;
+}
+
+.mail-toast:hover .mail-toast-ring {
+  animation-play-state: paused;
+}
+
+@keyframes mail-toast-ring {
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+/* Still a (near-instant) animation: its end unmounts the closed panel. */
+@media (prefers-reduced-motion: reduce) {
+  .mail-reader-panel,
+  .mail-reader-panel.is-closing {
+    animation-duration: 1ms;
+  }
+}
+
+/* ── Mail composer (MailComposer) ──
+   From 1024px a window over the page's bottom right, of the reader panel's
+   solid white and frame with a deeper shadow (it floats over the panel);
+   below, a sheet over the whole screen sliding up, as iOS Mail's. */
+.mail-composer {
+  background-color: #ffffff;
+  animation: mail-composer-sheet-in 380ms cubic-bezier(0.32, 0.72, 0, 1) both;
+}
+
+:where([data-theme="dark"]) .mail-composer {
+  background-color: #1c1c1c;
+}
+
+@media (min-width: 1024px) {
+  .mail-composer {
+    border-color: rgb(52 18 0 / 0.08);
+    box-shadow: 0 1px 3px rgb(52 18 0 / 0.08), 0 32px 80px -20px rgb(52 18 0 / 0.36);
+    transform-origin: 100% 100%;
+    animation: mail-composer-window-in 260ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+  }
+
+  :where([data-theme="dark"]) .mail-composer {
+    border-color: rgb(255 255 255 / 0.1);
+    box-shadow: 0 1px 3px rgb(0 0 0 / 0.4), 0 32px 80px -20px rgb(0 0 0 / 0.8);
+  }
+}
+
+@keyframes mail-composer-window-in {
+  from {
+    opacity: 0;
+    transform: translateY(16px) scale(0.97);
+  }
+}
+
+@keyframes mail-composer-sheet-in {
+  from {
+    transform: translateY(100%);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mail-composer {
+    animation: none;
+  }
+}
+
+/* Its fields: the row shows nothing on focus (the caret says it), not
+   index.css's square ring; same for the text. */
+.mail-composer-input:focus-visible,
+.mail-composer-body:focus,
+.mail-composer-body:focus-visible {
+  outline: none;
+}
+
+/* The composer's grades drawer (MailGradePicker): it slides up from the
+   composer's foot, at any width. */
+.mail-grade-drawer {
+  animation: gd-sheet-in 360ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mail-grade-drawer {
+    animation: none;
+  }
+}
+
+/* A recipient token selected (focused, MailComposer's RecipientToken) shows
+   it by its filled pill: no ring around it as well. */
+.mail-recipient-token:focus-visible {
+  outline: none;
+}
+
+/* The composer going full screen and back (MailComposer, from 1024 px): a
+   view transition as a UE's tile opening full page (.ue-morph, .ue-card:
+   the frame grows, its content cross-fades unscaled; its own frame further
+   down, after the UE's). */
+@media (min-width: 1024px) {
+  .mail-composer {
+    view-transition-name: mail-composer;
+    view-transition-class: ue-morph ue-card;
+  }
+}
+
+/* The automatic signature in the composer's text (MailSignatureView): the
+   « — » above it, the name, the group, the establishment, then the
+   logos, in the muted colour of a quote, not typed into. */
+.mail-composer-signature {
+  display: grid;
+  justify-items: start;
+  gap: 1px;
+  margin: 14px 0 6px;
+  font-size: 14px;
+  line-height: 1.45;
+  color: var(--color-text-muted);
+  user-select: none;
+}
+
+.mail-composer-signature-rule {
+  margin-bottom: 2px;
+}
+
+.mail-composer-signature-name {
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+.mail-composer-signature-logos {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-top: 8px;
+}
+
+.mail-composer-signature-logos img {
+  height: 32px;
+  width: auto;
+}
+
+/* The student's own signature (« Partage », « Personnalisée »): in the
+   text's colour, as the mail sent has it (server/mailSignature.js); a hint
+   in its place when there's none. */
+.mail-composer-signature--own {
+  color: var(--color-text);
+}
+
+.mail-composer-signature-hint {
+  color: var(--color-text-muted);
+  font-style: italic;
+  font-synthesis-style: auto;
+}
+
+/* A webmail signature's HTML (MailSignatureHtml), in the composer and in
+   Réglages: its blocks and lists as a mail shows them, links underlined.
+   In the dark theme its colours give way to the theme's (a black text
+   was unreadable); the mail sent keeps them. */
+.mail-signature-html {
+  overflow-wrap: anywhere;
+  font-synthesis-style: auto;
+}
+
+.mail-signature-html p,
+.mail-signature-html div {
+  margin: 0;
+}
+
+.mail-signature-html ul,
+.mail-signature-html ol {
+  margin: 0.25em 0;
+  padding-left: 1.5em;
+}
+
+.mail-signature-html ul {
+  list-style: disc;
+}
+
+.mail-signature-html ol {
+  list-style: decimal;
+}
+
+.mail-signature-html a {
+  color: inherit;
+  text-decoration: underline;
+  text-decoration-color: color-mix(in srgb, currentColor 35%, transparent);
+  text-underline-offset: 2px;
+}
+
+:where([data-theme="dark"]) .mail-signature-html [style] {
+  color: inherit !important;
+}
+
+/* « Signature automatique » beside the composer's switch, while it's on: a
+   light passing over the word now and then (a gradient clipped to the
+   text), as the app's skeletons shimmer. Still with reduced motion. */
+.mail-signature-shimmer {
+  background-image: linear-gradient(100deg, var(--color-text-muted) 0%, var(--color-text-muted) 38%, var(--color-text) 50%, var(--color-text-muted) 62%, var(--color-text-muted) 100%);
+  background-size: 300% 100%;
+  background-position: 100% 0;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: mail-signature-shimmer 3.2s ease-in-out infinite;
+}
+
+@keyframes mail-signature-shimmer {
+  0% {
+    background-position: 100% 0;
+  }
+  55%,
+  100% {
+    background-position: 0% 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mail-signature-shimmer {
+    animation: none;
+    background: none;
+    color: var(--color-text-muted);
+  }
+}
+
+/* The text being written: Tailwind's reset takes the lists' markers, the
+   headings' sizes and the paragraphs' gaps away, given back here (as a mail
+   shows them once received). */
+.mail-composer-body {
+  overflow-wrap: anywhere;
+  caret-color: var(--color-text);
+  /* The app loads Inter upright only and turns synthesis off (index.css):
+     italic text would stay upright. Here the browser may slant it. */
+  font-synthesis-style: auto;
+}
+
+.mail-composer-body p,
+.mail-composer-body div {
+  margin: 0;
+}
+
+.mail-composer-body ul,
+.mail-composer-body ol {
+  margin: 0.25em 0;
+  padding-left: 1.5em;
+}
+
+.mail-composer-body ul {
+  list-style: disc;
+}
+
+.mail-composer-body ol {
+  list-style: decimal;
+}
+
+.mail-composer-body h2 {
+  margin: 0.2em 0;
+  font-family: inherit;
+  font-size: 1.5em;
+  font-weight: 700;
+  line-height: 1.25;
+}
+
+.mail-composer-body h3 {
+  margin: 0.2em 0;
+  font-family: inherit;
+  font-size: 1.2em;
+  font-weight: 600;
+  line-height: 1.3;
+}
+
+/* The mail answered: its text as written (its own line breaks), under a
+   rule, muted. The line naming it (« Le …, … a écrit : ») keeps its breaks
+   too: a forward's lists the original's headers. */
+.mail-composer-body blockquote {
+  margin: 0.4em 0 0;
+  padding-left: 12px;
+  border-left: 2px solid rgb(52 18 0 / 0.16);
+  color: var(--color-text-muted);
+  white-space: pre-wrap;
+}
+
+:where([data-theme="dark"]) .mail-composer-body blockquote {
+  border-left-color: rgb(255 255 255 / 0.2);
+}
+
+/* A highlight's text stays dark on its light colour, the dark theme's
+   light text being unreadable on it (as in the sent mail, mailSend.js). A
+   chosen text colour sits inside the highlight and keeps its own. */
+.mail-composer-body mark {
+  /* Over the « color: inherit » Tiptap writes on the mark itself. */
+  color: #1f1f1f !important;
+  border-radius: 3px;
+  padding-inline: 1px;
+}
+
+.mail-composer-body .mail-composer-quote-header {
+  color: var(--color-text-muted);
+  white-space: pre-wrap;
+}
+
+/* A summary box (src/mailSummaryNode.js): a light card of label and value
+   rows, as the sent mail has it (server/mailSend.js). Not typed into: a
+   click selects it whole (its outline), Backspace takes it out. */
+.mail-composer-body table[data-mail-summary] {
+  margin: 4px 0 12px;
+  padding: 6px 0;
+  border-collapse: separate;
+  border-spacing: 0;
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  background: var(--color-bg-subtle);
+  font-size: 14px;
+  line-height: 1.45;
+  cursor: default;
+  user-select: none;
+}
+
+.mail-composer-body table[data-mail-summary] th {
+  padding: 4px 18px 4px 14px;
+  text-align: left;
+  vertical-align: top;
+  font-weight: 500;
+  color: var(--color-text-muted);
+  white-space: nowrap;
+}
+
+.mail-composer-body table[data-mail-summary] td {
+  padding: 4px 14px 4px 0;
+  vertical-align: top;
+  font-weight: 600;
+}
+
+.mail-composer-body table[data-mail-summary].ProseMirror-selectednode {
+  outline: 2px solid var(--color-text);
+  outline-offset: 2px;
+}
+
+/* The header's Tafac wordmark (not its chocolate mark) in white over the
+   photo, as the university's logo, for it to read; its own colours on the
+   plain page (white in dark mode, as LogoBut1 has it). */
+.header-wordmark {
+  filter: brightness(0) invert(1) drop-shadow(0 1px 2px rgb(0 0 0 / 0.45)) drop-shadow(0 0 10px rgb(0 0 0 / 0.3));
+}
+
+.dashboard-no-wallpaper .header-wordmark {
+  filter: none;
+}
+
+:where([data-theme="dark"]) .dashboard-no-wallpaper .header-wordmark {
+  filter: brightness(0) invert(1);
+}
+
 /* The header logo is whitened for the photo; on the plain page it would vanish. */
 .dashboard-no-wallpaper .header-university-logo {
   filter: none;
@@ -146,12 +959,159 @@
   box-shadow: 0 1px 3px rgb(0 0 0 / 0.4), 0 16px 40px -14px rgb(0 0 0 / 0.7);
 }
 
+/* The folded sidebar unfolding on hover over the page (Sidebar's canPeek):
+   the full sidebar, laid over the folded strip, grows from its width to
+   the unfolded one and lifts off the page. Transitions, not animations, so
+   leaving mid-way turns it around. The page keeps the folded width. Solid
+   (no blur), so the strip under it doesn't show through. */
+.sidebar-panel.sidebar-peek {
+  width: var(--sidebar-width);
+  background-color: #f5f3ec;
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transition:
+    width 260ms cubic-bezier(0.32, 0.72, 0, 1),
+    box-shadow 260ms ease-out,
+    opacity 120ms ease-out 140ms,
+    visibility 0s linear 260ms;
+}
+
+.sidebar-panel.sidebar-peek.is-open {
+  width: var(--sidebar-full-width, 280px);
+  opacity: 1;
+  visibility: visible;
+  pointer-events: auto;
+  box-shadow: 0 2px 6px rgb(52 18 0 / 0.08), 0 28px 64px -18px rgb(52 18 0 / 0.38);
+  transition:
+    width 340ms cubic-bezier(0.32, 0.72, 0, 1),
+    box-shadow 340ms ease-out,
+    opacity 100ms ease-out,
+    visibility 0s;
+}
+
+/* Its content fades in once the panel has started to grow, out at once. */
+.sidebar-peek > * {
+  opacity: 0;
+  transition: opacity 100ms ease-out;
+}
+
+.sidebar-peek.is-open > * {
+  opacity: 1;
+  transition: opacity 220ms ease-out 60ms;
+}
+
+:where([data-theme="dark"]) .sidebar-panel.sidebar-peek {
+  background-color: #161616;
+}
+
+:where([data-theme="dark"]) .sidebar-panel.sidebar-peek.is-open {
+  box-shadow: 0 2px 6px rgb(0 0 0 / 0.4), 0 28px 64px -18px rgb(0 0 0 / 0.8);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sidebar-panel.sidebar-peek,
+  .sidebar-panel.sidebar-peek.is-open,
+  .sidebar-peek > *,
+  .sidebar-peek.is-open > * {
+    transition: none;
+  }
+}
+
 :where([data-theme="dark"]) .dashboard-no-wallpaper .header-university-logo {
   filter: invert(1);
 }
 
+/* The home's widgets and Mes notes' cards, a step lighter than the band
+   (#191919) and the page (#0f0f0f) they sit on: in the same grey as the
+   band, they didn't stand out from it. */
+:where([data-theme="dark"]) .dashboard-no-wallpaper :is(.dashboard-widgets, .grades-page) .widget-card {
+  --color-widget-bg: #222222;
+  --color-bg-subtle: #2a2a2a;
+}
+
+/* A logo with a dark version of its own (logoDark): that one, as is. */
+:where([data-theme="dark"]) .dashboard-no-wallpaper .header-university-logo.is-themed {
+  filter: none;
+}
+
 /* ── Sidebar resize (drag handle on its right edge) ──
    While dragging, keep the resize cursor everywhere and don't select text. */
+
+/* Folding and unfolding the sidebar (Sidebar.jsx adds .sidebar-switching
+   for the duration): --sidebar-width eases, and with it the panel, the
+   page's left padding and the resize line; the content fades in. */
+@property --sidebar-width {
+  syntax: '<length>';
+  inherits: true;
+  initial-value: 280px;
+}
+
+.sidebar-switching {
+  transition: --sidebar-width 340ms cubic-bezier(0.32, 0.72, 0, 1);
+}
+
+.sidebar-switching .sidebar-swap {
+  animation: sidebar-swap-in 260ms ease-out both;
+}
+
+@keyframes sidebar-swap-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* The sidebar's resize line and its fold button: brown in light mode, a
+   soft yellow in dark mode. */
+.sidebar-handle-tint {
+  background-color: rgb(74 38 14 / 0.78);
+}
+
+:where([data-theme="dark"]) .sidebar-handle-tint {
+  background-color: rgb(255 250 228 / 0.78);
+}
+
+/* Translucent, the line would show through the button: it stops where the
+   button sits (centred), except while dragging (no button). */
+.sidebar-handle-line:not(.is-dragging) {
+  --handle-gap: 20px;
+  -webkit-mask-image: linear-gradient(to bottom, #000 calc(50% - var(--handle-gap)), transparent calc(50% - var(--handle-gap)), transparent calc(50% + var(--handle-gap)), #000 calc(50% + var(--handle-gap)));
+  mask-image: linear-gradient(to bottom, #000 calc(50% - var(--handle-gap)), transparent calc(50% - var(--handle-gap)), transparent calc(50% + var(--handle-gap)), #000 calc(50% + var(--handle-gap)));
+}
+
+.group:has(.sidebar-handle-button:hover, .sidebar-handle-button:focus-visible) .sidebar-handle-line:not(.is-dragging) {
+  --handle-gap: 22px;
+}
+
+/* A pill on the line, morphing into a big circle under the pointer. */
+.sidebar-handle-button {
+  width: 20px;
+  height: 40px;
+  transition:
+    width 260ms cubic-bezier(0.34, 1.4, 0.64, 1),
+    height 260ms cubic-bezier(0.34, 1.4, 0.64, 1),
+    opacity 150ms ease;
+}
+
+.sidebar-handle-button:hover,
+.sidebar-handle-button:focus-visible {
+  width: 44px;
+  height: 44px;
+}
+
+.sidebar-handle-button svg {
+  transition: transform 260ms cubic-bezier(0.34, 1.4, 0.64, 1);
+}
+
+.sidebar-handle-button:hover svg,
+.sidebar-handle-button:focus-visible svg {
+  transform: scale(1.3);
+}
 
 .sidebar-resizing,
 .sidebar-resizing * {
@@ -214,6 +1174,16 @@
     inset 0 1px 0 rgb(255 255 255 / 0.14),
     0 14px 34px -10px rgb(0 0 0 / 0.6),
     0 2px 8px rgb(0 0 0 / 0.3);
+}
+
+/* The mail reader's toolbar (MailToolbar): hairlines between the buttons
+   of a group. */
+.mail-toolbar-divider {
+  background-color: rgb(52 18 0 / 0.12);
+}
+
+:where([data-theme="dark"]) .mail-toolbar-divider {
+  background-color: rgb(255 255 255 / 0.14);
 }
 
 /* A sheet's close button (a grade's, a class's), of the tab bar's glass. */
@@ -777,6 +1747,8 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .sidebar-handle-button,
+  .sidebar-handle-button svg,
   .onboarding-completion-page,
   .onboarding-completion-page--leaving,
   .onboarding-completion-panel,
@@ -1021,10 +1993,10 @@
    the clouds by an eighth and the cards by a sixteenth. Around the phone,
    as each comes onto the screen, the flower behind lags and the island in
    front leads, both settling where they're placed (`translate`, as the
-   pointer parallax holds `transform`). The laptop, when it comes first,
-   takes the same flower and island. The second device, in the row under,
-   rises a little as it comes in (.landing-device); it settles once fully
-   on screen, which the page's end always allows. */
+   pointer parallax holds `transform`). The laptop takes the same flower
+   and island. The phone in front of it rises a little as it comes in
+   (.landing-device); it settles once fully on screen, which the page's end
+   always allows. */
 @supports (animation-timeline: scroll()) {
   @media (prefers-reduced-motion: no-preference) {
     .landing-scroll-sky,
@@ -1109,9 +2081,8 @@
   }
 }
 
-/* The landing's feature pills, then the note under them, come in one by
-   one once the list is on screen (FeatureShowcase: data-revealed,
-   --reveal-index). With reduced motion they're simply there. */
+/* The landing's feature pills come in one by one once the list is on
+   screen (FeatureShowcase: data-revealed, --reveal-index). With reduced motion they're simply there. */
 @media (prefers-reduced-motion: no-preference) {
   .landing-feature {
     opacity: 0;
@@ -1127,6 +2098,232 @@
   to {
     opacity: 1;
     translate: 0 0;
+  }
+}
+
+/* ── Landing showcase (LandingShowcase) ──
+   The tab list wears the app's phone tab bar (.mobile-tab-bar), its tabs
+   sharing it equally; the selected one's lens slides under the tab picked
+   (--tab-index of --tab-count, inside the bar's 6px padding and 4px gaps). */
+.landing-tabs-lens {
+  --tab-width: calc((100% - 12px - (var(--tab-count) - 1) * 4px) / var(--tab-count));
+  top: 6px;
+  bottom: 6px;
+  left: calc(6px + var(--tab-index) * (var(--tab-width) + 4px));
+  width: var(--tab-width);
+  transition: left 420ms cubic-bezier(0.32, 0.72, 0, 1);
+}
+
+/* Pinned (src/landingShowcaseScroll.js): on screens tall and wide enough
+   for a whole panel, the section stays on screen while the page scrolls
+   along its track, one stretch per tab, under the floating header, a little
+   tighter to fit; on laptops under 820px, without the intro and with a
+   smaller preview. The same media query as PINNED_QUERY. */
+@media (width >= 1024px) and (height >= 700px) {
+  .landing-showcase-track {
+    --showcase-step: 70svh;
+    height: calc(100svh + (var(--tab-count) - 1) * var(--showcase-step));
+  }
+
+  /* Its content from the top, under the header (centred, it left a band
+     of blank above the title as the section came in, on top of the
+     section's own padding, dropped here). */
+  .landing-showcase:has(> * > .landing-showcase-track) {
+    padding-top: 0;
+    margin-top: -48px;
+  }
+
+  .landing-showcase-track .landing-showcase-pin {
+    position: sticky;
+    top: 0;
+    justify-content: flex-start;
+    min-height: 100svh;
+    padding-block: 92px 12px;
+  }
+
+  .landing-showcase-track .landing-tabs {
+    margin-top: 24px;
+  }
+
+  .landing-showcase-track .landing-showcase-panels {
+    margin-top: 32px;
+  }
+
+  /* The scroll places the panels, frame by frame (placePanels: their
+     opacity and translate inline), and the lens with them (--tab-progress
+     on it): nothing of their own to ease. */
+  .landing-showcase-track .landing-showcase-panel {
+    transition: none;
+    will-change: opacity, translate;
+  }
+
+  .landing-showcase-track .landing-tabs-lens {
+    left: calc(6px + var(--tab-progress, var(--tab-index)) * (var(--tab-width) + 4px));
+    transition: none;
+  }
+}
+
+@media (width >= 1024px) and (700px <= height < 820px) {
+  .landing-showcase-track .landing-showcase-intro {
+    display: none;
+  }
+
+  .landing-showcase-track .landing-showcase-stage {
+    zoom: 0.8;
+  }
+}
+
+/* The lens is the selected tab's: no hover tint over it. */
+.landing-tabs .mobile-tab-bar-item[aria-selected="true"] {
+  background-color: transparent;
+}
+
+/* The panels one over the other, the section as tall as the tallest (each
+   its own height, from the top), so nothing moves when a tab is picked: the
+   selected one shows, the others stay in the page faded out (and inert:
+   LandingShowcase). */
+.landing-showcase-panels {
+  display: grid;
+  align-items: start;
+}
+
+/* A panel: its title and list on the left, the preview on the right; on
+   narrower screens the preview between the title and the list. */
+.landing-showcase-panel {
+  grid-area: 1 / 1;
+  display: grid;
+  grid-template-columns: minmax(0, 380px) minmax(0, 1fr);
+  grid-template-areas:
+    "head preview"
+    "items preview";
+  grid-template-rows: auto 1fr;
+  column-gap: 56px;
+  row-gap: 24px;
+  align-items: start;
+}
+
+.landing-showcase-head {
+  grid-area: head;
+  align-self: end;
+}
+
+.landing-showcase-items {
+  grid-area: items;
+}
+
+.landing-showcase-frame {
+  grid-area: preview;
+  align-self: center;
+}
+
+@media (width < 1024px) {
+  .landing-showcase-panel {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas:
+      "head"
+      "preview"
+      "items";
+    grid-template-rows: auto;
+    row-gap: 24px;
+    max-width: 640px;
+    margin-inline: auto;
+  }
+}
+
+/* Each preview on the login page's sky, the app's cards frosted over it as
+   on the dashboard's wallpaper; as tall on every tab, so the page doesn't
+   jump when one is picked (on phones, as tall as its preview). */
+.landing-showcase-frame {
+  box-shadow: 0 1px 3px rgb(52 18 0 / 0.08), 0 28px 64px -30px rgb(52 18 0 / 0.4);
+}
+
+:where([data-theme="dark"]) .landing-showcase-frame {
+  box-shadow: 0 1px 3px rgb(0 0 0 / 0.4), 0 28px 64px -30px rgb(0 0 0 / 0.8);
+}
+
+.landing-showcase-stage {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  align-content: center;
+  min-height: 500px;
+  padding: 28px;
+}
+
+@media (width < 1024px) {
+  .landing-showcase-stage {
+    min-height: 0;
+    padding: 24px;
+  }
+}
+
+@media (width < 640px) {
+  .landing-showcase-stage {
+    padding: 14px;
+  }
+}
+
+/* The mail list, solid as the mail page is; the composer of « Écrire au
+   sujet de cette note » over it as the app's composer window is over the
+   page (.mail-composer). */
+.landing-preview-sheet {
+  background-color: var(--color-bg);
+  border-color: rgb(255 255 255 / 0.8);
+  box-shadow: 0 1px 3px rgb(52 18 0 / 0.06), 0 10px 28px -14px rgb(52 18 0 / 0.16);
+}
+
+:where([data-theme="dark"]) .landing-preview-sheet {
+  background-color: #141414;
+  border-color: rgb(255 255 255 / 0.08);
+  box-shadow: 0 1px 3px rgb(0 0 0 / 0.3);
+}
+
+.landing-preview-composer {
+  background-color: #ffffff;
+  border-color: rgb(52 18 0 / 0.08);
+  box-shadow: 0 1px 3px rgb(52 18 0 / 0.08), 0 32px 80px -20px rgb(52 18 0 / 0.36);
+}
+
+:where([data-theme="dark"]) .landing-preview-composer {
+  background-color: #1c1c1c;
+  border-color: rgb(255 255 255 / 0.1);
+  box-shadow: 0 1px 3px rgb(0 0 0 / 0.4), 0 32px 80px -20px rgb(0 0 0 / 0.8);
+}
+
+/* The tab picked: the last panel fades out as the picked one rises into its
+   place (a beat later, so the two don't blend). With reduced motion they
+   simply swap, and the lens jumps. */
+.landing-showcase-panel:not([data-selected]) {
+  opacity: 0;
+  translate: 0 10px;
+  visibility: hidden;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .landing-showcase-panel {
+    transition: opacity 360ms ease-out 90ms, translate 480ms cubic-bezier(0.16, 1, 0.3, 1) 90ms, visibility 0s 90ms;
+  }
+
+  .landing-showcase-panel:not([data-selected]) {
+    transition: opacity 180ms ease-in, translate 180ms ease-in, visibility 0s 180ms;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .landing-tabs-lens {
+    transition: none;
+  }
+}
+
+/* The security section's mails part (SecurityShowcase): its points come in
+   one by one once the card is on screen. */
+@media (prefers-reduced-motion: no-preference) {
+  .security-mail-point {
+    opacity: 0;
+    translate: 0 16px;
+  }
+
+  .security-mail[data-revealed] .security-mail-point {
+    animation: landing-feature-in 600ms cubic-bezier(0.16, 1, 0.3, 1) calc(var(--reveal-index) * 90ms + 150ms) both;
   }
 }
 
@@ -2691,28 +3888,31 @@
   background-color: color-mix(in srgb, var(--color-brand) 4%, var(--color-widget-bg));
 }
 
-/* Mes notes' "Simuler" button: white like the cards, lifted by a shadow,
-   with the semester's UE colours washed softly up from its bottom edge and
-   drifting slowly back and forth (--simulate-wash, set by the button; the
-   brand's without UE colours), so it reads as the way into something to
-   play with. With a mouse, the wash also leans towards the pointer
-   (--simulate-shift, -1 to 1, set by the button). */
-.simulate-button {
-  --simulate-wash: linear-gradient(100deg, var(--color-brand), #e9b44c, var(--color-brand));
-  border-color: #ffffff;
+/* ── Material ──
+   The surface of Mes notes' "Simuler" button, for the app's secondary
+   buttons (SECONDARY_BUTTON) and Material.jsx: white like the cards, lifted
+   by a shadow that deepens on hover, pressed in on a tap. Optionally a
+   rainbow (Material's `rainbow`): colours washed softly up from the bottom
+   edge and drifting slowly back and forth (--material-wash, set by
+   Material; the brand's by default), so it reads as the way into something
+   to play with. With a mouse, the wash also leans towards the pointer
+   (--material-shift, -1 to 1, set by Material). */
+.material {
+  --material-wash: linear-gradient(100deg, var(--color-brand), #e9b44c, var(--color-brand));
+  border: 1px solid #ffffff;
   background-color: #ffffff;
   color: var(--color-text);
   box-shadow: 0 1px 3px rgb(52 18 0 / 0.08), 0 8px 20px -10px rgb(52 18 0 / 0.28);
   transition: box-shadow 150ms ease, transform 100ms ease-out;
 }
 
-.simulate-button:active {
+.material:active:not(:disabled) {
   transform: scale(0.96);
 }
 
-/* Clips the wash, wider than the button so it has room to lean, and fades
+/* Clips the wash, wider than the surface so it has room to lean, and fades
    it out towards the top: a tint rising from the bottom, not a fill. */
-.simulate-button-wash-frame {
+.material-wash-frame {
   position: absolute;
   inset: 0;
   z-index: -1;
@@ -2723,22 +3923,22 @@
   transition: opacity 150ms ease;
 }
 
-.simulate-button-wash {
+.material-wash {
   position: absolute;
   inset: 0 -30%;
-  background-image: var(--simulate-wash);
+  background-image: var(--material-wash);
   background-size: 300% 100%;
-  translate: calc(var(--simulate-shift, 0) * 18%) 0;
+  translate: calc(var(--material-shift, 0) * 18%) 0;
   transition: translate 600ms cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 
 @media (prefers-reduced-motion: no-preference) {
-  .simulate-button-wash {
-    animation: simulate-wash-drift 9s ease-in-out infinite alternate;
+  .material-wash {
+    animation: material-wash-drift 9s ease-in-out infinite alternate;
   }
 }
 
-@keyframes simulate-wash-drift {
+@keyframes material-wash-drift {
   from {
     background-position: 0% 50%;
   }
@@ -2749,22 +3949,32 @@
 }
 
 @media (hover: hover) {
-  .simulate-button:hover {
+  .material:hover:not(:disabled) {
     box-shadow: 0 1px 3px rgb(52 18 0 / 0.1), 0 12px 26px -12px rgb(52 18 0 / 0.34);
   }
 
-  .simulate-button:hover .simulate-button-wash-frame {
+  .material:hover .material-wash-frame {
     opacity: 0.38;
   }
 }
 
-:where([data-theme="dark"]) .simulate-button {
+:where([data-theme="dark"]) .material {
   border-color: rgb(255 255 255 / 0.08);
   background-color: #1c1c1c;
   box-shadow: 0 1px 3px rgb(0 0 0 / 0.4), 0 8px 20px -10px rgb(0 0 0 / 0.7);
 }
 
-:where([data-theme="dark"]) .simulate-button-wash-frame {
+/* In the mail reader's white panel the white edge would vanish: a hairline
+   instead, so its chips and buttons still read as lifted. */
+.mail-reader-panel .material {
+  border-color: rgb(52 18 0 / 0.1);
+}
+
+:where([data-theme="dark"]) .mail-reader-panel .material {
+  border-color: rgb(255 255 255 / 0.08);
+}
+
+:where([data-theme="dark"]) .material-wash-frame {
   opacity: 0.34;
 }
 
@@ -2897,6 +4107,35 @@
   height: 100%;
   object-fit: none;
   object-position: top left;
+}
+
+@media (min-width: 1024px) {
+  /* While it grows or shrinks, the frame the group draws is the window's
+     own (its colour, corners and floating shadow), not a UE card's lighter
+     one: the shadow stays from start to end. After the .ue-card rules, which
+     it overrides. */
+  ::view-transition-group(mail-composer.ue-card),
+  ::view-transition-image-pair(mail-composer.ue-card) {
+    border-radius: 26px;
+  }
+
+  ::view-transition-group(mail-composer.ue-card) {
+    background: #ffffff;
+    box-shadow: 0 0 0 1px rgb(52 18 0 / 0.08), 0 1px 3px rgb(52 18 0 / 0.08), 0 32px 80px -20px rgb(52 18 0 / 0.36);
+  }
+
+  [data-theme="dark"]::view-transition-group(mail-composer.ue-card) {
+    background: #1c1c1c;
+    box-shadow: 0 0 0 1px rgb(255 255 255 / 0.1), 0 1px 3px rgb(0 0 0 / 0.4), 0 32px 80px -20px rgb(0 0 0 / 0.8);
+  }
+
+  @supports (corner-shape: superellipse(1.3)) {
+    ::view-transition-group(mail-composer.ue-card),
+    ::view-transition-image-pair(mail-composer.ue-card) {
+      border-radius: calc(26px / 0.853);
+      corner-shape: superellipse(1.3);
+    }
+  }
 }
 
 /* What the card showed goes quickly and what it shows arrives once it has
@@ -3204,11 +4443,41 @@
   }
 }
 
-/* ── Context menu transform-origin from CSS variables ── */
+/* ── Context menu (ContextMenu) ──
+   Grows from the pointer (--context-origin-*, set by ContextMenu); a
+   destructive action (Supprimer) in red, its icon too. */
 
+.context-menu {
+  transform-origin: var(--context-origin-x, 0) var(--context-origin-y, 0);
+}
+
+/* A place a long press opens the menu of (useContextMenu): no callout,
+   no text selection starting under the finger. */
+@media (hover: none) {
+  [data-menu-press] {
+    -webkit-touch-callout: none;
+    -webkit-user-select: none;
+    user-select: none;
+  }
+}
+
+/* The dropdowns' (Dropdown, the planning's header), in the older look. */
 .favorites-context-menu {
   transform-origin: var(--favorites-context-origin-x, 24px)
     var(--favorites-context-origin-y, 24px);
+}
+
+/* A colour menu's « Automatique » / « Aucun »: a dot crossed out. */
+.context-menu-swatch--none {
+  background: linear-gradient(135deg, transparent calc(50% - 0.75px), #d1342f calc(50% - 0.75px), #d1342f calc(50% + 0.75px), transparent calc(50% + 0.75px)), var(--color-widget-bg);
+}
+
+.context-menu-item--destructive {
+  color: #d1342f;
+}
+
+:where([data-theme="dark"]) .context-menu-item--destructive {
+  color: #ff6b63;
 }
 
 /* ── Next class widget gradient + transition ── */
@@ -3287,6 +4556,22 @@
   color: #0f0f0f;
 }
 
+/* The mail page's count, raised like the UE tags (.ue-also-tag): a lit top
+   edge, a darker bottom one, a shadow tinted with the pill's deep shade. */
+.mail-unread-pill--raised {
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.35),
+    inset 0 -1px 0 rgb(0 0 0 / 0.12),
+    -1px 2px 4px -1px color-mix(in srgb, #0b3d82 55%, transparent);
+}
+
+:where([data-theme="dark"]) .mail-unread-pill--raised {
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.4),
+    inset 0 -1px 0 rgb(0 0 0 / 0.15),
+    -1px 2px 4px -1px rgb(0 0 0 / 0.6);
+}
+
 /* ── Widget row layout with paired list cards ──
    When both list cards (mail + deadlines) actually render, the row lays out
    from its own width (sidebar or not) instead of viewport breakpoints. If
@@ -3350,6 +4635,56 @@
   .widget-row:has(.recent-mail-widget):has(.moodle-deadlines-widget) .widget-lists > .widget-card {
     flex: 1 1 0;
     min-width: 0;
+  }
+}
+
+/* ── Widget row layout with one list card ──
+   With mail or deadlines alone (the other hidden or not rendering), the
+   cards' natural widths (280 · 380 · 280 · 360) leave the row half empty
+   and the next class looks shrunk: from 760px of row they fill it instead,
+   in those proportions. The group holding the grade and the list card
+   (.widget-row-group) dissolves so they flow with the others.
+   ≥ 1336px : one row (the natural widths and their gaps fit; from 1044px
+              without the greeting).
+   760–1335 : greeting · next class · grade share row 1, the list card takes
+              row 2 alone. Not on the landing, whose preview row lays out its own way. */
+
+@container widget-row (min-width: 760px) {
+  .widget-row:not(.landing-scroll-cards):not(:has(.recent-mail-widget):has(.moodle-deadlines-widget)) .widget-row-group {
+    display: contents;
+  }
+
+  .widget-row:not(.landing-scroll-cards):not(:has(.recent-mail-widget):has(.moodle-deadlines-widget)) .widget-card {
+    min-width: 0;
+  }
+
+  .widget-row:not(.landing-scroll-cards):not(:has(.recent-mail-widget):has(.moodle-deadlines-widget)) .greeting-card,
+  .widget-row:not(.landing-scroll-cards):not(:has(.recent-mail-widget):has(.moodle-deadlines-widget)) .latest-grade-widget {
+    flex: 28 1 0;
+  }
+
+  .widget-row:not(.landing-scroll-cards):not(:has(.recent-mail-widget):has(.moodle-deadlines-widget)) .next-class-widget {
+    flex: 38 1 0;
+  }
+
+  .widget-row:not(.landing-scroll-cards):not(:has(.recent-mail-widget):has(.moodle-deadlines-widget)) .recent-mail-widget,
+  .widget-row:not(.landing-scroll-cards):not(:has(.recent-mail-widget):has(.moodle-deadlines-widget)) .moodle-deadlines-widget {
+    flex: 36 1 0;
+  }
+}
+
+@container widget-row (min-width: 760px) and (max-width: 1335.98px) {
+  .widget-row:not(.landing-scroll-cards):not(:has(.recent-mail-widget):has(.moodle-deadlines-widget)):has(.greeting-card) .recent-mail-widget,
+  .widget-row:not(.landing-scroll-cards):not(:has(.recent-mail-widget):has(.moodle-deadlines-widget)):has(.greeting-card) .moodle-deadlines-widget {
+    flex-basis: 100%;
+  }
+}
+
+/* Without the greeting, three cards: one row from 1044px. */
+@container widget-row (min-width: 760px) and (max-width: 1043.98px) {
+  .widget-row:not(.landing-scroll-cards):not(:has(.recent-mail-widget):has(.moodle-deadlines-widget)):not(:has(.greeting-card)) .recent-mail-widget,
+  .widget-row:not(.landing-scroll-cards):not(:has(.recent-mail-widget):has(.moodle-deadlines-widget)):not(:has(.greeting-card)) .moodle-deadlines-widget {
+    flex-basis: 100%;
   }
 }
 
@@ -3884,9 +5219,44 @@
   }
 }
 
+/* « Messagerie » (MailLaunchCard): the message list's rows slide in from
+   the right one after the other (a soft overshoot), then the first one's
+   unread dot pops in the brand colour. */
+
+.mail-launch-row {
+  border-color: var(--color-border);
+  box-shadow: 0 1px 2px rgb(21 54 99 / 0.12);
+  animation: mail-launch-row-in 700ms var(--fly-spring) calc(140ms + var(--i, 0) * 110ms) backwards;
+}
+
+:where([data-theme="dark"]) .mail-launch-row {
+  box-shadow: 0 1px 2px rgb(0 0 0 / 0.35);
+}
+
+.mail-launch-line {
+  background: var(--color-text);
+  opacity: 0.55;
+}
+
+.mail-launch-line.is-faint {
+  opacity: 0.22;
+}
+
+.mail-launch-unread {
+  background: var(--color-brand);
+  animation: launch-card-pop 520ms var(--dial-spring) 780ms backwards;
+}
+
+@keyframes mail-launch-row-in {
+  from {
+    opacity: 0;
+    transform: translateX(26px) scale(0.94);
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .launch-card,
-  .launch-card :is(.launch-card-hub, .launch-card-rise, .launch-card-cta-arrow, .grades-launch-turn, .grades-launch-step, .grades-launch-ribbon, .planning-launch-block, .planning-launch-now) {
+  .launch-card :is(.launch-card-hub, .launch-card-rise, .launch-card-cta-arrow, .grades-launch-turn, .grades-launch-step, .grades-launch-ribbon, .planning-launch-block, .planning-launch-now, .mail-launch-row, .mail-launch-unread) {
     animation: none;
   }
 
@@ -4019,6 +5389,7 @@
   .favorites-strip-item,
   .badge-placeholder,
   .text-placeholder-shimmer,
+  .context-menu,
   .favorites-context-menu,
   .favorites-context-action {
     animation: none;
@@ -4509,14 +5880,14 @@
 }
 
 /* The sheet's corners clip its content (see GradeDetailModal); the sheet
-   keeps its border and shadow outside. */
+   keeps its border and shadow outside. Inside its 1px border. */
 .gd-clip {
-  clip-path: inset(0 round 25px);
+  clip-path: inset(0 round calc(var(--modal-radius, 26px) - 1px));
 }
 
 @media (max-width: 639.98px) {
   .gd-clip {
-    clip-path: inset(0 round 25px 25px 0 0);
+    clip-path: inset(0 round calc(var(--modal-radius, 26px) - 1px) calc(var(--modal-radius, 26px) - 1px) 0 0);
   }
 }
 
@@ -5384,7 +6755,9 @@ button.planning-block:active {
 }
 
 /* The rows of a class's sheet (PlanningEventSheet): one card, the rows
-   parted by a hairline from the text's edge, as the iOS GroupCard. */
+   parted by a hairline from the text's edge, as the iOS GroupCard. A link
+   row hovers (or presses) as a rounded fill inside the card's padding; the
+   hairlines on either side of it give way, so the fill isn't cut. */
 .planning-row + .planning-row .planning-row-text,
 li + li > .planning-row .planning-row-text {
   border-top: 1px solid var(--color-border);
@@ -5394,10 +6767,20 @@ li + li > .planning-row .planning-row-text {
   .planning-row.is-link:hover {
     background-color: var(--color-bg-subtle);
   }
+
+  li:has(> .planning-row.is-link:hover) + li > .planning-row .planning-row-text,
+  .planning-row.is-link:hover .planning-row-text {
+    border-top-color: transparent;
+  }
 }
 
 .planning-row.is-link:active {
   background-color: var(--color-bg-subtle);
+}
+
+li:has(> .planning-row.is-link:active) + li > .planning-row .planning-row-text,
+.planning-row.is-link:active .planning-row-text {
+  border-top-color: transparent;
 }
 
 /* ── Planning states (PlanningNote) ──
@@ -5612,8 +6995,10 @@ li + li > .planning-row .planning-row-text {
    Its cards (the class's block, its rows) are widget cards, which are glass
    unless the page has no wallpaper; the sheet sits in a portal, outside the
    page, on its own plain colour: solid cards there, as on the page, with a
-   warm hairline (the sheet is lighter than the page) so they stand out. */
-.planning-sheet .widget-card {
+   warm hairline (the sheet is lighter than the page) so they stand out.
+   The mail reader's panel (its attachments' card) likewise. */
+.planning-sheet .widget-card,
+.mail-reader-panel .widget-card {
   --color-widget-bg: #ffffff;
   --color-bg-subtle: #f8f7f3;
   border-color: rgb(52 18 0 / 0.1);
@@ -5622,11 +7007,17 @@ li + li > .planning-row .planning-row-text {
   box-shadow: 0 1px 3px rgb(52 18 0 / 0.06), 0 10px 28px -14px rgb(52 18 0 / 0.16);
 }
 
-:where([data-theme="dark"]) .planning-sheet .widget-card {
+:where([data-theme="dark"]) .planning-sheet .widget-card,
+:where([data-theme="dark"]) .mail-reader-panel .widget-card {
   --color-widget-bg: #1c1c1c;
   --color-bg-subtle: #242424;
   border-color: rgba(255, 255, 255, 0.08);
   box-shadow: 0 1px 3px rgb(0 0 0 / 0.3);
+}
+
+/* The sheet already wears the course's wash: its block stays plain. */
+.planning-sheet .planning-block > .latest-grade-wash {
+  display: none;
 }
 
 /* The planning's export button (PlanningExportButton): its word hidden at
@@ -5659,4 +7050,192 @@ li + li > .planning-row .planning-row-text {
   .planning-export-label {
     transition: none;
   }
+}
+
+/* The composer's drop zone (MailDropSheets): three sheets fan out of a pile
+   with a little spring, one after the other, then float, each on its own
+   beat. The fan moves the individual translate/rotate/scale properties,
+   the float the transform, so the two add up. Still with reduced motion,
+   laid out where the fan ends. */
+.mail-drop-sheets {
+  position: relative;
+  display: block;
+  width: 132px;
+  height: 92px;
+  margin-bottom: 6px;
+}
+
+.mail-drop-sheet {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 50px;
+  height: 62px;
+  overflow: visible;
+  filter: drop-shadow(0 1px 1.5px rgb(52 18 0 / 0.1)) drop-shadow(0 8px 14px rgb(52 18 0 / 0.14));
+  translate: var(--sheet-x) var(--sheet-y);
+  rotate: var(--sheet-r);
+  animation:
+    mail-drop-fan 560ms cubic-bezier(0.34, 1.56, 0.64, 1) var(--sheet-delay) both,
+    mail-drop-float 2.8s ease-in-out var(--sheet-float-delay) infinite;
+}
+
+.mail-drop-sheet--left {
+  --sheet-x: calc(-50% - 34px);
+  --sheet-y: calc(-50% + 4px);
+  --sheet-r: -13deg;
+  --sheet-delay: 40ms;
+  --sheet-float-delay: -0.9s;
+}
+
+.mail-drop-sheet--right {
+  --sheet-x: calc(-50% + 34px);
+  --sheet-y: calc(-50% + 4px);
+  --sheet-r: 12deg;
+  --sheet-delay: 100ms;
+  --sheet-float-delay: -1.8s;
+}
+
+.mail-drop-sheet--front {
+  --sheet-x: -50%;
+  --sheet-y: calc(-50% - 4px);
+  --sheet-r: -2deg;
+  --sheet-delay: 0ms;
+  --sheet-float-delay: 0s;
+  z-index: 1;
+}
+
+.mail-drop-sheet-paper {
+  fill: var(--color-widget-bg);
+  stroke: rgb(52 18 0 / 0.12);
+  stroke-width: 1;
+}
+
+.mail-drop-sheet-fold {
+  fill: rgb(52 18 0 / 0.07);
+  stroke: rgb(52 18 0 / 0.12);
+  stroke-width: 1;
+  stroke-linejoin: round;
+}
+
+.mail-drop-sheet-line {
+  fill: rgb(52 18 0 / 0.13);
+}
+
+:where([data-theme="dark"]) .mail-drop-sheet {
+  filter: drop-shadow(0 1px 1.5px rgb(0 0 0 / 0.4)) drop-shadow(0 8px 14px rgb(0 0 0 / 0.5));
+}
+
+:where([data-theme="dark"]) .mail-drop-sheet-paper,
+:where([data-theme="dark"]) .mail-drop-sheet-fold {
+  stroke: rgb(255 255 255 / 0.14);
+}
+
+:where([data-theme="dark"]) .mail-drop-sheet-fold {
+  fill: rgb(255 255 255 / 0.08);
+}
+
+:where([data-theme="dark"]) .mail-drop-sheet-line {
+  fill: rgb(255 255 255 / 0.16);
+}
+
+@keyframes mail-drop-fan {
+  from {
+    opacity: 0;
+    translate: -50% calc(-50% + 14px);
+    rotate: 0deg;
+    scale: 0.7;
+  }
+}
+
+@keyframes mail-drop-float {
+  0%,
+  100% {
+    transform: translateY(0) rotate(0deg);
+  }
+  50% {
+    transform: translateY(-4px) rotate(1.5deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mail-drop-sheet {
+    animation: none;
+  }
+}
+
+/* Dark mode, inside the composer: its window (#1c1c1c) is as dark as the
+   app's subtle fills (#1e1e1e), so the format bar's pills, the tokens and
+   the attachments' chips vanished into it. Lighter fills there only, and
+   a pressed format button (bold on…) lighter still. */
+:where([data-theme="dark"]) .mail-composer {
+  --color-bg-subtle: #2b2b2b;
+  --color-bg-muted: #363636;
+}
+
+:where([data-theme="dark"]) .mail-composer [role="toolbar"] button[aria-pressed="true"] {
+  background-color: #444444;
+  box-shadow: 0 1px 2px rgb(0 0 0 / 0.4);
+}
+
+/* The mail search's field is .material, but a field, not a button: no
+   press-in when the text is clicked, no lift on hover. And a tighter,
+   lighter shadow than a button's: spread under a field this wide, the
+   material's warm one read as an orange smudge on the tinted band. */
+.mail-search-field.material,
+.mail-search-field.material:hover {
+  box-shadow: 0 1px 2px rgb(52 18 0 / 0.06), 0 3px 10px -4px rgb(52 18 0 / 0.12);
+}
+
+.mail-search-field.material:active {
+  transform: none;
+}
+
+:where([data-theme="dark"]) .mail-search-field.material,
+:where([data-theme="dark"]) .mail-search-field.material:hover {
+  box-shadow: 0 1px 2px rgb(0 0 0 / 0.35), 0 3px 10px -4px rgb(0 0 0 / 0.5);
+}
+
+/* The mail page's folder pills: the one shown in the app's secondary look
+   (the material's white surface and soft shadow, as the search beside),
+   not the primary dark fill, too loud for a mere folder. Shadows only (no
+   border), so the pill keeps its size as it grows. */
+.mail-folder-pill--current {
+  background-color: #ffffff;
+  box-shadow: 0 1px 3px rgb(52 18 0 / 0.08), 0 8px 20px -10px rgb(52 18 0 / 0.28);
+}
+
+:where([data-theme="dark"]) .mail-folder-pill--current {
+  background-color: #262626;
+  box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.08), 0 1px 3px rgb(0 0 0 / 0.4), 0 8px 20px -10px rgb(0 0 0 / 0.7);
+}
+
+/* The unread dot on the shown folder's pill: ringed in the pill's own
+   colour, so it reads as cut out of it. */
+.mail-unread-dot--on-pill {
+  --tw-ring-color: #ffffff;
+}
+
+:where([data-theme="dark"]) .mail-unread-dot--on-pill {
+  --tw-ring-color: #262626;
+}
+
+/* After .page-top-band's own rule (position: relative), which it beats. */
+.dashboard-no-wallpaper .mail-top-band {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+}
+
+/* With the band (no wallpaper), the header is solid: the list goes under it
+   hidden. Its progressive blur would only tint the header's own width once
+   the list scrolls, darker than the band carried on either side. */
+.dashboard-no-wallpaper .gd-header:has(> .mail-top-band) .gd-header-blur {
+  display: none;
+}
+
+/* A send's « Annuler » (src/useMailSend.js): its timer runs on under the
+   pointer, so its ring does too. */
+.mail-toast--steady:hover .mail-toast-ring {
+  animation-play-state: running;
 }

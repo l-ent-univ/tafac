@@ -17,6 +17,7 @@ export const UNIVERSITY_SETTING_KEYS = [
   'l-ent:student-tp',
   'l-ent:favorites-order',
   'l-ent:local-pins',
+  'l-ent:local-favorites',
   'l-ent:apps-order',
   'l-ent:grade-colors',
   'l-ent:class-colors',

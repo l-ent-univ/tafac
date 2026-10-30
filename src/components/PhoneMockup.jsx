@@ -8,8 +8,9 @@ import iphoneFrame from '../assets/landing/iphone-frame.webp'
 import island from '../assets/landing/landing-island.webp'
 import { usePointerParallax, useVisiblePlayback } from '../landingMotion'
 
-// A tour of the app (demo account, nothing marked new: dashboard, Mes notes,
-// Planning; 390 × 797 under a 47 pt status bar, looping) in an iPhone
+// A tour of the app (demo account, nothing marked new: the next class, Mes
+// notes, a reply to the scolarité, what's due; 390 × 797 under a 47 pt
+// status bar, looping) in an iPhone
 // frame. The frame's screen is transparent: the video sits behind it,
 // inset as the screen is (the frame's 1294 × 2656 original:
 // screen from 58 to 1234 across, 51 to 2604 down). When it comes first
@@ -38,7 +39,7 @@ function PhoneMockup({ className = '', decorated = true, darkScreen = false }) {
             loop
             playsInline
             preload="metadata"
-            aria-label="Tafac sur un téléphone : l’accueil, Mes notes et le planning"
+            aria-label="Tafac sur un téléphone : le prochain cours, Mes notes, la réponse à un mail de la scolarité et les devoirs à rendre"
             className="block w-full h-auto"
           />
         </div>

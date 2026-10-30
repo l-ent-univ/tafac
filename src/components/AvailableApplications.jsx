@@ -5,9 +5,11 @@ import universityConfig from '@university'
 import { toAppSlug, track } from '../analytics'
 import { fetchAppIcons, getCachedAppIcons } from '../appIcons'
 import { scoreAppSearch, searchApps } from '../appSearch'
-import { DEMO_PLANNING_APP_FNAME } from '../demoAccount'
+import { DEMO_MAIL_APP_FNAME, DEMO_PLANNING_APP_FNAME } from '../demoAccount'
 import { getGradesOrigin, opensGradesPageInApp } from '../gradesPortalApp'
 import { getPlanningOrigin, opensPlanningPageInApp } from '../planningPortalApp'
+import { getMailOrigins, opensMailPageInApp } from '../mailPortalApp'
+import ContextMenu from './ContextMenu'
 import LoadingDots from './LoadingDots'
 import {
   ENT_AUTH_PREFIX,
@@ -24,9 +26,7 @@ import {
 } from '../entApi'
 
 const DEFAULT_ERROR_MESSAGE = 'Impossible de charger les applications pour le moment'
-const FAVORITES_CONTEXT_MENU_WIDTH = 216
-const FAVORITES_CONTEXT_MENU_HEIGHT = 56
-const FAVORITES_CONTEXT_MENU_MARGIN = 12
+const CLOSED_CONTEXT_MENU = { open: false, x: 0, y: 0, application: null, source: 'favorite' }
 const FAVORITE_REMOVAL_ANIMATION_MS = 220
 // The sidebar only fits a few favorites; the rest stay starred in the full list.
 const SIDEBAR_FAVORITES_LIMIT = 4
@@ -202,6 +202,45 @@ function saveLocalPins(pins) {
     localStorage.setItem(LOCAL_PINS_KEY, JSON.stringify(pins))
   } catch {
     return
+  }
+}
+
+// A portal that can't store favourites (services.localFavorites: Drupal at
+// Rennes 2) keeps them in this browser instead: the keys of the starred apps,
+// in the order they were starred. The row then works as with the ENT's
+// favourites (star, exit animation, drag order), only without the portal.
+const LOCAL_FAVORITES = universityConfig.services?.localFavorites === true
+const LOCAL_FAVORITES_KEY = 'l-ent:local-favorites'
+
+function loadLocalFavorites() {
+  try {
+    const stored = JSON.parse(localStorage.getItem(LOCAL_FAVORITES_KEY) || 'null')
+    return Array.isArray(stored) ? stored.filter((key) => typeof key === 'string') : []
+  } catch {
+    return []
+  }
+}
+
+function saveLocalFavorites(keys) {
+  try {
+    localStorage.setItem(LOCAL_FAVORITES_KEY, JSON.stringify(keys))
+  } catch {
+    // Storage unavailable
+  }
+}
+
+// The favourites section built from the stored keys, as
+// normalizeBootstrapSections builds it from the portal. Apps the portal no
+// longer lists are left out.
+function buildLocalFavoriteSections(services, keys) {
+  const servicesByKey = new Map(services.map((service) => [getApplicationKey(service), service]))
+  const applications = [...new Set(keys)].map((key) => servicesByKey.get(key)).filter(Boolean)
+  return {
+    source: 'local-favorites',
+    rawCount: applications.length,
+    sections: applications.length > 0
+      ? [{ id: 'ent-favorites', title: 'Favoris', subtitle: '', applications }]
+      : [],
   }
 }
 
@@ -881,20 +920,6 @@ async function copyTextToClipboard(text) {
   }
 }
 
-function getContextMenuPosition(event) {
-  const maxX = window.innerWidth - FAVORITES_CONTEXT_MENU_WIDTH - FAVORITES_CONTEXT_MENU_MARGIN
-  const maxY = window.innerHeight - FAVORITES_CONTEXT_MENU_HEIGHT - FAVORITES_CONTEXT_MENU_MARGIN
-  const x = Math.max(FAVORITES_CONTEXT_MENU_MARGIN, Math.min(event.clientX, maxX))
-  const y = Math.max(FAVORITES_CONTEXT_MENU_MARGIN, Math.min(event.clientY, maxY))
-
-  return {
-    x,
-    y,
-    originX: `${Math.max(18, event.clientX - x)}px`,
-    originY: `${Math.max(18, event.clientY - y)}px`,
-  }
-}
-
 // What tells the grade service's app ("Notes IUT Lannion": ScoDoc) apart,
 // whatever the list it comes from (see gradesPortalApp.js).
 const GRADES_PORTAL_OPTIONS = {
@@ -912,10 +937,19 @@ const PLANNING_PORTAL_OPTIONS = {
   casOrigin: universityConfig.origins?.cas ?? '',
 }
 
+// And for the webmail's app (« Messagerie », see mailPortalApp.js).
+const MAIL_PORTAL_OPTIONS = {
+  mailOrigins: getMailOrigins(universityConfig.mail?.webmailUrls),
+  appKeys: [DEMO_MAIL_APP_FNAME],
+  launchPath: `${ENT_AUTH_PREFIX}/launch`,
+  casOrigin: universityConfig.origins?.cas ?? '',
+}
+
 // What an in-app tile says it opens (aria-description).
 const IN_APP_PAGE_DESCRIPTIONS = {
   grades: 'Ouvre Mes notes',
   planning: 'Ouvre le planning',
+  mail: 'Ouvre la messagerie',
 }
 
 // `onOpenGradesPage`: the app's own grades page, passed only while the
@@ -924,6 +958,7 @@ const IN_APP_PAGE_DESCRIPTIONS = {
 // nouvel onglet » still open ScoDoc, its link stays on the tile for that.
 // `onOpenPlanningPage`: the same for the planning service's app and the
 // in-app Planning page, passed only while the student has it.
+// `onOpenMailPage`: and for the webmail's app and the in-app mail page.
 function AvailableApplications({
   establishment = null,
   canUseServerLaunch = true,
@@ -931,6 +966,7 @@ function AvailableApplications({
   showDescriptions = false,
   onOpenGradesPage = null,
   onOpenPlanningPage = null,
+  onOpenMailPage = null,
 }) {
   const [viewState, setViewState] = useState({
     status: 'loading',
@@ -953,15 +989,7 @@ function AvailableApplications({
     removingKey: '',
     error: '',
   })
-  const [contextMenuState, setContextMenuState] = useState({
-    open: false,
-    x: 0,
-    y: 0,
-    originX: '24px',
-    originY: '24px',
-    application: null,
-    source: 'favorite',
-  })
+  const [contextMenuState, setContextMenuState] = useState(CLOSED_CONTEXT_MENU)
   const [allServices, setAllServices] = useState([])
   const [appIcons, setAppIcons] = useState(getCachedAppIcons)
   const [loadedIconKey, setLoadedIconKey] = useState('')
@@ -978,7 +1006,6 @@ function AvailableApplications({
   const deferredRemovalsRef = useRef(new Set())
   const launchTargetsRef = useRef({})
   const isMountedRef = useRef(true)
-  const contextMenuRef = useRef(null)
   const dragRef = useRef({ index: -1, didDrag: false })
   const favoritesRowRef = useRef(null)
   const flipRectsRef = useRef(new Map())
@@ -1126,14 +1153,7 @@ function AvailableApplications({
         removingKey: '',
         error: '',
       })
-      setContextMenuState({
-        open: false,
-        x: 0,
-        y: 0,
-        originX: '24px',
-        originY: '24px',
-        application: null,
-      })
+      setContextMenuState(CLOSED_CONTEXT_MENU)
     }
 
     window.addEventListener('pageshow', handlePageShow)
@@ -1143,51 +1163,6 @@ function AvailableApplications({
     }
   }, [])
 
-  useEffect(() => {
-    if (!contextMenuState.open) {
-      return undefined
-    }
-
-    function closeContextMenu() {
-      setContextMenuState({
-        open: false,
-        x: 0,
-        y: 0,
-        originX: '24px',
-        originY: '24px',
-        application: null,
-        source: 'favorite',
-      })
-    }
-
-    function handlePointerDown(event) {
-      if (contextMenuRef.current?.contains(event.target)) {
-        return
-      }
-
-      closeContextMenu()
-    }
-
-    function handleKeyDown(event) {
-      if (event.key === 'Escape') {
-        closeContextMenu()
-      }
-    }
-
-    window.addEventListener('pointerdown', handlePointerDown)
-    window.addEventListener('keydown', handleKeyDown)
-    window.addEventListener('resize', closeContextMenu)
-    window.addEventListener('scroll', closeContextMenu, true)
-    window.addEventListener('blur', closeContextMenu)
-
-    return () => {
-      window.removeEventListener('pointerdown', handlePointerDown)
-      window.removeEventListener('keydown', handleKeyDown)
-      window.removeEventListener('resize', closeContextMenu)
-      window.removeEventListener('scroll', closeContextMenu, true)
-      window.removeEventListener('blur', closeContextMenu)
-    }
-  }, [contextMenuState.open])
 
   useEffect(() => {
     let isCancelled = false
@@ -1199,8 +1174,10 @@ function AvailableApplications({
           return
         }
 
-        const sections = normalizeBootstrapSections(bootstrap)
         const services = normalizeAllServices(bootstrap, loadAppsOrder())
+        const sections = LOCAL_FAVORITES
+          ? buildLocalFavoriteSections(services, loadLocalFavorites())
+          : normalizeBootstrapSections(bootstrap)
         saveAppsOrder(services)
 
         // Tile icons come in the background: the grid never waits for them.
@@ -1410,29 +1387,17 @@ function AvailableApplications({
     })
   }
 
-  function closeContextMenu() {
-    setContextMenuState({
-      open: false,
-      x: 0,
-      y: 0,
-      originX: '24px',
-      originY: '24px',
-      application: null,
-      source: 'favorite',
-    })
-  }
+  // Stable: the menu listens with it (ContextMenu).
+  const closeContextMenu = useCallback(() => setContextMenuState(CLOSED_CONTEXT_MENU), [])
 
   function handleFavoriteContextMenu(event, application, source = 'favorite') {
     event.preventDefault()
 
-    const { x, y, originX, originY } = getContextMenuPosition(event)
     setFavoriteActionState((current) => ({ ...current, error: '' }))
     setContextMenuState({
       open: true,
-      x,
-      y,
-      originX,
-      originY,
+      x: event.clientX,
+      y: event.clientY,
       application,
       source,
     })
@@ -1654,19 +1619,23 @@ function AvailableApplications({
   // before a fast reply drops it from the list.
   async function sendFavoriteRemoval(application, exitAnimation = Promise.resolve()) {
     const applicationKey = getApplicationKey(application)
-    const requestPath = buildRemoveFavoriteRequestPath(application)
 
     try {
-      if (!requestPath) {
-        throw new Error('Impossible de retirer ce favori pour le moment')
-      }
-      const response = await postFavoriteLayoutChange(requestPath)
-      if (!response.ok) {
-        throw new Error(
-          (typeof response.data === 'object' ? response.data?.error : '')
-          || response.text
-          || 'Impossible de retirer ce favori pour le moment',
-        )
+      if (LOCAL_FAVORITES) {
+        saveLocalFavorites(loadLocalFavorites().filter((key) => key !== applicationKey))
+      } else {
+        const requestPath = buildRemoveFavoriteRequestPath(application)
+        if (!requestPath) {
+          throw new Error('Impossible de retirer ce favori pour le moment')
+        }
+        const response = await postFavoriteLayoutChange(requestPath)
+        if (!response.ok) {
+          throw new Error(
+            (typeof response.data === 'object' ? response.data?.error : '')
+            || response.text
+            || 'Impossible de retirer ce favori pour le moment',
+          )
+        }
       }
       await exitAnimation
       if (!isMountedRef.current) return
@@ -1744,6 +1713,23 @@ function AvailableApplications({
       return
     }
 
+    // Stored in this browser: the favourite is confirmed at once.
+    if (LOCAL_FAVORITES) {
+      setFavoriteActionState({ removingKey: '', error: '' })
+      cancelFavoriteRemoval(applicationKey)
+      const keys = loadLocalFavorites()
+      const nextKeys = keys.includes(applicationKey) ? keys : [...keys, applicationKey]
+      saveLocalFavorites(nextKeys)
+      const local = buildLocalFavoriteSections(allServices, nextKeys)
+      setViewState((current) => ({
+        ...current,
+        ...local,
+        status: local.sections.length > 0 ? 'ready' : 'empty',
+        error: '',
+      }))
+      return
+    }
+
     const lastEntFavorite = orderedFavorites.filter((f) => !isLocalService(f)).pop()
     const requestPath = buildAddFavoriteRequestPath(application, lastEntFavorite)
 
@@ -1797,10 +1783,21 @@ function AvailableApplications({
     })
   }
 
+  // The webmail's app while the student has the mail page, likewise.
+  function opensMailPage(application) {
+    return opensMailPageInApp(application, {
+      ...MAIL_PORTAL_OPTIONS,
+      hasMailPage: Boolean(onOpenMailPage),
+      resolvedHref: launchTargets[getApplicationKey(application)]?.href,
+      base: window.location.href,
+    })
+  }
+
   // The app's own page a tile opens instead of its site, or null.
   function getInAppPage(application) {
     if (opensGradesPage(application)) return 'grades'
     if (opensPlanningPage(application)) return 'planning'
+    if (opensMailPage(application)) return 'mail'
     return null
   }
 
@@ -1820,6 +1817,8 @@ function AvailableApplications({
       event.preventDefault()
       if (inAppPage === 'grades') {
         onOpenGradesPage('tile')
+      } else if (inAppPage === 'mail') {
+        onOpenMailPage('tile')
       } else {
         onOpenPlanningPage('tile')
       }
@@ -2110,60 +2109,22 @@ function AvailableApplications({
         const targetApplication = favoriteEntry ?? contextMenuState.application
 
         return (
-        <div
-          ref={contextMenuRef}
-          className="favorites-context-menu fixed z-60 min-w-[252px] p-[6px] border border-border corners-[18px] bg-context-bg shadow-[0_18px_40px_var(--color-shadow)] backdrop-blur-[12px] animate-context-menu-in max-md:min-w-[220px]"
-          role="menu"
-          aria-label={`Actions pour ${targetApplication.title}`}
-          style={{
-            top: `${contextMenuState.y}px`,
-            left: `${contextMenuState.x}px`,
-            '--favorites-context-origin-x': contextMenuState.originX,
-            '--favorites-context-origin-y': contextMenuState.originY,
-          }}
-        >
-          <button
-            type="button"
-            className="favorites-context-action w-full flex items-center gap-[10px] min-h-[44px] px-3 border-0 corners-[12px] bg-transparent text-brand font-inherit text-[15px] font-semibold text-left animate-context-action-in hover:bg-context-hover focus-visible:bg-context-hover focus-visible:outline-none"
-            role="menuitem"
-            onClick={() => void handleOpenApplicationInNewTab(targetApplication)}
-          >
-            <Icon icon="carbon:launch" className="w-[18px] h-[18px] shrink-0" aria-hidden="true" />
-            <span>Ouvrir dans un nouvel onglet</span>
-          </button>
-          <button
-            type="button"
-            className="favorites-context-action w-full flex items-center gap-[10px] min-h-[44px] px-3 border-0 corners-[12px] bg-transparent text-brand font-inherit text-[15px] font-semibold text-left animate-context-action-in hover:bg-context-hover focus-visible:bg-context-hover focus-visible:outline-none"
-            role="menuitem"
-            onClick={() => void handleCopyApplicationLink(targetApplication)}
-          >
-            <Icon icon="carbon:copy-link" className="w-[18px] h-[18px] shrink-0" aria-hidden="true" />
-            <span>Copier le lien</span>
-          </button>
-          <div className="mx-2 my-1 h-px bg-border/80" aria-hidden="true" />
-          {isAddMode ? (
-            <button
-              type="button"
-              className="favorites-context-action w-full flex items-center gap-[10px] min-h-[44px] px-3 border-0 corners-[12px] bg-transparent text-brand font-inherit text-[15px] font-semibold text-left animate-context-action-in hover:bg-context-hover focus-visible:bg-context-hover focus-visible:outline-none"
-              role="menuitem"
-              onClick={() => void handleAddFavorite(targetApplication)}
-            >
-              <Icon icon="carbon:star" className="w-[18px] h-[18px] shrink-0" aria-hidden="true" />
-              <span>Ajouter aux favoris</span>
-            </button>
-          ) : (
-            <button
-              type="button"
-              className="favorites-context-action w-full flex items-center gap-[10px] min-h-[44px] px-3 border-0 corners-[12px] bg-transparent text-brand font-inherit text-[15px] font-semibold text-left animate-context-action-in hover:bg-context-hover focus-visible:bg-context-hover focus-visible:outline-none"
-              role="menuitem"
-              onClick={() => void handleUnfavorite(targetApplication)}
-            >
-              <Icon icon="carbon:close-outline" className="w-[18px] h-[18px] shrink-0" aria-hidden="true" />
-              <span>Retirer des favoris</span>
-            </button>
-          )}
-        </div>
-      )})() : null}
+          <ContextMenu
+            x={contextMenuState.x}
+            y={contextMenuState.y}
+            label={`Actions pour ${targetApplication.title}`}
+            onClose={closeContextMenu}
+            items={[
+              { id: 'open', label: 'Ouvrir dans un nouvel onglet', icon: 'carbon:launch', onSelect: () => void handleOpenApplicationInNewTab(targetApplication) },
+              { id: 'copy', label: 'Copier le lien', icon: 'carbon:copy-link', onSelect: () => void handleCopyApplicationLink(targetApplication) },
+              'separator',
+              isAddMode
+                ? { id: 'favorite', label: 'Ajouter aux favoris', icon: 'carbon:star', onSelect: () => void handleAddFavorite(targetApplication) }
+                : { id: 'unfavorite', label: 'Retirer des favoris', icon: 'carbon:close-outline', onSelect: () => void handleUnfavorite(targetApplication) },
+            ]}
+          />
+        )
+      })() : null}
     </>
   )
 }

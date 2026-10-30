@@ -432,7 +432,7 @@ function GradeSimulatorModal({ report = null, releve = null, config = null, seme
       <div className="weather-modal-backdrop absolute inset-0 bg-backdrop animate-modal-backdrop-in" onClick={onClose} aria-hidden="true" />
       <section
         ref={dialogRef}
-        className="gd-dialog relative isolate flex max-h-[min(860px,calc(100dvh-40px))] w-[min(600px,100%)] flex-col corners-[26px] border border-border bg-bg text-text shadow-[0_24px_80px_var(--color-shadow)] outline-none max-sm:max-h-[calc(100dvh-16px)] max-sm:rounded-b-none max-sm:border-b-0"
+        className="gd-dialog relative isolate flex max-h-[min(860px,calc(100dvh-40px))] w-[min(600px,100%)] flex-col modal-corners [--modal-inset:24px] [--modal-inner-radius:20px] max-sm:[--modal-inset:16px] max-sm:[--modal-inner-radius:18px] border border-border bg-bg text-text shadow-[0_24px_80px_var(--color-shadow)] outline-none max-sm:max-h-[calc(100dvh-16px)] max-sm:rounded-b-none max-sm:border-b-0"
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}
@@ -472,7 +472,7 @@ function GradeSimulatorModal({ report = null, releve = null, config = null, seme
         ) : null}
         {/* Once a grade is typed in: on to the result. */}
         {picked && editCount && !reveal ? (
-          <footer className="semester-fade relative z-10 flex items-center gap-3 rounded-b-[25px] border-t border-border bg-bg px-6 py-3 max-sm:rounded-b-none max-sm:px-4 max-sm:pb-[max(12px,env(safe-area-inset-bottom))]">
+          <footer className="semester-fade relative z-10 flex items-center gap-3 modal-corners-bottom border-t border-border bg-bg px-6 py-3 max-sm:rounded-b-none max-sm:px-4 max-sm:pb-[max(12px,env(safe-area-inset-bottom))]">
             <span className={`min-w-0 flex-1 truncate font-body text-[14px] font-medium ${hasInvalid ? 'text-error' : 'text-text-secondary'}`} aria-live="polite">
               {hasInvalid ? 'Une note n’est pas valide' : `${editCount} ${editCount > 1 ? 'notes modifiées' : 'note modifiée'}`}
             </span>

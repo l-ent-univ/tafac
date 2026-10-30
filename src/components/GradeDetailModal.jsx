@@ -16,10 +16,11 @@ import UeShareRing from './UeShareRing'
 import { useUeColor } from '../useUeColor'
 import { NewBadge } from './SubjectsList'
 import CloseButton from './CloseButton'
+import Tooltip from './Tooltip'
 
 const FOCUSABLE_SELECTOR = 'button:not([disabled]), [href], [tabindex]:not([tabindex="-1"])'
 const DATE_FORMAT = new Intl.DateTimeFormat('fr-FR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })
-const CARD = 'gd-card gd-rise grid gap-4 corners-[20px] border border-border bg-widget-bg p-4 max-sm:corners-[18px] max-sm:p-[14px]'
+const CARD = 'gd-card gd-rise grid gap-4 modal-inner-corners border border-border bg-widget-bg p-4 max-sm:p-[14px]'
 
 // What a grade that isn't a number means for the averages.
 const STATE_NOTES = {
@@ -288,7 +289,9 @@ function PromoCard({ evaluation, semesterId, showPromoStats, titleId }) {
 // department shows promo stats) and what it counts for in each UE.
 // Centred card on wide screens, bottom sheet on phones; focus kept inside,
 // Escape and the backdrop close it, focus goes back to the row.
-function GradeDetailModal({ report, module, evaluation, semesterId, icon = null, isNew = false, onClose }) {
+// `onWrite`: « Écrire au sujet de cette note » (a mail about it, in the
+// Messagerie), null without the in-app mail page.
+function GradeDetailModal({ report, module, evaluation, semesterId, icon = null, isNew = false, onWrite = null, onClose }) {
   const dialogRef = useRef(null)
   const titleId = useId()
   const summaryId = useId()
@@ -381,7 +384,7 @@ function GradeDetailModal({ report, module, evaluation, semesterId, icon = null,
       <div className="weather-modal-backdrop absolute inset-0 bg-backdrop animate-modal-backdrop-in" onClick={onClose} aria-hidden="true" />
       <section
         ref={dialogRef}
-        className="gd-dialog relative isolate flex max-h-[min(820px,calc(100dvh-40px))] w-[min(540px,100%)] flex-col corners-[26px] border border-border bg-bg text-text shadow-[0_24px_80px_var(--color-shadow)] outline-none max-sm:max-h-[calc(100dvh-16px)] max-sm:rounded-b-none max-sm:border-b-0"
+        className="gd-dialog relative isolate flex max-h-[min(820px,calc(100dvh-40px))] w-[min(540px,100%)] flex-col modal-corners [--modal-inset:24px] [--modal-inner-radius:20px] max-sm:[--modal-inset:16px] max-sm:[--modal-inner-radius:18px] border border-border bg-bg text-text shadow-[0_24px_80px_var(--color-shadow)] outline-none max-sm:max-h-[calc(100dvh-16px)] max-sm:rounded-b-none max-sm:border-b-0"
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}
@@ -427,7 +430,22 @@ function GradeDetailModal({ report, module, evaluation, semesterId, icon = null,
                     </span>
                   </span>
                 </span>
-                <CloseButton glass onClick={onClose} />
+                {/* « Écrire au sujet de cette note » beside the close button, a
+                    round glass button of its own (its name in a tooltip). */}
+                <span className="flex shrink-0 items-center gap-2">
+                  {onWrite ? (
+                    <button
+                      type="button"
+                      aria-label="Écrire au sujet de cette note"
+                      onClick={onWrite}
+                      className="close-button glass-close-button group relative inline-flex size-[34px] shrink-0 cursor-pointer items-center justify-center rounded-full border-0 p-0 text-text focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-text"
+                    >
+                      <Icon icon="carbon:email" className="size-[16px]" aria-hidden="true" />
+                      <Tooltip title="Écrire au sujet de cette note" side="bottom-end" className="max-4xl:hidden" />
+                    </button>
+                  ) : null}
+                  <CloseButton glass onClick={onClose} />
+                </span>
               </div>
             </header>
 

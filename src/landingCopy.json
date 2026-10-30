@@ -7,100 +7,175 @@
     "login": "Se connecter"
   },
   "hero": {
-    "title": "Cours, notes et services de {university}",
-    "subtitle": "Emploi du temps, notes, mails et rendus Moodle sur une seule page",
-    "cta": "Se connecter à mon ENT",
+    "title": "Ta journée à la fac, en un coup d’œil.",
+    "universityTitle": "Ta journée à {university}, en un coup d’œil.",
+    "subtitle": "Consulte ton prochain cours, tes notes, tes mails et tes devoirs à rendre dans une seule app.",
+    "cta": "Me connecter avec mon ENT",
     "disclaimer": "Projet étudiant indépendant, non officiel, non affilié à {university}",
     "compatible": "Compatible avec :"
   },
-  "features": {
-    "main": {
-      "title": "Ce que regroupe {appName}",
-      "intro": "{appName} se connecte aux services de {university} et rassemble votre emploi du temps, vos notes, vos rendus et mails sur une seule page, sur ordinateur comme sur téléphone",
-      "items": [
-        {
-          "title": "Emploi du temps",
-          "body": "Affichage du prochain cours en un clin d'œil"
-        },
-        {
-          "title": "Notes",
-          "body": "Les derniers résultats et moyenne générale"
-        },
-        {
-          "title": "Mails",
-          "body": "Les derniers mails reçus sur ton adresse universitaire"
-        },
-        {
-          "title": "Rendus Moodle",
-          "body": "Tout les devoirs à rendre et leur détails"
-        },
-        {
-          "title": "Et bien plus",
-          "body": ""
-        }
-      ],
-      "note": "Les fonctionnalités dépendent de ce que propose l’intégration de votre université"
-    },
-    "computer": {
-      "title": "Moyennes et planning",
-      "intro": "La moyenne générale, et le planning à la journée",
-      "items": [
-        {
-          "title": "Moyennes par UE pour les BUT",
-          "body": "Avec le coefficient de chaque matière"
-        },
-        {
-          "title": "Simulateur de notes",
-          "body": "Les moyennes avec des notes à venir"
-        },
-        {
-          "title": "Planning",
-          "body": "Par jour, par semaine ou en liste"
-        },
-        {
-          "title": "Export du planning",
-          "body": "Vers Google Agenda, Calendrier ou Outlook"
-        }
-      ]
-    },
-    "phone": {
-      "title": "Disponible sur le tél.",
-      "intro": "{appName} s’installe sur l’écran d’accueil du téléphone, sans passer par un store",
-      "items": [
-        {
-          "title": "Sur l’écran d’accueil",
-          "body": "Raccourci accessible sur ton écran d'applications"
-        },
-        {
-          "title": "Thème sombre",
-          "body": "Mode sombre pour préserver la vision"
-        },
-        {
-          "title": "Audience anonyme",
-          "body": "Aucune donnée personnelle collectée et aucun cookie de suivi"
-        },
-        {
-          "title": "Code source ouvert",
-          "body": "Disponible sur GitHub"
-        }
-      ]
+  "showcase": {
+    "title": "Retrouve tes infos de la fac au même endroit.",
+    "intro": "Vérifie ta salle avant de partir, consulte tes résultats ou réponds à un mail sans passer d’un site à l’autre.",
+    "tabsLabel": "Pages de {appName}",
+    "previewLabel": "Aperçu avec le compte de démonstration",
+    "note": "Les services disponibles dépendent de ton université. Les notes sont accessibles pour les formations BUT utilisant ScoDoc.",
+    "tabs": {
+      "home": {
+        "label": "Accueil",
+        "shortLabel": "Accueil",
+        "title": "Ce qui t’attend aujourd’hui",
+        "intro": "Tes cours, tes derniers messages et tes devoirs à rendre dès l’ouverture de Tafac.",
+        "previewLabel": "L’accueil : message du jour, prochain cours, dernière note, mails récents et échéances",
+        "items": [
+          {
+            "title": "Ta journée de cours",
+            "body": "Vois les cours qu’il te reste et l’heure à laquelle tu termines."
+          },
+          {
+            "title": "Ta prochaine salle",
+            "body": "Retrouve où aller, à quelle heure et avec quel enseignant."
+          },
+          {
+            "title": "Les derniers mails de la fac",
+            "body": "Consulte tes messages récents depuis l’accueil."
+          },
+          {
+            "title": "Tes devoirs à rendre",
+            "body": "Repère les prochaines échéances Moodle et les rendus en retard."
+          },
+          {
+            "title": "Tes services favoris",
+            "body": "Retrouve les outils de ton ENT sans chercher leur lien à chaque fois."
+          }
+        ]
+      },
+      "grades": {
+        "label": "Mes notes",
+        "shortLabel": "Notes",
+        "title": "Suis tes résultats pendant le semestre",
+        "intro": "Consulte tes notes, tes moyennes et le détail de chaque UE.",
+        "previewLabel": "Mes notes : moyenne générale, UE validées et dernières notes",
+        "items": [
+          {
+            "title": "Tes moyennes par UE",
+            "body": "Regarde où tu en es dans chaque UE et sur l’ensemble du semestre."
+          },
+          {
+            "title": "Le poids de chaque note",
+            "body": "Vérifie combien une évaluation compte dans tes moyennes."
+          },
+          {
+            "title": "Tes prochaines notes en simulation",
+            "body": "Essaie un 14 au prochain contrôle et regarde comment tes moyennes évoluent."
+          },
+          {
+            "title": "Un message à ton enseignant",
+            "body": "Écris au sujet d’un résultat avec les informations de la note déjà ajoutées au mail."
+          }
+        ]
+      },
+      "planning": {
+        "label": "Planning",
+        "shortLabel": "Planning",
+        "title": "Prépare ta semaine de cours",
+        "intro": "Consulte tes horaires par jour, par semaine ou en liste.",
+        "previewLabel": "Le Planning : les cours de la journée et le menu d’un cours",
+        "items": [
+          {
+            "title": "Horaires, salles et enseignants",
+            "body": "Retrouve les informations de chaque cours et ses prochaines séances."
+          },
+          {
+            "title": "Contacter un enseignant",
+            "body": "Prépare un mail depuis le cours, avec ses informations et les destinataires proposés."
+          },
+          {
+            "title": "Tes cours dans ton agenda",
+            "body": "Exporte ton planning vers Google Agenda, Calendrier ou Outlook."
+          },
+          {
+            "title": "Les jours à venir",
+            "body": "Parcours ton planning pour voir quand tu commences, quand tu finis et les pauses entre tes cours."
+          }
+        ]
+      },
+      "mail": {
+        "label": "Messagerie",
+        "shortLabel": "Mail",
+        "title": "Tes mails universitaires dans Tafac",
+        "intro": "Lis et envoie tes messages avec ton adresse de la fac.",
+        "previewLabel": "La Messagerie : la boîte de réception et un mail au sujet d’une note",
+        "items": [
+          {
+            "title": "Retrouve un message",
+            "body": "Recherche un mail de la scolarité ou reprends une conversation avec un enseignant."
+          },
+          {
+            "title": "Écris depuis l’app",
+            "body": "Réponds, joins un document ou garde un brouillon pour plus tard."
+          },
+          {
+            "title": "Cinq secondes pour annuler",
+            "body": "Reprends ton mail si tu as cliqué trop vite sur « Envoyer »."
+          },
+          {
+            "title": "Le cours ou la note dans le mail",
+            "body": "Ajoute leurs informations à ton message sans les recopier."
+          },
+          {
+            "title": "Des expéditeurs identifiables",
+            "body": "Le domaine des adresses extérieures à l’université s’affiche à côté du nom."
+          }
+        ]
+      }
     }
   },
+  "features": {
+    "title": "Sur ton ordinateur et ton téléphone",
+    "intro": "Les mêmes infos dans ton navigateur, à la BU ou entre deux cours",
+    "items": [
+      {
+        "title": "Trouve ta prochaine salle",
+        "body": "Vérifie où tu as cours et à quelle heure il commence, même en chemin."
+      },
+      {
+        "title": "Prépare ta semaine",
+        "body": "Consulte tes cours et repère les créneaux libres pour travailler ou prévoir une sortie."
+      },
+      {
+        "title": "Fais le point sur tes résultats",
+        "body": "Regarde tes moyennes et simule l’effet de tes prochaines notes."
+      },
+      {
+        "title": "Réponds aux mails de la fac",
+        "body": "Lis tes échanges, rédige tes réponses et ajoute tes documents."
+      },
+      {
+        "title": "Vérifie ce qu’il reste à rendre",
+        "body": "Retrouve tes prochains devoirs Moodle et leurs dates de rendu depuis l’accueil."
+      },
+      {
+        "title": "Retrouve tes outils de cours",
+        "body": "Accède aux services de ton ENT et garde ceux que tu utilises en favoris."
+      }
+    ]
+  },
   "security": {
-    "title": "Sécurisé et respectueux de votre vie privée",
-    "intro": "{appName} ne fait que relayer vos échanges avec {university} : votre mot de passe n’est jamais enregistré, et la session **reste chiffrée dans votre navigateur**",
+    "title": "Sécurisé et respectueux de ta vie privée",
+    "intro": "{appName} ne fait que relayer tes échanges avec {university} : ton mot de passe n’est jamais enregistré, et la session **reste chiffrée dans ton navigateur**",
     "points": {
       "noStorage": {
         "title": "Mot de passe jamais enregistré",
-        "body": "Votre mot de passe n'est transmis que lors de la connexion. Aucune base de donnée ni journal n'est utilisé"
+        "body": "Il n’est transmis qu’à la connexion. Aucune base de données ni journal ne le garde"
       },
       "session": {
         "title": "Session chiffrée",
-        "body": "Tafac sécurise votre session grâce à un cookie chiffré en AES-256, inaccessible aux scripts de la page et valable jusqu’à 30 jours."
+        "body": "Un cookie chiffré en AES-256, inaccessible aux scripts de la page et valable jusqu’à 30 jours"
       },
       "stats": {
         "title": "Statistiques anonymes",
-        "body": "Tafac compte uniquement les visites, sans données personnelles ni cookies de suivi. Ces statistiques sont hébergées dans l’Union européenne et peuvent être désactivées à tout moment dans les réglages."
+        "body": "Les visites seulement, sans données personnelles ni cookie de suivi, hébergées dans l’Union européenne et désactivables dans les réglages"
       },
       "source": {
         "title": "Code source ouvert",
@@ -108,11 +183,11 @@
         "link": "Voir le code sur GitHub"
       }
     },
-    "passwordTitle": "Votre mot de passe ne fait que passer",
-    "passwordIntro": "{appName} le transmet à {university} pour vous connecter, **sans l’enregistrer**. Ensuite, il utilise la session ouverte par l’université, gardée chiffrée dans un cookie de votre navigateur",
+    "passwordTitle": "Ton mot de passe ne fait que passer",
+    "passwordIntro": "{appName} le transmet à {university} pour te connecter, **sans l’enregistrer**. Ensuite, il utilise la session ouverte par l’université, gardée chiffrée dans un cookie de ton navigateur",
     "stops": {
       "device": {
-        "title": "Votre appareil",
+        "title": "Ton appareil",
         "body": "Garde la session dans un cookie chiffré"
       },
       "relay": {
@@ -120,8 +195,32 @@
         "body": "Transmet le mot de passe sans l’enregistrer"
       },
       "university": {
-        "title": "Votre université",
+        "title": "Ton université",
         "body": "Vérifie le mot de passe et ouvre la session"
+      }
+    },
+    "mailTitle": "Tes mails ne font que passer",
+    "mailIntro": "La Messagerie lit et envoie tes mails dans le webmail de {university}, en passant par le serveur de {appName}. **Rien n’est écrit sur disque**",
+    "mailPoints": {
+      "relay": {
+        "title": "Relayés, pas copiés",
+        "body": "Chaque demande va au webmail et sa réponse revient à ton navigateur, pièces jointes comprises"
+      },
+      "memory": {
+        "title": "En mémoire, le temps de ta session",
+        "body": "La connexion au webmail et la dernière liste de mails, effacées à la déconnexion"
+      },
+      "account": {
+        "title": "Brouillons et signature",
+        "body": "Enregistrés dans ton compte de messagerie de l’université, pas chez {appName}"
+      },
+      "images": {
+        "title": "Images externes masquées",
+        "body": "Les images d’un mail venues d’ailleurs ne se chargent que si tu le demandes"
+      },
+      "stats": {
+        "title": "Hors des statistiques",
+        "body": "Ni objet, ni adresse, ni contenu, ni pièce jointe dans la mesure d’audience"
       }
     },
     "disclaimer": ""
@@ -136,39 +235,47 @@
       },
       "officiel": {
         "question": "{appName} est-il une application de mon université ?",
-        "answer": "Non. {appName} est un projet étudiant indépendant, non officiel et non affilié à {university}. Il affiche les données que publient les services de l’université (emploi du temps, notes, mails, Moodle) au même endroit"
+        "answer": "Non. {appName} est un projet étudiant indépendant, non officiel et non affilié à {university}. Il rassemble les services de l’université (emploi du temps, notes, messagerie, Moodle) dans une seule app"
       },
       "appareils": {
         "question": "Sur quels appareils fonctionne {appName} ?",
-        "answer": "Tafac fonctionne sur téléphone, tablette et ordinateur, depuis un navigateur récent, sans téléchargement. Sur téléphone, vous pouvez aussi l’ajouter à votre écran d’accueil pour y accéder plus facilement."
+        "answer": "Sur téléphone, tablette et ordinateur, depuis un navigateur récent, sans téléchargement. Sur téléphone, tu peux aussi l’ajouter à ton écran d’accueil"
       },
       "identifiants": {
         "question": "Avec quels identifiants se connecter ?",
-        "answer": "Ceux de votre ENT, comme sur le site de l’université. Pas de compte à créer"
+        "answer": "Ceux de ton ENT, comme sur le site de l’université. Pas de compte à créer"
       },
       "motDePasse": {
         "question": "Que devient mon mot de passe ?",
-        "answer": "{appName} transmet votre mot de passe à {university} pour vous connecter, sans jamais l’enregistrer. Seule la session créée par votre université est conservée dans votre navigateur, dans un cookie chiffré"
+        "answer": "{appName} transmet ton mot de passe à {university} pour te connecter, sans jamais l’enregistrer. Seule la session ouverte par l’université est gardée dans ton navigateur, dans un cookie chiffré"
+      },
+      "mails": {
+        "question": "{appName} garde-t-il mes mails ?",
+        "answer": "Non. La Messagerie lit et envoie tes mails dans le webmail de {university}, en passant par le serveur de {appName}, sans rien écrire sur disque. La connexion au webmail et la dernière liste de mails restent en mémoire le temps de ta session et s’effacent à la déconnexion. Brouillons et signature sont enregistrés dans ton compte de messagerie de l’université"
+      },
+      "envoi": {
+        "question": "Les mails envoyés depuis {appName} partent-ils de mon adresse ?",
+        "answer": "Oui. Ils partent de ton adresse de l’université, par le webmail de l’université, comme si tu les écrivais là-bas"
       },
       "donnees": {
         "question": "{appName} collecte-t-il mes données personnelles ?",
-        "answer": "Non. {appName} ne collecte ni vos notes, ni vos mails, ni vos identifiants. Seules les visites sont comptées de façon anonyme, sans cookie de suivi. Ces statistiques sont hébergées dans l’Union européenne et peuvent être désactivées dans les réglages, sous « Statistiques anonymes »"
+        "answer": "Non. {appName} ne collecte ni tes notes, ni tes mails, ni tes identifiants. Seules les visites sont comptées, de façon anonyme et sans cookie de suivi. Ces statistiques sont hébergées dans l’Union européenne et se désactivent dans les réglages, sous « Statistiques anonymes »"
       },
       "session": {
         "question": "Combien de temps je reste connecté ?",
-        "answer": "Votre session reste active jusqu’à 30 jours. Passé ce délai, il suffit de vous reconnecter. Si vous vous déconnectez, votre session est immédiatement supprimée de votre navigateur et fermée auprès de {university}."
+        "answer": "Jusqu’à 30 jours. Ensuite, il suffit de te reconnecter. Te déconnecter supprime la session de ton navigateur et la ferme auprès de {university}"
       },
       "installer": {
         "question": "Comment l’installer sur mon téléphone ?",
-        "answer": "Vous pouvez ajouter {appName} à votre écran d’accueil directement depuis votre navigateur.\n\nSur iPhone, ouvrez {appName} dans Safari, touchez « Partager », puis « Sur l’écran d’accueil ». Sur Android, ouvrez {appName} dans Chrome, puis sélectionnez « Installer l’application » ou « Ajouter à l’écran d’accueil » dans le menu.\n\n{appName} s’ouvre ensuite en plein écran, comme une application"
+        "answer": "Tu peux ajouter {appName} à ton écran d’accueil depuis ton navigateur.\n\nSur iPhone, ouvre {appName} dans Safari, touche « Partager », puis « Sur l’écran d’accueil ». Sur Android, ouvre {appName} dans Chrome, puis choisis « Installer l’application » ou « Ajouter à l’écran d’accueil » dans le menu.\n\n{appName} s’ouvre ensuite en plein écran, comme une application"
       },
       "notes": {
         "question": "Pourquoi je ne vois pas mes notes ou mon prochain cours ?",
-        "answer": "Les données accessibles dans {appName} varient selon votre université et les services compatibles. Vous souhaitez ajouter des fonctionnalités pour votre université ? N’hésitez pas à contribuer au projet sur [GitHub](issues) !"
+        "answer": "Ce que {appName} affiche dépend de {university} et des services pris en charge : « Mes notes » demande un relevé ScoDoc de BUT. Pour ajouter un service à ton université, tu peux contribuer au projet sur [GitHub](issues)"
       },
       "universite": {
         "question": "Mon université n’est pas dans la liste, que faire ?",
-        "answer": "Elle n’est pas encore prise en charge. Le code étant ouvert, n’importe qui peut l’ajouter : contribuez sur [GitHub](issues)"
+        "answer": "Elle n’est pas encore prise en charge. Le code étant ouvert, n’importe qui peut l’ajouter : contribue sur [GitHub](issues)"
       },
       "contribuer": {
         "question": "Puis-je contribuer à {appName} ?",
@@ -176,19 +283,19 @@
       },
       "contact": {
         "question": "Un bug, une idée, une question ?",
-        "answer": "Écrivez à l’équipe sur [GitHub](issues)"
+        "answer": "Écris à l’équipe sur [GitHub](issues)"
       }
     }
   },
   "beta": {
     "title": "Juste pour préciser, Tafac est encore en bêta !",
-    "body": "Avec l’équipe, nous travaillons à améliorer Tafac chaque jour. Le projet est encore jeune : vous pourrez rencontrer des bugs ou des fonctionnalités incomplètes. Vos retours et vos contributions nous aident à le faire progresser !",
+    "body": "Avec l’équipe, nous travaillons à améliorer Tafac chaque jour. Le projet est encore jeune : tu pourras rencontrer des bugs ou des fonctionnalités incomplètes. Tes retours et tes contributions nous aident à le faire progresser !",
     "photoCaption": "Tom"
   },
   "papillon": {
     "partOf": "fait partie de",
     "title": "Fait par la même équipe que Papillon",
-    "body": "Papillon, c’est l’application libre et open source créée par des étudiants pour simplifier la vie scolaire. Avec Tafac, Tom et Lucas, membres de l’association Papillon, prolongent cette ambition à l’université : rendre vos outils du quotidien plus simples et plus agréables à utiliser.",
+    "body": "Papillon, c’est l’application libre et open source créée par des étudiants pour simplifier la vie scolaire. Avec Tafac, Tom et Lucas, membres de l’association Papillon, prolongent cette ambition à l’université : rendre tes outils du quotidien plus simples et plus agréables à utiliser.",
     "cta": "Découvrir l’association Papillon"
   },
   "contact": {
@@ -219,7 +326,7 @@
     },
     "latestGrade": {
       "title": "Dernière note",
-      "subject": "Développement Front",
+      "subject": "Relations presse",
       "grade": "15.5",
       "outOf": "/20"
     },
@@ -227,11 +334,11 @@
       "title": "Mails récents",
       "badge": "7",
       "from": "Thomas Lemoine",
-      "subject": "Rendu du TP React décalé"
+      "subject": "Rendu du dossier de presse décalé"
     },
     "deadlines": {
       "title": "Échéances",
-      "task": "TP 3 – API REST",
+      "task": "Dossier – communication de crise",
       "status": "En retard"
     }
   }

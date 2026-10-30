@@ -20,7 +20,7 @@ export function shouldAskWeek(entry, { force = false, retry = false, now = Date.
 // A page's days' states as one (its single note when it has no class at
 // all): any day not set up, still on its way or failed says so first.
 export function pageStatus(statuses) {
-  for (const status of ['unconfigured', 'loading', 'unavailable']) {
+  for (const status of ['unconfigured', 'loading', 'unavailable', 'no-timetable']) {
     if (statuses.includes(status)) return status
   }
   return 'loaded'

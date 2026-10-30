@@ -1,6 +1,6 @@
 // Demo ScoDoc data for the demo account, shaped like the notes9 passerelle
-// answers (ScoDoc 9 BUT bulletin): a BUT MMI history from S1 to S5, parcours
-// "Développement web et dispositifs interactifs", spread so every case of
+// answers (ScoDoc 9 BUT bulletin): a BUT Information-Communication history
+// from S1 to S5, parcours "Communication des organisations", spread so every case of
 // "Mes notes" shows somewhere (see the comment above each semester).
 //
 // Only the evaluations, coefficients, promo stats and ranks are written by
@@ -13,30 +13,30 @@
 import { buildDistribution, createSeededRandom, generateDemoGrades } from './evaluationDistribution.js'
 
 const DEMO_GRADES_SEMESTERS = Object.freeze([
-  { formsemestre_id: 9101, titre: 'BUT MMI', annee_scolaire: '2024/2025', semestre_id: 1 },
-  { formsemestre_id: 9102, titre: 'BUT MMI', annee_scolaire: '2024/2025', semestre_id: 2 },
-  { formsemestre_id: 9103, titre: 'BUT MMI', annee_scolaire: '2025/2026', semestre_id: 3 },
-  { formsemestre_id: 9104, titre: 'BUT MMI', annee_scolaire: '2025/2026', semestre_id: 4 },
-  { formsemestre_id: 9105, titre: 'BUT MMI', annee_scolaire: '2026/2027', semestre_id: 5 },
+  { formsemestre_id: 9101, titre: 'BUT Info-Com', annee_scolaire: '2024/2025', semestre_id: 1 },
+  { formsemestre_id: 9102, titre: 'BUT Info-Com', annee_scolaire: '2024/2025', semestre_id: 2 },
+  { formsemestre_id: 9103, titre: 'BUT Info-Com', annee_scolaire: '2025/2026', semestre_id: 3 },
+  { formsemestre_id: 9104, titre: 'BUT Info-Com', annee_scolaire: '2025/2026', semestre_id: 4 },
+  { formsemestre_id: 9105, titre: 'BUT Info-Com', annee_scolaire: '2026/2027', semestre_id: 5 },
 ])
 
 // Long enough to fold behind "Lire la suite" on a phone.
 export const DEMO_GRADES_DEPARTMENT_MESSAGE = '<p>Les jurys du semestre 5 auront lieu le <b>28 janvier</b>.<br>Pensez à vérifier vos notes et à signaler toute erreur à votre enseignant avant le 20 janvier.</p><p>Les rattrapages se dérouleront la semaine du 12 janvier : la convocation vous sera envoyée par mail. Toute absence à un rattrapage doit être justifiée auprès du secrétariat dans les 48 heures.</p>'
 
-// The five MMI competences, one per UE, each with the colour the department
-// gives it in every semester.
+// The five Info-Com competences, one per UE, each with the colour the
+// department gives it in every semester.
 const DEMO_COMPETENCES = Object.freeze({
-  comprendre: { titre: 'Comprendre les écosystèmes numériques', color: '#b80004' },
-  concevoir: { titre: 'Concevoir une réponse stratégique', color: '#f97b3d' },
-  exprimer: { titre: 'Exprimer un message', color: '#feb40b' },
-  developper: { titre: 'Développer pour le web', color: '#80cb3f' },
-  entreprendre: { titre: 'Entreprendre dans le numérique', color: '#05162e' },
+  analyser: { titre: 'Analyser les enjeux de l’information et de la communication', color: '#b80004' },
+  concevoir: { titre: 'Concevoir une stratégie de communication', color: '#f97b3d' },
+  informer: { titre: 'Informer et communiquer', color: '#feb40b' },
+  produire: { titre: 'Produire les supports de communication', color: '#80cb3f' },
+  piloter: { titre: 'Piloter les relations avec les parties prenantes', color: '#05162e' },
 })
 
 const DEMO_FORMATION = Object.freeze({
-  acronyme: 'BUT MMI',
-  titre: "BUT Métiers du Multimédia et de l'Internet",
-  titre_officiel: "Bachelor Universitaire de Technologie Métiers du Multimédia et de l'Internet",
+  acronyme: 'BUT Info-Com',
+  titre: 'BUT Information-Communication',
+  titre_officiel: 'Bachelor Universitaire de Technologie Information-Communication',
 })
 
 // Everything shown but the ranks: the demo is there to see every part of the
@@ -56,7 +56,7 @@ const DEMO_GRADES_CONFIG = Object.freeze({
   liste_dep_publi_absences: '',
   metrique_absences: 'heure',
   message_rapport_absences: "Les causes de l’absence doivent être notifiées par écrit à l'aide d'un justificatif dans les 48 heures à compter du début de l’absence au secrétariat du département.",
-  liste_dep_affichage_appreciations: 'MMI',
+  liste_dep_affichage_appreciations: 'INFOCOM',
   autoriser_justificatifs: false,
 })
 
@@ -170,8 +170,8 @@ function buildDemoStudent() {
     prenom: 'Camille',
     nom: 'MARTIN',
     civilite: 'X',
-    dept_acronym: 'MMI',
-    photo_url: '/ScoDoc/MMI/api/etudiant/photo',
+    dept_acronym: 'INFOCOM',
+    photo_url: '/ScoDoc/INFOCOM/api/etudiant/photo',
   }
 }
 
@@ -260,7 +260,7 @@ function group(id, name, partition) {
 }
 
 const BUT1_GROUPS = [group(4111, 'TD A', 'TD'), group(4112, 'TP 2', 'TP')]
-const BUT23_GROUPS = [group(5121, 'TD B', 'TD'), group(5123, 'TP 3', 'TP'), group(5130, 'DWeb-DI', 'Parcours')]
+const BUT23_GROUPS = [group(5121, 'TD B', 'TD'), group(5123, 'TP 3', 'TP'), group(5130, 'Com-Orga', 'Parcours')]
 
 // S1, BUT1: five UEs (3 + 2 tiles). UE1.3 ends under 10 (warning icon) and
 // is validated by compensation with UE2.3 (jury code CMP on the semester).
@@ -284,20 +284,20 @@ const S1 = {
   decisionAnnee: { annee_scolaire: 2024, date: '2025-07-03T12:00:00+02:00', code: 'ADM', ordre: 1 },
   appreciation: [{ comment: 'Bon début de BUT. L’expression écrite et orale reste à travailler : le semestre 2 doit permettre de valider l’UE 3 par compensation.' }],
   ues: [
-    { code: 'UE1.1', id: 1001, competence: 'comprendre', ects: 6, stats: ['5.10', '11.70', '17.20'], rang: '24' },
+    { code: 'UE1.1', id: 1001, competence: 'analyser', ects: 6, stats: ['5.10', '11.70', '17.20'], rang: '24' },
     { code: 'UE1.2', id: 1002, competence: 'concevoir', ects: 6, stats: ['4.80', '11.50', '17.60'], rang: '29' },
     // Under 10: validated by compensation with UE2.3, so its ECTS are awarded.
-    { code: 'UE1.3', id: 1003, competence: 'exprimer', ects: 6, stats: ['4.20', '11.10', '16.80'], rang: '71' },
-    { code: 'UE1.4', id: 1004, competence: 'developper', ects: 6, stats: ['3.90', '11.30', '18.10'], rang: '9' },
-    { code: 'UE1.5', id: 1005, competence: 'entreprendre', ects: 6, stats: ['5.60', '11.80', '16.90'], rang: '27' },
+    { code: 'UE1.3', id: 1003, competence: 'informer', ects: 6, stats: ['4.20', '11.10', '16.80'], rang: '71' },
+    { code: 'UE1.4', id: 1004, competence: 'produire', ects: 6, stats: ['3.90', '11.30', '18.10'], rang: '9' },
+    { code: 'UE1.5', id: 1005, competence: 'piloter', ects: 6, stats: ['5.60', '11.80', '16.90'], rang: '27' },
   ],
   modules: [
     module('R1.01', 11001, 'Anglais', { 'UE1.1': 2, 'UE1.3': 2 }, [
       evaluation(30101, '2024-09-26', 'Compréhension orale', '13.50', ['5.00', '11.20', '18.00']),
       evaluation(30102, '2024-11-21', 'Présentation orale', '12.00', ['4.50', '11.60', '17.50'], { coef: '2.00' }),
     ]),
-    module('R1.02', 11002, 'Culture numérique', { 'UE1.1': 3, 'UE1.2': 1 }, [
-      evaluation(30103, '2024-10-03', 'QCM histoire du web', '15.25', ['6.50', '12.40', '19.00']),
+    module('R1.02', 11002, 'Culture des médias', { 'UE1.1': 3, 'UE1.2': 1 }, [
+      evaluation(30103, '2024-10-03', 'QCM histoire des médias', '15.25', ['6.50', '12.40', '19.00']),
       evaluation(30104, '2024-12-12', 'Dossier de veille', '13.00', ['5.00', '12.10', '17.50'], { coef: '2.00' }),
     ]),
     module('R1.03', 11003, 'Stratégies de communication', { 'UE1.1': 2, 'UE1.2': 3, 'UE1.5': 1 }, [
@@ -311,10 +311,10 @@ const S1 = {
       // Better than the module's 6.75: replaces it.
       evaluation(30109, '2025-01-14', 'Commentaire de texte', '8.50', ['5.00', '8.80', '12.00'], { type: EVALUATION_RATTRAPAGE }),
     ]),
-    module('R1.05', 11005, 'Écriture multimédia et narration', { 'UE1.3': 2 }, [
+    module('R1.05', 11005, 'Écriture journalistique', { 'UE1.3': 2 }, [
       // Unjustified absence that day (see the absences): counts 0.
-      evaluation(30110, '2024-11-14', 'Écriture de scénario', 'ABS', ['5.50', '12.20', '17.00']),
-      evaluation(30111, '2024-12-19', 'Storyboard', '11.00', ['6.00', '12.50', '18.00'], { coef: '2.00' }),
+      evaluation(30110, '2024-11-14', 'Brève et dépêche', 'ABS', ['5.50', '12.20', '17.00']),
+      evaluation(30111, '2024-12-19', 'Reportage écrit', '11.00', ['6.00', '12.50', '18.00'], { coef: '2.00' }),
     ]),
     module('R1.06', 11006, 'Production graphique', { 'UE1.3': 2, 'UE1.4': 1 }, [
       evaluation(30112, '2024-10-24', 'Affiche typographique', '8.00', ['4.00', '11.80', '17.50']),
@@ -323,30 +323,30 @@ const S1 = {
     module('R1.08', 11008, 'Production audio et vidéo', { 'UE1.3': 2 }, [
       evaluation(30114, '2024-11-28', 'Montage vidéo', '7.00', ['3.50', '11.40', '17.00']),
     ]),
-    module('R1.10', 11010, 'Développement web', { 'UE1.4': 3 }, [
-      evaluation(30115, '2024-09-30', 'TP HTML et CSS', '16.00', ['7.00', '13.20', '20.00']),
-      evaluation(30116, '2024-11-25', 'Contrôle JavaScript', '14.50', ['2.50', '10.80', '19.50'], { coef: '2.00' }),
+    module('R1.10', 11010, 'Communication numérique', { 'UE1.4': 3 }, [
+      evaluation(30115, '2024-09-30', 'TP réseaux sociaux', '16.00', ['7.00', '13.20', '20.00']),
+      evaluation(30116, '2024-11-25', 'Contrôle', '14.50', ['2.50', '10.80', '19.50'], { coef: '2.00' }),
     ]),
-    module('R1.12', 11012, 'Intégration', { 'UE1.4': 2 }, [
-      evaluation(30117, '2024-12-02', 'Maquette responsive', '15.00', ['6.00', '12.60', '19.00']),
+    module('R1.12', 11012, 'PAO et mise en page', { 'UE1.4': 2 }, [
+      evaluation(30117, '2024-12-02', 'Mise en page d’un flyer', '15.00', ['6.00', '12.60', '19.00']),
     ]),
-    module('R1.14', 11014, 'Économie et droit du numérique', { 'UE1.5': 2 }, [
-      evaluation(30118, '2024-11-07', 'Étude de cas RGPD', '12.50', ['5.00', '11.90', '17.00']),
+    module('R1.14', 11014, 'Droit de l’information', { 'UE1.5': 2 }, [
+      evaluation(30118, '2024-11-07', 'Étude de cas : liberté de la presse', '12.50', ['5.00', '11.90', '17.00']),
       evaluation(30119, '2025-01-08', 'Partiel', '11.25', ['4.00', '10.20', '16.75'], { coef: '2.00' }),
     ]),
     module('R1.15', 11015, 'Gestion de projet', { 'UE1.2': 1, 'UE1.5': 2 }, [
       evaluation(30120, '2024-10-21', 'Rétroplanning', '14.00', ['8.00', '12.90', '18.00']),
     ]),
-    module('SAÉ 1.01', 12001, 'Audit de communication numérique', { 'UE1.1': 4, 'UE1.2': 4 }, [
+    module('SAÉ 1.01', 12001, 'Audit de communication d’une organisation', { 'UE1.1': 4, 'UE1.2': 4 }, [
       evaluation(30121, '2024-11-04', 'Rapport d’audit', '13.00', ['7.00', '12.30', '17.00'], { coef: '2.00' }),
       evaluation(30122, '2024-11-18', 'Soutenance', '14.50', ['8.50', '12.80', '18.00']),
     ]),
     module('SAÉ 1.02', 12002, 'Production audiovisuelle', { 'UE1.3': 4 }, [
       evaluation(30123, '2025-01-10', 'Clip de présentation', '8.00', ['5.00', '12.10', '17.50'], { coef: '2.00' }),
     ]),
-    module('SAÉ 1.03', 12003, 'Création d’un site web', { 'UE1.4': 4, 'UE1.5': 3 }, [
-      evaluation(30124, '2025-01-13', 'Site vitrine', '15.50', ['7.50', '12.70', '18.50'], { coef: '2.00' }),
-      // Only for UE1.5: the project's management, not its code.
+    module('SAÉ 1.03', 12003, 'Campagne d’affichage', { 'UE1.4': 4, 'UE1.5': 3 }, [
+      evaluation(30124, '2025-01-13', 'Affiches et déclinaisons', '15.50', ['7.50', '12.70', '18.50'], { coef: '2.00' }),
+      // Only for UE1.5: the project's management, not its production.
       evaluation(30125, '2025-01-16', 'Dossier de gestion de projet', '12.00', ['6.00', '11.50', '16.50'], { poids: { 'UE1.5': 1 } }),
     ]),
   ],
@@ -373,23 +373,23 @@ const S2 = {
   absenceSummary: { injustifie: 3, total: 9, metrique: 'H.' },
   decision: { code: '', etat: 'I', date: '' },
   decisionAnnee: { annee_scolaire: 2024, date: '2025-07-03T12:00:00+02:00', code: 'ADM', ordre: 1 },
-  appreciation: [{ comment: 'Progrès nets à l’oral comme à l’écrit. Attention à l’assiduité en développement web.' }],
+  appreciation: [{ comment: 'Progrès nets à l’oral comme à l’écrit. Attention à l’assiduité en communication numérique.' }],
   ues: [
     // Bonus for a cultural activity, already in the average.
-    { code: 'UE2.1', id: 2001, competence: 'comprendre', ects: 6, stats: ['5.70', '12.00', '17.40'], rang: '15', bonus: 0.2 },
+    { code: 'UE2.1', id: 2001, competence: 'analyser', ects: 6, stats: ['5.70', '12.00', '17.40'], rang: '15', bonus: 0.2 },
     { code: 'UE2.2', id: 2002, competence: 'concevoir', ects: 6, stats: ['5.30', '11.80', '17.10'], rang: '26' },
     // Compensates UE1.3: (UE1.3 + UE2.3) / 2 ≥ 10.
-    { code: 'UE2.3', id: 2003, competence: 'exprimer', ects: 6, stats: ['4.90', '11.60', '16.70'], rang: '30' },
+    { code: 'UE2.3', id: 2003, competence: 'informer', ects: 6, stats: ['4.90', '11.60', '16.70'], rang: '30' },
     // Malus for the unjustified absences, already taken off.
-    { code: 'UE2.4', id: 2004, competence: 'developper', ects: 6, stats: ['4.10', '11.40', '18.20'], rang: '18 ex', malus: 0.5 },
-    { code: 'UE2.5', id: 2005, competence: 'entreprendre', ects: 6, stats: ['5.80', '11.90', '16.60'], rang: '21', capitalise: { date: '2024-07-05', moyenne: 12.4 } },
+    { code: 'UE2.4', id: 2004, competence: 'produire', ects: 6, stats: ['4.10', '11.40', '18.20'], rang: '18 ex', malus: 0.5 },
+    { code: 'UE2.5', id: 2005, competence: 'piloter', ects: 6, stats: ['5.80', '11.90', '16.60'], rang: '21', capitalise: { date: '2024-07-05', moyenne: 12.4 } },
   ],
   modules: [
     module('R2.01', 21001, 'Anglais', { 'UE2.1': 2, 'UE2.3': 2 }, [
       evaluation(40101, '2025-02-06', 'Compréhension écrite', '14.00', ['6.00', '11.90', '18.50']),
       evaluation(40102, '2025-04-03', 'Oral en interaction', '13.25', ['5.50', '12.00', '18.00'], { coef: '2.00' }),
     ]),
-    module('R2.02', 21002, 'Culture numérique', { 'UE2.1': 3 }, [
+    module('R2.02', 21002, 'Culture des médias', { 'UE2.1': 3 }, [
       // Excused: justified absence that day, doesn't count.
       evaluation(40103, '2025-03-13', 'Exposé sur les usages', 'EXC', ['7.00', '12.80', '18.00']),
       evaluation(40104, '2025-05-22', 'Partiel', '14.50', ['5.00', '11.70', '18.50'], { coef: '2.00' }),
@@ -407,33 +407,33 @@ const S2 = {
     module('R2.08', 21008, 'Production audio et vidéo', { 'UE2.3': 2 }, [
       evaluation(40109, '2025-04-10', 'Podcast', '13.00', ['6.00', '12.40', '17.50']),
     ]),
-    module('R2.10', 21010, 'Développement web', { 'UE2.4': 3 }, [
-      evaluation(40110, '2025-03-06', 'PHP et formulaires', '14.00', ['3.00', '10.90', '19.00'], { coef: '2.00' }),
+    module('R2.10', 21010, 'Communication numérique', { 'UE2.4': 3 }, [
+      evaluation(40110, '2025-03-06', 'Plan de publication', '14.00', ['3.00', '10.90', '19.00'], { coef: '2.00' }),
       evaluation(40111, '2025-05-15', 'Contrôle', '12.50', ['2.00', '10.40', '18.50']),
     ]),
-    module('R2.11', 21011, 'Intégration', { 'UE2.4': 2 }, [
-      evaluation(40112, '2025-04-17', 'Intégration accessible', '15.50', ['6.50', '12.80', '19.00']),
+    module('R2.11', 21011, 'PAO et mise en page', { 'UE2.4': 2 }, [
+      evaluation(40112, '2025-04-17', 'Brochure institutionnelle', '15.50', ['6.50', '12.80', '19.00']),
     ]),
-    module('R2.12', 21012, 'Hébergement', { 'UE2.4': 1 }, [
-      evaluation(40113, '2025-02-13', 'Mise en ligne', '16.00', ['8.00', '13.60', '20.00']),
+    module('R2.12', 21012, 'Photographie', { 'UE2.4': 1 }, [
+      evaluation(40113, '2025-02-13', 'Série photo', '16.00', ['8.00', '13.60', '20.00']),
     ]),
-    module('R2.14', 21014, 'Économie et droit du numérique', { 'UE2.5': 2 }, [
+    module('R2.14', 21014, 'Droit de l’information', { 'UE2.5': 2 }, [
       evaluation(40114, '2025-05-27', 'Partiel', '8.50', ['3.50', '10.60', '16.00']),
     ]),
     module('R2.15', 21015, 'Gestion de projet', { 'UE2.2': 1, 'UE2.5': 2 }, [
       evaluation(40115, '2025-04-24', 'Budget prévisionnel', '9.00', ['4.00', '11.20', '17.00']),
     ]),
-    module('SAÉ 2.01', 22001, 'Exploration des usages', { 'UE2.1': 4, 'UE2.2': 3 }, [
-      evaluation(40116, '2025-03-31', 'Enquête utilisateurs', '14.00', ['7.00', '12.60', '17.50'], { coef: '2.00' }),
+    module('SAÉ 2.01', 22001, 'Enquête sur les publics', { 'UE2.1': 4, 'UE2.2': 3 }, [
+      evaluation(40116, '2025-03-31', 'Questionnaire et entretiens', '14.00', ['7.00', '12.60', '17.50'], { coef: '2.00' }),
       evaluation(40117, '2025-04-14', 'Restitution', '13.50', ['8.00', '12.90', '18.00']),
     ]),
-    module('SAÉ 2.02', 22002, 'Concevoir un produit et sa communication', { 'UE2.2': 4, 'UE2.3': 4, 'UE2.5': 3 }, [
+    module('SAÉ 2.02', 22002, 'Concevoir une campagne de communication', { 'UE2.2': 4, 'UE2.3': 4, 'UE2.5': 3 }, [
       evaluation(40118, '2025-06-05', 'Dossier de conception', '12.50', ['6.50', '12.00', '17.00'], { coef: '2.00' }),
       // The pitch weighs toward expression and entrepreneurship only.
       evaluation(40119, '2025-06-12', 'Pitch', '9.00', ['5.00', '11.40', '16.50'], { poids: { 'UE2.3': 1, 'UE2.5': 1 } }),
     ]),
-    module('SAÉ 2.03', 22003, 'Produire un site web dynamique', { 'UE2.4': 4 }, [
-      evaluation(40120, '2025-06-10', 'Site dynamique', '15.00', ['6.00', '12.50', '18.50'], { coef: '2.00' }),
+    module('SAÉ 2.03', 22003, 'Produire un magazine', { 'UE2.4': 4 }, [
+      evaluation(40120, '2025-06-10', 'Magazine imprimé', '15.00', ['6.00', '12.50', '18.50'], { coef: '2.00' }),
     ]),
   ],
 }
@@ -461,11 +461,11 @@ const S3 = {
   appreciation: [],
   ues: [
     // Under 10, not compensated by UE4.1: no ECTS.
-    { code: 'UE3.1', id: 3001, competence: 'comprendre', ects: 6, stats: ['4.60', '11.20', '16.40'], rang: '66', bonus: 0.15, validated: false },
+    { code: 'UE3.1', id: 3001, competence: 'analyser', ects: 6, stats: ['4.60', '11.20', '16.40'], rang: '66', bonus: 0.15, validated: false },
     { code: 'UE3.2', id: 3002, competence: 'concevoir', ects: 6, stats: ['5.20', '11.70', '17.00'], rang: '55', bonus: 0.15 },
-    { code: 'UE3.3', id: 3003, competence: 'exprimer', ects: 6, stats: ['5.90', '12.10', '17.30'], rang: '28', bonus: 0.15 },
-    { code: 'UE3.4', id: 3004, competence: 'developper', ects: 6, stats: ['3.40', '11.50', '18.60'], rang: '7', bonus: 0.15 },
-    { code: 'UE3.5', id: 3005, competence: 'entreprendre', ects: 6, stats: ['6.10', '11.90', '16.80'], rang: '25', bonus: 0.15 },
+    { code: 'UE3.3', id: 3003, competence: 'informer', ects: 6, stats: ['5.90', '12.10', '17.30'], rang: '28', bonus: 0.15 },
+    { code: 'UE3.4', id: 3004, competence: 'produire', ects: 6, stats: ['3.40', '11.50', '18.60'], rang: '7', bonus: 0.15 },
+    { code: 'UE3.5', id: 3005, competence: 'piloter', ects: 6, stats: ['6.10', '11.90', '16.80'], rang: '25', bonus: 0.15 },
   ],
   modules: [
     module('R3.01', 31001, 'Anglais', { 'UE3.1': 2, 'UE3.3': 2 }, [
@@ -476,29 +476,29 @@ const S3 = {
       evaluation(50103, '2025-10-09', 'Analyse de marché', '8.50', ['4.00', '11.10', '16.50'], { coef: '2.00' }),
       evaluation(50104, '2026-01-08', 'Partiel', '11.00', ['3.50', '10.80', '17.50'], { coef: '2.00' }),
     ]),
-    module('R3.04', 31004, 'Expérience utilisateur', { 'UE3.1': 3 }, [
-      evaluation(50105, '2025-10-16', 'Tests utilisateurs', '7.00', ['4.50', '11.40', '17.00']),
+    module('R3.04', 31004, 'Études des publics', { 'UE3.1': 3 }, [
+      evaluation(50105, '2025-10-16', 'Enquête de terrain', '7.00', ['4.50', '11.40', '17.00']),
       evaluation(50106, '2025-12-11', 'Partiel', '5.50', ['2.50', '10.20', '16.50'], { coef: '2.00' }),
       // After the jury's first session, replaces the module's average.
       evaluation(50107, '2026-01-15', 'Partiel', '6.50', ['4.00', '8.60', '12.50'], { type: EVALUATION_SESSION2 }),
     ]),
-    module('R3.05', 31005, 'Écriture multimédia et narration', { 'UE3.3': 2 }, [
-      evaluation(50108, '2025-11-06', 'Narration interactive', '14.00', ['6.00', '12.40', '18.00']),
+    module('R3.05', 31005, 'Écriture journalistique', { 'UE3.3': 2 }, [
+      evaluation(50108, '2025-11-06', 'Portrait', '14.00', ['6.00', '12.40', '18.00']),
     ]),
-    module('R3.07', 31007, 'Création et design interactif', { 'UE3.3': 3, 'UE3.2': 1 }, [
-      evaluation(50109, '2025-10-02', 'Maquettes Figma', '13.50', ['6.50', '12.60', '18.50']),
-      evaluation(50110, '2025-12-04', 'Prototype animé', '12.00', ['5.00', '12.10', '18.00'], { coef: '2.00' }),
+    module('R3.07', 31007, 'Conception graphique', { 'UE3.3': 3, 'UE3.2': 1 }, [
+      evaluation(50109, '2025-10-02', 'Identité visuelle', '13.50', ['6.50', '12.60', '18.50']),
+      evaluation(50110, '2025-12-04', 'Motion design', '12.00', ['5.00', '12.10', '18.00'], { coef: '2.00' }),
     ]),
-    module('R3.10', 31010, 'Développement front', { 'UE3.4': 3 }, [
-      evaluation(50111, '2025-09-29', 'TP JavaScript moderne', '16.50', ['5.00', '12.30', '19.50']),
-      evaluation(50112, '2025-11-24', 'Contrôle Vue.js', '15.00', ['2.50', '10.60', '19.00'], { coef: '2.00' }),
+    module('R3.10', 31010, 'Communication numérique', { 'UE3.4': 3 }, [
+      evaluation(50111, '2025-09-29', 'TP ligne éditoriale', '16.50', ['5.00', '12.30', '19.50']),
+      evaluation(50112, '2025-11-24', 'Contrôle réseaux sociaux', '15.00', ['2.50', '10.60', '19.00'], { coef: '2.00' }),
     ]),
-    module('R3.11', 31011, 'Développement back', { 'UE3.4': 3 }, [
-      evaluation(50113, '2025-10-20', 'TP PHP objet', '14.00', ['3.00', '11.20', '18.50']),
-      evaluation(50114, '2025-12-15', 'Contrôle SQL', '13.50', ['2.00', '10.50', '19.00'], { coef: '2.00' }),
+    module('R3.11', 31011, 'Relations presse', { 'UE3.4': 3 }, [
+      evaluation(50113, '2025-10-20', 'Communiqué de presse', '14.00', ['3.00', '11.20', '18.50']),
+      evaluation(50114, '2025-12-15', 'Dossier de presse', '13.50', ['2.00', '10.50', '19.00'], { coef: '2.00' }),
     ]),
-    module('R3.12', 31012, 'Déploiement de services', { 'UE3.4': 1 }, [
-      evaluation(50115, '2025-11-13', 'Mise en production', '15.50', ['7.00', '13.00', '19.00']),
+    module('R3.12', 31012, 'Événementiel', { 'UE3.4': 1 }, [
+      evaluation(50115, '2025-11-13', 'Fiche technique d’événement', '15.50', ['7.00', '13.00', '19.00']),
     ]),
     module('R3.14', 31014, 'Entrepreneuriat', { 'UE3.5': 2 }, [
       evaluation(50116, '2025-12-02', 'Business model', '12.50', ['6.50', '12.00', '17.50']),
@@ -506,13 +506,13 @@ const S3 = {
     module('R3.15', 31015, 'Gestion de projet', { 'UE3.2': 1, 'UE3.5': 2 }, [
       evaluation(50117, '2025-10-23', 'Méthodes agiles', '13.00', ['7.00', '12.40', '17.00']),
     ]),
-    module('SAÉ 3.01', 32001, 'Analyse d’usages et préconisations', { 'UE3.1': 4, 'UE3.2': 3 }, [
+    module('SAÉ 3.01', 32001, 'Diagnostic de communication', { 'UE3.1': 4, 'UE3.2': 3 }, [
       evaluation(50118, '2025-11-17', 'Rapport d’analyse', '8.50', ['5.50', '11.80', '16.50'], { coef: '2.00' }),
       evaluation(50119, '2025-12-08', 'Soutenance', '10.50', ['6.00', '12.20', '17.00']),
     ]),
-    module('SAÉ 3.02', 32002, 'Dispositif interactif', { 'UE3.3': 3, 'UE3.4': 4, 'UE3.5': 3 }, [
-      evaluation(50120, '2026-01-12', 'Démonstration', '15.00', ['7.00', '12.80', '18.50'], { coef: '2.00' }),
-      evaluation(50121, '2026-01-14', 'Dossier technique', '14.00', ['6.50', '12.20', '18.00'], { poids: { 'UE3.4': 1, 'UE3.5': 0.5 } }),
+    module('SAÉ 3.02', 32002, 'Événement de communication', { 'UE3.3': 3, 'UE3.4': 4, 'UE3.5': 3 }, [
+      evaluation(50120, '2026-01-12', 'Organisation de l’événement', '15.00', ['7.00', '12.80', '18.50'], { coef: '2.00' }),
+      evaluation(50121, '2026-01-14', 'Bilan de l’événement', '14.00', ['6.50', '12.20', '18.00'], { poids: { 'UE3.4': 1, 'UE3.5': 0.5 } }),
     ]),
   ],
 }
@@ -540,11 +540,11 @@ const S4 = {
   appreciation: [{ comment: 'Très bon semestre, travail régulier et sérieux.' }],
   ues: [
     // Validated on its own, but its average with UE3.1 stays under 10.
-    { code: 'UE4.1', id: 4001, competence: 'comprendre', ects: 6, stats: ['5.40', '11.60', '16.80'], rang: '57' },
+    { code: 'UE4.1', id: 4001, competence: 'analyser', ects: 6, stats: ['5.40', '11.60', '16.80'], rang: '57' },
     { code: 'UE4.2', id: 4002, competence: 'concevoir', ects: 6, stats: ['7.20', '12.30', '17.60'], rang: '15' },
-    { code: 'UE4.3', id: 4003, competence: 'exprimer', ects: 6, stats: ['6.80', '12.40', '17.20'], rang: '20' },
-    { code: 'UE4.4', id: 4004, competence: 'developper', ects: 6, stats: ['6.10', '12.20', '18.40'], rang: '8' },
-    { code: 'UE4.5', id: 4005, competence: 'entreprendre', ects: 6, stats: ['7.90', '12.80', '17.80'], rang: '12' },
+    { code: 'UE4.3', id: 4003, competence: 'informer', ects: 6, stats: ['6.80', '12.40', '17.20'], rang: '20' },
+    { code: 'UE4.4', id: 4004, competence: 'produire', ects: 6, stats: ['6.10', '12.20', '18.40'], rang: '8' },
+    { code: 'UE4.5', id: 4005, competence: 'piloter', ects: 6, stats: ['7.90', '12.80', '17.80'], rang: '12' },
   ],
   modules: [
     module('R4.01', 41001, 'Stratégie de communication', { 'UE4.1': 1, 'UE4.2': 3 }, [
@@ -555,22 +555,22 @@ const S4 = {
       evaluation(60301, '2026-02-05', 'Compréhension écrite', '9.00', ['5.00', '11.80', '18.00']),
       evaluation(60302, '2026-04-02', 'Entretien d’embauche simulé', '12.50', ['6.50', '12.60', '18.50'], { coef: '2.00' }),
     ]),
-    module('R4.03', 41003, 'Référencement et analyse d’audience', { 'UE4.1': 3 }, [
-      evaluation(60303, '2026-03-12', 'Audit SEO', '7.00', ['4.00', '11.30', '17.00'], { coef: '2.00' }),
+    module('R4.03', 41003, 'Analyse des médias', { 'UE4.1': 3 }, [
+      evaluation(60303, '2026-03-12', 'Analyse de couverture médiatique', '7.00', ['4.00', '11.30', '17.00'], { coef: '2.00' }),
     ]),
-    module('R4.06', 41006, 'Création et design interactif', { 'UE4.3': 3 }, [
-      evaluation(60304, '2026-02-26', 'Design system', '14.50', ['7.00', '12.90', '18.50'], { coef: '2.00' }),
+    module('R4.06', 41006, 'Conception graphique', { 'UE4.3': 3 }, [
+      evaluation(60304, '2026-02-26', 'Charte graphique', '14.50', ['7.00', '12.90', '18.50'], { coef: '2.00' }),
     ]),
-    module('R4.08', 41008, 'Développement back', { 'UE4.4': 4 }, [
-      evaluation(60181, '2026-03-05', 'API REST', '16.50', ['3.00', '11.60', '19.00'], { coef: '2.00' }),
+    module('R4.08', 41008, 'Relations publiques', { 'UE4.4': 4 }, [
+      evaluation(60181, '2026-03-05', 'Plan de relations publiques', '16.50', ['3.00', '11.60', '19.00'], { coef: '2.00' }),
     ]),
-    module('R4.10', 41010, 'Développement front', { 'UE4.4': 3 }, [
-      evaluation(60305, '2026-03-26', 'Application monopage', '15.00', ['4.50', '12.00', '19.50'], { coef: '2.00' }),
+    module('R4.10', 41010, 'Communication numérique', { 'UE4.4': 3 }, [
+      evaluation(60305, '2026-03-26', 'Campagne réseaux sociaux', '15.00', ['4.50', '12.00', '19.50'], { coef: '2.00' }),
     ]),
     module('R4.12', 41012, 'Entrepreneuriat', { 'UE4.5': 2 }, [
       evaluation(60306, '2026-03-17', 'Étude de marché', '13.50', ['7.50', '12.70', '17.50']),
     ]),
-    module('SAÉ 4.01', 42001, 'Site e-commerce', { 'UE4.1': 1, 'UE4.2': 4, 'UE4.3': 3, 'UE4.4': 4 }, [
+    module('SAÉ 4.01', 42001, 'Campagne de communication', { 'UE4.1': 1, 'UE4.2': 4, 'UE4.3': 3, 'UE4.4': 4 }, [
       evaluation(60201, '2026-05-28', 'Soutenance finale', '15.00', ['8.00', '12.80', '18.00'], { coef: '3.00', poids: { 'UE4.1': 0.5, 'UE4.2': 1, 'UE4.3': 1, 'UE4.4': 1 } }),
     ]),
     module('SAÉ 4.02', 42002, 'Stage', { 'UE4.4': 3, 'UE4.5': 4 }, [
@@ -601,45 +601,45 @@ const S5 = {
   absenceSummary: { injustifie: 2, total: 6, metrique: 'H.' },
   ues: [
     { code: 'UE5.1', id: 5001, competence: 'concevoir', ects: 10, stats: ['6.90', '12.40', '17.80'], rang: '12' },
-    { code: 'UE5.2', id: 5002, competence: 'exprimer', ects: 10, stats: ['5.10', '12.05', '16.90'], rang: '24' },
-    { code: 'UE5.3', id: 5003, competence: 'developper', ects: 10, stats: ['7.40', '12.88', '18.20'], rang: '6', bonus: 0.1 },
+    { code: 'UE5.2', id: 5002, competence: 'informer', ects: 10, stats: ['5.10', '12.05', '16.90'], rang: '24' },
+    { code: 'UE5.3', id: 5003, competence: 'produire', ects: 10, stats: ['7.40', '12.88', '18.20'], rang: '6', bonus: 0.1 },
   ],
   modules: [
-    module('R5.07', 51007, 'UX Writing', { 'UE5.1': 3, 'UE5.2': 2 }, [
-      evaluation(70101, '2026-09-17', 'Atelier persona', '14.00', ['6.50', '12.60', '18.00'], { poids: { 'UE5.1': 1, 'UE5.2': 0.5 } }),
-      evaluation(70102, '2026-10-06', 'Audit éditorial', '17.00', ['8.00', '13.90', '19.00'], { coef: '2.00' }),
+    module('R5.07', 51007, 'Stratégie de communication', { 'UE5.1': 3, 'UE5.2': 2 }, [
+      evaluation(70101, '2026-09-17', 'Diagnostic de communication', '14.00', ['6.50', '12.60', '18.00'], { poids: { 'UE5.1': 1, 'UE5.2': 0.5 } }),
+      evaluation(70102, '2026-10-06', 'Recommandation stratégique', '17.00', ['8.00', '13.90', '19.00'], { coef: '2.00' }),
     ]),
-    module('R5.11', 51011, 'Développement Front', { 'UE5.3': 4 }, [
-      evaluation(70111, '2026-09-24', 'Composants React', '16.00', ['4.00', '12.50', '19.50'], { coef: '2.00' }),
+    module('R5.11', 51011, 'Relations presse', { 'UE5.3': 4 }, [
+      evaluation(70111, '2026-09-24', 'Communiqué de presse', '16.00', ['4.00', '12.50', '19.50'], { coef: '2.00' }),
       // Justified absence that day (see the absences): excused.
-      evaluation(70113, '2026-10-06', 'Quiz hooks', 'EXC', ['6.00', '13.40', '19.00'], { time: ['14:00', '15:00'] }),
-      evaluation(70112, '2026-10-09', 'Accessibilité UI', '18.00', ['9.00', '13.20', '18.50']),
-      evaluation(70114, '2026-10-14', 'TP état et effets', '15.50', ['6.00', '12.40', '19.00']),
+      evaluation(70113, '2026-10-06', 'Quiz paysage médiatique', 'EXC', ['6.00', '13.40', '19.00'], { time: ['14:00', '15:00'] }),
+      evaluation(70112, '2026-10-09', 'Dossier de presse', '18.00', ['9.00', '13.20', '18.50']),
+      evaluation(70114, '2026-10-14', 'Revue de presse', '15.50', ['6.00', '12.40', '19.00']),
     ]),
-    module('R5.04', 51004, 'Gestion de projet', { 'UE5.1': 2 }, [
+    module('R5.04', 51004, 'Gestion de projet événementiel', { 'UE5.1': 2 }, [
       evaluation(70141, '2026-09-22', 'Note de cadrage', '11.50', ['5.00', '11.80', '16.00']),
       // Held, not graded yet.
       evaluation(70142, '2026-10-13', 'Soutenance de cadrage', '~'),
     ]),
     module('R5.02', 51002, 'Anglais', { 'UE5.2': 2 }, [
       evaluation(70121, '2026-09-15', 'Compréhension écrite', 'ABS', ['7.00', '13.10', '18.00']),
-      evaluation(70122, '2026-10-01', 'Oral : pitch produit', '12.75', ['8.25', '12.40', '17.50']),
+      evaluation(70122, '2026-10-01', 'Oral : présentation d’une campagne', '12.75', ['8.25', '12.40', '17.50']),
       // Better than the module's average with the absence: replaces it.
       evaluation(70123, '2026-10-08', 'Compréhension écrite', '13.50', ['9.00', '11.00', '13.50'], { type: EVALUATION_RATTRAPAGE }),
     ]),
-    module('R5.03', 51003, 'Accessibilité numérique', { 'UE5.2': 1, 'UE5.3': 2 }, [
-      evaluation(70131, '2026-10-12', 'Audit RGAA', '16.50', ['8.00', '13.10', '18.50'], { coef: '2.00' }),
+    module('R5.03', 51003, 'Droit de l’information', { 'UE5.2': 1, 'UE5.3': 2 }, [
+      evaluation(70131, '2026-10-12', 'Cas pratique : droit à l’image', '16.50', ['8.00', '13.10', '18.50'], { coef: '2.00' }),
     ]),
     // No evaluation yet.
-    module('R5.09', 51009, 'Culture numérique', { 'UE5.2': 1 }),
-    module('R5.12', 51012, 'Développement back-end', { 'UE5.3': 3 }, [
-      evaluation(70151, '2026-09-29', 'QCM Node.js', '13.00', ['4.50', '11.90', '18.00']),
+    module('R5.09', 51009, 'Sémiologie de l’image', { 'UE5.2': 1 }),
+    module('R5.12', 51012, 'Communication interne', { 'UE5.3': 3 }, [
+      evaluation(70151, '2026-09-29', 'Étude de cas', '13.00', ['4.50', '11.90', '18.00']),
       // Handed in, waiting for its grade.
-      evaluation(70152, '2026-10-13', 'TP API REST', 'ATT', ['', '', ''], { coef: '2.00' }),
+      evaluation(70152, '2026-10-13', 'Plan de communication interne', 'ATT', ['', '', ''], { coef: '2.00' }),
     ]),
-    module('SAÉ 5.01', 52001, 'Prototype interactif', { 'UE5.1': 4, 'UE5.3': 4 }, [
-      evaluation(70201, '2026-09-30', 'Sprint review', '15.50', ['9.50', '12.70', '17.00'], { coef: '2.00', poids: { 'UE5.1': 0.5, 'UE5.3': 1 } }),
-      evaluation(70202, '2026-10-10', 'Démo client', '14.00', ['7.00', '12.10', '16.50']),
+    module('SAÉ 5.01', 52001, 'Campagne de communication', { 'UE5.1': 4, 'UE5.3': 4 }, [
+      evaluation(70201, '2026-09-30', 'Point d’étape', '15.50', ['9.50', '12.70', '17.00'], { coef: '2.00', poids: { 'UE5.1': 0.5, 'UE5.3': 1 } }),
+      evaluation(70202, '2026-10-10', 'Présentation au client', '14.00', ['7.00', '12.10', '16.50']),
     ]),
     module('SAÉ 5.02', 52002, 'Portfolio', { 'UE5.2': 3 }, [
       evaluation(70211, '2026-10-02', 'Revue de portfolio', '9.50', ['5.50', '11.40', '16.00']),

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { Icon } from '@iconify/react'
 import universityConfig from '@university'
 import { useWidgetLoadReport } from '../analytics'
@@ -6,6 +6,8 @@ import { publishBriefingSource } from '../briefingSources'
 import { ENT_AUTH_PREFIX, getRecentEntLoginAgeMs, getRequestErrorKind } from '../entApi'
 import { accentStyle } from '../eventAccents'
 import { toDayKey } from '../planningDates'
+import { classCopyText } from '../contextMenuItems'
+import { copyToClipboard, useContextMenu } from '../useContextMenu'
 import { useEventAccents } from '../usePlanningWeeks'
 import {
   NEXT_CLASS_LOOKAHEAD_DAYS,
@@ -20,6 +22,7 @@ const NEXT_CLASS_TICK_MS = 30 * 1000
 const NEXT_CLASS_REFRESH_MS = 5 * 60 * 1000
 const NEXT_CLASS_LOGIN_QUIET_MS = 90 * 1000
 const PLANNING_SERVICE_URL = universityConfig.planning?.serviceUrl ?? null
+const PLANNING_PROVIDER = universityConfig.planning?.providerName ?? 'ADE'
 const ADE_HREF = PLANNING_SERVICE_URL
   ? `${ENT_AUTH_PREFIX}/launch?url=${encodeURIComponent(PLANNING_SERVICE_URL)}`
   : null
@@ -31,6 +34,8 @@ function createWidgetState(overrides = {}) {
     errorMessage: '',
     errorKind: null,
     complete: true,
+    // 'empty' because the planning service has no timetable for the account.
+    noTimetable: false,
     ...overrides,
   }
 }
@@ -281,6 +286,15 @@ function getStatusCopy(widgetState, lookaheadDays = NEXT_CLASS_LOOKAHEAD_DAYS, {
         action,
       }
     case 'empty':
+      // The planning service has no timetable at all for the account (TEMPO).
+      if (widgetState.noTimetable) {
+        return {
+          title: 'Pas d’emploi du temps',
+          body: `${PLANNING_PROVIDER} n’a encore aucun cours pour toi cette année`,
+          icon: 'carbon:calendar',
+          action,
+        }
+      }
       return {
         title: 'Aucun cours à venir',
         body: `Rien de prévu dans les ${lookaheadDays} prochains jours`,
@@ -308,6 +322,7 @@ async function loadUpcomingClasses(options) {
 
   return {
     complete: data.complete,
+    noTimetable: data.noTimetable,
     events,
     nextClass: findNextClass(events),
   }
@@ -356,11 +371,13 @@ function WidgetNextClass({
       : createWidgetState({ status: hasResources ? (autoLoad ? 'loading' : 'paused') : 'unconfigured' })
   ))
   const [timeLabel, setTimeLabel] = useState('')
-  const [wide, setWide] = useState(false)
+  // The class (event key) whose lines overflowed the narrow card.
+  const [wideKey, setWideKey] = useState(null)
   useWidgetLoadReport('nextClass', getLoadOutcome(widgetState, isStatic))
   const visibleRef = useRef(visible)
   const loadedEventsRef = useRef([])
   const loadedCompleteRef = useRef(true)
+  const loadedNoTimetableRef = useRef(false)
   const lastRefreshAtRef = useRef(0)
   const quietUntilRef = useRef(0)
   const loadingRef = useRef(false)
@@ -376,6 +393,10 @@ function WidgetNextClass({
   const nextClassKey = nextClass ? getEventKey(nextClass) : ''
   const displayTimeRange = simplifyTimeLabel(nextClass?.timeLabel)
   const firstGroup = nextClass?.groups?.[0] || ''
+  // Wide (2xl) for the class that overflowed, and only that one: a refresh
+  // bringing the same class back keeps the card wide, another class starts
+  // narrow and is measured again.
+  const wide = widgetState.status === 'ready' && Boolean(nextClass) && wideKey === nextClassKey
 
   const measureWideLayout = useCallback(() => {
     const shouldExpand = [
@@ -388,9 +409,9 @@ function WidgetNextClass({
     ].some(isElementOverflowing)
 
     if (shouldExpand) {
-      setWide(true)
+      setWideKey(nextClassKey)
     }
-  }, [])
+  }, [nextClassKey])
 
   const syncNextClassFromLoadedEvents = useCallback(() => {
     const nextClass = findNextClass(loadedEventsRef.current)
@@ -412,13 +433,14 @@ function WidgetNextClass({
 
       if (loadedEventsRef.current.length === 0) {
         const nextStatus = loadedCompleteRef.current ? 'empty' : 'limited'
-        if (current.status === nextStatus) {
+        if (current.status === nextStatus && current.noTimetable === loadedNoTimetableRef.current) {
           return current
         }
 
         return createWidgetState({
           status: nextStatus,
           complete: loadedCompleteRef.current,
+          noTimetable: loadedNoTimetableRef.current,
         })
       }
 
@@ -485,6 +507,7 @@ function WidgetNextClass({
 
       loadedEventsRef.current = result.events
       loadedCompleteRef.current = result.complete
+      loadedNoTimetableRef.current = result.noTimetable === true
       lastRefreshAtRef.current = Date.now()
       persistNextClassCache(cacheKey, result)
       publishBriefingSource('classes', { cacheKey, loadedAt: lastRefreshAtRef.current })
@@ -501,6 +524,7 @@ function WidgetNextClass({
       setWidgetState(createWidgetState({
         status: result.complete ? 'empty' : 'limited',
         complete: result.complete,
+        noTimetable: result.noTimetable === true,
       }))
     } catch (error) {
       if (controller.signal.aborted || error?.name === 'AbortError') {
@@ -561,6 +585,7 @@ function WidgetNextClass({
     if (cachedResult) {
       loadedEventsRef.current = cachedResult.events
       loadedCompleteRef.current = cachedResult.complete
+      loadedNoTimetableRef.current = cachedResult.noTimetable === true
       lastRefreshAtRef.current = cachedResult.cachedAt
 
       const nextClass = findNextClass(cachedResult.events)
@@ -574,6 +599,7 @@ function WidgetNextClass({
         setWidgetState(createWidgetState({
           status: cachedResult.complete ? 'empty' : 'limited',
           complete: cachedResult.complete,
+          noTimetable: cachedResult.noTimetable === true,
         }))
       }
     } else if (!hasResources) {
@@ -670,16 +696,10 @@ function WidgetNextClass({
     }
   }, [autoLoad, isStatic, hasResources, loadNextClass, syncNextClassFromLoadedEvents])
 
-  useEffect(() => {
-    if (widgetState.status !== 'ready' || !nextClass) {
-      setWide(false)
-      return
-    }
-
-    setWide(false)
-  }, [nextClassKey, widgetState.status, nextClass])
-
-  useEffect(() => {
+  // Measured in a layout effect, on the card as this render laid it out: a
+  // frame later, a pending re-render could have changed its width (a refresh
+  // used to reset it narrow after the measure, leaving the lines cut off).
+  useLayoutEffect(() => {
     if (widgetState.status !== 'ready' || !nextClass) {
       return undefined
     }
@@ -687,19 +707,17 @@ function WidgetNextClass({
     let frameId = 0
     const measure = () => {
       window.cancelAnimationFrame(frameId)
-      frameId = window.requestAnimationFrame(() => {
-        measureWideLayout()
-      })
+      frameId = window.requestAnimationFrame(measureWideLayout)
     }
 
-    measure()
+    measureWideLayout()
     window.addEventListener('resize', measure)
 
     return () => {
       window.removeEventListener('resize', measure)
       window.cancelAnimationFrame(frameId)
     }
-  }, [displayTimeRange, firstGroup, measureWideLayout, nextClass, nextClassKey, timeLabel, widgetState.status])
+  }, [displayTimeRange, firstGroup, measureWideLayout, nextClass, timeLabel, widgetState.status])
 
   // The course's colour as the planning gives it (the same one on its
   // page: eventAccents, handed out in the order the courses are seen).
@@ -735,6 +753,12 @@ function WidgetNextClass({
     event.preventDefault()
     openPlanning()
   }, [openPlanning])
+  // Its right-click menu (a long press): what a click does, and the class
+  // as text.
+  const menuProps = useContextMenu(preview ? null : () => [
+    { id: 'open', label: opensInApp ? 'Voir le planning' : `Ouvrir ${PLANNING_PROVIDER}`, icon: 'carbon:calendar', disabled: !opensInApp && !ADE_HREF, onSelect: openPlanning },
+    showsClass ? { id: 'copy', label: 'Copier', icon: 'carbon:copy', onSelect: () => void copyToClipboard(classCopyText(nextClass)) } : null,
+  ])
 
   // Hidden when the planning can't be loaded; the background refresh brings
   // the card back once ADE answers again.
@@ -751,6 +775,7 @@ function WidgetNextClass({
       onKeyDown={preview ? undefined : handleKeyDown}
       role={preview ? undefined : opensInApp ? 'button' : 'link'}
       tabIndex={preview ? undefined : 0}
+      {...(preview ? null : menuProps())}
     >
       {/* The course's wash, as the planning's blocks wear it, in a layer of
           its own clipped to the card's corners (the card lets its date

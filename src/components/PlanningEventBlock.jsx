@@ -51,7 +51,7 @@ function MetaLabel({ icon, text, design, style }) {
 // notes" cards wear their UEs' colours), its accent bar, the title, and the
 // room and the teacher as they fit. No time: the grid tells it. A button
 // opening the class's sheet, or the card alone without `onOpen`.
-function PlanningEventBlock({ event, accent, variant, stackFirst = false, width, height, style, onOpen }) {
+function PlanningEventBlock({ event, accent, variant, stackFirst = false, width, height, style, onOpen, menuProps = null }) {
   const layout = layoutEventBlock({
     width,
     height,
@@ -101,6 +101,7 @@ function PlanningEventBlock({ event, accent, variant, stackFirst = false, width,
       type="button"
       {...card}
       onClick={() => onOpen(event)}
+      {...menuProps?.(event.id)}
       aria-label={`${formatTime(event.start)} à ${formatTime(event.end)}, ${event.title}${[event.location, event.teacher].filter(Boolean).map((part) => `, ${part}`).join('')}, ${durationText(event.start, event.end)}`}
     >
       {content}

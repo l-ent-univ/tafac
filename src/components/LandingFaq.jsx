@@ -11,7 +11,11 @@ const FIRST_QUESTIONS = 4
 // PLACEHOLDER copy, for the landing page's mockup: to rewrite before launch
 // (landingCopy.json, `faq`; the order and the emojis here).
 // Each answer says only what the code does (the login and the session:
-// server/entAuthApp.js, server/sessionCookie.js; the notes and the next
+// server/entAuthApp.js, server/sessionCookie.js; the mails: the mail routes
+// of server/entAuthApp.js, which keep the webmail's connection and the
+// inbox's last list in memory only (runtimeMailContexts, runtimeMailCache,
+// dropped at logout), relay the files without writing them, and send from
+// the account's own identities (server/mailSend.js); the notes and the next
 // class per establishment: `establishments` in the university's client.js;
 // the install: PwaInstallPrompt; the statistics: docs/ANALYTICS.md). Check
 // it again before changing a word.
@@ -22,6 +26,8 @@ const QUESTIONS = [
   { id: 'appareils', emoji: '📱' },
   { id: 'identifiants', emoji: '🔑' },
   { id: 'motDePasse', emoji: '🔐' },
+  { id: 'mails', emoji: '📬' },
+  { id: 'envoi', emoji: '📤' },
   { id: 'donnees', emoji: '🛡️' },
   { id: 'session', emoji: '⏱️' },
   { id: 'installer', emoji: '📲' },

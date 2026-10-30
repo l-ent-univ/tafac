@@ -1,16 +1,18 @@
 import { useState } from 'react'
 import { Icon } from '@iconify/react'
+import { useDevBranch } from '../useDevBranch'
 import AboutModal from './AboutModal'
 
 /* global __BUILD_HASH__ */
 
 function AppFooter({ heroCredit = null }) {
   const [aboutOpen, setAboutOpen] = useState(false)
+  const devBranch = useDevBranch()
 
   return (
     <footer className="flex items-center justify-center gap-[6px] pt-1 pb-4 px-4 text-text-muted text-[12px]">
       <span className="font-mono">
-        {import.meta.env.DEV ? 'dev' : `build ${typeof __BUILD_HASH__ !== 'undefined' ? __BUILD_HASH__ : 'dev'}`}
+        {import.meta.env.DEV ? `dev${devBranch ? ` · ${devBranch}` : ''}` : `build ${typeof __BUILD_HASH__ !== 'undefined' ? __BUILD_HASH__ : 'dev'}`}
       </span>
       <button
         type="button"
