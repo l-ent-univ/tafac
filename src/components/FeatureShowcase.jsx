@@ -1,13 +1,15 @@
 import { useRef } from 'react'
+import universityConfig from '@university'
 import { Icon } from '@iconify/react'
 import { copy, copyText } from '../landingCopy'
+import { DEVICE_FEATURES, listDeviceFeatures } from '../landingShowcase'
 import { useRevealOnce } from '../landingMotion'
 import LaptopMockup from './LaptopMockup'
 import PhoneMockup from './PhoneMockup'
 
-// What Tafac brings (landingCopy.json, `features`), the icons here, item
-// by item.
-const ICONS = ['carbon:location', 'carbon:calendar', 'carbon:chart-line', 'carbon:email', 'carbon:task', 'carbon:app-switcher']
+// What Tafac brings (landingCopy.json, `features`; their icons and what
+// each needs: DEVICE_FEATURES), those this university has.
+const ITEMS = listDeviceFeatures(universityConfig).map((index) => ({ ...copy.features.items[index], icon: DEVICE_FEATURES[index].icon }))
 
 // The app on a computer and a phone at once: the laptop (its flower and
 // island around it) with the phone in front of its right side, in the dark
@@ -19,7 +21,7 @@ const ICONS = ['carbon:location', 'carbon:calendar', 'carbon:chart-line', 'carbo
 // wrap, their corners round less. The phone rises a little as it comes in
 // (.landing-device).
 function FeatureShowcase({ className = '' }) {
-  const { title, intro, items } = copy.features
+  const { title, intro } = copy.features
   const listRef = useRef(null)
   const isRevealed = useRevealOnce(listRef)
 
@@ -47,14 +49,14 @@ function FeatureShowcase({ className = '' }) {
           data-revealed={isRevealed || undefined}
           className="landing-features m-0 mt-20 grid w-full list-none grid-cols-2 gap-2.5 p-0 text-left max-4xl:mt-16 max-4xl:max-w-[560px] max-4xl:grid-cols-1"
         >
-          {items.map((item, index) => (
+          {ITEMS.map((item, index) => (
             <li
               key={item.title}
               style={{ '--reveal-index': index }}
               className="landing-feature flex items-center gap-3 rounded-full border border-white bg-white py-2 pl-2 pr-6 shadow-[0_1px_3px_rgb(52_18_0/0.06),0_10px_28px_-14px_rgb(52_18_0/0.16)] dark:border-white/10 dark:bg-[#1c1c1c] max-sm:corners-[24px] max-sm:pr-4"
             >
               <span className="inline-flex size-10 shrink-0 items-center justify-center rounded-full bg-bg-subtle text-text" aria-hidden="true">
-                <Icon icon={ICONS[index] ?? 'carbon:checkmark'} className="size-[18px]" />
+                <Icon icon={item.icon} className="size-[18px]" />
               </span>
               <span className="flex min-w-0 flex-col">
                 <h3 className="m-0 text-[15px] font-bold leading-tight text-text">{copyText(item.title)}</h3>

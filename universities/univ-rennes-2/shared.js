@@ -13,8 +13,9 @@ export const university = {
   shortName: 'Rennes 2',
   // /rennes2: this university's landing page (its button to its login).
   slug: 'rennes2',
-  // Listed on dev servers only until a real sign-in has been checked.
-  devOnly: true,
+  // Open to everyone since a real sign-in was checked (2026-10-30); grades
+  // come later (features.grades).
+  devOnly: false,
   // The 2016 logo is a square badge (the striped "2" over its name), shown
   // taller than a wordmark (login, landing, sidebar).
   logoShape: 'square',

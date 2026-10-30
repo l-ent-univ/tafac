@@ -58,13 +58,39 @@ function hasFeatures(config, features) {
   return features.every((feature) => isFeatureOn(config?.features?.[feature]))
 }
 
+// Whether a university page shows the in-app Messagerie (not only the
+// webmail's link: mail.page false). The neutral page does.
+function hasMailPage(config) {
+  return Boolean(config?.neutral) || config?.mail?.page !== false
+}
+
+// The device section's features (FeatureShowcase; landingCopy.json,
+// `features.items`, by index): each one's icon and what a university needs
+// on for it, as the tabs'.
+export const DEVICE_FEATURES = Object.freeze([
+  { icon: 'carbon:location', features: ['ade'] },
+  { icon: 'carbon:calendar', features: ['planning'] },
+  { icon: 'carbon:chart-line', features: ['grades'] },
+  { icon: 'carbon:email', features: ['mail'], mailPage: true },
+  { icon: 'carbon:task', features: ['moodleDeadlines'] },
+  { icon: 'carbon:app-switcher', features: [] },
+])
+
+// The device section's features this landing shows, by index: every one
+// on the neutral page, a university's own on its page (/<slug>).
+export function listDeviceFeatures(config) {
+  return DEVICE_FEATURES
+    .map((item, index) => (hasFeatures(config, item.features) && (!item.mailPage || hasMailPage(config)) ? index : null))
+    .filter((index) => index !== null)
+}
+
 // The tabs this landing shows: every one on the neutral page, a
 // university's own on its page (/<slug>). Each with its items' indexes
 // (`items`) that apply, in the copy's order.
 export function listShowcaseTabs(config) {
   return SHOWCASE_TABS
     .filter((tab) => hasFeatures(config, tab.features))
-    .filter((tab) => !tab.mailPage || config?.neutral || config?.mail?.page !== false)
+    .filter((tab) => !tab.mailPage || hasMailPage(config))
     .map((tab) => ({
       ...tab,
       items: tab.itemFeatures
