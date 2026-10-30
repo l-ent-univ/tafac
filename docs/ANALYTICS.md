@@ -4,10 +4,7 @@
 
 Tafac peut mesurer son audience de façon anonyme, pour savoir quels widgets marchent, quelles applications sont ouvertes et si les connexions réussissent. Le dispositif est conçu pour rester dans le cadre de l'**exemption de consentement de la CNIL** (« mesure d'audience exemptée ») : aucun cookie, aucun identifiant persistant, aucune donnée personnelle, finalité strictement statistique, et un interrupteur pour la désactiver.
 
-Deux outils, tous deux **sans cookie et hébergés dans l'UE**, tous deux coupés par l'interrupteur *Statistiques anonymes* :
-
-- **PostHog**, appelé uniquement par le serveur, pour les événements détaillés ci-dessous. **Désactivé par défaut** : sans la variable `POSTHOG_PROJECT_KEY`, rien n'est créé, mis en file ni envoyé.
-- **Simple Analytics**, pour le simple comptage des pages vues (voir plus bas). Actif dans les builds de production.
+Un seul outil, **PostHog**, **sans cookie et hébergé dans l'UE**, appelé uniquement par le serveur, pour les événements détaillés ci-dessous. Aucun script tiers ne s'exécute dans la page. **Désactivé par défaut** : sans la variable `POSTHOG_PROJECT_KEY`, rien n'est créé, mis en file ni envoyé. L'interrupteur *Statistiques anonymes* le coupe.
 
 Une fenêtre « Tes données restent à toi » (`src/components/PrivacyModal.jsx`) explique tout cela aux étudiants ; elle s'ouvre depuis *Mon compte* et depuis « À propos ».
 
@@ -82,20 +79,13 @@ Les événements de la Messagerie décrivent l'usage de la page, jamais les mail
 
 PostHog ajoute aussi `$lib`, `$lib_version`, `$is_server` et `$geoip_disable` (métadonnées du SDK serveur), ainsi qu'un `timestamp` et un `uuid` d'événement.
 
-### Simple Analytics (pages vues)
-
-[Simple Analytics](https://www.simpleanalytics.com/) est un outil de mesure d'audience européen, sans cookie et sans identifiant, qui ne compte que les pages vues (page, référent, pays, type d'appareil). Son script est chargé par le navigateur depuis `scripts.simpleanalyticscdn.com`, mais :
-
-- il n'est **plus inclus dans `index.html`** : `src/analytics.js` l'injecte seulement si *Statistiques anonymes* est activé, et seulement dans les builds de production ;
-- il est chargé avec `data-auto-collect="false"` : il n'enregistre rien de lui-même. Tafac envoie **une seule page vue par chargement** (`sa_pageview(location.pathname)`, sans paramètres d'URL), et seulement tant que l'interrupteur est activé — le couper arrête donc aussi Simple Analytics, même si le script est déjà chargé.
-
 ## Ce qui n'est jamais collecté
 
 Identifiant ENT, e-mail, nom, prénom, numéro étudiant, id ou cookie de session, cookies CAS/ENT, notes ou moyennes, contenu ou objet des mails, expéditeurs, destinataires, noms de dossiers de la messagerie, noms de pièces jointes, signature, échéances Moodle, titres de cours ou de devoirs, salles, enseignants, groupe TP/TD, jours ou semaines consultés dans le Planning, contenu de l'export .ics, texte de recherche, ville météo, URL (avec ou sans paramètres), titre des applications, fond d'écran personnalisé, user-agent complet, adresse IP, géolocalisation. Les messages d'erreur ne sont pas transmis non plus, seulement leur catégorie (`error_kind`).
 
 ## Désactivation par l'utilisateur
 
-*Mon compte → Statistiques anonymes* (activé par défaut, visible dès qu'un des deux outils est actif). Il coupe PostHog **et** Simple Analytics. Le choix est mémorisé par utilisateur dans le `localStorage` (`l-ent:anonymous-analytics`). Quand l'interrupteur est coupé, `track()` ne fait plus rien, la file en attente est vidée immédiatement et l'endpoint ne reçoit plus aucune requête. Le texte « À propos » mentionne la mesure d'audience uniquement quand elle est active.
+*Mon compte → Statistiques anonymes* (activé par défaut, visible quand le serveur a une clé PostHog). Le choix est mémorisé par utilisateur dans le `localStorage` (`l-ent:anonymous-analytics`). Quand l'interrupteur est coupé, `track()` ne fait plus rien, la file en attente est vidée immédiatement et l'endpoint ne reçoit plus aucune requête. Le texte « À propos » mentionne la mesure d'audience uniquement quand elle est active.
 
 ## Configuration
 

@@ -178,12 +178,13 @@ Sans secret en développement, une clé temporaire est créée : redémarrer le 
 
 ### Statistiques et services externes
 
-Deux dispositifs distincts sont présents :
+La mesure d’audience passe par **PostHog**, facultatif et appelé par le serveur : événements filtrés par une liste de propriétés autorisées, sans SDK PostHog ni autre script tiers dans le navigateur. Sans clé PostHog, aucune mesure n’a lieu.
 
-- **PostHog**, facultatif et appelé par le serveur : événements filtrés par une liste de propriétés autorisées, sans SDK PostHog dans le navigateur.
-- **Simple Analytics**, chargé côté navigateur dans les builds de production pour compter les pages vues lorsque le réglage de statistiques est activé. L’absence de clé PostHog ne désactive donc pas toute mesure d’audience.
+Le réglage **Statistiques anonymes**, activé par défaut, permet de la désactiver. Le fonctionnement détaillé et les propriétés autorisées sont décrits dans [`docs/ANALYTICS.md`](docs/ANALYTICS.md) (écrit à l'aide d'IAg).
 
-Le réglage **Statistiques anonymes**, activé par défaut, permet de désactiver les deux. Le fonctionnement détaillé et les propriétés autorisées sont décrits dans [`docs/ANALYTICS.md`](docs/ANALYTICS.md) (écrit à l'aide d'IAg).
+### Vérifier ce que sert tafac.fr
+
+Chaque release signe la provenance de l’image Docker et de chaque fichier du frontend (Sigstore). `node scripts/verify-deployment.mjs` compare ce que sert le site à ce que GitHub Actions a compilé. Le fonctionnement et ses limites sont décrits dans [`docs/VERIFYING.md`](docs/VERIFYING.md).
 
 D’autres fonctionnalités font appel à des services externes : GitHub pour les contributeurs et Iconify pour les icônes. Une instance auto-hébergée conserve ces dépendances tant que leur code ou leur configuration n’est pas adapté.
 
