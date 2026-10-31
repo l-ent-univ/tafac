@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { buildHomeFeed, buildWeekStrip, formatDueLabel, pickAgendaDay } from '../src/homeDraft.js'
+import { buildDueList, buildGradeList, buildUnreadList, formatDueLabel, formatMark, pickAgendaDay } from '../src/homeDraft.js'
 
 // Days of October 2026 (the 29th is a Thursday), local time; day 33 is
 // 2 November.
@@ -41,25 +41,6 @@ test('duplicated slots (one per group) count once', () => {
   assert.equal(agenda.classes.length, 1)
 })
 
-test('the week strip counts classes and open deadlines per day', () => {
-  const days = buildWeekStrip(
-    [event(29, 8, 10), event(29, 14, 17), event(31, 9, 11)],
-    [{ dueAt: at(29, 23, 59).toISOString() }, { dueAt: at(30, 12).toISOString(), submitted: true }],
-    at(29, 7),
-  )
-  assert.equal(days.length, 7)
-  assert.deepEqual(
-    days.slice(0, 3).map(({ dayKey, classCount, firstStart, lastEnd, deadlineCount }) => ({ dayKey, classCount, firstStart, lastEnd, deadlineCount })),
-    [
-      { dayKey: '2026-10-29', classCount: 2, firstStart: '8h', lastEnd: '17h', deadlineCount: 1 },
-      { dayKey: '2026-10-30', classCount: 0, firstStart: null, lastEnd: null, deadlineCount: 0 },
-      { dayKey: '2026-10-31', classCount: 1, firstStart: '9h', lastEnd: '11h', deadlineCount: 0 },
-    ],
-  )
-  assert.equal(days[0].isToday, true)
-  assert.equal(days[0].weekday, 'Jeu')
-})
-
 test('due labels go from minutes to days', () => {
   const now = at(29, 10)
   assert.equal(formatDueLabel(at(29, 10, 20), now), 'Dans 20 min')
@@ -70,36 +51,45 @@ test('due labels go from minutes to days', () => {
   assert.equal(formatDueLabel(at(28, 12), now), 'En retard')
 })
 
-test('« À traiter » puts urgent deadlines first, then new grades, unread mails, later deadlines', () => {
+test('« À rendre » keeps open deadlines of the week, soonest first', () => {
   const now = at(29, 10)
-  const feed = buildHomeFeed({
-    deadlines: [
-      { id: 'later', title: 'Rapport', dueAt: at(34, 12).toISOString() },
-      { id: 'soon', title: 'Quiz', dueAt: at(29, 18).toISOString() },
-      { id: 'done', title: 'Rendu', dueAt: at(29, 18).toISOString(), submitted: true },
-      { id: 'far', title: 'Mémoire', dueAt: at(60, 12).toISOString() },
-    ],
-    mails: [
-      { id: '1', subject: 'Salle changée', unread: true, from: { name: 'Scolarité' } },
-      { id: '2', subject: 'Lu', unread: false },
-    ],
-    grades: [
-      { id: 7, description: 'Partiel', note: '14.50', noteSur: '20', resource: 'R5.01', date: at(27, 9).toISOString() },
-      { id: 6, description: 'TP', note: '12', noteSur: '20', resource: 'R5.02', date: at(20, 9).toISOString() },
-    ],
-    seenGradeIds: ['6'],
-    now,
-  })
-  assert.deepEqual(feed.map((item) => item.id), ['deadline:soon', 'grade:7', 'mail:1', 'deadline:later'])
-  assert.equal(feed[0].urgent, true)
-  assert.equal(feed[1].meta, '14.5/20')
-  assert.equal(feed[2].detail, 'Scolarité')
+  const items = buildDueList([
+    { id: 'later', title: 'Rapport', courseName: 'R5.01', dueAt: at(34, 12).toISOString() },
+    { id: 'soon', title: 'Quiz', dueAt: at(29, 18).toISOString() },
+    { id: 'late', title: 'TP noté', dueAt: at(28, 12).toISOString() },
+    { id: 'done', title: 'Rendu', dueAt: at(29, 18).toISOString(), submitted: true },
+    { id: 'far', title: 'Mémoire', dueAt: at(60, 12).toISOString() },
+  ], now)
+  assert.deepEqual(items.map((item) => item.id), ['deadline:late', 'deadline:soon', 'deadline:later'])
+  assert.deepEqual(items.map((item) => item.urgent), [true, true, false])
+  assert.equal(items[0].overdue, true)
+  assert.equal(items[2].detail, 'R5.01')
+  assert.deepEqual(buildDueList(null, now), [])
 })
 
-test('without a « Mes notes » visit, only a recent latest grade shows', () => {
-  const now = at(29, 10)
-  const grades = [{ id: 7, description: 'Partiel', note: '14', date: at(27, 9).toISOString() }, { id: 6, description: 'TP', note: '12', date: at(26, 9).toISOString() }]
-  assert.deepEqual(buildHomeFeed({ grades, now }).map((item) => item.id), ['grade:7'])
-  assert.deepEqual(buildHomeFeed({ grades: [{ ...grades[0], date: at(1, 9).toISOString() }], now }), [])
-  assert.deepEqual(buildHomeFeed(), [])
+test('« Notes » lists the latest grades, new ones flagged once « Mes notes » was opened here', () => {
+  const grades = [
+    { id: 7, description: 'Partiel', note: '14.50', noteSur: '20', resource: 'R5.01' },
+    { id: 6, description: 'TP', note: '12', noteSur: '20' },
+  ]
+  assert.deepEqual(buildGradeList(grades, ['6']).map(({ id, meta, isNew }) => ({ id, meta, isNew })), [
+    { id: 'grade:7', meta: '14,5/20', isNew: true },
+    { id: 'grade:6', meta: '12/20', isNew: false },
+  ])
+  assert.deepEqual(buildGradeList(grades, null).map((item) => item.isNew), [false, false])
+  assert.equal(buildGradeList(grades, null, 1).length, 1)
+  assert.equal(formatMark('ABS'), 'ABS/20')
+  assert.equal(formatMark(''), '')
+})
+
+test('« Non lus » keeps unread mails only', () => {
+  const items = buildUnreadList([
+    { id: '1', subject: 'Salle changée', unread: true, from: { name: 'Scolarité' } },
+    { id: '2', subject: 'Lu', unread: false },
+    { id: '3', subject: '  ', unread: true, from: { email: 'x@univ.fr' } },
+  ])
+  assert.deepEqual(items.map(({ id, title, detail }) => ({ id, title, detail })), [
+    { id: 'mail:1', title: 'Salle changée', detail: 'Scolarité' },
+    { id: 'mail:3', title: '(Sans objet)', detail: 'x@univ.fr' },
+  ])
 })

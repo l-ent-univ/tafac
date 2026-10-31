@@ -1,6 +1,6 @@
 // The « Accueil » exploration page (HomeDraftPage): a canvas for a new home
-// screen. What it shows is built here from what the dashboard already loads
-// (upcoming classes, Moodle deadlines, unread mails, graded evaluations).
+// screen, one column: the day's classes, « À rendre », « Notes », « Non
+// lus ». Built here from what the dashboard already loads.
 // Pure on purpose: `now` passed in, no storage, no fetch, so every case is
 // unit tested (tests/homeDraft.test.js).
 
@@ -13,21 +13,16 @@ const DAY_MS = 24 * HOUR_MS
 const EVENING_HOUR = 18
 // How far ahead the agenda looks for the next day with classes.
 const AGENDA_LOOKAHEAD_DAYS = 14
-// Deadlines due within this window count as urgent in « À traiter ».
-const URGENT_DEADLINE_MS = 48 * HOUR_MS
-// Deadlines further than this are left to the week strip.
-const FEED_DEADLINE_WINDOW_MS = 7 * DAY_MS
-// Without a « Mes notes » visit on this device, the latest grade still
-// shows if it's recent.
-const RECENT_GRADE_MS = 14 * DAY_MS
-const MAX_FEED_MAILS = 3
-const MAX_FEED_GRADES = 2
-export const MAX_FEED_ITEMS = 6
-export const WEEK_STRIP_DAYS = 7
+// Deadlines due within this window are said in red in « À rendre ».
+const URGENT_DUE_MS = 48 * HOUR_MS
+// « À rendre » looks this far ahead.
+const DUE_WINDOW_MS = 7 * DAY_MS
+export const MAX_DUE_ITEMS = 5
+export const MAX_GRADE_ITEMS = 4
+export const MAX_UNREAD_ITEMS = 4
 
 const weekdayFormatter = new Intl.DateTimeFormat('fr-FR', { weekday: 'long' })
 const dayMonthFormatter = new Intl.DateTimeFormat('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' })
-const shortWeekdayFormatter = new Intl.DateTimeFormat('fr-FR', { weekday: 'short' })
 
 function parseDate(value) {
   const date = value instanceof Date ? value : value ? new Date(value) : null
@@ -130,36 +125,7 @@ export function pickAgendaDay(events, now = new Date()) {
   }
 }
 
-// Seven days from today: classes and deadlines per day, for the week strip.
-// `deadlines`: Moodle items ({ dueAt, submitted }), submitted ones left out.
-export function buildWeekStrip(events, deadlines, now = new Date(), days = WEEK_STRIP_DAYS) {
-  const classes = normalizeClasses(events)
-  const todayKey = toDayKey(now)
-  const dueDays = (Array.isArray(deadlines) ? deadlines : [])
-    .filter((item) => item?.submitted !== true)
-    .map((item) => parseDate(item?.dueAt))
-    .filter(Boolean)
-    .map((date) => toDayKey(date))
-
-  return Array.from({ length: days }, (_, offset) => {
-    const dayKey = addDays(todayKey, offset)
-    const [year, month, day] = dayKey.split('-').map(Number)
-    const date = new Date(year, month - 1, day)
-    const dayClasses = classes.filter((item) => item.dayKey === dayKey)
-    return {
-      dayKey,
-      isToday: offset === 0,
-      weekday: capitalize(shortWeekdayFormatter.format(date).replace('.', '')),
-      dayNumber: day,
-      classCount: dayClasses.length,
-      firstStart: dayClasses[0] ? formatHour(dayClasses[0].start) : null,
-      lastEnd: dayClasses.length ? formatHour(dayClasses.reduce((latest, item) => (item.end > latest ? item.end : latest), dayClasses[0].end)) : null,
-      deadlineCount: dueDays.filter((key) => key === dayKey).length,
-    }
-  })
-}
-
-// When a deadline is due, as « À traiter » says it: « dans 3 h », « ce soir
+// When a deadline is due, as « À rendre » says it: « dans 3 h », « ce soir
 // à 23h59 », « demain à 12h », « jeudi », « en retard ».
 export function formatDueLabel(dueAt, now = new Date()) {
   const due = parseDate(dueAt)
@@ -175,72 +141,63 @@ export function formatDueLabel(dueAt, now = new Date()) {
   return capitalize(dayMonthFormatter.format(due))
 }
 
-// « À traiter »: one list for what asks for the student's attention, from
-// every source the page has. Urgent deadlines first, then new grades, unread
-// mails and the rest of the week's deadlines.
-//   deadlines: Moodle items ({ id, title, courseName, dueAt, submitted, overdue, href })
-//   mails: mail messages ({ id, subject, from, receivedAt, unread, href })
-//   grades: graded evaluations, newest first (listGradedEvaluations)
-//   seenGradeIds: the ids « Mes notes » last showed, null if never opened here
-// Each source may be null (not available, not loaded). Returns items
-// { id, kind: 'deadline' | 'grade' | 'mail', title, detail, meta, urgent, source }
-// (plus `dueAt` for a deadline, `receivedAt` for a mail).
-export function buildHomeFeed({ deadlines = null, mails = null, grades = null, seenGradeIds = null, now = new Date() } = {}) {
-  const urgent = []
-  const later = []
-
-  for (const item of Array.isArray(deadlines) ? deadlines : []) {
-    const due = parseDate(item?.dueAt)
-    if (!due || item.submitted === true) continue
-    const overdue = item.overdue === true || due <= now
-    if (!overdue && due - now > FEED_DEADLINE_WINDOW_MS) continue
-    const entry = {
-      id: `deadline:${item.id ?? item.title ?? due.getTime()}`,
-      kind: 'deadline',
-      title: String(item.title ?? '').trim() || 'Devoir',
-      detail: String(item.courseName ?? '').trim() || null,
-      meta: formatDueLabel(due, now),
-      urgent: overdue || due - now <= URGENT_DEADLINE_MS,
-      dueAt: due,
-      source: item,
-    }
-    ;(entry.urgent ? urgent : later).push(entry)
-  }
-  urgent.sort((left, right) => left.dueAt - right.dueAt)
-  later.sort((left, right) => left.dueAt - right.dueAt)
-
-  const gradeList = Array.isArray(grades) ? grades : []
-  const seen = Array.isArray(seenGradeIds) ? new Set(seenGradeIds.map(String)) : null
-  const newGrades = gradeList
-    .filter((grade) => {
-      if (seen) return grade?.id != null && !seen.has(String(grade.id))
-      const date = parseDate(grade?.date)
-      return Boolean(date) && now - date <= RECENT_GRADE_MS
+// « À rendre »: Moodle items not yet submitted, overdue or due within a
+// week, soonest first. Items { id, title, detail, meta, overdue, urgent, source }.
+export function buildDueList(deadlines, now = new Date(), max = MAX_DUE_ITEMS) {
+  return (Array.isArray(deadlines) ? deadlines : [])
+    .map((item) => ({ item, due: parseDate(item?.dueAt) }))
+    .filter(({ item, due }) => due && item.submitted !== true)
+    .filter(({ item, due }) => item.overdue === true || due <= now || due - now <= DUE_WINDOW_MS)
+    .sort((left, right) => left.due - right.due)
+    .slice(0, max)
+    .map(({ item, due }) => {
+      const overdue = item.overdue === true || due <= now
+      return {
+        id: `deadline:${item.id ?? item.title ?? due.getTime()}`,
+        title: String(item.title ?? '').trim() || 'Devoir',
+        detail: String(item.courseName ?? '').trim() || null,
+        meta: formatDueLabel(due, now),
+        overdue,
+        urgent: overdue || due - now <= URGENT_DUE_MS,
+        source: item,
+      }
     })
-    .slice(0, seen ? MAX_FEED_GRADES : 1)
+}
+
+// « 14,5/20 »; a mark that isn't a number (ABS, EXC) as it comes.
+export function formatMark(note, noteSur = 20) {
+  const value = parseFloat(note)
+  const mark = Number.isFinite(value) ? value.toLocaleString('fr-FR', { maximumFractionDigits: 2 }) : String(note ?? '').trim()
+  return mark ? `${mark}/${noteSur ?? 20}` : ''
+}
+
+// « Notes »: the latest graded evaluations (listGradedEvaluations, newest
+// first), each flagged `isNew` when « Mes notes » hasn't shown it on this
+// device (`seenGradeIds`, null if never opened here: nothing flagged).
+export function buildGradeList(grades, seenGradeIds = null, max = MAX_GRADE_ITEMS) {
+  const seen = Array.isArray(seenGradeIds) ? new Set(seenGradeIds.map(String)) : null
+  return (Array.isArray(grades) ? grades : [])
+    .slice(0, max)
     .map((grade) => ({
       id: `grade:${grade.id ?? grade.description}`,
-      kind: 'grade',
-      title: String(grade.description ?? '').trim() || 'Nouvelle note',
-      detail: grade.resource ?? null,
-      meta: `${String(parseFloat(grade.note))}/${grade.noteSur ?? 20}`,
-      urgent: false,
+      title: String(grade.description ?? '').trim() || 'Évaluation',
+      detail: grade.resource ? String(grade.resource).trim() : null,
+      meta: formatMark(grade.note, grade.noteSur),
+      isNew: Boolean(seen && grade.id != null && !seen.has(String(grade.id))),
       source: grade,
     }))
+}
 
-  const unreadMails = (Array.isArray(mails) ? mails : [])
+// « Non lus »: unread mails, newest first as the mailbox gives them.
+export function buildUnreadList(mails, max = MAX_UNREAD_ITEMS) {
+  return (Array.isArray(mails) ? mails : [])
     .filter((message) => message?.unread)
-    .slice(0, MAX_FEED_MAILS)
+    .slice(0, max)
     .map((message) => ({
       id: `mail:${message.id ?? message.subject}`,
-      kind: 'mail',
       title: String(message.subject ?? '').trim() || '(Sans objet)',
       detail: message.from?.name?.trim() || message.from?.email?.trim() || null,
-      meta: null,
       receivedAt: parseDate(message.receivedAt),
-      urgent: false,
       source: message,
     }))
-
-  return [...urgent, ...newGrades, ...unreadMails, ...later].slice(0, MAX_FEED_ITEMS)
 }

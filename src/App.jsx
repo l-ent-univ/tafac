@@ -2679,13 +2679,11 @@ function App() {
             {isHomePage ? (
               <div className="page-enter flex-1 min-h-0 4xl:flex-none 4xl:min-h-0">
                 <HomeDraftPage
-                  userName={sessionState.givenName ?? sessionState.user}
                   sessionUser={sessionState.user}
                   establishment={establishment}
                   gradesSupported={gradesSupported}
                   selection={selectedTp}
                   lookaheadDays={appliedLookaheadDays}
-                  onNavigatePage={handleNavigatePage}
                   onOpenPlanningDay={hasPlanningPage ? handleHomeOpenPlanningDay : null}
                   onOpenMail={hasMailPage ? handleHomeOpenMail : null}
                   onOpenGrade={hasGradesPage ? handleHomeOpenGrade : null}
