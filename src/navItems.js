@@ -60,6 +60,10 @@ export function buildNavItems(establishment, { gradesSupported = true } = {}) {
       icon: 'carbon:app-switcher',
       targetId: 'sidebar-section-applications',
     },
+    // « Accueil »: the canvas for a new home screen (HomeDraftPage), every
+    // university. Desktop only: the tab bar's own « Accueil » is the
+    // dashboard (getMobileTabItems leaves this one out).
+    { id: 'home', label: 'Accueil', icon: 'carbon:home', page: 'home' },
     ...(gradesNavItem ? [gradesNavItem] : []),
     // The in-app planning page (PlanningPage), launched by its own
     // « Nouveautés » entry (`announcedBy`, as « Mes notes »).
@@ -88,7 +92,10 @@ export function openNavItemLink(item, source) {
 }
 
 // The shortcuts the mobile tab bar carries (every nav item but "Toutes les
-// applications", which is the dashboard itself). Empty means no tab bar.
+// applications", which is the dashboard itself, and the « Accueil » canvas,
+// whose name the bar's own home tab already carries). Empty means no tab bar.
+const DESKTOP_ONLY_ITEM_IDS = new Set(['applications', 'home'])
+
 export function getMobileTabItems(establishment, options) {
-  return buildNavItems(establishment, options).filter((item) => item.id !== 'applications')
+  return buildNavItems(establishment, options).filter((item) => !DESKTOP_ONLY_ITEM_IDS.has(item.id))
 }

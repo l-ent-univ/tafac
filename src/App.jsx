@@ -54,6 +54,7 @@ import WidgetContainer from './components/WidgetContainer'
 import GradesPage from './components/GradesPage'
 import PlanningPage from './components/PlanningPage'
 import MailPage from './components/MailPage'
+import HomeDraftPage from './components/HomeDraftPage'
 import LoadingDots from './components/LoadingDots'
 import { resolveHeroImage } from './heroImage'
 import { getStoredTheme, persistTheme, watchTheme } from './theme'
@@ -1822,10 +1823,13 @@ function App() {
     () => activePage === 'mail' && getMobileTabItems(establishment, { gradesSupported }).some((item) => item.page === 'mail'),
     [activePage, establishment, gradesSupported],
   )
+  // The « Accueil » canvas (HomeDraftPage): every university, no feature
+  // behind it.
+  const isHomePage = activePage === 'home'
   // Folded for a mail open beside the list (handleMailReaderOpenChange).
   const isSidebarAutoCompact = isMailPage && mailReaderOpen && !sidebarCompact && !sidebarAutoCompactDismissed
   // The page the sidebar and the tab bar show as selected.
-  const shownPage = isGradesPage ? 'grades' : isPlanningPage ? 'planning' : isMailPage ? 'mail' : 'dashboard'
+  const shownPage = isHomePage ? 'home' : isGradesPage ? 'grades' : isPlanningPage ? 'planning' : isMailPage ? 'mail' : 'dashboard'
   // Being on « Mes notes » is having seen its launch, however the student
   // got there (tab, card, "Dernière note", app list, a reload on the page):
   // the dashboard card and the tab's « Nouveau » go. After the audience
@@ -1978,6 +1982,17 @@ function App() {
     handleNavigatePage('mail', request?.kind === 'course' ? 'planning' : 'grades')
   }, [handleNavigatePage])
   const clearPendingMailCompose = useCallback(() => setPendingMailCompose(null), [])
+  // The « Accueil » canvas's links: the same pages, counted as 'other' so
+  // the dashboard cards' numbers stay theirs.
+  const handleHomeOpenPlanningDay = useCallback((day) => {
+    setPendingPlanningDay(day ?? null)
+    handleNavigatePage('planning', 'other')
+  }, [handleNavigatePage])
+  const handleHomeOpenMail = useCallback((id) => {
+    writeHistoryNav({ page: 'mail', mail: id })
+    showPage('mail', 'other')
+  }, [showPage])
+  const handleHomeOpenGrade = useCallback((grade) => handleOpenLatestGrade(grade, 'other'), [handleOpenLatestGrade])
   // The composer's « Un cours… »: the Planning's weeks, where it's in the app.
   const mailPlanning = useMemo(() => (hasPlanningPage ? { selection: selectedTp, user: sessionState.user } : null), [hasPlanningPage, selectedTp, sessionState.user])
 
@@ -2661,6 +2676,22 @@ function App() {
                 showAppDescriptions={showAppDescriptions}
               />
             </div>
+            {isHomePage ? (
+              <div className="page-enter flex-1 min-h-0 4xl:flex-none 4xl:min-h-0">
+                <HomeDraftPage
+                  userName={sessionState.givenName ?? sessionState.user}
+                  sessionUser={sessionState.user}
+                  establishment={establishment}
+                  gradesSupported={gradesSupported}
+                  selection={selectedTp}
+                  lookaheadDays={appliedLookaheadDays}
+                  onNavigatePage={handleNavigatePage}
+                  onOpenPlanningDay={hasPlanningPage ? handleHomeOpenPlanningDay : null}
+                  onOpenMail={hasMailPage ? handleHomeOpenMail : null}
+                  onOpenGrade={hasGradesPage ? handleHomeOpenGrade : null}
+                />
+              </div>
+            ) : null}
             {isGradesPage ? (
               <div className="page-enter flex-1 min-h-0 4xl:flex-none 4xl:min-h-0">
                 <GradesPage user={sessionState.user} arrivalSource={gradesArrivalSource} initialGradeRequest={pendingGradeRequest} onInitialGradeRequestHandled={clearPendingGradeRequest} onComposeMail={hasMailPage ? handleComposeMail : null} />

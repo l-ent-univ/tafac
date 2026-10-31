@@ -7,6 +7,7 @@ test('an entry without app state is the dashboard', () => {
   assert.deepEqual(readHistoryNav({ other: 1 }), { page: 'dashboard', ue: null, mail: null })
   assert.deepEqual(readHistoryNav({ tafac: { page: 'nope', ue: 'UE5.1' } }), { page: 'dashboard', ue: null, mail: null })
   assert.deepEqual(readHistoryNav({ tafac: { page: 'mail' } }), { page: 'mail', ue: null, mail: null })
+  assert.deepEqual(readHistoryNav({ tafac: { page: 'home' } }), { page: 'home', ue: null, mail: null })
 })
 
 test('a UE only counts on the grades page', () => {

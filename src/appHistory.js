@@ -3,7 +3,7 @@
 // full page and each mail opened in the reader is a history entry. What the entry shows lives in its state
 // (`tafac`), the URL doesn't change (its fragment belongs to the settings
 // transfer link). A reload keeps the entry's state, so it lands where it was.
-const PAGES = new Set(['dashboard', 'grades', 'planning', 'mail'])
+const PAGES = new Set(['dashboard', 'home', 'grades', 'planning', 'mail'])
 
 // A mail entry belongs to the sign-in that wrote it. Logging out doesn't
 // reload the page, so the tab's history still holds the previous student's
