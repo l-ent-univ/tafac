@@ -1823,8 +1823,7 @@ function App() {
     () => activePage === 'mail' && getMobileTabItems(establishment, { gradesSupported }).some((item) => item.page === 'mail'),
     [activePage, establishment, gradesSupported],
   )
-  // The « Accueil » canvas (HomeDraftPage): every university, no feature
-  // behind it.
+  // The « Accueil » canvas (HomeDraftPage), every university.
   const isHomePage = activePage === 'home'
   // Folded for a mail open beside the list (handleMailReaderOpenChange).
   const isSidebarAutoCompact = isMailPage && mailReaderOpen && !sidebarCompact && !sidebarAutoCompactDismissed
@@ -1982,17 +1981,6 @@ function App() {
     handleNavigatePage('mail', request?.kind === 'course' ? 'planning' : 'grades')
   }, [handleNavigatePage])
   const clearPendingMailCompose = useCallback(() => setPendingMailCompose(null), [])
-  // The « Accueil » canvas's links: the same pages, counted as 'other' so
-  // the dashboard cards' numbers stay theirs.
-  const handleHomeOpenPlanningDay = useCallback((day) => {
-    setPendingPlanningDay(day ?? null)
-    handleNavigatePage('planning', 'other')
-  }, [handleNavigatePage])
-  const handleHomeOpenMail = useCallback((id) => {
-    writeHistoryNav({ page: 'mail', mail: id })
-    showPage('mail', 'other')
-  }, [showPage])
-  const handleHomeOpenGrade = useCallback((grade) => handleOpenLatestGrade(grade, 'other'), [handleOpenLatestGrade])
   // The composer's « Un cours… »: the Planning's weeks, where it's in the app.
   const mailPlanning = useMemo(() => (hasPlanningPage ? { selection: selectedTp, user: sessionState.user } : null), [hasPlanningPage, selectedTp, sessionState.user])
 
@@ -2678,16 +2666,7 @@ function App() {
             </div>
             {isHomePage ? (
               <div className="page-enter flex-1 min-h-0 4xl:flex-none 4xl:min-h-0">
-                <HomeDraftPage
-                  sessionUser={sessionState.user}
-                  establishment={establishment}
-                  gradesSupported={gradesSupported}
-                  selection={selectedTp}
-                  lookaheadDays={appliedLookaheadDays}
-                  onOpenPlanningDay={hasPlanningPage ? handleHomeOpenPlanningDay : null}
-                  onOpenMail={hasMailPage ? handleHomeOpenMail : null}
-                  onOpenGrade={hasGradesPage ? handleHomeOpenGrade : null}
-                />
+                <HomeDraftPage />
               </div>
             ) : null}
             {isGradesPage ? (
