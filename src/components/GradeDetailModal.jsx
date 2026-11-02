@@ -294,7 +294,7 @@ function PromoCard({ evaluation, semesterId, showPromoStats, titleId }) {
 // Messagerie), null without the in-app mail page.
 function GradeDetailModal({ report, module, evaluation, semesterId, icon = null, isNew = false, onWrite = null, onClose }) {
   const dialogRef = useRef(null)
-  useSheetDrag(dialogRef, onClose)
+  const dismiss = useSheetDrag(dialogRef, onClose)
   const titleId = useId()
   const summaryId = useId()
   const promoTitleId = useId()
@@ -354,7 +354,7 @@ function GradeDetailModal({ report, module, evaluation, semesterId, icon = null,
     if (event.key === 'Escape') {
       event.stopPropagation()
       event.preventDefault()
-      onClose()
+      dismiss()
       return
     }
     if (event.key !== 'Tab' || !dialogRef.current) return
@@ -383,7 +383,7 @@ function GradeDetailModal({ report, module, evaluation, semesterId, icon = null,
 
   return createPortal(
     <div className="gd-root fixed inset-0 z-50 flex items-center justify-center p-5 max-sm:items-end max-sm:p-0" role="presentation">
-      <div className="weather-modal-backdrop absolute inset-0 bg-backdrop animate-modal-backdrop-in" onClick={onClose} aria-hidden="true" />
+      <div className="weather-modal-backdrop absolute inset-0 bg-backdrop animate-modal-backdrop-in" onClick={dismiss} aria-hidden="true" />
       <section
         ref={dialogRef}
         className="gd-dialog relative isolate flex max-h-[min(820px,calc(100dvh-40px))] w-[min(540px,100%)] flex-col modal-corners [--modal-inset:24px] [--modal-inner-radius:20px] max-sm:[--modal-inset:16px] max-sm:[--modal-inner-radius:18px] border border-border bg-bg text-text shadow-[0_24px_80px_var(--color-shadow)] outline-none max-sm:max-h-[calc(100dvh-16px)] max-sm:rounded-b-none max-sm:border-b-0"
@@ -446,7 +446,7 @@ function GradeDetailModal({ report, module, evaluation, semesterId, icon = null,
                       <Tooltip title="Écrire au sujet de cette note" side="bottom-end" className="max-4xl:hidden" />
                     </button>
                   ) : null}
-                  <CloseButton glass onClick={onClose} />
+                  <CloseButton glass onClick={dismiss} />
                 </span>
               </div>
             </header>
