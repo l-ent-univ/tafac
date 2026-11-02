@@ -9,7 +9,6 @@ import BetaTag from './BetaTag'
 import LogoBut1 from './LogoBut1'
 import AboutModal from './AboutModal'
 import PapillonBadge from './PapillonBadge'
-import RenameNotice from './RenameNotice'
 import ServiceNotice from './ServiceNotice'
 import { APP_NAME } from '../seo'
 import { getListedUniversities, getLoadedUniversityId, writeUniversityChoice } from '../universityRuntime'
@@ -133,7 +132,6 @@ function LoginPage({
 }) {
   const [showPassword, setShowPassword] = useState(false)
   const [aboutOpen, setAboutOpen] = useState(false)
-  const [renameNoticeOpen, setRenameNoticeOpen] = useState(false)
 
   function handleDemoLinkClick() {
     setAboutOpen(false)
@@ -202,26 +200,10 @@ function LoginPage({
         onDemoLinkClick={handleDemoLinkClick}
       />
 
-      <RenameNotice visible={renameNoticeOpen} onDismiss={() => setRenameNoticeOpen(false)} />
-
       <div className="relative isolate flex min-h-screen min-w-0 flex-[1_1_auto] flex-col bg-[#f5f3ed] dark:bg-bg max-4xl:w-full">
         {/* In the flow rather than pinned over the form, so nothing overlaps
             on short or narrow screens. */}
-        <div className="flex shrink-0 items-center justify-between gap-3 px-6 pt-6 max-3xl:px-5 max-3xl:pt-5 max-md:px-4 max-md:pt-4">
-          <button
-            type="button"
-            className="inline-flex h-8 min-w-0 items-center gap-[6px] rounded-full border border-border/70 bg-widget-bg/60 px-3 text-[13px] font-medium leading-none font-body transition-colors duration-120 hover:bg-widget-bg"
-            onClick={() => setRenameNoticeOpen(true)}
-          >
-            <Icon icon="ph:star" className="h-[14px] w-[14px] shrink-0 text-text-muted" aria-hidden="true" />
-            <span
-              className="truncate bg-[linear-gradient(90deg,var(--color-text-muted)_0%,var(--color-text)_50%,var(--color-text-muted)_100%)] bg-[length:200%_100%] bg-clip-text text-transparent animate-shimmer"
-              style={{ animationDuration: '3s' }}
-            >
-              l'ent devient Tafac !
-            </span>
-          </button>
-
+        <div className="flex shrink-0 items-center justify-end gap-3 px-6 pt-6 max-3xl:px-5 max-3xl:pt-5 max-md:px-4 max-md:pt-4">
           <button
             type="button"
             className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-border/70 bg-widget-bg/60 text-text-muted transition-colors duration-120 hover:bg-widget-bg hover:text-text"
