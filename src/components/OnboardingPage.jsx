@@ -334,7 +334,7 @@ function OnboardingPage({
                     <p className="m-0 mt-2 text-sm text-text-muted font-body">
                       {stepKey === 'year' && selectedYear ? selectedYear.label : null}
                       {stepKey === 'td' && selectedTd ? selectedTd.label : null}
-                      {stepKey === 'tp' ? 'Groupe final' : null}
+                      {stepKey === 'tp' && isCompleted ? 'Groupe final' : null}
                       {!isCompleted && !isCurrent ? 'À choisir' : null}
                       {isCurrent ? 'En cours' : null}
                     </p>
