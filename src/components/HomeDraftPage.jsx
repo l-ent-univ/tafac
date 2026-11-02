@@ -21,12 +21,13 @@ import MailLaunchCard from './MailLaunchCard'
 import PlanningLaunchCard from './PlanningLaunchCard'
 import ServiceNotice from './ServiceNotice'
 import WidgetAssiduity from './WidgetAssiduity'
-import WidgetAverageGrade from './WidgetAverageGrade'
+import WidgetAverageGrade, { AverageGradeValues } from './WidgetAverageGrade'
 import WidgetDeadlines from './WidgetDeadlines'
 import WidgetNextClasses from './WidgetNextClasses'
 import WidgetRecentGrades from './WidgetRecentGrades'
 import WidgetRecentMail from './WidgetRecentMail'
-import { SHIMMER_CLASSES } from './widgetListUtils'
+import { Skeleton } from 'skullet/react'
+import { useSkeletonsForced } from '../skeletonSamples'
 import { r } from '../register.js'
 import HomeIcon from './HomeIcon'
 import SmoothSurface from './SmoothSurface'
@@ -152,10 +153,10 @@ function AveragePlaceholder() {
         <img src={averageIcon} alt="" width="22" height="22" draggable="false" className="mr-[3px] size-[22px] shrink-0 select-none" aria-hidden="true" />
         <span className="min-w-0 truncate text-base font-medium leading-[1.06] text-text-muted max-md:text-[14px]">Moyenne générale</span>
       </div>
-      <div className="mt-auto grid gap-2" aria-hidden="true">
-        <span className={`block h-8 w-28 rounded-full ${SHIMMER_CLASSES}`} />
-        <span className={`block h-3 w-36 rounded-full ${SHIMMER_CLASSES}`} />
-      </div>
+      {/* The figures' skeleton (skullet), measured from sample ones. */}
+      <Skeleton loading label="Chargement de la moyenne" className="mt-auto flex">
+        <AverageGradeValues avgDisplay="14.5" promoDisplay="12.44" />
+      </Skeleton>
     </article>
   )
 }
@@ -307,6 +308,7 @@ function HomeDraftPage({
   onOpenAssiduity = null,
   appsSlotRef = null,
 }) {
+  const skeletonsForced = useSkeletonsForced()
   const displayName = userName?.trim() || ''
   // Anonymous analytics: one dashboard_viewed each time « Accueil » shows
   // (the ref outlives StrictMode's second effect run).
@@ -474,7 +476,7 @@ function HomeDraftPage({
                   onOpenGrades()
                 } : undefined}
               >
-                {grades.status === 'loading'
+                {grades.status === 'loading' || skeletonsForced
                   ? <AveragePlaceholder />
                   : <WidgetAverageGrade releve={grades.releve} visible icon={averageIcon} />}
               </div>

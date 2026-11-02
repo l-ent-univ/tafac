@@ -10195,3 +10195,15 @@ div:has(> .justify-ticket) {
     background-color: var(--glass-solid-fill-hover);
   }
 }
+
+/* ── Skeletons (skullet: everything that loads, measured from what it
+   will show: « Accueil »'s cards, the mail list and reader, the composer's
+   pickers, Planning's directory, the favourites) ──
+   In the app's shimmer colours, its lines of text as pills; dark follows
+   from the colour tokens. Held up from the debug panel (« Simuler le
+   chargement ») or `?skeletons` (skeletonSamples.js). */
+:root {
+  --skullet-base: var(--color-bg-muted);
+  --skullet-highlight: var(--color-bg-subtle);
+  --skullet-radius: 999px;
+}

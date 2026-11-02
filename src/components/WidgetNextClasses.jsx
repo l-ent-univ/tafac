@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { Icon } from '@iconify/react'
+import { Skeleton } from 'skullet/react'
 import { publishBriefingSource } from '../briefingSources'
+import { useSkeletonsForced, SAMPLE_CLASSES } from '../skeletonSamples'
 import { formatHour, pickNextClassesDay } from '../nextClassesDay'
 import {
   NEXT_CLASS_LOOKAHEAD_DAYS,
@@ -14,7 +16,6 @@ import { useEventAccents } from '../usePlanningWeeks'
 import calendarIcon from '../assets/home-icons/calendar.png'
 import PlanningEventBlock from './PlanningEventBlock'
 import WidgetListStatus from './WidgetListStatus'
-import { SHIMMER_CLASSES } from './widgetListUtils'
 import { r } from '../register.js'
 
 // The list follows the clock (a class over leaves it).
@@ -127,37 +128,31 @@ function WidgetNextClasses({
   onOpenPlanningDay = null,
   fill = false,
 }) {
+  const skeletonsForced = useSkeletonsForced()
   const now = useNow()
   const [classes, retry] = useUpcomingClasses({ selection, sessionUser, lookaheadDays })
   const day = useMemo(() => (classes.status === 'ok' ? pickNextClassesDay(classes.events, now) : null), [classes, now])
-  const accentFor = useEventAccents(day?.classes ?? NO_CLASSES)
+  const loading = classes.status === 'loading'
+  const dayClasses = day?.classes ?? NO_CLASSES
+  const accentFor = useEventAccents(dayClasses)
   const [boxRef, box] = useElementSize()
   const blockWidth = Math.max(0, box.width - TIME_COLUMN - TIME_GAP)
 
-  // The classes shown and their blocks' height. Filling the cell: those
-  // that fit whole, then grown to share what's left.
-  const dayClasses = day?.classes ?? NO_CLASSES
-  let shownCount = Math.min(dayClasses.length, MAX_CLASSES)
-  let blockHeight = BLOCK_HEIGHT
-  if (fill) {
+  // Of `count` classes, how many show and their blocks' height. Filling the
+  // cell: those that fit whole, then grown to share what's left.
+  const fitClasses = (count) => {
+    if (!fill) return { shownCount: Math.min(count, MAX_CLASSES), blockHeight: BLOCK_HEIGHT }
     const room = box.height
     const fitting = Math.max(1, Math.floor((room + ROW_GAP) / (BLOCK_HEIGHT + ROW_GAP)))
-    shownCount = Math.min(dayClasses.length, fitting, MAX_FILL_CLASSES)
-    if (shownCount > 0) {
-      const share = Math.floor((room - (shownCount - 1) * ROW_GAP) / shownCount)
-      blockHeight = Math.min(BLOCK_MAX_HEIGHT, Math.max(BLOCK_HEIGHT, share))
-    }
+    const shownCount = Math.min(count, fitting, MAX_FILL_CLASSES)
+    if (shownCount === 0) return { shownCount, blockHeight: BLOCK_HEIGHT }
+    const share = Math.floor((room - (shownCount - 1) * ROW_GAP) / shownCount)
+    return { shownCount, blockHeight: Math.min(BLOCK_MAX_HEIGHT, Math.max(BLOCK_HEIGHT, share)) }
   }
-  const hiddenCount = dayClasses.length - shownCount
+  const hiddenCount = dayClasses.length - fitClasses(dayClasses.length).shownCount
 
   let body
-  if (classes.status === 'loading') {
-    body = (
-      <div className="grid gap-2" aria-hidden="true">
-        {[0, 1, 2].map((index) => <div key={index} className={`h-11 corners-[12px] ${SHIMMER_CLASSES}`} />)}
-      </div>
-    )
-  } else if (classes.status === 'error') {
+  if (classes.status === 'error') {
     // The dashboard's « Prochain cours » hides; here the card keeps its
     // place in the grid, with « Réessayer ».
     body = (
@@ -170,36 +165,49 @@ function WidgetNextClasses({
     )
   } else if (classes.status === 'unconfigured') {
     body = <WidgetListStatus icon="ph:users" title="Groupe manquant" body={r('Choisis ton groupe TD ou TP dans « Mon compte »', 'Choisissez votre groupe TD ou TP dans « Mon compte »')} />
-  } else if (!day) {
+  } else if (!loading && !day) {
     body = <WidgetListStatus icon="ph:calendar-blank" title="Aucun cours à venir" body={`Rien de prévu dans les ${lookaheadDays} prochains jours`} />
   } else {
-    const openDay = onOpenPlanningDay ? () => onOpenPlanningDay(day.dayKey) : undefined
+    const openDay = onOpenPlanningDay && day ? () => onOpenPlanningDay(day.dayKey) : undefined
+    const renderClasses = (items) => {
+      const { shownCount, blockHeight } = fitClasses(items.length)
+      return (
+        <ol className="m-0 grid list-none p-0" style={{ gap: ROW_GAP }}>
+          {items.slice(0, shownCount).map((item) => (
+            <li key={item.key} className="flex items-center" style={{ gap: TIME_GAP }}>
+              <span className="shrink-0 text-center font-body tabular-nums" style={{ width: TIME_COLUMN }}>
+                <span className="block text-[15px] font-semibold leading-[1.25]">{formatHour(item.start)}</span>
+                <span className="block text-[12px] font-medium leading-[1.3] text-text-muted">{formatHour(item.end)}</span>
+                {item.isNow ? <span className="mt-1 block text-[12px] font-semibold leading-[1.3] text-brand">En cours</span> : null}
+              </span>
+              {blockWidth > 0 ? (
+                // Coloured, drawn whole in the skeleton (skullet-block).
+                <span skullet-block="" className="flex flex-none rounded-[12px]">
+                  <PlanningEventBlock
+                    event={{ ...item, id: item.key }}
+                    accent={accentFor(item.title)}
+                    variant="compact"
+                    stackFirst
+                    width={blockWidth}
+                    height={blockHeight}
+                    style={{ position: 'relative', flex: 'none' }}
+                    onOpen={openDay}
+                  />
+                </span>
+              ) : (
+                <span className="flex-1" style={{ height: blockHeight }} aria-hidden="true" />
+              )}
+            </li>
+          ))}
+        </ol>
+      )
+    }
+    // Loading: a skeleton (skullet) of the last classes shown (`id`, kept
+    // across visits), of sample classes before there were any.
     body = (
-      <ol className="m-0 grid list-none p-0" style={{ gap: ROW_GAP }}>
-        {dayClasses.slice(0, shownCount).map((item) => (
-          <li key={item.key} className="flex items-center" style={{ gap: TIME_GAP }}>
-            <span className="shrink-0 text-center font-body tabular-nums" style={{ width: TIME_COLUMN }}>
-              <span className="block text-[15px] font-semibold leading-[1.25]">{formatHour(item.start)}</span>
-              <span className="block text-[12px] font-medium leading-[1.3] text-text-muted">{formatHour(item.end)}</span>
-              {item.isNow ? <span className="mt-1 block text-[12px] font-semibold leading-[1.3] text-brand">En cours</span> : null}
-            </span>
-            {blockWidth > 0 ? (
-              <PlanningEventBlock
-                event={{ ...item, id: item.key }}
-                accent={accentFor(item.title)}
-                variant="compact"
-                stackFirst
-                width={blockWidth}
-                height={blockHeight}
-                style={{ position: 'relative', flex: 'none' }}
-                onOpen={openDay}
-              />
-            ) : (
-              <span className="flex-1" style={{ height: blockHeight }} aria-hidden="true" />
-            )}
-          </li>
-        ))}
-      </ol>
+      <Skeleton loading={skeletonsForced || undefined} data={loading ? null : dayClasses} sample={SAMPLE_CLASSES} id="home-next-classes" label="Chargement des cours">
+        {renderClasses}
+      </Skeleton>
     )
   }
 

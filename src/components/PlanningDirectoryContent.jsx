@@ -8,7 +8,8 @@ import RoomIcon from './RoomIcon'
 import SegmentedControl from './SegmentedControl'
 import { getSenderInitial } from './mailSender'
 import { directoryTintStyle } from '../directoryTint'
-import { SHIMMER_CLASSES } from './widgetListUtils'
+import { Skeleton } from 'skullet/react'
+import { SAMPLE_DIRECTORY_ROWS } from '../skeletonSamples'
 import { r } from '../register.js'
 import SmoothSurface from './SmoothSurface'
 
@@ -17,7 +18,6 @@ const TABS = [
   { id: 'person', label: 'Personnels', placeholder: 'Nom, département…' },
   { id: 'group', label: 'Formations', placeholder: 'Groupe, formation…' },
 ]
-const SKELETON_ROWS = 8
 
 // A person's badge, as a mail's sender's (MailRowContent, mailSender.js):
 // their first letter on a colour of their own, by name (ADE gives no
@@ -188,14 +188,14 @@ function PlanningDirectoryContent({ header = null, stickyClassName = '', user = 
   let body
   if (status === 'loading' || status === 'idle') {
     body = (
-      <ul className="m-0 grid list-none gap-1 p-0" aria-label="Chargement" aria-busy="true">
-        {Array.from({ length: SKELETON_ROWS }, (_, index) => (
-          <li key={index} className="grid gap-1.5 px-3 py-2.5">
-            <span className={`h-3.5 ${index % 3 ? 'w-[45%]' : 'w-[60%]'} rounded-full ${SHIMMER_CLASSES}`} />
-            <span className={`h-3 w-[35%] rounded-full ${SHIMMER_CLASSES}`} />
-          </li>
-        ))}
-      </ul>
+      // Measured from sample rows drawn as real ones (skullet).
+      <Skeleton loading label="Chargement">
+        <ul className="m-0 grid list-none gap-0.5 p-0">
+          {SAMPLE_DIRECTORY_ROWS.map((entry) => (
+            <DirectoryRow key={entry.id} entry={entry} detail={entry.detail} selected={false} onPick={() => {}} />
+          ))}
+        </ul>
+      </Skeleton>
     )
   } else if (status === 'unsupported') {
     body = <DirectoryNote>Non disponible pour cette université</DirectoryNote>

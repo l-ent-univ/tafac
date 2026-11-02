@@ -14,6 +14,7 @@ import ContextMenu from './ContextMenu'
 import LoadingDots from './LoadingDots'
 import MailAttachDrawer, { ATTACH_CARD_CLASS, AttachDrawerNote } from './MailAttachDrawer'
 import SmoothSurface from './SmoothSurface'
+import { Skeleton } from 'skullet/react'
 import {
   ENT_AUTH_PREFIX,
   ENT_ORIGIN,
@@ -1901,7 +1902,6 @@ function AvailableApplications({
     setReloadKey((current) => current + 1)
   }
 
-  const shimmerClassName = 'bg-[linear-gradient(90deg,var(--color-bg-muted)_0%,var(--color-bg-subtle)_50%,var(--color-bg-muted)_100%)] bg-[length:200%_100%] animate-shimmer'
   // One app of the full list: its icon, name (and description), a star to
   // add or remove it from the favourites. Also the « Accueil » page's
   // drawer (`inDrawer`: the star always shows, the arrows move through).
@@ -2035,14 +2035,18 @@ function AvailableApplications({
         )}
 
         {viewState.status === 'loading' ? (
-          <div className={favoriteListClassName} role="status" aria-live="polite" aria-label="Chargement des favoris">
-            {Array.from({ length: 4 }).map((_, index) => (
-              <div key={`loading-favorite-${index}`} className={favoriteItemClassName} aria-hidden="true">
-                <span className={`badge-placeholder shrink-0 ${favoriteIconClassName} ${shimmerClassName}`} />
-                <span className={`text-placeholder-shimmer h-3 rounded-full ${isSidebarFavorites ? 'w-[55%]' : 'w-[80px] max-md:w-[48px] max-md:h-2.5'} ${shimmerClassName}`} />
-              </div>
-            ))}
-          </div>
+          // Measured from sample tiles laid out as real ones (skullet): the
+          // icon a block, the name a bar.
+          <Skeleton loading label="Chargement des favoris">
+            <div className={favoriteListClassName}>
+              {['Application', 'Annuaire', 'Documentation', 'Assistance'].map((name) => (
+                <div key={name} className={favoriteItemClassName}>
+                  <span skullet-block="" className={`shrink-0 ${favoriteIconClassName}`} />
+                  <span className={favoriteTitleClassName}>{name}</span>
+                </div>
+              ))}
+            </div>
+          </Skeleton>
         ) : null}
 
         {viewState.status === 'error' ? (

@@ -31,7 +31,8 @@ export function LatestGradeCardBody({ moduleTitle, moduleCode, day, title, value
   const dayLabel = day ? <span className={`ml-auto shrink-0 font-body text-[13px] font-medium leading-[1.4] text-text-muted ${heading ? 'max-md:text-[12px]' : ''}`}>{day}</span> : null
   return (
     <>
-      {wash ? <span className="latest-grade-wash" style={{ background: wash }} aria-hidden="true" /> : null}
+      {/* skullet-ignore: no bone for the wash in « Accueil »'s skeletons. */}
+      {wash ? <span skullet-ignore="" className="latest-grade-wash" style={{ background: wash }} aria-hidden="true" /> : null}
       {heading ? (
         <div className="flex items-center gap-[6px] min-w-0">
           <span className="m-0 min-w-0 truncate text-base font-medium leading-[1.06] text-text-muted max-md:text-[15px]">{heading}</span>

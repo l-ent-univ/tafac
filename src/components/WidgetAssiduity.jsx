@@ -9,7 +9,8 @@ import {
   readJustificationWindow,
   sumAbsenceHours,
 } from '../assiduity'
-import { SHIMMER_CLASSES } from './widgetListUtils'
+import { Skeleton } from 'skullet/react'
+import { useSkeletonsForced } from '../skeletonSamples'
 
 // « Accueil »'s « Assiduité » card: the newest semester's absences from
 // the relevé (buildAbsenceReport, the passerelle's rules), as the
@@ -31,14 +32,21 @@ function Header() {
   )
 }
 
+// While the relevé loads: the figures' skeleton (skullet), measured from
+// sample ones, so nothing moves when they come in.
 export function AssiduityPlaceholder() {
   return (
     <article className={CARD_CLASSES} aria-label="Assiduité, chargement" aria-busy="true">
       <Header />
-      <div className="mt-auto grid gap-2" aria-hidden="true">
-        <span className={`block h-8 w-24 rounded-full ${SHIMMER_CLASSES}`} />
-        <span className={`block h-3 w-40 rounded-full ${SHIMMER_CLASSES}`} />
-      </div>
+      <Skeleton loading label="Chargement de l’assiduité" className="mt-auto">
+        <div className="flex min-w-0 flex-col gap-[5px]">
+          <div className="flex items-end gap-[6px] leading-[1.06]">
+            <span className="font-display text-[37px] font-bold leading-none whitespace-nowrap max-md:text-[clamp(28px,8vw,34px)]">2h</span>
+            <span className="pb-[3px] text-[15px] font-semibold leading-[1.06] whitespace-nowrap max-md:text-[14px]">non justifiées</span>
+          </div>
+          <span className="min-w-0 truncate text-[14px] font-medium leading-[1.2] text-text-muted max-md:text-[13px]">6h manquées · 1 retard</span>
+        </div>
+      </Skeleton>
     </article>
   )
 }
@@ -73,6 +81,7 @@ function MiniLine({ timeline }) {
 // `payload`: the grades answer (the relevé's semester, its `absences`);
 // `status`: 'loading', 'ok', 'empty', 'error' (HomeDraftPage's grades).
 function WidgetAssiduity({ payload, releve, config, status }) {
+  const skeletonsForced = useSkeletonsForced()
   // Read once: the card is redrawn as the page loads, the line stays put.
   const [now] = useState(() => new Date())
   const report = useMemo(() => (releve ? buildAbsenceReport(payload, releve, config) : null), [payload, releve, config])
@@ -87,7 +96,7 @@ function WidgetAssiduity({ payload, releve, config, status }) {
   }), [releve, entries, now])
   const open = useMemo(() => listOpenJustifications(entries, readJustificationWindow(report?.notice), now), [entries, report, now])
 
-  if (status === 'loading') return <AssiduityPlaceholder />
+  if (status === 'loading' || skeletonsForced) return <AssiduityPlaceholder />
   if (!report?.visible) return null
 
   const missed = sums.justified + sums.unjustified

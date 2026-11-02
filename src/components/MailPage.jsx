@@ -26,7 +26,6 @@ import { useContextMenu } from '../useContextMenu'
 import { trackMailAction, useMailPageReport } from '../analytics'
 import { createSearchReporter, describeMailLoad, toComposeKind, toFolderKind, toMailPageSource, toMailVia, toRemoveAction } from '../mailAnalytics'
 import {
-  SHIMMER_CLASSES,
   formatReceivedAt,
   getSenderLabel,
   parseDate,
@@ -35,6 +34,8 @@ import {
 } from './widgetListUtils'
 import { r } from '../register.js'
 import SmoothSurface from './SmoothSurface'
+import { Skeleton } from 'skullet/react'
+import { SAMPLE_MAIL_ROWS, useSkeletonsForced } from '../skeletonSamples'
 
 // The composer and its editor (Tiptap) load the first time one opens: most
 // visits only read.
@@ -479,20 +480,19 @@ function MailSelection({ count, onClear }) {
   )
 }
 
+// While the list loads: a skeleton (skullet) measured from sample rows
+// drawn as real ones (MailRowContent), a bar per line of text.
 function MailListPlaceholder() {
   return (
-    <ul className="mail-skeleton-delayed m-0 p-0 list-none grid" role="status" aria-label="Chargement des mails">
-      {['w-[34%]', 'w-[26%]', 'w-[40%]', 'w-[30%]'].map((senderWidth) => (
-        <li key={senderWidth} className={`${ROW_CLASSES} ${ITEM_CLASSES}`} aria-hidden="true">
-          <span className="flex items-center gap-2 h-6">
-            <span className={`text-placeholder-shimmer size-6 rounded-[6px] ${SHIMMER_CLASSES}`} />
-            <span className={`text-placeholder-shimmer h-2.5 rounded-full ${senderWidth} ${SHIMMER_CLASSES}`} />
-          </span>
-          <span className={`text-placeholder-shimmer mt-1 h-2.5 w-[58%] rounded-full ${SHIMMER_CLASSES}`} />
-          <span className={`text-placeholder-shimmer mt-1 h-2 w-[86%] rounded-full ${SHIMMER_CLASSES}`} />
-        </li>
-      ))}
-    </ul>
+    <Skeleton loading label="Chargement des mails">
+      <ul className="m-0 p-0 list-none grid">
+        {SAMPLE_MAIL_ROWS.map((message) => (
+          <li key={message.id} className={`${ROW_CLASSES} ${ITEM_CLASSES} px-3`}>
+            <MailRowContent message={message} person={message.from} sender={message.from.name} timeLabel="10h12" />
+          </li>
+        ))}
+      </ul>
+    </Skeleton>
   )
 }
 
@@ -608,6 +608,7 @@ function MailListItem({ message, fallbackHref, now, onOpen, onContextMenu, onHov
 // `planning`: { selection, user }, the composer's « Un cours… » (the
 // Planning in the app), null without.
 function MailPage({ onReaderOpenChange, onSignInAgain, sender = null, composeRequest = null, onComposeRequestHandled = () => {}, arrivalSource = 'other', canAttachGrades = false, planning = null }) {
+  const skeletonsForced = useSkeletonsForced()
   // nextOffset: where the next page starts on the server.
   // `folder`: the folder the list is of (the one shown until another's
   // first page arrives).
@@ -2004,6 +2005,7 @@ function MailPage({ onReaderOpenChange, onSignInAgain, sender = null, composeReq
 
       {state.status === 'loading' ? <MailListPlaceholder /> : null}
 
+
       {state.status === 'ok' && visibleMessages.length === 0 && isSearching && !isSearchPending ? (
         <p className="m-0 py-10 text-center text-[14px] font-medium text-text-muted" role="status">Aucun mail ne correspond</p>
       ) : null}
@@ -2027,6 +2029,8 @@ function MailPage({ onReaderOpenChange, onSignInAgain, sender = null, composeReq
       ) : null}
 
       {state.status === 'ok' && visibleMessages.length > 0 ? (
+        // Held as a skeleton from the debug panel (« Simuler le chargement »).
+        <Skeleton loading={skeletonsForced || undefined} label="Chargement des mails">
         <div className={`${hasOpenedMail ? 'mail-pop-in' : ''} grid min-w-0`}>
           <ul
             key={state.folder}
@@ -2074,6 +2078,7 @@ function MailPage({ onReaderOpenChange, onSignInAgain, sender = null, composeReq
             </div>
           ) : null}
         </div>
+        </Skeleton>
       ) : null}
 
       {isSearchPending && state.status === 'ok' ? (

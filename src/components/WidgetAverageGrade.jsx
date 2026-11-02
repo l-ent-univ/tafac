@@ -96,7 +96,7 @@ function PocRank({ poc }) {
 // The average sits at the bottom left like the latest grade's value, with the
 // promo average (and the rank, if shown) under it. Pointer events pass through
 // to the evolution line drawn behind (its hover), and on to the card.
-function AverageGradeValues({ avgDisplay, promoDisplay, ranks = null, pocRank = null }) {
+export function AverageGradeValues({ avgDisplay, promoDisplay, ranks = null, pocRank = null }) {
   return (
     <div className="pointer-events-none relative z-10 flex-1 flex flex-col gap-[5px] justify-end min-w-0">
       <div className="flex items-end gap-[3px] leading-[1.06]">

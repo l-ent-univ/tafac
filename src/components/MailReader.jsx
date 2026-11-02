@@ -11,7 +11,7 @@ import {
   threadCache,
   threadKey,
 } from '../mailReadCache'
-import { SHIMMER_CLASSES, calendarDayDiff, formatClockTime, getSenderLabel } from './widgetListUtils'
+import { calendarDayDiff, formatClockTime, getSenderLabel } from './widgetListUtils'
 import { getSenderBadgeStyle, getSenderDomainCue, getSenderInitial } from './mailSender'
 import { GROUP_CARD_CLASSES, GroupRow } from './GroupCard'
 import FileName from './FileName'
@@ -21,6 +21,7 @@ import { copyToClipboard, useContextMenu } from '../useContextMenu'
 import { trackMailAction } from '../analytics'
 import { bindFrameContextMenu } from '../contextMenuEvents'
 import SmoothSurface from './SmoothSurface'
+import { Skeleton } from 'skullet/react'
 
 const fullDateFormatter = new Intl.DateTimeFormat('fr-FR', { dateStyle: 'full', timeStyle: 'short' })
 const weekdayFormatter = new Intl.DateTimeFormat('fr-FR', { weekday: 'short' })
@@ -359,21 +360,32 @@ function AttachmentRows({ attachments }) {
   )
 }
 
-// Shown only past a short wait (.mail-skeleton-delayed), faded in: a quick
+// While a mail loads: a skeleton (skullet) measured from a sample header
+// laid out as the real one (the badge, the name and time, the subject, the
+// recipients) and a few lines of body. skullet waits 150ms first: a quick
 // load shows none.
 function MailReaderPlaceholder() {
   return (
-    <div className="mail-skeleton-delayed grid gap-4" role="status" aria-label="Chargement du mail">
-      <div className="flex items-start gap-3">
-        <span className={`text-placeholder-shimmer size-10 shrink-0 rounded-[10px] ${SHIMMER_CLASSES}`} />
-        <div className="grid flex-1 gap-2 pt-1">
-          <span className={`text-placeholder-shimmer h-3.5 w-[40%] rounded-full ${SHIMMER_CLASSES}`} />
-          <span className={`text-placeholder-shimmer h-3 w-[70%] rounded-full ${SHIMMER_CLASSES}`} />
-          <span className={`text-placeholder-shimmer h-2.5 w-[30%] rounded-full ${SHIMMER_CLASSES}`} />
+    <Skeleton loading label="Chargement du mail">
+      <div className="grid gap-5">
+        <header className="flex items-start gap-3 min-w-0">
+          <span skullet-block="" className="inline-flex size-10 shrink-0 rounded-[10px]" />
+          <div className="grid flex-1 gap-[3px] min-w-0">
+            <div className="flex items-baseline justify-between gap-3 min-w-0">
+              <span className="truncate text-[16px] font-semibold leading-[1.3]">Prénom Nom</span>
+              <span className="shrink-0 text-[13px] font-medium text-text-muted">10h12</span>
+            </div>
+            <span className="text-[15px] font-semibold leading-[1.3]">Objet du mail, sur une ligne</span>
+            <span className="text-[13px] font-medium text-text-muted">À moi</span>
+          </div>
+        </header>
+        <div className="grid gap-2 text-[15px] leading-[1.5]">
+          <p className="m-0">Bonjour,</p>
+          <p className="m-0">Les premières lignes du mail, assez longues pour tenir sur plusieurs lignes, comme le corps d’un vrai message qui expliquerait quelque chose en détail.</p>
+          <p className="m-0">Une autre ligne, plus courte.</p>
         </div>
       </div>
-      <span className={`text-placeholder-shimmer h-48 w-full rounded-[12px] ${SHIMMER_CLASSES}`} />
-    </div>
+    </Skeleton>
   )
 }
 
