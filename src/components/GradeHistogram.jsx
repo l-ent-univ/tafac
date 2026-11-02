@@ -130,7 +130,7 @@ function GradeHistogram({ state, studentBucket = null, isPending = false, onRetr
   ].filter(Boolean).join(' ')
 
   return (
-    <div className="grid gap-3">
+    <div className="relative grid gap-3">
       <div>
         {/* The plot: one tab stop, the arrows walk the bars. */}
         <div
