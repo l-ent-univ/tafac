@@ -51,6 +51,7 @@ import AvailableApplications from './components/AvailableApplications'
 import GradesPage from './components/GradesPage'
 import PlanningPage from './components/PlanningPage'
 import MailPage from './components/MailPage'
+import AssiduityPage from './components/AssiduityPage'
 import HomeDraftPage from './components/HomeDraftPage'
 import LoadingDots from './components/LoadingDots'
 import { resolveHeroImage } from './heroImage'
@@ -908,7 +909,7 @@ function App() {
   const [showUniversityLogo, setShowUniversityLogo] = useState(() => getStoredShowUniversityLogo())
   const [logoSource, setLogoSource] = useState(() => getStoredLogoSource())
   // Page shown next to the sidebar: 'home' (« Accueil »), 'grades',
-  // 'planning' or 'mail'. Each switch is
+  // 'planning', 'mail' or 'assiduity'. Each switch is
   // a history entry (see appHistory.js): back and forward move between
   // pages, and a reload stays on the page.
   const [activePage, setActivePage] = useState(() => readHistoryNav().page)
@@ -1869,14 +1870,16 @@ function App() {
   )
   // « Accueil » (HomeDraftPage), every university: the page shown when no
   // other is.
-  const isHomePage = !isGradesPage && !isPlanningPage && !isMailPage
+  // « Assiduité » (AssiduityPage), every university.
+  const isAssiduityPage = activePage === 'assiduity'
+  const isHomePage = !isGradesPage && !isPlanningPage && !isMailPage && !isAssiduityPage
   // The « Accueil » band's tint (--page-top-band, overrides.css): the
   // wallpaper's main colour when it shows one, else the brand's.
   const homeBandTint = useWallpaperTint(isHomePage && showWallpaper ? heroImage.src : null)
   // Folded for a mail open beside the list (handleMailReaderOpenChange).
   const isSidebarAutoCompact = isMailPage && mailReaderOpen && !sidebarCompact && !sidebarAutoCompactDismissed
   // The page the sidebar and the tab bar show as selected.
-  const shownPage = isGradesPage ? 'grades' : isPlanningPage ? 'planning' : isMailPage ? 'mail' : 'home'
+  const shownPage = isGradesPage ? 'grades' : isPlanningPage ? 'planning' : isMailPage ? 'mail' : isAssiduityPage ? 'assiduity' : 'home'
   // Being on « Mes notes » is having seen its launch, however the student
   // got there (tab, card, "Dernière note", app list, a reload on the page):
   // the dashboard card and the tab's « Nouveau » go. After the audience
@@ -2721,6 +2724,11 @@ function App() {
             {isPlanningPage ? (
               <div className="page-enter flex-1 min-h-0 4xl:flex-none 4xl:min-h-0">
                 <PlanningPage selection={selectedTp} user={sessionState.user} showWeekend={showPlanningWeekend} onOpenAccount={handleOpenAccountModal} initialDay={pendingPlanningDay} onInitialDayHandled={clearPendingPlanningDay} arrivalSource={planningArrivalSource} onComposeMail={hasMailPage ? handleComposeMail : null} />
+              </div>
+            ) : null}
+            {isAssiduityPage ? (
+              <div className="page-enter flex-1 min-h-0 4xl:flex-none 4xl:min-h-0">
+                <AssiduityPage />
               </div>
             ) : null}
             {isMailPage ? (
