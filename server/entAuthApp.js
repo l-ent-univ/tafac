@@ -1420,6 +1420,10 @@ async function requestGradesData(jar, query = GRADES_FIRST_CONNECTION_QUERY) {
   }
 }
 
+// ScoDoc answered, signed in, but with no grades: a student it doesn't know
+// (an ENSSAT one, its school not on the IUT's ScoDoc). Not a failure.
+class GradesNoRecordError extends Error {}
+
 // Signs in to ScoDoc and reads the grades, retrying once with a fresh sign-in
 // when ScoDoc says the session isn't authenticated.
 async function fetchGradesData(jar, query = GRADES_FIRST_CONNECTION_QUERY, isValid = isValidGradesPayload) {
@@ -1435,6 +1439,7 @@ async function fetchGradesData(jar, query = GRADES_FIRST_CONNECTION_QUERY, isVal
     }
 
     if (!payload?.redirect) {
+      if (status < 500) throw new GradesNoRecordError(`ScoDoc has no grades for this student (${status}).`)
       break
     }
   }
@@ -3207,6 +3212,10 @@ app.get('/__ent_auth/grades', async (req, res) => {
       grades: gradesData,
     })
   } catch (error) {
+    // No relevé for this student: « Aucun relevé disponible » on the page.
+    if (error instanceof GradesNoRecordError) {
+      return res.status(200).json({ authenticated: true, grades: null })
+    }
     res.status(500).json({
       error: error instanceof Error ? error.message : String(error),
     })
