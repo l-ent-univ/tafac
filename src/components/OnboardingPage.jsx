@@ -174,7 +174,7 @@ function OnboardingPage({
         type="button"
         className={isGroupCircleStep
           ? `onboarding-td-card onboarding-td-card-enter`
-          : 'onboarding-card app-card-enter flex min-h-[112px] flex-col items-start justify-between gap-4 corners-[22px] border border-white bg-widget-bg p-4 text-left font-inherit transition-all duration-150 ease-in-out hover:scale-[1.02] active:scale-[0.98] focus-visible:outline-2 focus-visible:outline-brand focus-visible:outline-offset-2 disabled:cursor-wait disabled:opacity-60'}
+          : 'onboarding-card onboarding-year-card app-card-enter flex min-h-[112px] flex-col items-start justify-between gap-4 corners-[22px] border border-white/60 p-4 text-left font-inherit transition-all duration-150 ease-in-out hover:-translate-y-1 hover:scale-[1.02] active:scale-[0.98] focus-visible:outline-2 focus-visible:outline-brand focus-visible:outline-offset-2 disabled:cursor-wait disabled:opacity-60'}
         style={isGroupCircleStep
           ? {
               '--td-card-bg': specialStepCardStyle?.['--td-card-bg'] ?? tdPalette.background,
@@ -182,7 +182,7 @@ function OnboardingPage({
               '--td-card-ring': specialStepCardStyle?.['--td-card-ring'] ?? tdPalette.ring,
               animationDelay: `${index * 40}ms`,
             }
-          : { animationDelay: `${index * 40}ms` }}
+          : { background: tdPalette.background, color: tdPalette.text, animationDelay: `${index * 40}ms` }}
         onClick={() => onSelect(stepOption)}
         disabled={isLoading}
       >
@@ -217,7 +217,7 @@ function OnboardingPage({
         ) : (
           <>
             <div className="flex w-full items-start justify-between gap-3">
-              <span className="text-[1.15rem] font-semibold leading-[1.1] text-text max-sm:text-base">{stepOption.label}</span>
+              <span className="text-[1.35rem] font-bold leading-[1.05] max-sm:text-lg">{stepOption.label}</span>
               {isDetected ? (
                 <span className="shrink-0 rounded-full bg-success-bg px-3 py-1 text-[0.75rem] font-semibold text-success-text">
                   Détecté sur ADE
@@ -227,12 +227,12 @@ function OnboardingPage({
 
             <div className="flex flex-wrap gap-2">
               {stepOption.parentLabel ? (
-                <span className="rounded-full bg-bg px-3 py-1 text-xs font-semibold text-text-muted">
+                <span className="rounded-full bg-black/[0.07] px-3 py-1 text-xs font-semibold">
                   {stepOption.parentLabel}
                 </span>
               ) : null}
               {stepOption.contextLabel && stepOption.contextLabel !== stepOption.parentLabel ? (
-                <span className="rounded-full bg-bg px-3 py-1 text-xs font-semibold text-text-muted">
+                <span className="rounded-full bg-black/[0.07] px-3 py-1 text-xs font-semibold">
                   {stepOption.contextLabel}
                 </span>
               ) : null}
@@ -325,35 +325,27 @@ function OnboardingPage({
                 return (
                   <div
                     key={stepKey}
-                    className={`corners-[22px] border p-4 transition-colors duration-300 ${isCurrent ? 'border-brand bg-widget-bg' : 'border-[color:var(--color-border)] bg-widget-bg'}`}
+                    className={`flex items-center gap-3 corners-[22px] border p-4 transition-colors duration-300 ${isCurrent ? 'border-brand bg-widget-bg' : 'border-[color:var(--color-border)] bg-widget-bg'} ${!isCurrent && !isCompleted ? 'opacity-60' : ''}`}
                   >
-                    <p className="m-0 text-xs font-bold uppercase tracking-[0.08em] text-text-muted font-body">
-                      Étape {index + 1}
-                    </p>
-                    <p className="m-0 mt-2 text-base font-semibold text-text">{STEP_CONFIG[stepKey].label}</p>
-                    <p className="m-0 mt-2 text-sm text-text-muted font-body">
+                    <span
+                      className={`flex size-9 shrink-0 items-center justify-center rounded-full text-sm font-bold transition-colors duration-300 ${isCompleted ? 'bg-success-bg text-success-text' : isCurrent ? 'bg-brand text-bg' : 'bg-bg text-text-muted'}`}
+                      aria-hidden="true"
+                    >
+                      {isCompleted ? '✓' : index + 1}
+                    </span>
+                    <div className="min-w-0">
+                    <p className="m-0 text-base font-semibold text-text">{STEP_CONFIG[stepKey].label}</p>
+                    <p className="m-0 mt-0.5 truncate text-sm text-text-muted font-body">
                       {stepKey === 'year' && selectedYear ? selectedYear.label : null}
                       {stepKey === 'td' && selectedTd ? selectedTd.label : null}
                       {stepKey === 'tp' && isCompleted ? 'Groupe final' : null}
                       {!isCompleted && !isCurrent ? 'À choisir' : null}
                       {isCurrent ? 'En cours' : null}
                     </p>
+                    </div>
                   </div>
                 )
               })}
-            </div>
-
-            <div className="flex flex-wrap gap-2">
-              {selectedYear ? (
-                <span className="rounded-full bg-widget-bg px-3 py-2 text-sm font-semibold text-text">
-                  Année : {selectedYear.label}
-                </span>
-              ) : null}
-              {selectedTd ? (
-                <span className="rounded-full bg-widget-bg px-3 py-2 text-sm font-semibold text-text">
-                  TD : {selectedTd.label}
-                </span>
-              ) : null}
             </div>
 
             <div className="flex items-start justify-between gap-4 max-sm:flex-col">
