@@ -32,8 +32,8 @@ const VALIDATED_BY = {
 // by the jury: ScoDoc's ECTS and jury codes say so), grey with a coloured
 // outline below, filled but faded with no average yet. The centre counts the validated UEs; hovering,
 // focusing or tapping a segment shows that UE's average there instead.
-// Hidden until one UE has an average.
-function WidgetUes({ releve = null, config = null, visible = false }) {
+// Hidden until one UE has an average. `icon`: an image before the title.
+function WidgetUes({ releve = null, config = null, visible = false, icon = null }) {
   const paintUe = useUeColor()
   const ues = useMemo(
     () => readSemesterUes(releve, config).map((ue) => ({ ...ue, color: paintUe(ue.color) })),
@@ -114,6 +114,7 @@ function WidgetUes({ releve = null, config = null, visible = false }) {
       aria-label={`UE validées : ${validatedCount} sur ${ues.length}. ${summary}`}
     >
       <div className="relative z-10 flex items-center gap-[5px] min-w-0">
+        {icon ? <img src={icon} alt="" width="22" height="22" draggable="false" className="mr-[3px] size-[22px] shrink-0 select-none" aria-hidden="true" /> : null}
         <span className="m-0 min-w-0 leading-[1.06] text-base font-medium text-text-muted overflow-hidden text-ellipsis whitespace-nowrap max-md:text-[14px]">UE validées</span>
         <CardInfoTip label="Les UE, c’est quoi ?">
           Chaque segment est une UE (unité d’enseignement) : plein quand elle est validée, par une moyenne de 10/20 ou plus, par compensation ou parce qu’elle est capitalisée. <span className="max-md:hidden">Survole</span><span className="md:hidden">Touche</span> un segment pour voir sa moyenne.

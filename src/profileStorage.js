@@ -1,5 +1,6 @@
 export const ESTABLISHMENT_KEY = 'l-ent:establishment'
 export const STUDENT_TP_KEY = 'l-ent:student-tp'
+// No longer read: the next-class lookahead is fixed (NEXT_CLASS_LOOKAHEAD_DAYS).
 export const ADE_LOOKAHEAD_KEY = 'l-ent:ade-lookahead-days'
 export const GREETING_HIDDEN_KEY = 'l-ent:greeting-hidden'
 export const HIDDEN_WIDGETS_KEY = 'l-ent:hidden-widgets'
@@ -10,10 +11,6 @@ export const UNIVERSITY_LOGO_KEY = 'l-ent:show-university-logo'
 export const LOGO_SOURCE_KEY = 'l-ent:logo-source'
 export const ANONYMOUS_ANALYTICS_KEY = 'l-ent:anonymous-analytics'
 const STUDENT_TP_SELECTION_VERSION = 4
-
-// Discrete steps offered by the "next class" lookahead slider (in days).
-export const ADE_LOOKAHEAD_DAY_OPTIONS = [7, 14, 21, 30, 60]
-export const DEFAULT_ADE_LOOKAHEAD_DAYS = 21
 
 function readStoredValue(key) {
   try {
@@ -139,44 +136,6 @@ export function clearStoredTpSelection() {
   }
 }
 
-function normalizeAdeLookaheadDays(value) {
-  const numeric = Number(value)
-
-  if (!Number.isFinite(numeric)) {
-    return DEFAULT_ADE_LOOKAHEAD_DAYS
-  }
-
-  if (ADE_LOOKAHEAD_DAY_OPTIONS.includes(numeric)) {
-    return numeric
-  }
-
-  // Snap unknown/legacy values to the closest available step.
-  return ADE_LOOKAHEAD_DAY_OPTIONS.reduce((closest, option) => (
-    Math.abs(option - numeric) < Math.abs(closest - numeric) ? option : closest
-  ), ADE_LOOKAHEAD_DAY_OPTIONS[0])
-}
-
-export function getStoredAdeLookaheadDays(userId = null) {
-  const storedValue = readScopedStorageValue(ADE_LOOKAHEAD_KEY, userId)
-
-  if (storedValue == null || storedValue === '') {
-    return DEFAULT_ADE_LOOKAHEAD_DAYS
-  }
-
-  return normalizeAdeLookaheadDays(storedValue)
-}
-
-export function persistAdeLookaheadDays(days, userId = null) {
-  try {
-    localStorage.setItem(ADE_LOOKAHEAD_KEY, JSON.stringify({
-      user: userId || null,
-      value: normalizeAdeLookaheadDays(days),
-    }))
-  } catch {
-    // Storage unavailable
-  }
-}
-
 // Ids of dashboard widgets the user hid (see src/dashboardWidgets.js).
 // Falls back to the older greeting-only flag so a dismissed greeting stays hidden.
 export function getStoredHiddenWidgets(userId = null) {
@@ -233,8 +192,11 @@ export function persistShowPlanningWeekend(show, userId = null) {
 }
 
 // Dashboard background photo (Mon compte): off unless this user switched it on.
+// On unless the student turned it off: never set on this device (or set by
+// another account) is on.
 export function getStoredShowWallpaper(userId = null) {
-  return readScopedStorageValue(WALLPAPER_KEY, userId) === true
+  const value = readScopedStorageValue(WALLPAPER_KEY, userId)
+  return value === null || value === undefined ? true : value === true
 }
 
 export function persistShowWallpaper(show, userId = null) {

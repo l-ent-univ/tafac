@@ -13,7 +13,7 @@ const VIEWPORT_EDGE = 12
 // closes it. Clicks stay here: a clickable card isn't opened by the ⓘ.
 // `icon` / `iconClassName`: another glyph than ⓘ (the UE cards' warning).
 // `text`: a word beside the glyph, the button then a small pill (a jury code).
-function CardInfoTip({ label, children, icon = 'carbon:information', iconClassName = 'text-text-muted hover:text-text focus-visible:text-text', text = null }) {
+function CardInfoTip({ label, children, icon = 'ph:info', iconClassName = 'text-text-muted hover:text-text focus-visible:text-text', text = null }) {
   const [isHovered, setIsHovered] = useState(false)
   const [isFocused, setIsFocused] = useState(false)
   const [isPinned, setIsPinned] = useState(false)

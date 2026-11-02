@@ -2,17 +2,19 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import { bindHistorySession, readHistoryNav, writeHistoryNav } from '../src/appHistory.js'
 
-test('an entry without app state is the dashboard', () => {
-  assert.deepEqual(readHistoryNav(null), { page: 'dashboard', ue: null, mail: null })
-  assert.deepEqual(readHistoryNav({ other: 1 }), { page: 'dashboard', ue: null, mail: null })
-  assert.deepEqual(readHistoryNav({ tafac: { page: 'nope', ue: 'UE5.1' } }), { page: 'dashboard', ue: null, mail: null })
+test('an entry without app state is « Accueil »', () => {
+  assert.deepEqual(readHistoryNav(null), { page: 'home', ue: null, mail: null })
+  assert.deepEqual(readHistoryNav({ other: 1 }), { page: 'home', ue: null, mail: null })
+  assert.deepEqual(readHistoryNav({ tafac: { page: 'nope', ue: 'UE5.1' } }), { page: 'home', ue: null, mail: null })
+  // An entry from before « Accueil » replaced the dashboard.
+  assert.deepEqual(readHistoryNav({ tafac: { page: 'dashboard' } }), { page: 'home', ue: null, mail: null })
   assert.deepEqual(readHistoryNav({ tafac: { page: 'mail' } }), { page: 'mail', ue: null, mail: null })
   assert.deepEqual(readHistoryNav({ tafac: { page: 'home' } }), { page: 'home', ue: null, mail: null })
 })
 
 test('a UE only counts on the grades page', () => {
   assert.deepEqual(readHistoryNav({ tafac: { page: 'grades', ue: 'UE5.1' } }), { page: 'grades', ue: 'UE5.1', mail: null })
-  assert.deepEqual(readHistoryNav({ tafac: { page: 'dashboard', ue: 'UE5.1' } }), { page: 'dashboard', ue: null, mail: null })
+  assert.deepEqual(readHistoryNav({ tafac: { page: 'home', ue: 'UE5.1' } }), { page: 'home', ue: null, mail: null })
 })
 
 test('a mail only counts on the mail page', () => {
@@ -28,10 +30,10 @@ test('writing keeps the entry’s other state and pushes or replaces', () => {
     replaceState: (state) => calls.push(['replace', state]),
   }
   writeHistoryNav({ page: 'grades', ue: 'UE5.2' }, { history })
-  writeHistoryNav({ page: 'dashboard' }, { history, replace: true })
+  writeHistoryNav({ page: 'home' }, { history, replace: true })
   assert.deepEqual(calls, [
     ['push', { other: 1, tafac: { page: 'grades', ue: 'UE5.2', mail: null } }],
-    ['replace', { other: 1, tafac: { page: 'dashboard', ue: null, mail: null } }],
+    ['replace', { other: 1, tafac: { page: 'home', ue: null, mail: null } }],
   ])
 })
 

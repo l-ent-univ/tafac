@@ -6,6 +6,8 @@
 // visitors without a session (server.js), so search engines and link
 // previews read the landing without running the app; the app then renders
 // over it.
+// The icons in the pre-rendered markup too.
+import './iconBundle'
 import { createElement } from 'react'
 import { renderToString } from 'react-dom/server'
 import universityConfig from './university'

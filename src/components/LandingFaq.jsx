@@ -68,7 +68,7 @@ function LandingFaq({ className = '' }) {
                 <span aria-hidden="true" className="w-7 shrink-0 text-center text-[24px] leading-none max-md:w-6 max-md:text-[20px]">{emoji}</span>
                 <span className="min-w-0 flex-1">{copyText(question)}</span>
                 <Icon
-                  icon="carbon:chevron-down"
+                  icon="ph:caret-down"
                   className="size-5 shrink-0 text-text transition-transform duration-300 group-open:rotate-180"
                   aria-hidden="true"
                 />
@@ -86,7 +86,7 @@ function LandingFaq({ className = '' }) {
             onClick={() => setExpanded(true)}
           >
             {copyText(copy.faq.showMore)}
-            <Icon icon="carbon:chevron-down" className="size-4" aria-hidden="true" />
+            <Icon icon="ph:caret-down" className="size-4" aria-hidden="true" />
           </button>
         ) : null}
       </div>

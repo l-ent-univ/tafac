@@ -7,7 +7,7 @@
 //     date: '2026-10-12',        // YYYY-MM-DD, the day it ships
 //     title: 'Un titre court',
 //     body: 'Une ou deux phrases concrètes, en tutoyant, sans jargon.',
-//     icon: 'carbon:calendar',   // optional, any Iconify name (carbon: or ph: like the rest)
+//     icon: 'ph:calendar-blank',   // optional, any Iconify name (carbon: or ph: like the rest)
 //     universities: ['univ-rennes'],  // optional: only these universityConfig.id
 //     features: ['mail', 'moodle'],   // optional: only where all these universityConfig.features are on
 //     audience: ['grades-page'],      // optional: only students who have all of these (see below)
@@ -41,11 +41,25 @@
 
 export const CHANGELOG = [
   {
+    id: 'nouvel-accueil',
+    date: '2026-11-02',
+    title: 'Un nouvel accueil',
+    body: 'Ta journée résumée en une phrase, et l’essentiel sur une seule page. Tes applications favorites sont juste en dessous, toutes les autres dans «\u202fToutes les applications\u202f». Choisis tes cartes dans Réglages\u202f›\u202fAccueil.',
+    icon: 'ph:house',
+  },
+  {
+    id: 'photo-de-profil',
+    date: '2026-11-02',
+    title: 'Ta photo de profil',
+    body: 'Dans Réglages\u202f›\u202fCompte, touche l’appareil photo sur ta photo pour en choisir une autre. Elle reste sur cet appareil.',
+    icon: 'ph:user-circle',
+  },
+  {
     id: 'messagerie',
     date: '2026-10-28',
     title: 'Ta messagerie dans l’appli',
     body: 'Lis tes mails en conversations, cherche et passe d’un dossier à l’autre. Écris avec de la mise en forme, des pièces jointes, des brouillons et ta signature, réponds ou transfère, imprime ou enregistre en PDF. Les mails récents de l’accueil et les tuiles du webmail l’ouvrent directement.',
-    icon: 'carbon:email',
+    icon: 'ph:envelope-simple',
     features: ['mail'],
     audience: ['mail-page'],
     spotlight: true,
@@ -55,7 +69,7 @@ export const CHANGELOG = [
     date: '2026-10-19',
     title: 'Ton emploi du temps dans l’appli',
     body: 'Tes cours par jour, par semaine ou en liste, sur la page Planning. Touche un cours pour voir sa fiche et ses prochaines séances, et exporte ton planning en .ics vers ton agenda.',
-    icon: 'carbon:calendar',
+    icon: 'ph:calendar-blank',
     features: ['planning'],
     audience: ['planning-page'],
     spotlight: true,
@@ -75,7 +89,7 @@ export const CHANGELOG = [
     date: '2026-10-16',
     title: 'Tes notes, enfin dans l’appli',
     body: 'Moyenne, UE validées, crédits ECTS\u202f: ton relevé ScoDoc tient sur une page, semestre par semestre. Touche une note pour voir combien elle pèse dans chaque UE. Et avec «\u202fSimuler\u202f», teste tes prochaines notes sans rien toucher aux vraies.',
-    icon: 'carbon:chart-pie',
+    icon: 'ph:chart-pie-slice',
     universities: ['univ-rennes'],
     features: ['grades'],
     audience: ['grades-page'],
@@ -94,7 +108,7 @@ export const CHANGELOG = [
     date: '2026-10-12',
     title: 'Ton certificat de scolarité en un clic',
     body: 'Télécharge-le en PDF depuis Réglages\u202f›\u202fCompte, sans aller le chercher ailleurs.',
-    icon: 'carbon:document-pdf',
+    icon: 'ph:file-pdf',
     features: ['schoolCertificate'],
   },
   {
@@ -102,7 +116,7 @@ export const CHANGELOG = [
     date: '2026-10-12',
     title: 'Un accueil plus compact sur téléphone',
     body: 'Les cartes prennent moins de place, et tu passes des mails aux échéances d’un glissement de doigt. Celle où il y a le plus à voir s’affiche en premier.',
-    icon: 'carbon:mobile',
+    icon: 'ph:device-mobile',
     features: ['mail', 'moodleDeadlines'],
   },
   {
@@ -118,7 +132,7 @@ export const CHANGELOG = [
     date: '2026-10-12',
     title: 'Messagerie et Moodle en un geste',
     body: 'Les deux ont leur raccourci dans la barre latérale, et en bas de l’écran sur téléphone. Un appui et tu y es, sans te reconnecter.',
-    icon: 'carbon:email',
+    icon: 'ph:envelope-simple',
     features: ['mail', 'moodle'],
   },
   {
@@ -126,20 +140,20 @@ export const CHANGELOG = [
     date: '2026-10-12',
     title: 'Thème sombre et photo de fond',
     body: 'Dans Réglages\u202f›\u202fApparence, choisis entre clair, sombre ou automatique (comme ton téléphone). Tu peux aussi masquer la photo\u202f: les cartes deviennent pleines et bien nettes.',
-    icon: 'carbon:moon',
+    icon: 'ph:moon',
   },
   {
     id: 'reglages-en-sections',
     date: '2026-10-12',
     title: 'Des Réglages mieux rangés',
     body: 'Compte, Planning, Apparence… Chaque chose a sa section. Et ce qui touche à ta vie privée est expliqué directement dedans.',
-    icon: 'carbon:settings',
+    icon: 'ph:gear-six',
   },
   {
     id: 'applications',
     date: '2026-10-12',
     title: 'Des applications plus faciles à trouver',
     body: 'Chaque application a sa vraie icône, logo Moodle compris. La recherche ignore les accents et connaît les synonymes («\u202fmail\u202f» trouve la messagerie), et tes favoris s’ajoutent instantanément.',
-    icon: 'carbon:app-switcher',
+    icon: 'ph:squares-four',
   },
 ]

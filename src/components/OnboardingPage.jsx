@@ -455,7 +455,7 @@ function OnboardingPage({
       </div>
 
       {isGroupCircleStep && hasIgnore && shouldShowTpStepActions ? (
-        <div className="fixed inset-x-0 bottom-0 z-20 hidden max-sm:flex justify-center px-5 pb-[calc(env(safe-area-inset-bottom)+16px)] pt-4">
+        <div className="fixed inset-x-0 bottom-0 z-20 hidden max-sm:flex justify-center pl-[max(1.25rem,env(safe-area-inset-left))] pr-[max(1.25rem,env(safe-area-inset-right))] pb-[calc(env(safe-area-inset-bottom)+16px)] pt-4">
           <div className="flex w-full max-w-[420px] items-center justify-center gap-3">
             {hasBack ? (
               <button

@@ -35,7 +35,7 @@ const DEFAULT_WEATHER_CITY = WEATHER_CONFIG.defaultCity || 'Paris'
 const INITIAL_WEATHER_STATE = {
   summary: 'Chargement météo...',
   location: 'Localisation...',
-  icon: 'carbon:cloudy',
+  icon: 'ph:cloud',
   gradient: 'linear-gradient(180deg, #fde68a 0%, transparent 55%)',
   gradientDark: 'linear-gradient(180deg, #5c3d0e 0%, transparent 55%)',
 }
@@ -44,7 +44,7 @@ function getLoadingWeatherState(previousState) {
   return {
     summary: 'Chargement météo...',
     location: previousState?.location || 'Localisation...',
-    icon: previousState?.icon || 'carbon:cloudy',
+    icon: previousState?.icon || 'ph:cloud',
     gradient: previousState?.gradient ?? INITIAL_WEATHER_STATE.gradient,
     gradientDark: previousState?.gradientDark ?? INITIAL_WEATHER_STATE.gradientDark,
   }
@@ -68,6 +68,7 @@ function WidgetContainer({
   onDismissGreeting,
   showAppDescriptions = false,
   favoritesPortalTarget = null,
+  homeAppsPortalTarget = null,
   gradesSupported = true,
   onOpenGrade = null,
   onOpenGradesPage = null,
@@ -140,7 +141,7 @@ function WidgetContainer({
           setWeatherState({
             summary: 'Météo indisponible',
             location: 'Choisir une ville',
-            icon: 'carbon:cloudy',
+            icon: 'ph:cloud',
             gradient: INITIAL_WEATHER_STATE.gradient,
           })
           setHasWeatherLoaded(true)
@@ -300,7 +301,7 @@ function WidgetContainer({
             id={showGradeWidgets ? 'sidebar-section-grades' : undefined}
             className={pairListWidgets ? 'contents' : 'widget-row-group flex-[1_1_100%] min-w-0 flex flex-wrap items-stretch gap-3 max-md:gap-2 empty:hidden 2xl:contents max-xs:contents'}
           >
-            {/* Bloc « Moyenne Générale » masqué pour l'instant — réimporter
+            {/* Bloc « Moyenne générale » masqué pour l'instant — réimporter
                 WidgetAverageGrade et le rendre ici pour le réactiver. */}
             {showGradeWidgets ? <WidgetLatestGrade visible={areWidgetsVisible} user={sessionUser} onOpenGrade={onOpenGrade} /> : null}
             {pairListWidgets ? (
@@ -331,6 +332,7 @@ function WidgetContainer({
             establishment={establishment}
             canUseServerLaunch={canUseServerLaunch}
             favoritesPortalTarget={favoritesPortalTarget}
+            homeAppsPortalTarget={homeAppsPortalTarget}
             showDescriptions={showAppDescriptions}
             onOpenGradesPage={onOpenGradesPage}
             onOpenPlanningPage={onOpenPlanningPage}

@@ -15,7 +15,7 @@ function DisabledSidebarAveragePocket() {
 
   return (
     <SidebarStatPocket
-      icon="carbon:summary-kpi"
+      icon="ph:presentation-chart"
       label="Moyenne"
       value={averageDisplay}
       max="20"
@@ -50,7 +50,7 @@ function LiveSidebarAveragePocket() {
 
   return (
     <SidebarStatPocket
-      icon="carbon:summary-kpi"
+      icon="ph:presentation-chart"
       label="Moyenne"
       value={averageDisplay}
       max="20"

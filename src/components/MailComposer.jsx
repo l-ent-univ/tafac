@@ -92,7 +92,7 @@ import { composeOrigin, pickDefaultIdentity, sendFailureText } from '../mailSend
 // below, a sheet over the whole screen, as iOS Mail's, its focus held inside.
 
 const KIND_TITLES = { new: 'Nouveau message', reply: 'Répondre', 'reply-all': 'Répondre à tous', forward: 'Transférer' }
-const KIND_ICONS = { new: 'carbon:reply', reply: 'carbon:reply', 'reply-all': 'carbon:reply-all', forward: 'carbon:reply' }
+const KIND_ICONS = { new: 'ph:arrow-bend-up-left', reply: 'ph:arrow-bend-up-left', 'reply-all': 'ph:arrow-bend-double-up-left', forward: 'ph:arrow-bend-up-left' }
 const PHONE_QUERY = '(max-width: 1023px)'
 const NOTICE_MS = 3200
 // A token dragged from one recipients' field to another (RecipientInput).
@@ -342,7 +342,7 @@ function RecipientToken({ address, field, hintId, onRemove, onEdit, onKeyDown })
         onKeyDown={onKeyDown}
       >
         {address.invalid ? (
-          <span className="inline-flex size-5 shrink-0 items-center justify-center text-error group-focus/token:text-bg" aria-hidden="true"><Icon icon="carbon:warning-alt-filled" className="size-[17px]" /></span>
+          <span className="inline-flex size-5 shrink-0 items-center justify-center text-error group-focus/token:text-bg" aria-hidden="true"><Icon icon="ph:warning-fill" className="size-[17px]" /></span>
         ) : (
           <span
             className={`inline-flex size-5 shrink-0 items-center justify-center rounded-full text-[10.5px] font-semibold leading-none ${badgeStyle ? 'app-icon--auto' : 'bg-bg-muted text-text-muted'}`}
@@ -365,7 +365,7 @@ function RecipientToken({ address, field, hintId, onRemove, onEdit, onKeyDown })
           onRemove()
         }}
       >
-        <Icon icon="carbon:close" className="size-[13px]" aria-hidden="true" />
+        <Icon icon="ph:x" className="size-[13px]" aria-hidden="true" />
       </button>
       <Tooltip
         title={address.invalid ? (address.refused ? 'Adresse refusée' : 'Adresse non valide') : address.name || address.email}
@@ -750,7 +750,7 @@ function RecipientInput({ id, field, label, tokens, onTokensChange, value, onVal
                     style={badgeStyle ?? undefined}
                     aria-hidden="true"
                   >
-                    {item.kind === 'group' ? <Icon icon="carbon:user-multiple" className="size-[14px]" /> : getSenderInitial(item.name || item.email)}
+                    {item.kind === 'group' ? <Icon icon="ph:users" className="size-[14px]" /> : getSenderInitial(item.name || item.email)}
                   </span>
                   <span className="grid min-w-0 flex-1 gap-[3px]">
                     {item.name ? (
@@ -819,7 +819,7 @@ function TeacherSuggestions({ groups, canAddAll, onAdd, onDismiss }) {
                   </span>
                   <span className="min-w-0 truncate text-[13.5px] font-medium leading-none text-text">{match.name || match.email}</span>
                   {match.name ? <span className="min-w-0 truncate text-[12.5px] font-medium leading-none text-text-muted max-sm:hidden">{match.email}</span> : null}
-                  <Icon icon="carbon:add" className="size-4 shrink-0 text-text-muted" aria-hidden="true" />
+                  <Icon icon="ph:plus" className="size-4 shrink-0 text-text-muted" aria-hidden="true" />
                   <Tooltip title={match.email} detail={`Enseignant : ${group.name}`} side="bottom-start" className="max-4xl:hidden" />
                 </button>
               )
@@ -842,7 +842,7 @@ function TeacherSuggestions({ groups, canAddAll, onAdd, onDismiss }) {
         aria-label="Masquer les suggestions"
         onClick={onDismiss}
       >
-        <Icon icon="carbon:close" className="size-4" aria-hidden="true" />
+        <Icon icon="ph:x" className="size-4" aria-hidden="true" />
         <Tooltip title="Masquer les suggestions" side="bottom-end" className="max-4xl:hidden" />
       </button>
     </div>
@@ -864,7 +864,7 @@ function ToolButton({ label, icon, iconClassName = '', disabled = false, menu = 
       onClick={onClick}
     >
       <Icon icon={icon} className={`size-[18px] shrink-0 transition-transform duration-100 ease-out group-active:scale-[0.86] ${iconClassName}`} aria-hidden="true" />
-      {menu ? <Icon icon="carbon:chevron-down" className="size-3 shrink-0 text-text-muted" aria-hidden="true" /> : null}
+      {menu ? <Icon icon="ph:caret-down" className="size-3 shrink-0 text-text-muted" aria-hidden="true" /> : null}
       <Tooltip title={label} side={tooltipSide} className="max-4xl:hidden" />
     </button>
   )
@@ -887,7 +887,7 @@ function FormatSelect({ label, value, options, onOpen, className = '' }) {
     >
       {/* The font on a span: index.css gives buttons `font: inherit`, outside Tailwind's layers. */}
       <span className="text-[13px] font-medium leading-none">{current?.label}</span>
-      <Icon icon="carbon:chevron-down" className="size-3 shrink-0 text-text-muted" aria-hidden="true" />
+      <Icon icon="ph:caret-down" className="size-3 shrink-0 text-text-muted" aria-hidden="true" />
     </button>
   )
 }
@@ -934,7 +934,7 @@ function ColorButton({ label, kind, color, onOpen }) {
       {kind === 'text' ? (
         <span className="text-[14px] font-bold leading-[14px] tracking-[-0.02em]" aria-hidden="true">A</span>
       ) : (
-        <Icon icon="carbon:pen" className="size-[13px]" aria-hidden="true" />
+        <Icon icon="ph:pen" className="size-[13px]" aria-hidden="true" />
       )}
       <span
         className={`h-[3px] w-[15px] rounded-full ${color ? '' : kind === 'text' ? 'bg-text' : 'border border-border'}`}
@@ -1017,7 +1017,7 @@ function AttachmentChip({ item, onRemove, onRetry = null }) {
           : { 'aria-hidden': true })}
       >
         {busy ? <UploadRing progress={item.progress ?? 0} waiting={item.status === 'queued'} /> : (
-          <Icon icon={failed ? 'carbon:warning-alt-filled' : getAttachmentIcon(item.contentType)} className="size-[19px]" />
+          <Icon icon={failed ? 'ph:warning-fill' : getAttachmentIcon(item.contentType)} className="size-[19px]" />
         )}
       </span>
       <span className="grid min-w-0 flex-1 grid-cols-[minmax(0,1fr)] gap-[4px]" aria-hidden="true">
@@ -1031,7 +1031,7 @@ function AttachmentChip({ item, onRemove, onRetry = null }) {
           aria-label={`Réessayer ${item.name}`}
           onClick={onRetry}
         >
-          <Icon icon="carbon:renew" className="size-[15px]" aria-hidden="true" />
+          <Icon icon="ph:arrows-clockwise" className="size-[15px]" aria-hidden="true" />
         </button>
       ) : null}
       <button
@@ -1040,7 +1040,7 @@ function AttachmentChip({ item, onRemove, onRetry = null }) {
         aria-label={busy ? `Annuler ${item.name}` : `Retirer ${item.name}`}
         onClick={onRemove}
       >
-        <Icon icon="carbon:close" className="size-[15px]" aria-hidden="true" />
+        <Icon icon="ph:x" className="size-[15px]" aria-hidden="true" />
       </button>
       <Tooltip title={item.name} detail={detail} side="bottom-start" className="max-4xl:hidden" />
     </li>
@@ -2000,10 +2000,10 @@ function MailComposer({ initialKind = 'new', message = null, sender = null, iden
     onSelect: () => applyFormat(menu.kind, option.value, menu.range),
   })) : menu?.kind === 'attach'
     ? [
-      { id: 'files', label: 'Joindre un fichier…', icon: 'carbon:document-add', onSelect: pickFiles },
-      canAttachGrades ? { id: 'grade', label: 'Une note…', icon: 'carbon:chart-pie', onSelect: () => setGradePickerOpen(true) } : null,
-      canAttachCourses ? { id: 'course', label: 'Un cours…', icon: 'carbon:calendar', onSelect: () => setCoursePickerOpen(true) } : null,
-      canAddOriginal ? { id: 'original', label: 'Pièces jointes d’origine', icon: 'carbon:attachment', detail: String(originalAttachments.length), onSelect: () => setMessageItems(originalAttachments) } : null,
+      { id: 'files', label: 'Joindre un fichier…', icon: 'ph:file-plus', onSelect: pickFiles },
+      canAttachGrades ? { id: 'grade', label: 'Une note…', icon: 'ph:chart-pie-slice', onSelect: () => setGradePickerOpen(true) } : null,
+      canAttachCourses ? { id: 'course', label: 'Un cours…', icon: 'ph:calendar-blank', onSelect: () => setCoursePickerOpen(true) } : null,
+      canAddOriginal ? { id: 'original', label: 'Pièces jointes d’origine', icon: 'ph:paperclip', detail: String(originalAttachments.length), onSelect: () => setMessageItems(originalAttachments) } : null,
     ].filter(Boolean)
     : menu?.kind === 'identity'
     ? identities.map((identity) => ({ id: identity.id, label: identity.email, hint: identity.name, checked: identity.id === fromIdentity?.id, onSelect: () => setIdentityId(identity.id) }))
@@ -2011,8 +2011,8 @@ function MailComposer({ initialKind = 'new', message = null, sender = null, iden
     ? ['reply', 'reply-all', 'forward'].map((id) => ({ id, label: KIND_TITLES[id], icon: KIND_ICONS[id], checked: kind === id, onSelect: () => switchKind(id) }))
     : menu?.kind === 'list'
       ? [
-        { id: 'ul', label: 'Liste à puces', icon: 'carbon:list-bulleted', checked: format.unorderedList, onSelect: () => edit((chain) => chain.toggleBulletList(), menu.range) },
-        { id: 'ol', label: 'Liste numérotée', icon: 'carbon:list-numbered', checked: format.orderedList, onSelect: () => edit((chain) => chain.toggleOrderedList(), menu.range) },
+        { id: 'ul', label: 'Liste à puces', icon: 'ph:list-bullets', checked: format.unorderedList, onSelect: () => edit((chain) => chain.toggleBulletList(), menu.range) },
+        { id: 'ol', label: 'Liste numérotée', icon: 'ph:list-numbers', checked: format.orderedList, onSelect: () => edit((chain) => chain.toggleOrderedList(), menu.range) },
       ]
       : []
 
@@ -2026,7 +2026,7 @@ function MailComposer({ initialKind = 'new', message = null, sender = null, iden
       aria-disabled={uploading || undefined}
       onClick={send}
     >
-      <Icon icon="carbon:arrow-up" className="size-[19px]" aria-hidden="true" />
+      <Icon icon="ph:arrow-up" className="size-[19px]" aria-hidden="true" />
       <Tooltip title={uploading ? 'Pièces jointes en cours de chargement' : 'Envoyer'} detail={uploading ? null : `${MOD_KEY} Entrée`} side="bottom-end" className="max-4xl:hidden" />
     </button>
   )
@@ -2048,7 +2048,7 @@ function MailComposer({ initialKind = 'new', message = null, sender = null, iden
       <span className="mobile-tab-bar relative flex shrink-0 items-center rounded-full p-[3px]">
         <ToolButton
           label="Joindre un fichier"
-          icon="carbon:attachment"
+          icon="ph:paperclip"
           menu={hasAttachMenu}
           onClick={(event) => (hasAttachMenu ? openMenu('attach', event) : pickFiles())}
         />
@@ -2069,7 +2069,7 @@ function MailComposer({ initialKind = 'new', message = null, sender = null, iden
   return createPortal(
     <section
       ref={rootRef}
-      className={`mail-composer fixed z-30 flex flex-col overflow-hidden text-text [&_button_svg]:pointer-events-none 4xl:border 4xl:corners-[26px] max-4xl:inset-0 ${isFullscreen ? 'is-fullscreen 4xl:inset-3' : '4xl:right-6 4xl:bottom-6 4xl:h-[min(580px,calc(100dvh-48px))] 4xl:w-[min(680px,calc(100vw-48px))]'}`}
+      className={`mail-composer fixed z-30 flex flex-col overflow-hidden text-text [&_button_svg]:pointer-events-none 4xl:border 4xl:corners-[26px] max-4xl:inset-0 max-4xl:pl-[env(safe-area-inset-left)] max-4xl:pr-[env(safe-area-inset-right)] ${isFullscreen ? 'is-fullscreen 4xl:inset-3' : '4xl:right-6 4xl:bottom-6 4xl:h-[min(580px,calc(100dvh-48px))] 4xl:w-[min(680px,calc(100vw-48px))]'}`}
       role="dialog"
       aria-modal={isPhone || undefined}
       aria-label={kindTitle}
@@ -2114,7 +2114,7 @@ function MailComposer({ initialKind = 'new', message = null, sender = null, iden
             aria-pressed={isFullscreen}
             onClick={toggleFullscreen}
           >
-            <Icon icon={isFullscreen ? 'carbon:minimize' : 'carbon:maximize'} className="size-[15px]" aria-hidden="true" />
+            <Icon icon={isFullscreen ? 'ph:arrows-in' : 'ph:arrows-out'} className="size-[15px]" aria-hidden="true" />
             <Tooltip title={isFullscreen ? 'Quitter le plein écran' : 'Plein écran'} side="bottom-start" />
           </button>
           <div className="flex min-w-0 flex-1 items-baseline gap-2.5">
@@ -2137,7 +2137,7 @@ function MailComposer({ initialKind = 'new', message = null, sender = null, iden
                 aria-label="Ajouter Cc et Cci"
                 onClick={revealCc}
               >
-                <Icon icon="carbon:add-alt" className="size-[18px]" aria-hidden="true" />
+                <Icon icon="ph:plus-circle" className="size-[18px]" aria-hidden="true" />
                 <Tooltip title="Ajouter Cc et Cci" side="bottom-end" className="max-4xl:hidden" />
               </button>
             )}
@@ -2184,7 +2184,7 @@ function MailComposer({ initialKind = 'new', message = null, sender = null, iden
                   onClick={(event) => openMenu('identity', event)}
                 >
                   <span className="min-w-0 truncate">{fromLabel}</span>
-                  <Icon icon="carbon:chevron-down" className="size-3 shrink-0 text-text-muted" aria-hidden="true" />
+                  <Icon icon="ph:caret-down" className="size-3 shrink-0 text-text-muted" aria-hidden="true" />
                 </button>
               </span>
             ) : (
@@ -2236,16 +2236,16 @@ function MailComposer({ initialKind = 'new', message = null, sender = null, iden
               <ColorButton label="Surlignage" kind="highlight" color={format.highlight} onOpen={(event) => openMenu('highlight', event)} />
             </FormatSegment>
             <FormatSegment>
-              <FormatButton label="Gras" icon="carbon:text-bold" pressed={format.bold} onClick={() => edit((chain) => chain.toggleBold())} />
-              <FormatButton label="Italique" icon="carbon:text-italic" pressed={format.italic} onClick={() => edit((chain) => chain.toggleItalic())} />
-              <FormatButton label="Souligné" icon="carbon:text-underline" pressed={format.underline} onClick={() => edit((chain) => chain.toggleUnderline())} />
-              <FormatButton label="Barré" icon="carbon:text-strikethrough" pressed={format.strikeThrough} onClick={() => edit((chain) => chain.toggleStrike())} />
+              <FormatButton label="Gras" icon="ph:text-b" pressed={format.bold} onClick={() => edit((chain) => chain.toggleBold())} />
+              <FormatButton label="Italique" icon="ph:text-italic" pressed={format.italic} onClick={() => edit((chain) => chain.toggleItalic())} />
+              <FormatButton label="Souligné" icon="ph:text-underline" pressed={format.underline} onClick={() => edit((chain) => chain.toggleUnderline())} />
+              <FormatButton label="Barré" icon="ph:text-strikethrough" pressed={format.strikeThrough} onClick={() => edit((chain) => chain.toggleStrike())} />
             </FormatSegment>
             <FormatSegment>
-              <FormatButton label="Listes" icon={format.orderedList ? 'carbon:list-numbered' : 'carbon:list-bulleted'} pressed={format.unorderedList || format.orderedList} haspopup="menu" onClick={(event) => openMenu('list', event)} />
+              <FormatButton label="Listes" icon={format.orderedList ? 'ph:list-numbers' : 'ph:list-bullets'} pressed={format.unorderedList || format.orderedList} haspopup="menu" onClick={(event) => openMenu('list', event)} />
               {/* A list's item nests (into the one above); a paragraph indents. */}
-              <FormatButton label="Réduire le retrait" icon="carbon:text-indent-less" disabled={!format.canOutdent} onClick={() => edit((chain) => (format.inList ? chain.liftListItem('listItem') : chain.outdent()))} />
-              <FormatButton label="Augmenter le retrait" icon="carbon:text-indent-more" disabled={!format.canIndent} onClick={() => edit((chain) => (format.inList ? chain.sinkListItem('listItem') : chain.indent()))} />
+              <FormatButton label="Réduire le retrait" icon="ph:text-outdent" disabled={!format.canOutdent} onClick={() => edit((chain) => (format.inList ? chain.liftListItem('listItem') : chain.outdent()))} />
+              <FormatButton label="Augmenter le retrait" icon="ph:text-indent" disabled={!format.canIndent} onClick={() => edit((chain) => (format.inList ? chain.sinkListItem('listItem') : chain.indent()))} />
             </FormatSegment>
           </div>
 

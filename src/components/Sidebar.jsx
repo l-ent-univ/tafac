@@ -183,7 +183,7 @@ function SidebarResizeHandle({ compact, onCompactChange, unfoldsInPlaceRef = nul
         title={compact ? 'Déplier la barre latérale' : 'Replier la barre latérale'}
         className={`sidebar-handle-tint sidebar-handle-button absolute left-1/2 top-1/2 inline-flex -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border-0 p-0 text-bg cursor-pointer focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-text ${isDragging ? 'opacity-0 pointer-events-none' : 'opacity-0 group-hover:opacity-100 group-has-[:focus-visible]:opacity-100'}`}
       >
-        <Icon icon={compact ? 'carbon:chevron-right' : 'carbon:chevron-left'} className="size-3.5" aria-hidden="true" />
+        <Icon icon={compact ? 'ph:caret-right' : 'ph:caret-left'} className="size-3.5" aria-hidden="true" />
       </button>
     </div>
   )
@@ -217,7 +217,7 @@ function CompactUpdateButton({ onUpdateClick }) {
       aria-label="Nouvelle version, mettre à jour"
       className="group relative inline-flex items-center justify-center size-10 rounded-full border border-border/70 bg-widget-bg/60 text-text cursor-pointer transition-[background-color] duration-150 hover:bg-brand-subtle disabled:opacity-50 disabled:cursor-wait"
     >
-      <Icon icon="carbon:rocket" className="size-4" aria-hidden="true" />
+      <Icon icon="ph:rocket" className="size-4" aria-hidden="true" />
       <span className="changelog-new-dot absolute top-[6px] right-[6px] size-[7px] rounded-full" aria-hidden="true" />
       <CompactTooltip title={isApplying ? 'Mise à jour…' : 'Nouvelle version'} detail={isApplying ? null : 'Mettre à jour'} />
     </button>
@@ -240,7 +240,7 @@ function Sidebar({
   showUniversityLogo = true,
   logoSource = 'establishment',
   gradesSupported = true,
-  activePage = 'dashboard',
+  activePage = 'home',
   onNavigatePage,
   onOpenLatestGrade = null,
   // Compact: the icons alone (App keeps it, the settings toggle it too).
@@ -295,11 +295,8 @@ function Sidebar({
     if (peekPendingRef.current !== true) schedulePeek(true, SIDEBAR_PEEK_DELAY_MS)
   }
 
-  const [activeSection, setActiveSection] = useState('applications')
   const navItems = buildNavItems(establishment, { gradesSupported })
   const { unseenIds } = useChangelog()
-  // On another page (grades…) its own item is the active one.
-  const activeItemId = activePage === 'dashboard' ? activeSection : activePage
 
   const handleNavigate = useCallback((item) => {
     if (typeof document === 'undefined') {
@@ -320,19 +317,8 @@ function Sidebar({
       // (`launch`: its page, 'grades' or 'planning').
       if (item.announcedBy && unseenIds.includes(item.announcedBy)) track('launch_card', { action: 'tab_marker', launch: item.page })
       onNavigatePage?.(item.page, 'nav')
-      return
     }
-
-    setActiveSection(item.id)
-
-    if (activePage !== 'dashboard') {
-      // Back from another page: the dashboard opens at its top.
-      onNavigatePage?.('dashboard')
-      return
-    }
-
-    document.getElementById(item.targetId)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
-  }, [activePage, onNavigatePage, unseenIds])
+  }, [onNavigatePage, unseenIds])
 
   const initials = (userName || '?').trim().charAt(0).toUpperCase()
 
@@ -362,7 +348,8 @@ function Sidebar({
 
         <nav className="flex flex-col w-full" aria-label="Sections">
           {navItems.map((item) => {
-            const isActive = activeItemId === item.id
+            // Every page item's id is its page's.
+            const isActive = activePage === item.id
             const isNew = Boolean(item.announcedBy) && unseenIds.includes(item.announcedBy)
             return (
               <button
@@ -384,7 +371,10 @@ function Sidebar({
                   className="w-[17px] h-[17px] shrink-0"
                   aria-hidden="true"
                 />
-                <span>{item.label}</span>
+                {/* Cut short with an ellipsis when it can't fit (a larger
+                    text size, a narrow sidebar), whole in its tooltip (a
+                    disabled one has its own). */}
+                <span className="min-w-0 truncate" title={item.disabled ? undefined : item.label}>{item.label}</span>
                 {/* Just launched (its « Nouveautés » entry unseen): gone once
                     the page is visited or its dashboard card closed. */}
                 {isNew ? (
@@ -399,7 +389,7 @@ function Sidebar({
                 {/* No in-app page yet: this one opens the service's own site. */}
                 {item.href && !item.disabled ? (
                   <Icon
-                    icon="carbon:arrow-up-right"
+                    icon="ph:arrow-up-right"
                     className="ml-auto mr-[-2px] w-3 h-3 shrink-0 text-text-muted"
                     aria-label="Ouvre un autre site"
                   />
@@ -474,7 +464,7 @@ function Sidebar({
               className="inline-flex items-center justify-center size-8 rounded-full bg-transparent border-0 text-text-muted cursor-pointer transition-opacity duration-120 ease-in-out hover:opacity-70 disabled:opacity-40 disabled:cursor-wait"
               aria-label="Se déconnecter"
             >
-              <Icon icon="carbon:logout" className="w-4 h-4" aria-hidden="true" />
+              <Icon icon="ph:sign-out" className="w-4 h-4" aria-hidden="true" />
             </button>
           </div>
         ) : null}
@@ -501,7 +491,7 @@ function Sidebar({
   
             <nav className="flex flex-col items-center gap-1 w-full" aria-label="Sections">
               {navItems.map((item) => {
-                const isActive = activeItemId === item.id
+                const isActive = activePage === item.id
                 const isNew = Boolean(item.announcedBy) && unseenIds.includes(item.announcedBy)
                 const label = [
                   item.label,
@@ -571,7 +561,7 @@ function Sidebar({
                   className="group relative inline-flex items-center justify-center size-8 rounded-full bg-transparent border-0 text-text-muted cursor-pointer transition-opacity duration-120 ease-in-out hover:opacity-70 disabled:opacity-40 disabled:cursor-wait"
                   aria-label="Se déconnecter"
                 >
-                  <Icon icon="carbon:logout" className="w-4 h-4" aria-hidden="true" />
+                  <Icon icon="ph:sign-out" className="w-4 h-4" aria-hidden="true" />
                   <CompactTooltip title="Se déconnecter" />
                 </button>
               </>

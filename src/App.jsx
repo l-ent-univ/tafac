@@ -26,9 +26,7 @@ import { syncRuntimeSeo } from './seo'
 import {
   ESTABLISHMENT_KEY,
   STUDENT_TP_KEY,
-  ADE_LOOKAHEAD_DAY_OPTIONS,
   clearStoredTpSelection,
-  getStoredAdeLookaheadDays,
   getStoredAnonymousAnalytics,
   getStoredEstablishment,
   getStoredHiddenWidgets,
@@ -38,7 +36,6 @@ import {
   getStoredShowUniversityLogo,
   getStoredShowWallpaper,
   getStoredTpSelection,
-  persistAdeLookaheadDays,
   persistAnonymousAnalytics,
   persistEstablishment,
   persistHiddenWidgets,
@@ -50,23 +47,25 @@ import {
   persistTpSelection,
 } from './profileStorage'
 import { getStoredSidebarCompact, persistSidebarCompact } from './sidebarWidth'
-import WidgetContainer from './components/WidgetContainer'
+import AvailableApplications from './components/AvailableApplications'
 import GradesPage from './components/GradesPage'
 import PlanningPage from './components/PlanningPage'
 import MailPage from './components/MailPage'
 import HomeDraftPage from './components/HomeDraftPage'
 import LoadingDots from './components/LoadingDots'
 import { resolveHeroImage } from './heroImage'
+import { useWallpaperTint } from './useWallpaperTint'
 import { getStoredTheme, persistTheme, watchTheme } from './theme'
 import MobileTabBar from './components/MobileTabBar'
 import { getMobileTabItems } from './navItems'
-import { getAvailableWidgets } from './dashboardWidgets'
+import { getHomeWidgets } from './dashboardWidgets'
 import { bindHistorySession, readHistoryNav, writeHistoryNav } from './appHistory'
 import { clearMailReadCache } from './mailReadCache'
 import { clearMailSignatures } from './mailSignatureStore'
 import { clearMailSends, flushMailSends } from './useMailSend'
 import useGradesFormation from './useGradesFormation'
 import { clearStoredCustomBackground, getStoredCustomBackground, saveCustomBackground } from './customBackground'
+import { CUSTOM_PROFILE_PHOTO_KEY, clearStoredCustomProfilePhoto, getStoredCustomProfilePhoto, saveCustomProfilePhoto } from './customProfilePhoto'
 import {
   flushAnalytics,
   setAnalyticsAvailable,
@@ -90,9 +89,6 @@ import {
   logoutFromEnt,
   preloadSchoolCertificateStatus,
 } from './entApi'
-
-// How far the hero photo extends below the widget row before fully fading.
-const HERO_FADE_OVERHANG_PX = 80
 
 // The planning is the student's own (TEMPO): no group to choose in Mon compte.
 const HAS_PERSONAL_PLANNING = universityConfig.planning?.personal === true
@@ -498,19 +494,10 @@ function getFrenchAuthErrorMessage(error, context = 'login') {
     : 'La connexion a échoué, vérifie tes identifiants puis réessaie'
 }
 
-function getSessionWarningMessage(session) {
-  if (!session?.authenticated || !session?.degraded) {
-    return ''
-  }
-
-  if (session.degradedReason === 'missing-cas-tgc') {
-    return session.sessionSource === 'cookie'
-      ? "Certains services sont indisponibles, reconnecte-toi pour les afficher."
-      : "Certains services sont indisponibles, reconnecte-toi pour les afficher."
-  }
-
-  return "Certains services sont indisponibles, reconnecte-toi pour les afficher."
-}
+// Signed in without the CAS ticket the other services sign in with (the
+// session's `degraded`): signed out completely rather than left with some
+// services missing, and told why on the login form.
+const DEGRADED_SESSION_MESSAGE = 'Ta session a expiré, reconnecte-toi'
 
 function buildDebugSnapshot(label, data, error = '') {
   return {
@@ -915,13 +902,13 @@ function App() {
   })
   const [establishment, setEstablishment] = useState(() => getStoredEstablishment())
   const [selectedTp, setSelectedTp] = useState(() => getStoredTpSelection())
-  const [nextClassLookaheadDays, setNextClassLookaheadDays] = useState(() => getStoredAdeLookaheadDays())
   const [hiddenWidgets, setHiddenWidgets] = useState(() => getStoredHiddenWidgets())
   const [customBackground, setCustomBackground] = useState(() => getStoredCustomBackground())
   const [showWallpaper, setShowWallpaper] = useState(() => getStoredShowWallpaper())
   const [showUniversityLogo, setShowUniversityLogo] = useState(() => getStoredShowUniversityLogo())
   const [logoSource, setLogoSource] = useState(() => getStoredLogoSource())
-  // Page shown next to the sidebar: 'dashboard' or 'grades'. Each switch is
+  // Page shown next to the sidebar: 'home' (« Accueil »), 'grades',
+  // 'planning' or 'mail'. Each switch is
   // a history entry (see appHistory.js): back and forward move between
   // pages, and a reload stays on the page.
   const [activePage, setActivePage] = useState(() => readHistoryNav().page)
@@ -945,10 +932,6 @@ function App() {
   const [showPlanningWeekend, setShowPlanningWeekend] = useState(() => getStoredShowPlanningWeekend())
   const [anonymousAnalytics, setAnonymousAnalytics] = useState(() => getStoredAnonymousAnalytics())
   const isAnalyticsAvailable = useAnalyticsAvailable()
-  // Lookahead actually fed to the next-class widget. Re-synced only while the
-  // account modal is closed, so moving the slider doesn't refetch the widget
-  // on every step.
-  const [appliedLookaheadDays, setAppliedLookaheadDays] = useState(nextClassLookaheadDays)
   const [profileUser, setProfileUser] = useState(null)
   const [isHydratingProfile, setIsHydratingProfile] = useState(false)
   const [hasHydratedProfile, setHasHydratedProfile] = useState(false)
@@ -964,7 +947,15 @@ function App() {
     userName: '',
   })
   const [isAccountModalOpen, setIsAccountModalOpen] = useState(false)
+  // The section the modal opens on (« Accueil »'s empty state: Tableau de
+  // bord); null, the one last seen.
+  const [accountModalSection, setAccountModalSection] = useState(null)
   const [accountModalPhoto, setAccountModalPhoto] = useState(null)
+  // The photo picked in Mon compte, kept on this device: shown over the
+  // ENT's. Read once the session's user is known, never before sign-in.
+  const [customProfilePhoto, setCustomProfilePhoto] = useState(null)
+  const profilePhotoSrc = customProfilePhoto || accountModalPhoto
+  const hasCustomProfilePhoto = Boolean(customProfilePhoto)
   const [accountModalPlanningState, setAccountModalPlanningState] = useState(createEmptyAccountModalPlanningState)
   // 'idle' | 'loading' | 'done' — once the ADE tree has loaded (or failed),
   // reopening the account modal reuses the in-memory state instead of
@@ -975,6 +966,9 @@ function App() {
     typeof window !== 'undefined' && window.matchMedia('(min-width: 1024px)').matches
   ))
   const [favoritesSlotEl, setFavoritesSlotEl] = useState(null)
+  // The « Accueil » page's « Applications » slot (the favourites as tiles,
+  // portalled by the dashboard's app list).
+  const [homeAppsSlotEl, setHomeAppsSlotEl] = useState(null)
   const [sessionState, setSessionState] = useState({
     checking: true,
     authenticated: false,
@@ -985,7 +979,6 @@ function App() {
     degradedReason: null,
     sessionSource: null,
     canUseServerLaunch: false,
-    warning: '',
     error: '',
   })
   const [hasCheckedInitialSession, setHasCheckedInitialSession] = useState(false)
@@ -1018,6 +1011,15 @@ function App() {
     })
   }, [])
 
+  const navigate = useCallback((path, { replace = false } = {}) => {
+    if (window.location.pathname !== path) {
+      // Replacing keeps the entry's state (the in-app page, see appHistory.js).
+      if (replace) window.history.replaceState(window.history.state, '', path)
+      else window.history.pushState(null, '', path)
+    }
+    setPathname(path)
+  }, [])
+
   const refreshSession = useCallback(async (options = {}) => {
     const { exposeOutput = false } = options
 
@@ -1035,6 +1037,36 @@ function App() {
       const session = await getAuthSession()
       setAnalyticsAvailable(session?.analyticsEnabled)
       reportSettingsTransfer()
+
+      if (session.authenticated && session.degraded) {
+        try {
+          await logoutFromEnt()
+        } catch {
+          // Signed out here all the same: the next check tries again.
+        }
+        clearLegacySensitiveClientCaches()
+        forgetMailAccount()
+        bindHistorySession(null)
+        setActivePage('home')
+        writeHistoryNav({ page: 'home' }, { replace: true })
+        setSessionState({
+          checking: false,
+          authenticated: false,
+          user: null,
+          givenName: null,
+          account: null,
+          degraded: false,
+          degradedReason: null,
+          sessionSource: null,
+          canUseServerLaunch: false,
+          error: DEGRADED_SESSION_MESSAGE,
+        })
+        navigate(LOGIN_PATH, { replace: true })
+        if (exposeOutput) {
+          commitDebugState('Session', session, DEGRADED_SESSION_MESSAGE)
+        }
+        return null
+      }
       let givenName = null
       let account = null
 
@@ -1050,7 +1082,6 @@ function App() {
 
       const authenticated = Boolean(session.authenticated)
       const user = session.user ?? null
-      const warning = getSessionWarningMessage(session)
 
       setSessionState({
         checking: false,
@@ -1062,7 +1093,6 @@ function App() {
         degradedReason: session.degradedReason ?? null,
         sessionSource: session.sessionSource ?? null,
         canUseServerLaunch: Boolean(session.canUseServerLaunch),
-        warning,
         error: '',
       })
 
@@ -1088,7 +1118,6 @@ function App() {
         degradedReason: null,
         sessionSource: null,
         canUseServerLaunch: false,
-        warning: '',
         error: message,
       })
       clearLegacySensitiveClientCaches()
@@ -1101,7 +1130,7 @@ function App() {
     } finally {
       setHasCheckedInitialSession(true)
     }
-  }, [commitDebugState, startDebugState])
+  }, [commitDebugState, navigate, startDebugState])
 
   useEffect(() => {
     clearLegacySensitiveClientCaches()
@@ -1126,15 +1155,6 @@ function App() {
 
     faviconLink.setAttribute('type', 'image/png')
     faviconLink.setAttribute('href', favicon)
-  }, [])
-
-  const navigate = useCallback((path, { replace = false } = {}) => {
-    if (window.location.pathname !== path) {
-      // Replacing keeps the entry's state (the in-app page, see appHistory.js).
-      if (replace) window.history.replaceState(window.history.state, '', path)
-      else window.history.pushState(null, '', path)
-    }
-    setPathname(path)
   }, [])
 
   useEffect(() => {
@@ -1229,9 +1249,9 @@ function App() {
     setProfileUser(sessionState.user)
     setEstablishment(getStoredEstablishment(sessionState.user))
     setSelectedTp(getStoredTpSelection(sessionState.user))
-    setNextClassLookaheadDays(getStoredAdeLookaheadDays(sessionState.user))
     setHiddenWidgets(getStoredHiddenWidgets(sessionState.user))
     setCustomBackground(getStoredCustomBackground(sessionState.user))
+    setCustomProfilePhoto(getStoredCustomProfilePhoto(sessionState.user))
     setShowWallpaper(getStoredShowWallpaper(sessionState.user))
     setShowUniversityLogo(getStoredShowUniversityLogo(sessionState.user))
     setLogoSource(getStoredLogoSource(sessionState.user))
@@ -1613,6 +1633,7 @@ function App() {
 
     setIsAccountModalOpen(false)
     setAccountModalPhoto(null)
+    setCustomProfilePhoto(null)
     setAccountModalPlanningState(createEmptyAccountModalPlanningState())
     accountModalAdeLoadRef.current = 'idle'
   }, [sessionState.authenticated])
@@ -1633,7 +1654,8 @@ function App() {
   }, [])
 
   useEffect(() => {
-    if (!sessionState.authenticated) {
+    // With a photo of their own, the ENT's isn't asked for at all.
+    if (!sessionState.authenticated || hasCustomProfilePhoto) {
       return undefined
     }
 
@@ -1648,7 +1670,23 @@ function App() {
     return () => {
       cancelled = true
     }
-  }, [sessionState.authenticated, sessionState.account])
+  }, [sessionState.authenticated, sessionState.account, hasCustomProfilePhoto])
+
+  // A photo picked or removed in another tab shows here too.
+  useEffect(() => {
+    if (!sessionState.authenticated) {
+      return undefined
+    }
+
+    const handleStorage = (event) => {
+      if (event.key === null || event.key === CUSTOM_PROFILE_PHOTO_KEY) {
+        setCustomProfilePhoto(getStoredCustomProfilePhoto(sessionState.user))
+      }
+    }
+
+    window.addEventListener('storage', handleStorage)
+    return () => window.removeEventListener('storage', handleStorage)
+  }, [sessionState.authenticated, sessionState.user])
 
   // The school certificate's status, asked in the background a moment after
   // sign-in (the dashboard's own data first): Réglages shows it at once.
@@ -1712,6 +1750,17 @@ function App() {
       return
     }
 
+    setAccountModalSection(null)
+    setIsAccountModalOpen(true)
+  }, [sessionState.authenticated, sessionState.checking])
+
+  // Réglages › Accueil, from « Accueil » without a card.
+  const handleOpenCardsSettings = useCallback(() => {
+    if (!sessionState.authenticated || sessionState.checking) {
+      return
+    }
+
+    setAccountModalSection('dashboard')
     setIsAccountModalOpen(true)
   }, [sessionState.authenticated, sessionState.checking])
 
@@ -1758,11 +1807,6 @@ function App() {
     }))
   }, [accountModalPlanningState, selectedTp, sessionState.user])
 
-  const handleNextClassLookaheadChange = useCallback((days) => {
-    persistAdeLookaheadDays(days, sessionState.user)
-    setNextClassLookaheadDays(days)
-  }, [sessionState.user])
-
   const heroImage = useMemo(() => (
     customBackground
       ? { src: customBackground, position: null, credit: null }
@@ -1807,7 +1851,7 @@ function App() {
       ...(hasConfirmedMailPage ? ['mail-page'] : []),
     ])
   }, [hasConfirmedGradesPage, hasConfirmedPlanningPage, hasConfirmedMailPage])
-  // Falls back to the dashboard if the grades item goes away (establishment
+  // Falls back to « Accueil » if the grades item goes away (establishment
   // without grade widgets, feature switched off, a relevé that isn't BUT).
   const isGradesPage = useMemo(
     () => activePage === 'grades' && getMobileTabItems(establishment, { gradesSupported }).some((item) => item.page === 'grades'),
@@ -1823,12 +1867,16 @@ function App() {
     () => activePage === 'mail' && getMobileTabItems(establishment, { gradesSupported }).some((item) => item.page === 'mail'),
     [activePage, establishment, gradesSupported],
   )
-  // The « Accueil » canvas (HomeDraftPage), every university.
-  const isHomePage = activePage === 'home'
+  // « Accueil » (HomeDraftPage), every university: the page shown when no
+  // other is.
+  const isHomePage = !isGradesPage && !isPlanningPage && !isMailPage
+  // The « Accueil » band's tint (--page-top-band, overrides.css): the
+  // wallpaper's main colour when it shows one, else the brand's.
+  const homeBandTint = useWallpaperTint(isHomePage && showWallpaper ? heroImage.src : null)
   // Folded for a mail open beside the list (handleMailReaderOpenChange).
   const isSidebarAutoCompact = isMailPage && mailReaderOpen && !sidebarCompact && !sidebarAutoCompactDismissed
   // The page the sidebar and the tab bar show as selected.
-  const shownPage = isHomePage ? 'home' : isGradesPage ? 'grades' : isPlanningPage ? 'planning' : isMailPage ? 'mail' : 'dashboard'
+  const shownPage = isGradesPage ? 'grades' : isPlanningPage ? 'planning' : isMailPage ? 'mail' : 'home'
   // Being on « Mes notes » is having seen its launch, however the student
   // got there (tab, card, "Dernière note", app list, a reload on the page):
   // the dashboard card and the tab's « Nouveau » go. After the audience
@@ -1844,8 +1892,6 @@ function App() {
   useEffect(() => {
     if (isMailPage && hasConfirmedMailPage) markChangelogEntrySeen('messagerie')
   }, [isMailPage, hasConfirmedMailPage])
-  // The other pages sit on the plain background, like with the wallpaper off.
-  const isWallpaperShown = showWallpaper && shownPage === 'dashboard'
 
   // Rejects with a user-facing message (shown in Mon compte) on failure.
   const handleCustomBackgroundChange = useCallback(async (file) => {
@@ -1853,6 +1899,19 @@ function App() {
     setCustomBackground(dataUrl)
     track('setting_changed', { setting: 'custom_background', value: 'on' })
   }, [sessionState.user])
+
+  // Rejects with a user-facing message (shown in Mon compte) on failure.
+  const handleCustomProfilePhotoChange = useCallback(async (file) => {
+    const dataUrl = await saveCustomProfilePhoto(file, sessionState.user)
+    setCustomProfilePhoto(dataUrl)
+    track('setting_changed', { setting: 'profile_photo', value: 'on' })
+  }, [sessionState.user])
+
+  const handleCustomProfilePhotoReset = useCallback(() => {
+    clearStoredCustomProfilePhoto()
+    setCustomProfilePhoto(null)
+    track('setting_changed', { setting: 'profile_photo', value: 'off' })
+  }, [])
 
   const handleCustomBackgroundReset = useCallback(() => {
     clearStoredCustomBackground()
@@ -1882,33 +1941,22 @@ function App() {
     persistLogoSource(source, sessionState.user)
     setLogoSource(source)
   }, [sessionState.user])
-  const [heroHeight, setHeroHeight] = useState(null)
-  const heroObserverRef = useRef(null)
   const dashboardColumnElementRef = useRef(null)
-
-  // The hero photo runs behind the header and the whole widget row (one or
-  // two lines, fewer when widgets are hidden), then fades just below it.
-  // Callback ref: the dashboard column mounts after auth/onboarding settle.
-  const dashboardColumnRef = useCallback((column) => {
-    dashboardColumnElementRef.current = column
-    heroObserverRef.current?.disconnect()
-    heroObserverRef.current = null
-
-    const widgetRow = column?.querySelector('.widget-row')
-    if (!column || !widgetRow || typeof ResizeObserver === 'undefined') {
-      return
-    }
-
-    const measure = () => {
-      const columnTop = column.getBoundingClientRect().top - column.scrollTop
-      setHeroHeight(Math.round(widgetRow.getBoundingClientRect().bottom - columnTop + HERO_FADE_OVERHANG_PX))
-    }
-
-    measure()
-    const observer = new ResizeObserver(measure)
-    observer.observe(widgetRow)
-    observer.observe(column)
-    heroObserverRef.current = observer
+  // The top bar (below 4xl): its height on the page column, as
+  // --top-bar-height, for the « Accueil » band to run up behind it (a
+  // phone's).
+  // A callback ref: the bar mounts after the sign-in, not with App.
+  const topBarObserverRef = useRef(null)
+  const topBarRef = useCallback((bar) => {
+    topBarObserverRef.current?.disconnect()
+    topBarObserverRef.current = null
+    const column = bar?.parentElement
+    if (!bar || !column) return
+    const publish = () => column.style.setProperty('--top-bar-height', `${bar.offsetHeight}px`)
+    publish()
+    const observer = new ResizeObserver(publish)
+    observer.observe(bar)
+    topBarObserverRef.current = observer
   }, [])
 
   // Shows a page at its top, once it's rendered. Wide screens scroll the
@@ -1935,14 +1983,16 @@ function App() {
     showPage(page, source)
   }, [showPage])
 
-  // The dashboard's "Dernière note" (or the sidebar's, `source`): "Mes
-  // notes", opened on that grade.
+  // A grade of « Accueil »'s « Dernières notes » (or the sidebar's,
+  // `source`): "Mes notes", opened on that grade.
   const [pendingGradeRequest, setPendingGradeRequest] = useState(null)
   const handleOpenLatestGrade = useCallback((grade, source = 'dashboard_card') => {
     setPendingGradeRequest({ evaluationId: grade.id, moduleCode: grade.resource })
     handleNavigatePage('grades', source)
   }, [handleNavigatePage])
   const handleOpenSidebarGrade = useCallback((grade) => handleOpenLatestGrade(grade, 'sidebar_card'), [handleOpenLatestGrade])
+  // « Accueil »'s « Moyenne générale »: « Mes notes », as a dashboard card.
+  const handleOpenGradesFromCard = useCallback(() => handleNavigatePage('grades', 'dashboard_card'), [handleNavigatePage])
   const clearPendingGradeRequest = useCallback(() => setPendingGradeRequest(null), [])
   // The grade service's app in the app lists ('tile': "Mes notes" rather
   // than ScoDoc) and the launch card ('launch_card') say which they are.
@@ -1950,7 +2000,7 @@ function App() {
   // The planning service's app in the app lists ('tile': the planning page
   // rather than the service) and its launch card ('launch_card').
   const handleOpenPlanningPage = useCallback((source = 'tile') => handleNavigatePage('planning', source), [handleNavigatePage])
-  // The dashboard's "Prochain cours": the planning page, opened on that
+  // « Accueil »'s « Prochains cours »: the planning page, opened on that
   // class's day (today without one).
   const [pendingPlanningDay, setPendingPlanningDay] = useState(null)
   const handleOpenPlanningDay = useCallback((day) => {
@@ -1961,7 +2011,7 @@ function App() {
   // The webmail's app in the app lists ('tile'): the mail page rather than
   // the webmail.
   const handleOpenMailPage = useCallback((source = 'tile') => handleNavigatePage('mail', source), [handleNavigatePage])
-  // The dashboard's "Mails récents": the mail page, on a mail (its history
+  // « Accueil »'s « Mails récents »: the mail page, on a mail (its history
   // entry names it, which the page reads as it opens).
   const handleOpenMail = useCallback((id) => {
     if (id) {
@@ -2016,12 +2066,12 @@ function App() {
     })
   }, [sessionState.user])
 
-  const widgetToggles = useMemo(() => getAvailableWidgets(establishment).map((widget) => ({
+  const widgetToggles = useMemo(() => getHomeWidgets(establishment, { gradesAvailable: hasGradesPage }).map((widget) => ({
     id: widget.id,
     label: widget.label,
     icon: widget.icon,
     visible: !hiddenWidgets.includes(widget.id),
-  })), [establishment, hiddenWidgets])
+  })), [establishment, hasGradesPage, hiddenWidgets])
 
   const handleShowPlanningWeekendChange = useCallback((show) => {
     persistShowPlanningWeekend(show, sessionState.user)
@@ -2067,12 +2117,6 @@ function App() {
   useEffect(() => {
     setAnalyticsFormation(selectedTp?.programLabel ?? null)
   }, [selectedTp?.programLabel])
-
-  useEffect(() => {
-    if (!isAccountModalOpen) {
-      setAppliedLookaheadDays(nextClassLookaheadDays)
-    }
-  }, [isAccountModalOpen, nextClassLookaheadDays])
 
   const handleAccountModalYearChange = useCallback(async (yearResourceId) => {
     const nextYear = findTpOptionByResourceId(accountModalPlanningState.yearOptions, yearResourceId)
@@ -2326,7 +2370,6 @@ function App() {
         degradedReason: null,
         sessionSource: null,
         canUseServerLaunch: false,
-        warning: '',
         error: message,
       })
       track('login_result', { result: 'failure', demo: false })
@@ -2372,7 +2415,6 @@ function App() {
         degradedReason: null,
         sessionSource: null,
         canUseServerLaunch: false,
-        warning: '',
         error: message,
       })
       track('login_result', { result: 'failure', demo: true })
@@ -2409,8 +2451,8 @@ function App() {
       // next in this tab.
       forgetMailAccount()
       bindHistorySession(null)
-      setActivePage('dashboard')
-      writeHistoryNav({ page: 'dashboard' }, { replace: true })
+      setActivePage('home')
+      writeHistoryNav({ page: 'home' }, { replace: true })
       setSessionState({
         checking: false,
         authenticated: false,
@@ -2421,7 +2463,6 @@ function App() {
         degradedReason: null,
         sessionSource: null,
         canUseServerLaunch: false,
-        warning: '',
         error: '',
       })
       commitDebugState('Deconnexion', result)
@@ -2533,7 +2574,13 @@ function App() {
   }
 
   return (
-    <main className="relative min-h-screen flex flex-col bg-bg overflow-x-clip">
+    // viewport-fit=cover (index.html): the page runs under the notch and the
+    // rounded corners, its background filling the screen instead of iOS's
+    // black letterboxing. The content keeps clear of the edges by the
+    // insets (0 in portrait and without a notch), padding inside the clip
+    // so the bands' tint and photo still reach the edges. Bars fixed to
+    // the screen carry their own insets.
+    <main className="relative min-h-screen flex flex-col bg-bg overflow-x-clip pl-[env(safe-area-inset-left)] pr-[env(safe-area-inset-right)]">
       {shouldHoldInitialRender ? (
         <div className="flex-1 min-h-0 bg-bg" aria-hidden="true" />
       ) : isProfileSwitching ? (
@@ -2565,7 +2612,12 @@ function App() {
       ) : shouldShowCompletionScreen ? (
         <OnboardingCompletionPage userName={completionScreenState.userName} isLeaving={completionScreenState.leaving} />
       ) : sessionState.authenticated ? (
-        <div key={`dashboard-${dashboardRevealNonce}`} className={`${dashboardRevealNonce > 0 ? 'dashboard-reveal-shell ' : ''}${isWallpaperShown ? '' : 'dashboard-no-wallpaper '}flex flex-col min-h-screen 4xl:h-screen 4xl:min-h-0 4xl:overflow-hidden`}>
+        <div key={`dashboard-${dashboardRevealNonce}`} className={`${dashboardRevealNonce > 0 ? 'dashboard-reveal-shell ' : ''}dashboard-no-wallpaper flex flex-col min-h-screen 4xl:h-screen 4xl:min-h-0 4xl:overflow-hidden`}
+          style={homeBandTint ? {
+            '--page-top-band': `color-mix(in srgb, ${homeBandTint} 14%, var(--color-bg))`,
+            '--page-top-line': `color-mix(in srgb, ${homeBandTint} 26%, var(--color-bg))`,
+          } : undefined}
+        >
           <Sidebar
             authenticated={sessionState.authenticated}
             checking={sessionState.checking}
@@ -2574,7 +2626,7 @@ function App() {
               sessionState.account?.family_name,
             ].filter(Boolean).join(' ') || sessionState.account?.name || sessionState.givenName || sessionState.user}
             userSubtitle={HAS_PERSONAL_PLANNING ? null : selectedTp?.label ?? selectedTp?.tpLabel ?? selectedTp?.tdLabel ?? selectedTp?.yearLabel ?? null}
-            profilePhotoSrc={accountModalPhoto}
+            profilePhotoSrc={profilePhotoSrc}
             onLogout={handleHeaderAction}
             onAccountClick={handleOpenAccountModal}
             favoritesSlotRef={setFavoritesSlotEl}
@@ -2592,22 +2644,13 @@ function App() {
             canPeek={isSidebarAutoCompact}
             onCompactChange={handleSidebarCompactChange}
           />
-          <div ref={dashboardColumnRef} className={`app-column relative isolate flex flex-col flex-1 min-w-0 4xl:h-screen 4xl:overflow-y-auto 4xl:pl-[calc(var(--sidebar-width,280px)+12px)] ${hasMobileTabBar ? (isMailPage && mailReaderOpen ? 'max-4xl:pb-[calc(env(safe-area-inset-bottom)+148px)]' : 'max-4xl:pb-[calc(env(safe-area-inset-bottom)+84px)]') : ''}`}>
-            {/* Hero image behind the header and widget cards, fading into the solid background. */}
-            {isWallpaperShown ? (
-              <div
-                aria-hidden="true"
-                className="dashboard-hero pointer-events-none absolute inset-x-0 top-0 -z-10 h-[230px] bg-cover bg-[center_40%] max-md:h-[260px] dark:opacity-60"
-                style={{
-                  ...(heroHeight ? { height: heroHeight } : null),
-                  backgroundImage: `url("${heroImage.src}")`,
-                  ...(heroImage.position ? { backgroundPosition: heroImage.position } : null),
-                }}
-              />
-            ) : null}
+          <div ref={dashboardColumnElementRef} className={`app-column relative isolate flex flex-col flex-1 min-w-0 4xl:h-screen 4xl:overflow-y-auto 4xl:pl-[calc(var(--sidebar-width,280px)+12px)] ${hasMobileTabBar ? (isMailPage && mailReaderOpen ? 'max-4xl:pb-[calc(env(safe-area-inset-bottom)+148px)]' : 'max-4xl:pb-[calc(env(safe-area-inset-bottom)+84px)]') : ''}`}>
             {/* On a phone, "Mes notes" and the planning start with their own
-                header: no top bar. */}
-            <div className={`${shownPage !== 'dashboard' ? 'max-md:hidden ' : ''}4xl:hidden`}>
+                header: no top bar. The « Accueil » page keeps it (the logo, the account's buttons). On a phone, over
+                the « Accueil » page's band, which runs up behind it (its
+                wallpaper too): see-through and above it, its height for the
+                band to know (--top-bar-height). */}
+            <div ref={topBarRef} className={`${isHomePage ? 'max-md:relative max-md:z-10 max-md:!bg-transparent' : 'max-md:hidden'} 4xl:hidden`}>
               <AppHeader
                 authenticated={sessionState.authenticated}
                 checking={sessionState.checking}
@@ -2627,46 +2670,47 @@ function App() {
               // Right under the header buttons, eating into the space above
               // the cards rather than pushing them down a full row: over
               // them (relative z-10), not cut by the page's block coming up
-              // under it. On a phone, with the top bar: on the dashboard
-              // only (the other pages start with their own header).
-              <ChangelogPill className={`${shownPage !== 'dashboard' ? 'max-md:hidden ' : ''}relative z-10 4xl:hidden flex justify-end px-6 pt-2 -mb-2 max-md:px-3 max-md:pt-1.5`} />
+              // under it. Not on a phone: « Accueil »'s band runs up behind
+              // the top bar, the other pages start with their own header.
+              <ChangelogPill className={`max-md:hidden relative z-10 4xl:hidden flex justify-end px-6 pt-2 -mb-2 max-md:px-3 max-md:pt-1.5`} />
             ) : null}
-            {sessionState.warning ? (
-              <div className="px-6 pt-3 max-md:px-3 4xl:pt-5">
-                <div className="flex items-start gap-3 corners-[20px] border border-[#f2cf8f] bg-[#fff7e8] px-4 py-3 text-text shadow-[0_10px_30px_rgba(0,0,0,0.05)] dark:border-[#6a4d15] dark:bg-[#2f2410]">
-                  <Icon icon="carbon:warning-filled" className="mt-0.5 h-[18px] w-[18px] shrink-0 text-[#b76e00]" aria-hidden="true" />
-                  <p className="m-0 text-sm font-medium leading-[1.5] font-body">{sessionState.warning}</p>
-                </div>
-              </div>
-            ) : null}
-            {/* Kept mounted behind other pages: coming back is instant and the
-                favorites it portals into the sidebar stay put. */}
-            <div className={`${hasSwitchedPage ? 'page-enter ' : ''}flex-1 min-h-0 4xl:flex-none 4xl:min-h-0`} hidden={shownPage !== 'dashboard'}>
-              <WidgetContainer
-                userName={sessionState.givenName ?? sessionState.user}
-                isSessionReady={!sessionState.checking}
+            {/* The app list alone (the dashboard, WidgetContainer, isn't
+                shown any more), never shown itself, kept mounted: the
+                favourites it portals into the sidebar, « Accueil »'s
+                « Applications » row and « Toutes les applications » drawer. */}
+            <div hidden>
+              <AvailableApplications
                 establishment={establishment}
-                gradesSupported={gradesSupported}
-                sessionUser={sessionState.user}
-                selectedPlanningSelection={selectedTp}
-                nextClassLookaheadDays={appliedLookaheadDays}
-                debugNextClass={debugNextClass}
                 canUseServerLaunch={sessionState.canUseServerLaunch}
                 favoritesPortalTarget={isSidebarViewport ? favoritesSlotEl : null}
-                hiddenWidgets={hiddenWidgets}
-                onDismissGreeting={() => handleWidgetVisibilityChange('greeting', false)}
-                onOpenGrade={hasGradesPage ? handleOpenLatestGrade : null}
+                homeAppsPortalTarget={isHomePage ? homeAppsSlotEl : null}
+                showDescriptions={showAppDescriptions}
                 onOpenGradesPage={hasGradesPage ? handleOpenGradesPage : null}
                 onOpenPlanningPage={hasPlanningPage ? handleOpenPlanningPage : null}
-                onOpenPlanningDay={hasPlanningPage ? handleOpenPlanningDay : null}
-                onOpenMail={hasMailPage ? handleOpenMail : null}
                 onOpenMailPage={hasMailPage ? handleOpenMailPage : null}
-                showAppDescriptions={showAppDescriptions}
               />
             </div>
             {isHomePage ? (
               <div className="page-enter flex-1 min-h-0 4xl:flex-none 4xl:min-h-0">
-                <HomeDraftPage />
+                <HomeDraftPage
+                  userName={sessionState.givenName ?? sessionState.user}
+                  sessionUser={sessionState.user}
+                  establishment={establishment}
+                  selection={selectedTp}
+                  hiddenWidgets={hiddenWidgets}
+                  debugNextClass={debugNextClass}
+                  wallpaper={showWallpaper ? heroImage : null}
+                  onOpenPlanningDay={hasPlanningPage ? handleOpenPlanningDay : null}
+                  showAverage={hasGradesPage}
+                  onOpenGrade={hasGradesPage ? handleOpenLatestGrade : null}
+                  onOpenGrades={hasGradesPage ? handleOpenGradesFromCard : null}
+                  onOpenMail={hasMailPage ? handleOpenMail : null}
+                  onOpenCardsSettings={handleOpenCardsSettings}
+                  onOpenGradesPage={hasGradesPage ? handleOpenGradesPage : null}
+                  onOpenPlanningPage={hasPlanningPage ? handleOpenPlanningPage : null}
+                  onOpenMailPage={hasMailPage ? handleOpenMailPage : null}
+                  appsSlotRef={setHomeAppsSlotEl}
+                />
               </div>
             ) : null}
             {isGradesPage ? (
@@ -2684,9 +2728,13 @@ function App() {
                 <MailPage onReaderOpenChange={handleMailReaderOpenChange} onSignInAgain={() => void handleSignInAgain()} sender={mailSender} composeRequest={pendingMailCompose} onComposeRequestHandled={clearPendingMailCompose} arrivalSource={mailArrivalSource} canAttachGrades={hasGradesPage} planning={mailPlanning} />
               </div>
             ) : null}
-            <div className="4xl:mt-auto">
-              <AppFooter heroCredit={isWallpaperShown ? heroImage.credit : null} />
-            </div>
+            {/* The build line and « À propos »: on « Accueil » only (its
+                photo's credit is in its band). */}
+            {isHomePage ? (
+              <div className="4xl:mt-auto">
+                <AppFooter />
+              </div>
+            ) : null}
             {/* Fades each page switch in (see .page-switch-veil). Keyed by page
                 so it replays on every switch. */}
             {hasSwitchedPage ? (
@@ -2714,18 +2762,16 @@ function App() {
       )}
       <AccountModal
         open={isAccountModalOpen}
+        initialSectionId={accountModalSection}
         onClose={handleCloseAccountModal}
         onManageAccount={sessionState.user === DEMO_CREDENTIALS.username || !manageAccountUrl ? null : handleManageAccount}
         onYearChange={handleAccountModalYearChange}
         onTdChange={handleAccountModalTdChange}
         onTpChange={handleAccountModalTpChange}
         displayInfo={accountDisplayInfo}
-        profilePhotoSrc={accountModalPhoto}
+        profilePhotoSrc={profilePhotoSrc}
         planningState={accountModalPlanningState}
         planningFieldLabels={universityConfig.planning?.selectionLabels}
-        lookaheadDays={nextClassLookaheadDays}
-        lookaheadOptions={ADE_LOOKAHEAD_DAY_OPTIONS}
-        onLookaheadChange={handleNextClassLookaheadChange}
         widgetToggles={widgetToggles}
         onWidgetVisibilityChange={handleWidgetVisibilityChange}
         backgroundPreviewSrc={heroImage.src}
@@ -2741,6 +2787,9 @@ function App() {
         hasCustomBackground={Boolean(customBackground)}
         onCustomBackgroundChange={handleCustomBackgroundChange}
         onCustomBackgroundReset={handleCustomBackgroundReset}
+        hasCustomProfilePhoto={hasCustomProfilePhoto}
+        onCustomProfilePhotoChange={handleCustomProfilePhotoChange}
+        onCustomProfilePhotoReset={handleCustomProfilePhotoReset}
         showAppDescriptions={showAppDescriptions}
         onShowAppDescriptionsChange={handleShowAppDescriptionsChange}
         sidebarCompact={sidebarCompact}
@@ -2804,7 +2853,6 @@ function App() {
             onShowUpdatePrompt={() => setForceUpdatePrompt(true)}
             onShowWelcomeFromLent={() => setWelcomeFromLentOpen(true)}
             selectedTp={selectedTp}
-            nextClassLookaheadDays={nextClassLookaheadDays}
           />
         </Suspense>
       ) : null}

@@ -148,7 +148,7 @@ function Dropdown({
         className={triggerClassName}
       >
         <span className="min-w-0 truncate">{triggerLabel ?? selected?.label ?? placeholder}</span>
-        <Icon icon="carbon:chevron-down" className={`shrink-0 transition-transform duration-150 ${isOpen ? 'rotate-180' : ''} ${chevronClassName}`} aria-hidden="true" />
+        <Icon icon="ph:caret-down" className={`shrink-0 transition-transform duration-150 ${isOpen ? 'rotate-180' : ''} ${chevronClassName}`} aria-hidden="true" />
       </button>
       {isOpen && typeof document !== 'undefined' ? createPortal(
         <div
@@ -180,7 +180,7 @@ function Dropdown({
                 onClick={() => pick(option.value)}
               >
                 <span className="flex-1">{option.label}</span>
-                {isSelected ? <Icon icon="carbon:checkmark" className="w-[18px] h-[18px] shrink-0" aria-hidden="true" /> : null}
+                {isSelected ? <Icon icon="ph:check" className="w-[18px] h-[18px] shrink-0" aria-hidden="true" /> : null}
               </button>
             )
           })}

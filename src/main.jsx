@@ -1,4 +1,6 @@
 import './settingsTransferBoot'
+// Iconify's icons, bundled: none waits on the network to show.
+import './iconBundle'
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import './index.css'

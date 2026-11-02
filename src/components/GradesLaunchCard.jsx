@@ -162,7 +162,7 @@ function GradesLaunchCard({ onOpen }) {
           {/* In the dial's hollow (60, 45 in VIEW_BOX, 30 wide): the page's icon. */}
           <span className="launch-card-hub absolute left-1/2 top-[77.3%] flex aspect-square w-[22.7%] -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full" aria-hidden="true">
             <span className="launch-card-ripple absolute inset-0 rounded-full" />
-            <Icon icon="carbon:chart-pie" className="h-[56%] w-[56%]" />
+            <Icon icon="ph:chart-pie-slice" className="h-[56%] w-[56%]" />
           </span>
         </>
       )}

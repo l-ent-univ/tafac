@@ -128,11 +128,11 @@ const POINTS = [
 // (server/mailMessage.js); the statistics never carry a mail
 // (docs/ANALYTICS.md). Check it again before changing a word.
 const MAIL_POINTS = [
-  { kind: 'relay', icon: 'carbon:arrows-horizontal', ...copy.security.mailPoints.relay },
-  { kind: 'memory', icon: 'carbon:time', ...copy.security.mailPoints.memory },
-  { kind: 'account', icon: 'carbon:edit', ...copy.security.mailPoints.account },
-  { kind: 'images', icon: 'carbon:view-off', ...copy.security.mailPoints.images },
-  { kind: 'stats', icon: 'carbon:chart-column', ...copy.security.mailPoints.stats },
+  { kind: 'relay', icon: 'ph:arrows-horizontal', ...copy.security.mailPoints.relay },
+  { kind: 'memory', icon: 'ph:clock', ...copy.security.mailPoints.memory },
+  { kind: 'account', icon: 'ph:pencil-simple', ...copy.security.mailPoints.account },
+  { kind: 'images', icon: 'ph:eye-slash', ...copy.security.mailPoints.images },
+  { kind: 'stats', icon: 'ph:chart-bar', ...copy.security.mailPoints.stats },
 ]
 
 // The parts the intros put forward (**…** in landingCopy.json).

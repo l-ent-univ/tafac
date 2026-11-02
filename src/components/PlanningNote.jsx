@@ -13,20 +13,20 @@ const OTHER_TIMETABLES = universityConfig.planning?.otherTimetables ?? []
 // What a day without classes says, by its state (usePlanningWeeks'
 // statusOn): its icon and title, and in full why and what to do about it.
 const NOTES = {
-  loaded: { icon: 'carbon:sun', title: 'Aucun cours' },
+  loaded: { icon: 'ph:sun', title: 'Aucun cours' },
   loading: { icon: null, title: 'Chargement du planning…' },
   unavailable: {
-    icon: 'carbon:cloud-offline',
+    icon: 'ph:cloud-slash',
     title: 'Planning indisponible',
     detail: `${PROVIDER} n’a pas répondu. Vérifie ta connexion, puis réessaie.`,
   },
   'no-timetable': {
-    icon: 'carbon:calendar',
+    icon: 'ph:calendar-blank',
     title: 'Pas d’emploi du temps',
     detail: `${PROVIDER} n’a encore aucun cours pour toi cette année. Ton emploi du temps est peut-être ailleurs`,
   },
   unconfigured: {
-    icon: 'carbon:events',
+    icon: 'ph:users-three',
     title: 'Choisis ton groupe',
     detail: 'Indique ton groupe de TD/TP dans Mon compte pour voir ton planning.',
   },
@@ -51,8 +51,8 @@ function PlanningNote({ kind, text = null, compact = false, stacked = false, onR
   const retries = kind === 'unavailable' && Boolean(onRetry)
   const opensAccount = kind === 'unconfigured' && Boolean(onOpenAccount)
   const action = retries
-    ? { label: 'Réessayer', icon: 'carbon:renew' }
-    : opensAccount ? { label: compact ? 'Mon compte' : 'Ouvrir Mon compte', icon: 'carbon:user-avatar' } : null
+    ? { label: 'Réessayer', icon: 'ph:arrows-clockwise' }
+    : opensAccount ? { label: compact ? 'Mon compte' : 'Ouvrir Mon compte', icon: 'ph:user-circle' } : null
   // Retrying swaps the button for the dots: the note keeps the focus, so
   // it isn't lost to the page.
   const handleAction = () => {
@@ -96,7 +96,7 @@ function PlanningNote({ kind, text = null, compact = false, stacked = false, onR
         <div className="mt-1 flex flex-wrap justify-center gap-2">
           {OTHER_TIMETABLES.map((link) => (
             <a key={link.href} className={`${SECONDARY_BUTTON} planning-note-action no-underline`} href={link.href} target="_blank" rel="noopener noreferrer">
-              <Icon icon="carbon:launch" className="size-4 shrink-0" aria-hidden="true" />
+              <Icon icon="ph:arrow-square-out" className="size-4 shrink-0" aria-hidden="true" />
               {link.label}
             </a>
           ))}

@@ -67,10 +67,10 @@ function PlanningMonthPicker({ selectedDay, todayKey, onPick, onClose }) {
       <div className="flex items-center gap-1 pb-2">
         <span className="flex-1 pl-2 font-body text-[15px] font-semibold capitalize text-brand">{title}</span>
         <button type="button" className="planning-picker-arrow" onClick={() => setMonth(firstOfMonth(month, -1))} aria-label="Mois précédent">
-          <Icon icon="carbon:chevron-left" className="size-4" aria-hidden="true" />
+          <Icon icon="ph:caret-left" className="size-4" aria-hidden="true" />
         </button>
         <button type="button" className="planning-picker-arrow" onClick={() => setMonth(firstOfMonth(month, 1))} aria-label="Mois suivant">
-          <Icon icon="carbon:chevron-right" className="size-4" aria-hidden="true" />
+          <Icon icon="ph:caret-right" className="size-4" aria-hidden="true" />
         </button>
       </div>
       <div className="grid grid-cols-7 gap-y-[2px] text-center">
@@ -266,8 +266,8 @@ function PlanningHeader({ titleId, selectedDay, todayKey, view, isWide, columnsF
         {isWide ? (
           <span className="flex items-center gap-1 self-center">
             {[
-              { count: -1, icon: 'carbon:chevron-left', label: byWeek ? 'Semaine précédente' : 'Jour précédent' },
-              { count: 1, icon: 'carbon:chevron-right', label: byWeek ? 'Semaine suivante' : 'Jour suivant' },
+              { count: -1, icon: 'ph:caret-left', label: byWeek ? 'Semaine précédente' : 'Jour précédent' },
+              { count: 1, icon: 'ph:caret-right', label: byWeek ? 'Semaine suivante' : 'Jour suivant' },
             ].map(({ count, icon, label }) => (
               <button
                 key={count}
@@ -301,7 +301,7 @@ function PlanningHeader({ titleId, selectedDay, todayKey, view, isWide, columnsF
                 <span className="truncate md:hidden">{isList ? shortWeekRangeText(monday) : dayText(selectedDay)}</span>
               </>
             )}
-            <Icon icon="carbon:chevron-down" className={`size-3.5 shrink-0 transition-transform duration-150 ${isPickerOpen ? 'rotate-180' : ''}`} aria-hidden="true" />
+            <Icon icon="ph:caret-down" className={`size-3.5 shrink-0 transition-transform duration-150 ${isPickerOpen ? 'rotate-180' : ''}`} aria-hidden="true" />
           </button>
           {isPickerOpen ? (
             <PlanningMonthPicker

@@ -153,7 +153,7 @@ export const ANALYTICS_EVENTS = {
   },
   setting_changed: {
     properties: {
-      setting: oneOf('widget_visibility', 'app_descriptions', 'custom_background', 'wallpaper', 'university_logo', 'theme', 'analytics', 'mail_signature', 'mail_signature_kind'),
+      setting: oneOf('widget_visibility', 'app_descriptions', 'custom_background', 'profile_photo', 'wallpaper', 'university_logo', 'theme', 'analytics', 'mail_signature', 'mail_signature_kind'),
       value: oneOf('on', 'off', 'auto', 'light', 'dark', 'partage', 'custom'),
       widget: oneOf(...WIDGET_IDS),
     },

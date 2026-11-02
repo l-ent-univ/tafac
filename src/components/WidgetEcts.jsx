@@ -99,7 +99,8 @@ const RING_LENGTH = 2 * Math.PI * RING_RADIUS
 // arc starts at 3 o'clock and runs clockwise, as in the design. Behind it,
 // faint, the credits as piles of coins, one per UE in its colour. Hidden
 // until the jury awards some: an empty ring mid-semester only worries.
-function WidgetEcts({ releve = null, config = null, visible = false }) {
+// `icon`: an image before the title.
+function WidgetEcts({ releve = null, config = null, visible = false, icon = null }) {
   // ECTS as buildGradesReport reads them (none when the department turns
   // show_ects off).
   const report = useMemo(() => (releve ? buildGradesReport(releve, { config }) : null), [releve, config])
@@ -120,6 +121,7 @@ function WidgetEcts({ releve = null, config = null, visible = false }) {
     >
       <CoinPiles piles={piles} />
       <div className="relative z-10 flex items-center gap-[5px] min-w-0">
+        {icon ? <img src={icon} alt="" width="22" height="22" draggable="false" className="mr-[3px] size-[22px] shrink-0 select-none" aria-hidden="true" /> : null}
         <span className="m-0 min-w-0 leading-[1.06] text-base font-medium text-text-muted overflow-hidden text-ellipsis whitespace-nowrap max-md:text-[14px]">Crédits ECTS</span>
         <CardInfoTip label="Les crédits ECTS, c’est quoi ?">
           Les crédits ECTS valident ton semestre : chaque UE en apporte un nombre fixe. Le jury les attribue en fin de semestre pour chaque UE validée. En fond, une pile par UE, une pièce par crédit.

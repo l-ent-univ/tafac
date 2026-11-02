@@ -54,7 +54,7 @@ function FloatingWidgets({ className = '' }) {
           </div>
         </div>
         <p className="m-0 mt-1.5 flex items-center gap-1 text-[12px] font-bold text-text">
-          <Icon icon="carbon:time" className="size-3.5" />
+          <Icon icon="ph:clock" className="size-3.5" />
           {copyText(WIDGETS.nextClass.time)}
         </p>
       </MiniCard>

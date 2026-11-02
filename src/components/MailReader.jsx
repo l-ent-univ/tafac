@@ -227,7 +227,7 @@ function AddressCard({ address, onClose, anchorRef }) {
         </div>
       </div>
       <button type="button" className="material inline-flex h-9 w-full items-center justify-center gap-2 rounded-full px-4 cursor-pointer" onClick={copy}>
-        <Icon icon={copied ? 'carbon:checkmark' : 'carbon:copy'} className="size-[14px] shrink-0" aria-hidden="true" />
+        <Icon icon={copied ? 'ph:check' : 'ph:copy'} className="size-[14px] shrink-0" aria-hidden="true" />
         <span className="text-[13px] font-semibold leading-none">{copied ? 'Adresse copiée' : 'Copier l’adresse'}</span>
       </button>
     </div>
@@ -379,7 +379,7 @@ function MailReaderPlaceholder() {
 // is hard to read: its sizes are raised so its main text reaches it.
 const READABLE_TEXT_PX = 15
 const MAX_TEXT_BOOST = 1.4
-const PHONE_QUERY = '(max-width: 640px)'
+const PHONE_QUERY = '(max-width: 1023px)'
 
 // The size most of the mail's text is in, by its length.
 function mainTextSize(doc) {
@@ -582,7 +582,7 @@ function MailBodyFrame({ message, showRemoteImages, title, onResumeDraft = null 
         <div className="-mt-1 flex flex-wrap items-center gap-2">
           {onResumeDraft ? (
             <button type="button" className="material inline-flex h-8 items-center gap-2 rounded-full px-3 cursor-pointer" onClick={onResumeDraft}>
-              <Icon icon="carbon:edit" className="size-4 shrink-0 text-text-muted" aria-hidden="true" />
+              <Icon icon="ph:pencil-simple" className="size-4 shrink-0 text-text-muted" aria-hidden="true" />
               <span className="text-[13px] font-semibold leading-none text-text">Reprendre le brouillon</span>
             </button>
           ) : null}
@@ -593,7 +593,7 @@ function MailBodyFrame({ message, showRemoteImages, title, onResumeDraft = null 
               aria-expanded={quoteShown}
               onClick={toggleQuote}
             >
-              <Icon icon={quoteShown ? 'carbon:chevron-up' : 'carbon:overflow-menu-horizontal'} className="size-4 shrink-0 text-text-muted" aria-hidden="true" />
+              <Icon icon={quoteShown ? 'ph:caret-up' : 'ph:dots-three'} className="size-4 shrink-0 text-text-muted" aria-hidden="true" />
               <span className="text-[13px] font-semibold leading-none text-text">{quoteShown ? 'Masquer le message cité' : 'Afficher le message cité'}</span>
             </button>
           ) : null}
@@ -618,7 +618,7 @@ function ReaderBackRow({ onBack, label = 'Réception' }) {
         aria-label={`Retour : ${label}`}
         onClick={onBack}
       >
-        <Icon icon="carbon:chevron-left" className="size-[18px] shrink-0" aria-hidden="true" />
+        <Icon icon="ph:caret-left" className="size-[18px] shrink-0" aria-hidden="true" />
         <span className="text-[15px] font-semibold leading-none">{label}</span>
       </button>
     </div>
@@ -700,7 +700,7 @@ function MailReader({ id, webmailHref, onBack, onLoaded, embedded = false, autoF
             {webmailHref ? (
               <a className={SECONDARY_BUTTON_CLASSES} href={webmailHref} target="_blank" rel="noopener noreferrer">
                 Ouvrir le webmail
-                <Icon icon="carbon:arrow-up-right" className="size-[14px] shrink-0" aria-hidden="true" />
+                <Icon icon="ph:arrow-up-right" className="size-[14px] shrink-0" aria-hidden="true" />
               </a>
             ) : null}
           </div>
@@ -766,7 +766,7 @@ function MailReader({ id, webmailHref, onBack, onLoaded, embedded = false, autoF
           {message.attachments.length ? (
             <section className="grid gap-[10px] rounded-[28px] bg-bg-subtle p-2 dark:bg-bg-muted" aria-labelledby="mail-attachments-title">
               <div className="flex items-center gap-[5px] px-2 pt-[6px] text-brand">
-                <Icon icon="carbon:attachment" className="size-[17px] shrink-0" aria-hidden="true" />
+                <Icon icon="ph:paperclip" className="size-[17px] shrink-0" aria-hidden="true" />
                 <h3 id="mail-attachments-title" className="m-0 font-body text-base font-medium leading-[1.06]">Pièces jointes</h3>
                 <span className="ml-auto font-body text-[13px] font-medium leading-none text-text-muted tabular-nums">{message.attachments.length}</span>
               </div>
@@ -777,7 +777,7 @@ function MailReader({ id, webmailHref, onBack, onLoaded, embedded = false, autoF
           {message.remoteImages > 0 && !showRemoteImages ? (
             <ul className={GROUP_CARD_CLASSES}>
               <GroupRow
-                icon="carbon:image"
+                icon="ph:image"
                 title="Images externes masquées"
                 compact
                 trailing="Afficher"

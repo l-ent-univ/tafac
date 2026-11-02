@@ -146,10 +146,10 @@ function UeDial({ ues, turn, onTurn, leaving = false, hiddenCode = null, onLeft 
       {count > 1 ? (
         <>
           <button type="button" className={`${ARROW_CLASSES} left-6 max-sm:left-4`} aria-label="UE précédente" onClick={() => setTurn((current) => current - 1)}>
-            <Icon icon="carbon:chevron-left" className="size-5" aria-hidden="true" />
+            <Icon icon="ph:caret-left" className="size-5" aria-hidden="true" />
           </button>
           <button type="button" className={`${ARROW_CLASSES} right-6 max-sm:right-4`} aria-label="UE suivante" onClick={() => setTurn((current) => current + 1)}>
-            <Icon icon="carbon:chevron-right" className="size-5" aria-hidden="true" />
+            <Icon icon="ph:caret-right" className="size-5" aria-hidden="true" />
           </button>
         </>
       ) : null}
@@ -442,7 +442,7 @@ function GradeSimulatorModal({ report = null, releve = null, config = null, seme
         <header className="relative">
           <span className="gd-grabber relative mx-auto hidden h-[4px] w-9 rounded-full bg-text-30 max-sm:block max-sm:translate-y-2" aria-hidden="true" />
           <div className="relative flex items-center gap-3 px-6 pt-5 pb-3 max-sm:px-4 max-sm:pt-[14px]">
-            <Icon icon="carbon:calculator" className="size-6 shrink-0 text-text" aria-hidden="true" />
+            <Icon icon="ph:calculator" className="size-6 shrink-0 text-text" aria-hidden="true" />
             <span className="grid min-w-0 flex-1 gap-[2px]">
               <h2 id={titleId} className="m-0 truncate font-display text-[20px] font-bold leading-none text-text max-sm:text-[19px]">Simuler mes notes</h2>
               {semesterLabel ? (
@@ -478,7 +478,7 @@ function GradeSimulatorModal({ report = null, releve = null, config = null, seme
             </span>
             <LentButton disabled={hasInvalid} onClick={showReveal}>
               Suivant
-              <Icon icon="carbon:arrow-right" className="size-4" aria-hidden="true" />
+              <Icon icon="ph:arrow-right" className="size-4" aria-hidden="true" />
             </LentButton>
           </footer>
         ) : null}
@@ -509,7 +509,7 @@ function GradeSimulatorModal({ report = null, releve = null, config = null, seme
             </div>
             <LentButton disabled={!activeUe} onClick={goToUe}>
               Suivant
-              <Icon icon="carbon:arrow-right" className="size-4" aria-hidden="true" />
+              <Icon icon="ph:arrow-right" className="size-4" aria-hidden="true" />
             </LentButton>
           </div>
         )}

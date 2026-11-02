@@ -28,7 +28,7 @@ export default function RenameNotice({ visible, onDismiss }) {
         onClick={dismiss}
       />
       <div
-        className={`fixed bottom-0 left-0 right-0 z-50 px-4 pb-[max(1rem,env(safe-area-inset-bottom))] ${animatingOut ? 'animate-[pwa-slide-out_280ms_ease-in_forwards]' : 'animate-[pwa-slide-in_350ms_cubic-bezier(0.16,1,0.3,1)]'}`}
+        className={`fixed bottom-0 left-0 right-0 z-50 pl-[max(1rem,env(safe-area-inset-left))] pr-[max(1rem,env(safe-area-inset-right))] pb-[max(1rem,env(safe-area-inset-bottom))] ${animatingOut ? 'animate-[pwa-slide-out_280ms_ease-in_forwards]' : 'animate-[pwa-slide-in_350ms_cubic-bezier(0.16,1,0.3,1)]'}`}
         role="dialog"
         aria-modal="true"
         aria-labelledby="rename-notice-title"
@@ -55,7 +55,7 @@ export default function RenameNotice({ visible, onDismiss }) {
               href={`https://${NEW_ADDRESS}`}
               className="mt-1 flex items-center gap-3 corners-[16px] border border-border bg-bg-subtle px-3.5 py-3 text-text no-underline transition-colors hover:bg-bg"
             >
-              <Icon icon="carbon:earth" className="h-5 w-5 shrink-0 text-text-muted" aria-hidden="true" />
+              <Icon icon="ph:globe-hemisphere-west" className="h-5 w-5 shrink-0 text-text-muted" aria-hidden="true" />
               <span className="flex min-w-0 flex-col gap-0.5 font-body leading-snug">
                 <span className="text-[0.9rem] font-semibold">Nouvelle adresse : {NEW_ADDRESS}</span>
                 <span className="text-[0.8rem] text-text-muted">Pense à la rajouter sur ton écran d'accueil</span>
@@ -70,7 +70,7 @@ export default function RenameNotice({ visible, onDismiss }) {
                 rel="noopener noreferrer"
                 className="inline-flex items-center justify-center gap-2 py-3.5 border-r border-border text-text-muted font-body font-medium text-[0.95rem] no-underline active:bg-bg-subtle transition-colors hover:text-text"
               >
-                <Icon icon="carbon:logo-github" className="h-4 w-4" aria-hidden="true" />
+                <Icon icon="ph:github-logo" className="h-4 w-4" aria-hidden="true" />
                 Code source
               </a>
             ) : null}

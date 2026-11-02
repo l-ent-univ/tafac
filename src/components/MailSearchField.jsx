@@ -8,7 +8,7 @@ import { Icon } from '@iconify/react'
 function MailSearchField({ value, onChange, placeholder = 'Rechercher', label = placeholder, inputRef = null, className = '' }) {
   return (
     <div className={`material mail-search-field flex h-11 min-w-0 items-center gap-2 rounded-full pl-4 pr-[5px] text-[15px] focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-text/20 ${className}`}>
-      <Icon icon="carbon:search" className="size-[17px] shrink-0 text-text-muted" aria-hidden="true" />
+      <Icon icon="ph:magnifying-glass" className="size-[17px] shrink-0 text-text-muted" aria-hidden="true" />
       <input
         ref={inputRef}
         type="search"
@@ -34,7 +34,7 @@ function MailSearchField({ value, onChange, placeholder = 'Rechercher', label = 
             inputRef?.current?.focus()
           }}
         >
-          <Icon icon="carbon:close" className="size-4" aria-hidden="true" />
+          <Icon icon="ph:x" className="size-4" aria-hidden="true" />
         </button>
       ) : null}
     </div>

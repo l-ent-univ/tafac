@@ -10,10 +10,10 @@ import Switch from './Switch'
 // off and which (src/mailSignatureStore.js, shared with the composer's
 // switch), a preview of it as it goes, and the custom one's editor. The
 // custom text is kept in Partage (POST /mail/signature) as its « Tafac »
-// signature: on every device, and in the webmail too.
+// signature: on every device, and in the webmail too. « Partage » (the
+// webmail's own signature) is hidden for now (mailSignatureStore.js).
 const KINDS = [
   { id: 'auto', label: 'Automatique' },
-  { id: 'partage', label: 'Partage' },
   { id: 'custom', label: 'Personnalisée' },
 ]
 
@@ -142,7 +142,7 @@ function MailSignatureSettings({ autoSignature }) {
   return (
     <SettingsGroup title="Signature" footer={enabled ? FOOTERS[kind] : null}>
       <label className={`${ROW_CLASSES} cursor-pointer`}>
-        <RowText icon="carbon:pen" label="Signature des mails" description="Ajoutée sous chaque mail que tu écris" />
+        <RowText icon="ph:pen" label="Signature des mails" description="Ajoutée sous chaque mail que tu écris" />
         <Switch checked={enabled} onChange={setMailSignatureEnabled} />
       </label>
       {/* Unfolds with the switch (its grid row from 0fr to 1fr); folded, inert. */}

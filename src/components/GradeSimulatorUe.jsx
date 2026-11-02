@@ -94,7 +94,7 @@ function CustomRow({ custom, index, override, onOverride, onCoef, onRemove, onIn
         aria-label={`Retirer ${label}`}
         onClick={onRemove}
       >
-        <Icon icon="carbon:close" className="size-4" aria-hidden="true" />
+        <Icon icon="ph:x" className="size-4" aria-hidden="true" />
       </button>
     </li>
   )
@@ -200,7 +200,7 @@ function SubjectRow({ subject, icon, overrides, onOverride, customs, onAddCustom
           <span className="truncate font-body text-[13px] font-medium leading-[1.3] text-text-muted">{subject.code} · {progress}</span>
         </span>
         <Average value={subject.average} />
-        <Icon icon="carbon:chevron-down" className="subject-row-chevron size-4 shrink-0 text-text-muted" aria-hidden="true" />
+        <Icon icon="ph:caret-down" className="subject-row-chevron size-4 shrink-0 text-text-muted" aria-hidden="true" />
       </button>
       <div id={`${id}-panel`} role="region" aria-labelledby={`${id}-button`} className="subject-panel">
         <div className="subject-panel-inner">
@@ -235,7 +235,7 @@ function SubjectRow({ subject, icon, overrides, onOverride, customs, onAddCustom
               className="subject-add-grade inline-flex min-h-[42px] w-full items-center justify-center gap-[6px] corners-[14px] border border-dashed border-border-input bg-transparent px-3 font-body text-[14px] font-semibold text-text-secondary cursor-pointer transition-colors hover:bg-bg-subtle hover:text-text"
               onClick={onAddCustom}
             >
-              <Icon icon="carbon:add" className="size-4" aria-hidden="true" />
+              <Icon icon="ph:plus" className="size-4" aria-hidden="true" />
               Ajouter une note
             </button>
           </div>

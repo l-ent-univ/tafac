@@ -4,7 +4,6 @@ import universityConfig from '@university'
 import loginClouds from '../assets/login/login-clouds.webp'
 import loginIsland from '../assets/login/login-island.webp'
 import loginSky from '../assets/login/login-sky.webp'
-import loginLogo from '../assets/login/login-logo.webp'
 import LentButton from './LentButton'
 import BetaTag from './BetaTag'
 import LogoBut1 from './LogoBut1'
@@ -72,7 +71,7 @@ function UniversityPicker() {
     <div className="mt-6 flex w-full flex-col gap-3">
       {universities.length >= PICKER_SEARCH_FROM ? (
         <div className="relative">
-          <Icon icon="carbon:search" className="pointer-events-none absolute left-[18px] top-1/2 h-4 w-4 -translate-y-1/2 text-text-muted" aria-hidden="true" />
+          <Icon icon="ph:magnifying-glass" className="pointer-events-none absolute left-[18px] top-1/2 h-4 w-4 -translate-y-1/2 text-text-muted" aria-hidden="true" />
           <input
             type="search"
             className={`${FIELD_CLASS} pl-11`}
@@ -95,14 +94,14 @@ function UniversityPicker() {
               {entry.logoUrl ? (
                 <img className="block max-h-full w-auto max-w-full object-contain dark:invert" src={entry.logoUrl} alt="" />
               ) : (
-                <Icon icon="carbon:education" className="h-7 w-7 text-text" aria-hidden="true" />
+                <Icon icon="ph:graduation-cap" className="h-7 w-7 text-text" aria-hidden="true" />
               )}
             </span>
             <span className="flex min-w-0 flex-1 flex-col gap-0.5">
               <span className="text-[16px] font-bold leading-[1.2]">{entry.name}</span>
               <span className="truncate text-[13px] font-medium leading-[1.2] text-text-muted font-body">tafac.fr/{entry.slug}</span>
             </span>
-            <Icon icon="carbon:chevron-right" className="h-5 w-5 shrink-0 text-text-muted transition-colors duration-150 group-hover:text-text" aria-hidden="true" />
+            <Icon icon="ph:caret-right" className="h-5 w-5 shrink-0 text-text-muted transition-colors duration-150 group-hover:text-text" aria-hidden="true" />
           </a>
         ))}
         {universities.length === 0 ? (
@@ -154,16 +153,8 @@ function LoginPage({
         />
 
         <div className="relative z-10 ml-10 flex w-[381px] max-w-[calc(100%_-_80px)] shrink-0 flex-col items-start gap-5 pt-10 max-3xl:ml-8 max-3xl:max-w-[calc(100%_-_64px)]">
-          {/* The flower and butterfly overflow the 195×85 logo box. */}
-          <div className="relative h-[85px] w-[195px] shrink-0">
-            <img
-              className="absolute left-[-21px] top-[-15px] block h-[110px] w-[247px] max-w-none"
-              src={loginLogo}
-              alt={APP_NAME}
-              width="247"
-              height="110"
-            />
-          </div>
+          {/* The Tafac logo, its wordmark in white on the sky. */}
+          <LogoBut1 className="h-[64px]" wordmarkClassName="[filter:brightness(0)_invert(1)]" />
           {/* Under the logo: in beta, and the family it belongs to (as on the
               landing page's header), in white on the sky. */}
           <div className="flex flex-wrap items-center gap-3">
@@ -222,7 +213,7 @@ function LoginPage({
             className="inline-flex h-8 min-w-0 items-center gap-[6px] rounded-full border border-border/70 bg-widget-bg/60 px-3 text-[13px] font-medium leading-none font-body transition-colors duration-120 hover:bg-widget-bg"
             onClick={() => setRenameNoticeOpen(true)}
           >
-            <Icon icon="carbon:star" className="h-[14px] w-[14px] shrink-0 text-text-muted" aria-hidden="true" />
+            <Icon icon="ph:star" className="h-[14px] w-[14px] shrink-0 text-text-muted" aria-hidden="true" />
             <span
               className="truncate bg-[linear-gradient(90deg,var(--color-text-muted)_0%,var(--color-text)_50%,var(--color-text-muted)_100%)] bg-[length:200%_100%] bg-clip-text text-transparent animate-shimmer"
               style={{ animationDuration: '3s' }}
@@ -237,7 +228,7 @@ function LoginPage({
             onClick={() => setAboutOpen(true)}
             aria-label="À propos"
           >
-            <Icon icon="carbon:information" className="h-4 w-4" />
+            <Icon icon="ph:info" className="h-4 w-4" />
           </button>
         </div>
 
@@ -331,7 +322,7 @@ function LoginPage({
                           aria-controls="login-password"
                           tabIndex={-1}
                         >
-                          <Icon icon={showPassword ? 'carbon:view-off' : 'carbon:view'} className="h-[18px] w-[18px]" />
+                          <Icon icon={showPassword ? 'ph:eye-slash' : 'ph:eye'} className="h-[18px] w-[18px]" />
                         </button>
                       </div>
                     </div>
@@ -343,7 +334,7 @@ function LoginPage({
                     <div className="overflow-hidden">
                       <div className="pt-4" role="alert">
                         <div className={`flex items-start gap-[10px] corners-[14px] border border-error/20 bg-error-bg px-4 py-3 text-error transition-opacity duration-200 ${errorMessage ? 'opacity-100' : 'opacity-0'}`}>
-                          <Icon icon="carbon:warning-filled" className="mt-px h-4 w-4 shrink-0" aria-hidden="true" />
+                          <Icon icon="ph:warning-circle-fill" className="mt-px h-4 w-4 shrink-0" aria-hidden="true" />
                           <p className="m-0 text-sm font-semibold leading-[1.3] font-body">{errorMessage}</p>
                         </div>
                       </div>
@@ -373,7 +364,7 @@ function LoginPage({
                 {/* What happens to the password. */}
                 {passwordNote ? (
                   <p className="m-0 mt-5 box-border w-full corners-[16px] border border-border bg-widget-bg px-4 py-3 text-[13px] font-medium leading-[1.4] text-text-muted font-body">
-                    <Icon icon="carbon:locked" className="mr-[6px] inline-block h-[14px] w-[14px] align-[-2px]" aria-hidden="true" />
+                    <Icon icon="ph:lock" className="mr-[6px] inline-block h-[14px] w-[14px] align-[-2px]" aria-hidden="true" />
                     {passwordNote}
                   </p>
                 ) : null}

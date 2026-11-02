@@ -60,7 +60,7 @@ function HistogramUnavailable({ status, reason, isPending, onRetry }) {
   return (
     <Frame className="grid place-items-center corners-[14px] border border-dashed border-border-input">
       <div className="grid max-w-[260px] justify-items-center gap-[6px] px-4 text-center">
-        <Icon icon="carbon:chart-histogram" className="size-5 text-text-muted" aria-hidden="true" />
+        <Icon icon="ph:chart-bar-horizontal" className="size-5 text-text-muted" aria-hidden="true" />
         <p className="m-0 font-body text-[14px] font-semibold leading-[1.3] text-text">{notYet ? 'Pas encore de répartition' : tooFew ? 'Pas assez de notes' : 'Répartition indisponible'}</p>
         <p className="m-0 font-body text-[13px] font-medium leading-[1.35] text-text-muted">
           {isError
@@ -73,7 +73,7 @@ function HistogramUnavailable({ status, reason, isPending, onRetry }) {
         </p>
         {isError && onRetry ? (
           <button type="button" onClick={onRetry} className="gh-retry mt-1 inline-flex items-center gap-[5px] rounded-full border border-border bg-transparent px-3 py-[6px] text-text cursor-pointer">
-            <Icon icon="carbon:renew" className="size-[14px]" aria-hidden="true" />
+            <Icon icon="ph:arrows-clockwise" className="size-[14px]" aria-hidden="true" />
             <span className="font-body text-[13px] font-semibold leading-none">Réessayer</span>
           </button>
         ) : null}

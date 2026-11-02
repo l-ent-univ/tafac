@@ -32,6 +32,7 @@ import { DebugButton, DebugField, DebugRow, DebugSection, DebugSegmented, DebugS
 import CloseButton from '../CloseButton'
 import DebugOutput from './DebugOutput'
 import { clearClientRuntimeState, getErrorMessage, resolveDebugImagePreviewFromSnapshot } from './debugUtils'
+import { NEXT_CLASS_LOOKAHEAD_DAYS } from '../../upcomingClasses'
 
 const DEFAULT_REQUEST_PATH = '/api/v4-3/dlm/layout.json'
 // Both read once, at load (src/papillon.js, src/serviceNoticeDebug.js):
@@ -103,7 +104,6 @@ export default function DebugMenu({
   onShowUpdatePrompt,
   onShowWelcomeFromLent,
   selectedTp,
-  nextClassLookaheadDays,
 }) {
   const [outputTab, setOutputTab] = useState('api')
   const [imagePreview, setImagePreview] = useState(null)
@@ -270,7 +270,7 @@ export default function DebugMenu({
     ['ADE Timetable', () => getAdeTimetable({ force: true, resourceId: selectedAdeResourceId })],
     ['ADE Upcoming', () => getAdeUpcoming({
       date: new Date().toISOString().slice(0, 10),
-      lookaheadDays: nextClassLookaheadDays,
+      lookaheadDays: NEXT_CLASS_LOOKAHEAD_DAYS,
       selection: selectedTp,
     })],
     ['ADE Alerts', () => getAdeAlerts()],
@@ -465,10 +465,10 @@ export default function DebugMenu({
             </DebugRow>
             <DebugRow label="Photo du bandeau" hint={heroStatus}>
               <DebugButton className="w-9 px-0" onClick={() => onHeroShift(-1)} disabled={!canShiftHero} aria-label="Précédente" title="Précédente">
-                <Icon icon="carbon:chevron-left" className="h-5 w-5" aria-hidden="true" />
+                <Icon icon="ph:caret-left" className="h-5 w-5" aria-hidden="true" />
               </DebugButton>
               <DebugButton className="w-9 px-0" onClick={() => onHeroShift(1)} disabled={!canShiftHero} aria-label="Suivante" title="Suivante">
-                <Icon icon="carbon:chevron-right" className="h-5 w-5" aria-hidden="true" />
+                <Icon icon="ph:caret-right" className="h-5 w-5" aria-hidden="true" />
               </DebugButton>
             </DebugRow>
           </DebugSection>

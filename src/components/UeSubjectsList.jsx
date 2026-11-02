@@ -141,7 +141,7 @@ function describeDecision(code) {
 function BelowTenMark({ decision }) {
   if (!decision) {
     return (
-      <CardInfoTip label="Moyenne sous 10 : qu’est-ce que ça veut dire ?" icon="carbon:warning-alt-filled" iconClassName="ue-below-warning">
+      <CardInfoTip label="Moyenne sous 10 : qu’est-ce que ça veut dire ?" icon="ph:warning-fill" iconClassName="ue-below-warning">
         {BELOW_TEN_NOTE}
       </CardInfoTip>
     )
@@ -150,7 +150,7 @@ function BelowTenMark({ decision }) {
   return (
     <CardInfoTip
       label={`Décision du jury : ${decision}, ${title.toLowerCase()}. Qu’est-ce que ça veut dire ?`}
-      icon="carbon:warning-filled"
+      icon="ph:warning-circle-fill"
       iconClassName="ue-jury-decision"
       text={decision}
     >
@@ -224,7 +224,7 @@ function UeValidationTag({ ue, withTip = false }) {
   if (!tag) return null
   return (
     <span className="ue-validation-tag inline-flex items-center gap-[4px] whitespace-nowrap rounded-full bg-bg-subtle px-[7px] py-[3px] font-body dark:bg-white/[0.08] text-[12px] font-semibold leading-none text-text-secondary has-[button]:py-[1px] has-[button]:pr-[2px]">
-      <Icon icon="carbon:checkmark" className="size-[12px] shrink-0" aria-hidden="true" />
+      <Icon icon="ph:check" className="size-[12px] shrink-0" aria-hidden="true" />
       <span aria-hidden="true">{tag.label}</span>
       {withTip ? <CardInfoTip label={`${tag.label} : qu’est-ce que ça veut dire ?`}>{tag.tip}</CardInfoTip> : null}
     </span>
@@ -303,7 +303,7 @@ function UeModuleRow({ rowId, ueCode, module, isOpen, onToggle, icon, showPromoS
         {module.average != null
           ? <ScoreText value={module.average} />
           : <span className="shrink-0 font-body text-[13px] font-semibold text-text-muted">—</span>}
-        {isEmpty ? <span className="size-4 shrink-0" aria-hidden="true" /> : <Icon icon="carbon:chevron-down" className="subject-row-chevron size-4 shrink-0 text-text-muted" aria-hidden="true" />}
+        {isEmpty ? <span className="size-4 shrink-0" aria-hidden="true" /> : <Icon icon="ph:caret-down" className="subject-row-chevron size-4 shrink-0 text-text-muted" aria-hidden="true" />}
       </Header>
       {isEmpty ? null : (
       <div id={panelId} role="region" aria-labelledby={buttonId} className="subject-panel">
@@ -578,8 +578,8 @@ function UeSubjectsList({ report, subjectIcon = () => null, newEvaluationIds = n
     if (!ue) return null
     const news = ue.modules.filter(hasUnread)
     return [
-      { id: 'open', label: 'Ouvrir', icon: 'carbon:maximize', onSelect: () => openFromTile(code) },
-      news.length ? { id: 'news', label: 'Voir les nouvelles notes', icon: 'carbon:arrow-right', onSelect: () => openFromTile(code, news[0]) } : null,
+      { id: 'open', label: 'Ouvrir', icon: 'ph:arrows-out', onSelect: () => openFromTile(code) },
+      news.length ? { id: 'news', label: 'Voir les nouvelles notes', icon: 'ph:arrow-right', onSelect: () => openFromTile(code, news[0]) } : null,
     ]
   })
 
@@ -668,7 +668,7 @@ function UeSubjectsList({ report, subjectIcon = () => null, newEvaluationIds = n
                   aria-label={`Ouvrir ${ue.code} : ses matières et ses notes`}
                   className="ue-card-chevron col-start-4 row-start-1 inline-flex size-8 shrink-0 items-center justify-center rounded-full border-0 bg-transparent p-0 text-text-muted cursor-pointer"
                 >
-                  <Icon icon="carbon:maximize" className="size-4" aria-hidden="true" />
+                  <Icon icon="ph:arrows-out" className="size-4" aria-hidden="true" />
                 </button>
               </header>
               {/* News: how many new grades and where, at the tile's foot; it opens
@@ -685,7 +685,7 @@ function UeSubjectsList({ report, subjectIcon = () => null, newEvaluationIds = n
                       {newsCount} {newsCount > 1 ? 'nouvelles notes' : 'nouvelle note'}
                     </span>
                     <span className="min-w-0 flex-1 truncate font-body text-[13px] font-medium leading-none">{newsModules.map((module) => module.title).join(', ')}</span>
-                    <Icon icon="carbon:arrow-right" className="size-[14px] shrink-0" aria-hidden="true" />
+                    <Icon icon="ph:arrow-right" className="size-[14px] shrink-0" aria-hidden="true" />
                   </button>
                 </div>
               ) : null}
@@ -723,7 +723,7 @@ function UeFullView({ id, ue, headingId, backButtonRef, onClose, onKeyDown, hasN
             onClick={onClose}
             className="ue-full-close pointer-events-auto inline-flex items-center gap-[6px] rounded-full border border-border bg-widget-bg/85 py-[7px] pr-[13px] pl-[10px] text-text shadow-[0_6px_18px_-8px_rgb(52_18_0/0.25)] backdrop-blur-md cursor-pointer"
           >
-            <Icon icon="carbon:arrow-left" className="size-4" aria-hidden="true" />
+            <Icon icon="ph:arrow-left" className="size-4" aria-hidden="true" />
             <span className="font-body text-[13px] font-semibold leading-none">Toutes les UE</span>
           </button>
         </div>

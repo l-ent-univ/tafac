@@ -61,13 +61,13 @@ export function linkMenuItems(link, actions) {
   if (!link) return []
   if (link.kind === 'mail') return addressMenuItems({ email: link.address }, actions)
   if (link.kind === 'download') {
-    return [{ id: 'download', label: 'Télécharger', icon: 'carbon:download', onSelect: actions.open }]
+    return [{ id: 'download', label: 'Télécharger', icon: 'ph:download-simple', onSelect: actions.open }]
   }
   return [
-    { id: 'open', label: 'Ouvrir', icon: link.newTab ? 'carbon:launch' : 'carbon:arrow-right', onSelect: actions.open },
-    link.newTab ? null : { id: 'open-tab', label: 'Ouvrir dans un nouvel onglet', icon: 'carbon:new-tab', onSelect: actions.openInNewTab },
+    { id: 'open', label: 'Ouvrir', icon: link.newTab ? 'ph:arrow-square-out' : 'ph:arrow-right', onSelect: actions.open },
+    link.newTab ? null : { id: 'open-tab', label: 'Ouvrir dans un nouvel onglet', icon: 'ph:arrow-square-out', onSelect: actions.openInNewTab },
     'separator',
-    { id: 'copy-link', label: 'Copier le lien', icon: 'carbon:link', onSelect: () => actions.copy(link.absoluteHref ?? link.href) },
+    { id: 'copy-link', label: 'Copier le lien', icon: 'ph:link', onSelect: () => actions.copy(link.absoluteHref ?? link.href) },
   ].filter(Boolean)
 }
 
@@ -77,8 +77,8 @@ export function addressMenuItems(address, { copy, compose = null }) {
   const email = String(address?.email ?? '').trim()
   if (!email) return []
   return [
-    compose ? { id: 'compose', label: 'Nouveau message', icon: 'carbon:edit', onSelect: () => compose({ name: address.name ?? '', email }) } : null,
-    { id: 'copy-address', label: 'Copier l’adresse', icon: 'carbon:copy', onSelect: () => copy(email) },
+    compose ? { id: 'compose', label: 'Nouveau message', icon: 'ph:pencil-simple', onSelect: () => compose({ name: address.name ?? '', email }) } : null,
+    { id: 'copy-address', label: 'Copier l’adresse', icon: 'ph:copy', onSelect: () => copy(email) },
   ].filter(Boolean)
 }
 
@@ -92,8 +92,8 @@ export function selectionMenuItems(text, { copy, search = null }) {
   if (!value.trim()) return []
   const query = value.replace(/\s+/g, ' ').trim().slice(0, SEARCH_TEXT_MAX).trim()
   return [
-    { id: 'copy', label: 'Copier', icon: 'carbon:copy', onSelect: () => copy(value) },
-    search ? { id: 'search-mail', label: 'Rechercher dans les mails', icon: 'carbon:search', onSelect: () => search(query) } : null,
+    { id: 'copy', label: 'Copier', icon: 'ph:copy', onSelect: () => copy(value) },
+    search ? { id: 'search-mail', label: 'Rechercher dans les mails', icon: 'ph:magnifying-glass', onSelect: () => search(query) } : null,
   ].filter(Boolean)
 }
 
@@ -151,7 +151,7 @@ export function attachmentViewHref({ href, type }) {
 export function attachmentMenuItems(attachment, { open, download }) {
   const viewHref = attachmentViewHref(attachment)
   return [
-    viewHref ? { id: 'open', label: 'Ouvrir', icon: 'carbon:launch', onSelect: () => open(viewHref) } : null,
-    { id: 'download', label: 'Télécharger', icon: 'carbon:download', onSelect: download },
+    viewHref ? { id: 'open', label: 'Ouvrir', icon: 'ph:arrow-square-out', onSelect: () => open(viewHref) } : null,
+    { id: 'download', label: 'Télécharger', icon: 'ph:download-simple', onSelect: download },
   ].filter(Boolean)
 }

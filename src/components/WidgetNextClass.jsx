@@ -270,19 +270,19 @@ function getStatusCopy(widgetState, lookaheadDays = NEXT_CLASS_LOOKAHEAD_DAYS, {
       return {
         title: 'Chargement',
         body: 'Chargement',
-        icon: 'carbon:search',
+        icon: 'ph:magnifying-glass',
       }
     case 'unconfigured':
       return {
         title: 'Groupe manquant',
         body: 'Choisis ton groupe TD ou TP dans « Mon compte »',
-        icon: 'carbon:user-multiple',
+        icon: 'ph:users',
       }
     case 'limited':
       return {
         title: 'Planning partiel',
         body: 'Les données reçues sont incomplètes pour le moment',
-        icon: 'carbon:warning-alt',
+        icon: 'ph:warning',
         action,
       }
     case 'empty':
@@ -291,7 +291,7 @@ function getStatusCopy(widgetState, lookaheadDays = NEXT_CLASS_LOOKAHEAD_DAYS, {
         return {
           title: 'Pas d’emploi du temps',
           body: `${PLANNING_PROVIDER} n’a encore aucun cours pour toi cette année`,
-          icon: 'carbon:calendar',
+          icon: 'ph:calendar-blank',
           action,
         }
       }
@@ -304,14 +304,14 @@ function getStatusCopy(widgetState, lookaheadDays = NEXT_CLASS_LOOKAHEAD_DAYS, {
       return {
         title: 'Synchroniser le planning',
         body: 'Appuie ici pour mettre à jour le prochain cours',
-        icon: 'carbon:calendar-settings',
+        icon: 'ph:calendar-check',
         action,
       }
     default:
       return {
         title: 'Prochain cours',
         body: '',
-        icon: 'carbon:calendar',
+        icon: 'ph:calendar-blank',
       }
   }
 }
@@ -756,8 +756,8 @@ function WidgetNextClass({
   // Its right-click menu (a long press): what a click does, and the class
   // as text.
   const menuProps = useContextMenu(preview ? null : () => [
-    { id: 'open', label: opensInApp ? 'Voir le planning' : `Ouvrir ${PLANNING_PROVIDER}`, icon: 'carbon:calendar', disabled: !opensInApp && !ADE_HREF, onSelect: openPlanning },
-    showsClass ? { id: 'copy', label: 'Copier', icon: 'carbon:copy', onSelect: () => void copyToClipboard(classCopyText(nextClass)) } : null,
+    { id: 'open', label: opensInApp ? 'Voir le planning' : `Ouvrir ${PLANNING_PROVIDER}`, icon: 'ph:calendar-blank', disabled: !opensInApp && !ADE_HREF, onSelect: openPlanning },
+    showsClass ? { id: 'copy', label: 'Copier', icon: 'ph:copy', onSelect: () => void copyToClipboard(classCopyText(nextClass)) } : null,
   ])
 
   // Hidden when the planning can't be loaded; the background refresh brings
@@ -787,7 +787,7 @@ function WidgetNextClass({
       ) : null}
       {/* The "opens another site" arrow: none when the card opens the
           Planning page, as on "Dernière note". */}
-      {opensInApp || preview ? null : <Icon icon="carbon:arrow-up-right" className="grade-corner-arrow absolute top-3 right-3 w-[14px] h-[14px] text-text opacity-0 transition-opacity duration-150 ease-in-out shrink-0" aria-hidden="true" />}
+      {opensInApp || preview ? null : <Icon icon="ph:arrow-up-right" className="grade-corner-arrow absolute top-3 right-3 w-[14px] h-[14px] text-text opacity-0 transition-opacity duration-150 ease-in-out shrink-0" aria-hidden="true" />}
       <div className="flex items-center gap-[5px] min-w-0">
         <span className="m-0 min-w-0 leading-[1.06] text-base font-medium text-text-muted overflow-hidden text-ellipsis whitespace-nowrap max-md:text-[15px]">Prochain cours</span>
       </div>
@@ -825,7 +825,7 @@ function WidgetNextClass({
                     className={`relative inline-flex min-w-0 items-center gap-[5px] ${shouldShowExactDateTooltip ? 'group/next-class cursor-help' : ''}`}
                     title={shouldShowExactDateTooltip ? exactDateLabel : undefined}
                   >
-                    <Icon icon="carbon:time" className="w-[15px] h-[15px] shrink-0" aria-hidden="true" />
+                    <Icon icon="ph:clock" className="w-[15px] h-[15px] shrink-0" aria-hidden="true" />
                     <span ref={timeLabelRef} className="block min-w-0 leading-[1.06] text-[15px] font-semibold overflow-hidden text-ellipsis whitespace-nowrap max-md:text-[14px]">{timeLabel}</span>
                     {shouldShowExactDateTooltip ? (
                       <span className="pointer-events-none absolute left-1/2 top-full z-20 mt-2 inline-flex -translate-x-1/2 translate-y-1 scale-95 whitespace-nowrap rounded-full border border-white/70 bg-[rgba(17,24,39,0.92)] px-3 py-1.5 text-[12px] font-medium leading-none text-white opacity-0 shadow-[0_12px_32px_rgba(17,24,39,0.18)] transition-[opacity,transform] duration-180 ease-out invisible group-hover/next-class:visible group-hover/next-class:translate-y-0 group-hover/next-class:scale-100 group-hover/next-class:opacity-100">
@@ -857,7 +857,7 @@ function WidgetNextClass({
             {statusCopy.action ? (
               <span className="inline-flex items-center gap-1 text-[13px] font-semibold opacity-80">
                 {statusCopy.action}
-                <Icon icon={opensInApp ? 'carbon:arrow-right' : 'carbon:arrow-up-right'} className="w-[13px] h-[13px] shrink-0" aria-hidden="true" />
+                <Icon icon={opensInApp ? 'ph:arrow-right' : 'ph:arrow-up-right'} className="w-[13px] h-[13px] shrink-0" aria-hidden="true" />
               </span>
             ) : null}
           </div>

@@ -24,7 +24,7 @@ function UeLink({ code, color, onClick = null, label, title, children }) {
         {formatUeCode(code)}
       </span>
       {children}
-      {onClick ? <Icon icon="carbon:arrow-right" className="ue-also-arrow size-[13px] shrink-0 text-text-muted" aria-hidden="true" /> : null}
+      {onClick ? <Icon icon="ph:arrow-right" className="ue-also-arrow size-[13px] shrink-0 text-text-muted" aria-hidden="true" /> : null}
     </Tag>
   )
 }

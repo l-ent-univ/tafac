@@ -563,7 +563,7 @@ function estimatePromoAverage(releve, projectedUes) {
   return weightSum > 0 ? weighted / weightSum : null
 }
 
-// "Moyenne Générale" card. ScoDoc's semester average when the relevé
+// "Moyenne générale" card. ScoDoc's semester average when the relevé
 // carries it; when the department blocks it (or it isn't computed yet), the
 // UE averages weighted by their ECTS, like ScoDoc does. The promo average
 // the same way: ScoDoc's when it sends the student's (show_moypromo only
@@ -597,7 +597,7 @@ export function hasCountedGrade(releve) {
     .some((module) => (module?.evaluations ?? []).some((evaluation) => readCountedGrade(evaluation?.note?.value) != null)))
 }
 
-// Everything the "Moyenne Générale" card shows for one semester's relevé, or
+// Everything the "Moyenne générale" card shows for one semester's relevé, or
 // null when there's no average to show: also without a single grade yet, even
 // if ScoDoc sends an average (capitalised UEs, bonus…), as it means nothing yet.
 export function summarizeAverage(releve) {

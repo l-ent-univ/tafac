@@ -7,15 +7,15 @@ import { getMobileTabItems, openNavItemLink } from '../navItems'
 // How long the "unavailable" bubble stays above a greyed-out tab.
 const NOTICE_DURATION_MS = 3200
 
-// The dashboard itself: selected unless an in-app page (grades…) is shown.
-// Tapping the selected tab scrolls back to the top.
-const HOME_TAB = { id: 'home', label: 'Accueil', icon: 'carbon:home', page: 'dashboard' }
+// « Accueil » (HomeDraftPage): selected unless another in-app page
+// (grades…) is shown. Tapping the selected tab scrolls back to the top.
+const HOME_TAB = { id: 'home', label: 'Accueil', icon: 'ph:house', page: 'home' }
 
-// The bar's icons, all Carbon (as the sidebar's), outlines: the tab shown
-// is told by its lens (.mobile-tab-bar-item--selected), Carbon having no
-// filled versions. Moodle, without a Carbon logo, is its education cap.
+// The bar's icons, all Phosphor (as the sidebar's), regular weight: the tab
+// shown is told by its lens (.mobile-tab-bar-item--selected). Moodle, without
+// a Phosphor logo, is its graduation cap.
 const TAB_ICONS = {
-  moodle: 'carbon:education',
+  moodle: 'ph:graduation-cap',
 }
 
 function getTabIcon(item) {
@@ -36,7 +36,7 @@ function getTabSizeClasses(count) {
 // shown wherever the desktop sidebar isn't. Home first, then the same
 // shortcuts as the sidebar (grades, planning, mail, Moodle); a greyed-out tab
 // explains itself in a bubble instead of a hover tooltip.
-function MobileTabBar({ establishment, gradesSupported = true, activePage = 'dashboard', onNavigatePage }) {
+function MobileTabBar({ establishment, gradesSupported = true, activePage = 'home', onNavigatePage }) {
   const shortcuts = getMobileTabItems(establishment, { gradesSupported })
   const items = [HOME_TAB, ...shortcuts].map((item) => (
     item.page ? { ...item, selected: item.page === activePage } : item
@@ -99,10 +99,7 @@ function MobileTabBar({ establishment, gradesSupported = true, activePage = 'das
       // (`launch`: its page, as in the sidebar).
       if (item.announcedBy && unseenIds.includes(item.announcedBy)) track('launch_card', { action: 'tab_marker', launch: item.page })
       onNavigatePage?.(item.page, 'tabbar')
-      return
     }
-
-    document.getElementById(item.targetId)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
   }
 
   return (

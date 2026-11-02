@@ -1,6 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Icon } from '@iconify/react'
 import universityConfig from '@university'
+import averageIcon from '../assets/home-icons/average.png'
+import ectsIcon from '../assets/home-icons/ects.png'
+import ueIcon from '../assets/home-icons/ue.png'
 import { track, trackGradesAction, useGradesPageReport } from '../analytics'
 import { downloadGradesReportPdf } from '../entApi'
 import { advanceSimulatorReach, describeGradesLoad, toGradesPageSource } from '../gradesAnalytics'
@@ -96,7 +99,7 @@ function ReportPdfButton({ semesterId, semester, releveType }) {
       >
         {state === 'loading'
           ? <LoadingDots label={null} className="w-4" />
-          : <Icon icon="carbon:document-pdf" className="size-4 max-md:size-[18px]" aria-hidden="true" />}
+          : <Icon icon="ph:file-pdf" className="size-4 max-md:size-[18px]" aria-hidden="true" />}
         <span className="max-md:hidden">PDF</span>
       </button>
     </div>
@@ -116,7 +119,7 @@ function SimulateButton({ onClick, colors = [] }) {
       aria-label="Simuler mes notes"
       className="inline-flex items-center gap-1.5 rounded-full px-3.5 py-2 font-body text-[14px] font-semibold cursor-pointer focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand max-md:size-10 max-md:justify-center max-md:p-0 max-md:after:absolute max-md:after:-inset-[3px]"
     >
-      <Icon icon="carbon:calculator" className="size-4 max-md:size-[18px]" aria-hidden="true" />
+      <Icon icon="ph:calculator" className="size-4 max-md:size-[18px]" aria-hidden="true" />
       <span className="max-md:hidden">Simuler</span>
     </Material>
   )
@@ -146,7 +149,7 @@ function OpenGradeDetail({ request, onHandled }) {
 }
 
 // "Mes notes": the in-app grades page, opened from the sidebar and the tab
-// bar. For now the "Moyenne Générale", "Crédits ECTS" and "UE validées" cards for the
+// bar. For now the "Moyenne générale", "Crédits ECTS" and "UE validées" cards for the
 // semester picked next to the title; the relevé UI comes on top of
 // gradesReport.js.
 // `initialGradeRequest`: a grade to open on arrival (the dashboard's
@@ -297,19 +300,19 @@ function GradesPage({ user = null, arrivalSource = 'other', initialGradeRequest 
     body = <LoadingDots label="Chargement des notes" className="justify-self-start py-2 text-text-muted" />
   } else if (empty?.kind === 'unpublished') {
     body = (
-      <PageEmptyState key={activeId} icon="carbon:document-unknown" title="Relevé pas encore publié">
+      <PageEmptyState key={activeId} icon="ph:file-dashed" title="Relevé pas encore publié">
         {empty.message || `Ton relevé ${semesterName(activeSemester)} n’est pas encore visible sur ScoDoc.`}
       </PageEmptyState>
     )
   } else if (empty?.kind === 'noGrades') {
     body = (
-      <PageEmptyState key={activeId} icon="carbon:chart-line" title="Pas encore de notes">
+      <PageEmptyState key={activeId} icon="ph:chart-line" title="Pas encore de notes">
         Tes notes {semesterName(activeSemester)} apparaîtront ici dès qu’elles seront saisies sur ScoDoc.
       </PageEmptyState>
     )
   } else if (empty) {
     body = (
-      <PageEmptyState key={activeId} icon="carbon:document-blank" title="Aucun relevé pour ce semestre">
+      <PageEmptyState key={activeId} icon="ph:file" title="Aucun relevé pour ce semestre">
         ScoDoc n’a encore rien publié ici.
       </PageEmptyState>
     )
@@ -327,7 +330,7 @@ function GradesPage({ user = null, arrivalSource = 'other', initialGradeRequest 
           {latestGrades.length && !ueFocused ? (
             <section className="grid gap-3" aria-labelledby="latest-grades-title">
               <div className="flex items-center gap-[5px] text-brand">
-                <Icon icon="carbon:recently-viewed" className="w-[17px] h-[17px] shrink-0" aria-hidden="true" />
+                <Icon icon="ph:clock-counter-clockwise" className="w-[17px] h-[17px] shrink-0" aria-hidden="true" />
                 <h2 id="latest-grades-title" className="m-0 font-body text-base font-medium leading-[1.06]">Dernières notes</h2>
               </div>
               <LatestGradesList grades={latestGrades} ueColors={ueColors} subjectIcon={subjectIcon} onOpen={openGrade} />
@@ -337,7 +340,7 @@ function GradesPage({ user = null, arrivalSource = 'other', initialGradeRequest 
           {subjectCount ? (
             <section className="grid gap-3" aria-labelledby="subjects-title">
               <div className={`flex items-center gap-[5px] text-brand ${ueFocused ? 'sr-only' : ''}`}>
-                <Icon icon="carbon:certificate" className="w-[17px] h-[17px] shrink-0" aria-hidden="true" />
+                <Icon icon="ph:certificate" className="w-[17px] h-[17px] shrink-0" aria-hidden="true" />
                 <h2 id="subjects-title" className="m-0 font-body text-base font-medium leading-[1.06]">Unités d’enseignement</h2>
                 {!ueFocused ? <GradesExplainer ues={report.ues} /> : null}
               </div>
@@ -349,7 +352,7 @@ function GradesPage({ user = null, arrivalSource = 'other', initialGradeRequest 
           {subjectCount && !ueFocused ? (
             <section className="grid gap-3" aria-labelledby="subject-list-title">
               <div className="flex items-center gap-[5px] text-brand">
-                <Icon icon="carbon:book" className="w-[17px] h-[17px] shrink-0" aria-hidden="true" />
+                <Icon icon="ph:book" className="w-[17px] h-[17px] shrink-0" aria-hidden="true" />
                 <h2 id="subject-list-title" className="m-0 font-body text-base font-medium leading-[1.06]">Matières et SAÉ</h2>
               </div>
               <SubjectsList report={report} ueColors={ueColors} subjectIcon={subjectIcon} onOpenUe={openSubjectInUe} />
@@ -369,9 +372,9 @@ function GradesPage({ user = null, arrivalSource = 'other', initialGradeRequest 
           for the shadows): the average, "UE validées", then the ECTS (CSS
           order), the next card peeking. Each card sets its width. */}
       <div className="flex flex-wrap items-stretch gap-3 max-md:-mx-3 max-md:-mt-2 max-md:-mb-7 max-md:flex-nowrap max-md:gap-2 max-md:overflow-x-auto max-md:snap-x max-md:snap-mandatory max-md:scroll-px-3 max-md:px-3 max-md:pt-2 max-md:pb-7 favorites-scroll-hide">
-        <WidgetAverageGrade releve={releve} visible />
-        <WidgetEcts releve={releve} config={config} visible />
-        <WidgetUes releve={releve} config={config} visible />
+        <WidgetAverageGrade releve={releve} visible icon={averageIcon} />
+        <WidgetEcts releve={releve} config={config} visible icon={ectsIcon} />
+        <WidgetUes releve={releve} config={config} visible icon={ueIcon} />
       </div>
       <GradesNotices releve={releve} departmentMessage={departmentMessage} />
     </div>
