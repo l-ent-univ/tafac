@@ -1153,8 +1153,8 @@ function MailPage({ onReaderOpenChange, onSignInAgain, sender = null, composeReq
     else setOpenId(null)
   }, [openId])
 
-  // The open mail's row clicked again closes it (the side panel has no
-  // close button).
+  // The open mail's row clicked again closes it, as the panel's close
+  // button (MailToolbar) does.
   const openMail = useCallback((id) => {
     if (id === openId) {
       closeMail()
@@ -2005,6 +2005,7 @@ function MailPage({ onReaderOpenChange, onSignInAgain, sender = null, composeReq
             onMove={(event) => openFolderMenu('move', event.currentTarget.getBoundingClientRect(), targetIds, 'toolbar')}
             onToggleUnread={() => setMessagesFlag(targetIds, 'unread', !targetState?.unread, 'toolbar')}
             onToggleFlag={() => setMessagesFlag(targetIds, 'flagged', !targetState?.flagged, 'toolbar')}
+            onClose={isMultiple || isPanelClosing ? null : closeMail}
           />
           {/* On a phone the list (and its notice) is hidden behind the
               reader: the notice over the mail then. Beside the list, the
