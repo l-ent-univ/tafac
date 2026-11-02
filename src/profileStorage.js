@@ -104,7 +104,24 @@ function normalizeTpSelection(selection, { requireVersion = false } = {}) {
     tdLabel: selection.tdLabel ? String(selection.tdLabel) : null,
     tpResourceId: selection.tpResourceId == null ? null : String(selection.tpResourceId),
     tpLabel: selection.tpLabel ? String(selection.tpLabel) : null,
+    extraResources: normalizeExtraResources(selection.extraResources),
   }
+}
+
+// The courses added beside the group (a major, a minor, options: Réglages ›
+// Planning), each an ADE resource: { resourceId, label, path }, at most 12.
+export const MAX_EXTRA_RESOURCES = 12
+
+function normalizeExtraResources(entries) {
+  if (!Array.isArray(entries)) return []
+  const seen = new Set()
+  return entries.flatMap((entry) => {
+    const resourceId = String(entry?.resourceId ?? '').trim()
+    const label = String(entry?.label ?? '').trim()
+    if (!resourceId || !label || seen.has(resourceId)) return []
+    seen.add(resourceId)
+    return [{ resourceId, label, path: entry.path ? String(entry.path) : null }]
+  }).slice(0, MAX_EXTRA_RESOURCES)
 }
 
 export function getStoredTpSelection(userId = null) {

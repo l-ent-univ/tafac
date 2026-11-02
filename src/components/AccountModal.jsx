@@ -15,6 +15,7 @@ import CloseButton from './CloseButton'
 import Switch from './Switch'
 import MailSignatureSettings from './MailSignatureSettings'
 import HomeLayoutSetting from './HomeLayoutSetting'
+import PlanningExtraCourses from './PlanningExtraCourses'
 
 // Also the debug menu's toggles (src/components/debug/).
 export { Switch }
@@ -533,6 +534,7 @@ function AccountModal({
   showPlanningWeekend = false,
   onShowPlanningWeekendChange = null,
   planningSelection = null,
+  onPlanningExtraResourcesChange = null,
   anonymousAnalytics = true,
   onAnonymousAnalyticsChange = null,
   // { auto }: Réglages › Messagerie, with the in-app mail page (null
@@ -718,6 +720,13 @@ function AccountModal({
               <p className="m-0 px-1 font-body text-[13px] font-semibold leading-[1.2] text-[#b91c1c] dark:text-[var(--color-error)]" role="alert">
                 {planningState.errorMessage}
               </p>
+            ) : null}
+
+            {onPlanningExtraResourcesChange && planningSelection?.resourceId ? (
+              <PlanningExtraCourses
+                extraResources={planningSelection.extraResources ?? []}
+                onChange={onPlanningExtraResourcesChange}
+              />
             ) : null}
 
             {typeof onShowPlanningWeekendChange === 'function' ? (

@@ -1782,9 +1782,12 @@ function App() {
       accountModalPlanningState.contextLabel,
     )
 
-    if (!nextSelection) {
+    if (!draftSelection) {
       return
     }
+
+    // A new group keeps the courses added beside it.
+    const nextSelection = { ...draftSelection, extraResources: selectedTp?.extraResources ?? [] }
 
     const isSameSelection = Boolean(selectedTp)
       && selectedTp.resourceId === nextSelection.resourceId
@@ -1806,6 +1809,19 @@ function App() {
       selectedTd: accountModalPlanningState.draftTd,
     }))
   }, [accountModalPlanningState, selectedTp, sessionState.user])
+
+  // Réglages › Planning's added courses (a major, a minor, options): saved
+  // at once, beside the group.
+  const handleExtraResourcesChange = useCallback((extraResources) => {
+    if (!selectedTp?.resourceId) {
+      return
+    }
+
+    const nextSelection = { ...selectedTp, extraResources }
+    persistTpSelection(nextSelection, sessionState.user)
+    clearAdeTimetableCache()
+    setSelectedTp(nextSelection)
+  }, [selectedTp, sessionState.user])
 
   const heroImage = useMemo(() => (
     customBackground
@@ -2797,6 +2813,7 @@ function App() {
         showPlanningWeekend={showPlanningWeekend}
         onShowPlanningWeekendChange={handleShowPlanningWeekendChange}
         planningSelection={selectedTp}
+        onPlanningExtraResourcesChange={HAS_PERSONAL_PLANNING ? null : handleExtraResourcesChange}
         anonymousAnalytics={anonymousAnalytics}
         onAnonymousAnalyticsChange={isAnalyticsAvailable ? handleAnonymousAnalyticsChange : null}
         mailSignature={hasMailPage && sessionState.authenticated ? { auto: mailSenderName ? mailSender.signature : null } : null}

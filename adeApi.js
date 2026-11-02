@@ -170,12 +170,15 @@ export function getAdeSelectionLabels(selection = null) {
   }).map((value) => String(value).trim())
 }
 
+// The group's own resources, then the courses added beside it (a major, a
+// minor, options: `extraResources`, src/profileStorage.js), at most 12.
 export function getAdeSelectionResourceIds(selection = null) {
   const candidates = [
     selection?.tpResourceId,
     selection?.tdResourceId,
     selection?.yearResourceId,
     selection?.resourceId,
+    ...(Array.isArray(selection?.extraResources) ? selection.extraResources.slice(0, 12).map((entry) => entry?.resourceId) : []),
   ]
 
   return candidates.filter((value, index) => {
