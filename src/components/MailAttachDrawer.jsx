@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react'
 import { Icon } from '@iconify/react'
 import CloseButton from './CloseButton'
 import MailSearchField from './MailSearchField'
+import { useSheetDrag } from '../useSheetDrag'
 
 // The cards a drawer's arrows move through (MailGradePicker's grades,
 // MailCoursePicker's classes).
@@ -58,6 +59,7 @@ function nextCard(cards, current, key) {
 // first (`onSubmit`), Tab goes round it. `scrollRef`: its scroll box.
 function MailAttachDrawer({ titleId, title, subtitle = null, search = null, onSubmit = null, onClose, scrollRef = null, children }) {
   const dialogRef = useRef(null)
+  useSheetDrag(dialogRef, onClose)
   const searchRef = useRef(null)
   const hasSearch = Boolean(search)
 

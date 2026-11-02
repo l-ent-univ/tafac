@@ -9,6 +9,7 @@ import PlanningEventBlock from './PlanningEventBlock'
 import CloseButton from './CloseButton'
 import Tooltip from './Tooltip'
 import { GROUP_CARD_CLASSES, GroupRow } from './GroupCard'
+import { useSheetDrag } from '../useSheetDrag'
 
 function linkHost(href) {
   try {
@@ -27,6 +28,7 @@ function linkHost(href) {
 // in the Messagerie), null without the in-app mail page.
 function PlanningEventSheet({ event, accent, events, todayKey, searching, onWrite = null, onClose, onPickDay }) {
   const dialogRef = useRef(null)
+  useSheetDrag(dialogRef, onClose)
   const scrollRef = useRef(null)
   // Content under the header: its blur shows.
   const [isStuck, setIsStuck] = useState(false)

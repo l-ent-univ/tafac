@@ -17,6 +17,7 @@ import { useUeColor } from '../useUeColor'
 import { NewBadge } from './SubjectsList'
 import CloseButton from './CloseButton'
 import Tooltip from './Tooltip'
+import { useSheetDrag } from '../useSheetDrag'
 
 const FOCUSABLE_SELECTOR = 'button:not([disabled]), [href], [tabindex]:not([tabindex="-1"])'
 const DATE_FORMAT = new Intl.DateTimeFormat('fr-FR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })
@@ -293,6 +294,7 @@ function PromoCard({ evaluation, semesterId, showPromoStats, titleId }) {
 // Messagerie), null without the in-app mail page.
 function GradeDetailModal({ report, module, evaluation, semesterId, icon = null, isNew = false, onWrite = null, onClose }) {
   const dialogRef = useRef(null)
+  useSheetDrag(dialogRef, onClose)
   const titleId = useId()
   const summaryId = useId()
   const promoTitleId = useId()

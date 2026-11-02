@@ -7,6 +7,7 @@ import { describeRevealForAnalytics } from '../gradesAnalytics'
 import { addCustomEvaluations } from '../gradeSimulation'
 import { readSemesterUes } from '../semesterUes'
 import { useUeColor } from '../useUeColor'
+import { useSheetDrag } from '../useSheetDrag'
 import { buildSegmentPath, pointAt } from '../ueRingGeometry'
 import GradeSimulatorReveal from './GradeSimulatorReveal'
 import GradeSimulatorUe from './GradeSimulatorUe'
@@ -235,6 +236,7 @@ function UeDial({ ues, turn, onTurn, leaving = false, hiddenCode = null, onLeft 
 // opening and closing, for the anonymous analytics (GradesPage's).
 function GradeSimulatorModal({ report = null, releve = null, config = null, semester = null, subjectIcon = () => null, onStep = () => {}, onClose }) {
   const dialogRef = useRef(null)
+  useSheetDrag(dialogRef, onClose)
   const titleId = useId()
   const semesterLabel = semester?.number != null ? `Semestre ${semester.number}` : null
   // Their colours as painted (useUeColor): the dial, the UE's step and the
