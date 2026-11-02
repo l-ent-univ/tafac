@@ -358,6 +358,9 @@ test('lets a found group stand in for an account without one', async () => {
   const bare = await client.fetchPortalTree({}, { cacheScope: 'portal-fixture-none' })
   assert.equal(bare.defaultSelection, null)
   assert.equal(bare.currentResourceId, null)
+  // The students' first level only, to pick a programme from.
+  assert.deepEqual(bare.root.children.map(({ id }) => id), ['-1'])
+  assert.deepEqual(bare.root.children[0].children.map(({ id, children }) => [id, children.length]), [['100', 0]])
 
   const found = await client.fetchPortalTree({}, { fallbackResourceId: '14962', cacheScope: 'portal-fixture-none' })
   assert.equal(found.defaultSelection.resourceId, '14962')

@@ -737,11 +737,14 @@ export function createPlanningPortalApiClient({
       : requestedIsLevel
         ? getPortalLevelOptions(expandedNode).map((node) => clonePortalTreeNode(node))
         : null
+    // No group at all (an account whose planning was never set up): the
+    // students' first level, for the client to offer the programmes.
+    const studentsPath = findPortalTreePath(cachedTree, PORTAL_CATEGORY_METADATA.trainee.id) ?? [cachedTree]
     const focusedTree = buildFocusedPortalTree(
       currentPath,
       expandedNode?.id ?? currentResource?.id ?? cachedTree.id,
       expandedChildren,
-    ) ?? clonePortalTreeNode(cachedTree)
+    ) ?? buildFocusedPortalTree(studentsPath, studentsPath.at(-1).id)
 
     return {
       root: focusedTree,
