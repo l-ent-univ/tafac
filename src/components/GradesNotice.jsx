@@ -74,7 +74,7 @@ export function GradesNotice({ icon = null, media = null, tint = null, label, ti
           aria-label="Masquer ce message"
           className="-mr-0.5 -mt-0.5 inline-flex size-8 shrink-0 cursor-pointer items-center justify-center rounded-full border-0 bg-transparent text-text-muted transition-colors hover:bg-bg-subtle hover:text-text max-md:relative max-md:after:absolute max-md:after:-inset-1.5"
         >
-          <Icon icon="carbon:close" className="size-[18px]" aria-hidden="true" />
+          <Icon icon="ph:x" className="size-[18px]" aria-hidden="true" />
         </button>
       ) : null}
     </div>
@@ -89,9 +89,9 @@ export function GradesNotice({ icon = null, media = null, tint = null, label, ti
 // while waiting, a warm brown otherwise (never an alarm red), with a glyph
 // that reads on them.
 const COIN_TONES = {
-  positive: { color: '#1E8A4C', ink: '#F0F0F0', relief: 'rgb(0 0 0 / 0.28)', icon: 'carbon:checkmark' },
-  pending: { color: '#F5B400', ink: '#3D2D00', relief: 'rgb(255 255 255 / 0.45)', icon: 'carbon:hourglass' },
-  neutral: { color: '#7A5A45', ink: '#F0F0F0', relief: 'rgb(0 0 0 / 0.28)', icon: 'carbon:education' },
+  positive: { color: '#1E8A4C', ink: '#F0F0F0', relief: 'rgb(0 0 0 / 0.28)', icon: 'ph:check' },
+  pending: { color: '#F5B400', ink: '#3D2D00', relief: 'rgb(255 255 255 / 0.45)', icon: 'ph:hourglass' },
+  neutral: { color: '#7A5A45', ink: '#F0F0F0', relief: 'rgb(0 0 0 / 0.28)', icon: 'ph:graduation-cap' },
 }
 const COIN_SHADOWS = [[-0.5, 0.5, 1, 0.36], [-2, 3, 2, 0.31], [-4.5, 6.5, 3, 0.18], [-8, 12, 3.5, 0.05]]
 
@@ -197,7 +197,7 @@ function GradesNotices({ releve, departmentMessage }) {
     <div className="grid gap-3 max-md:gap-2">
       {decision ? <JuryDecisionNotice decision={decision} /> : null}
       {showMessage ? (
-        <GradesNotice icon="carbon:bullhorn" label="Message de ton département" title="Message de ton département" collapsible onDismiss={dismissMessage} onExpand={() => trackGradesAction('department_message_expanded')}>
+        <GradesNotice icon="ph:megaphone" label="Message de ton département" title="Message de ton département" collapsible onDismiss={dismissMessage} onExpand={() => trackGradesAction('department_message_expanded')}>
           {departmentMessage}
         </GradesNotice>
       ) : null}

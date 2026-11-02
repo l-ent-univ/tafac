@@ -18,8 +18,8 @@ const MOODLE_HREF = universityConfig.features?.moodle && MOODLE_ORIGIN
 // is the "Mails récents" card's link: the server opens the webmail already
 // signed in (or falls back to its launch URL).
 const MAIL_ITEM = universityConfig.mail?.page === false
-  ? { id: 'mail', label: 'Messagerie', shortLabel: 'Mail', icon: 'carbon:email', href: `${ENT_AUTH_PREFIX}/mail/open`, target: '_blank' }
-  : { id: 'mail', label: 'Messagerie', shortLabel: 'Mail', icon: 'carbon:email', page: 'mail', announcedBy: 'messagerie' }
+  ? { id: 'mail', label: 'Messagerie', shortLabel: 'Mail', icon: 'ph:envelope-simple', href: `${ENT_AUTH_PREFIX}/mail/open`, target: '_blank' }
+  : { id: 'mail', label: 'Messagerie', shortLabel: 'Mail', icon: 'ph:envelope-simple', page: 'mail', announcedBy: 'messagerie' }
 
 // "Mes notes" follows the tri-state grades feature: the in-app grades page
 // when live, a greyed-out item with the unavailability notice when
@@ -27,7 +27,7 @@ const MAIL_ITEM = universityConfig.mail?.page === false
 // `announcedBy`: the « Nouveautés » entry that launched the page; the item
 // says « Nouveau » while this device hasn't seen it (changelogStore).
 function buildGradesNavItem() {
-  const base = { id: 'grades', label: 'Mes notes', icon: 'carbon:chart-pie' }
+  const base = { id: 'grades', label: 'Mes notes', icon: 'ph:chart-pie-slice' }
 
   if (GRADES_FEATURE_ENABLED) {
     return { ...base, page: 'grades', announcedBy: 'mes-notes' }
@@ -54,17 +54,15 @@ export function buildNavItems(establishment, { gradesSupported = true } = {}) {
     : null
 
   return [
-    {
-      id: 'applications',
-      label: 'Toutes les applications',
-      icon: 'carbon:app-switcher',
-      targetId: 'sidebar-section-applications',
-    },
+    // « Accueil » (HomeDraftPage), every university: the home page, its
+    // « Toutes les applications » drawer listing every app. The tab bar has
+    // its own home tab (getMobileTabItems leaves this one out).
+    { id: 'home', label: 'Accueil', icon: 'ph:house', page: 'home' },
     ...(gradesNavItem ? [gradesNavItem] : []),
     // The in-app planning page (PlanningPage), launched by its own
     // « Nouveautés » entry (`announcedBy`, as « Mes notes »).
     ...(universityConfig.features?.planning
-      ? [{ id: 'planning', label: 'Planning', icon: 'carbon:calendar', page: 'planning', announcedBy: 'planning' }]
+      ? [{ id: 'planning', label: 'Planning', icon: 'ph:calendar-blank', page: 'planning', announcedBy: 'planning' }]
       : []),
     // The in-app mail page (MailPage), or the webmail link (MAIL_ITEM).
     // shortLabel: the tab bar's narrower tabs.
@@ -87,8 +85,8 @@ export function openNavItemLink(item, source) {
   window.location.assign(item.href)
 }
 
-// The shortcuts the mobile tab bar carries (every nav item but "Toutes les
-// applications", which is the dashboard itself). Empty means no tab bar.
+// The shortcuts the mobile tab bar carries (every nav item but « Accueil »,
+// the bar's own home tab). Empty means no tab bar.
 export function getMobileTabItems(establishment, options) {
-  return buildNavItems(establishment, options).filter((item) => item.id !== 'applications')
+  return buildNavItems(establishment, options).filter((item) => item.id !== 'home')
 }

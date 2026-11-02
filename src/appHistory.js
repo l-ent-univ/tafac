@@ -3,7 +3,9 @@
 // full page and each mail opened in the reader is a history entry. What the entry shows lives in its state
 // (`tafac`), the URL doesn't change (its fragment belongs to the settings
 // transfer link). A reload keeps the entry's state, so it lands where it was.
-const PAGES = new Set(['dashboard', 'grades', 'planning', 'mail'])
+// « Accueil » ('home') when the entry has none, or an older one's
+// 'dashboard' (the page « Accueil » replaced).
+const PAGES = new Set(['home', 'grades', 'planning', 'mail'])
 
 // A mail entry belongs to the sign-in that wrote it. Logging out doesn't
 // reload the page, so the tab's history still holds the previous student's
@@ -59,7 +61,7 @@ function isCurrentSession(nav) {
 export function readHistoryNav(state = globalThis.history?.state) {
   const nav = state?.tafac
   return {
-    page: PAGES.has(nav?.page) ? nav.page : 'dashboard',
+    page: PAGES.has(nav?.page) ? nav.page : 'home',
     ue: nav?.page === 'grades' && typeof nav?.ue === 'string' ? nav.ue : null,
     mail: nav?.page === 'mail' && typeof nav?.mail === 'string' && isCurrentSession(nav) ? nav.mail : null,
   }

@@ -86,7 +86,7 @@ function DayHeading({ day, todayKey, count }) {
   return (
     <div className="flex min-w-0 items-center gap-2 4xl:flex-col 4xl:items-start 4xl:gap-1.5 4xl:pt-[13px]">
       <div className="flex min-w-0 items-center gap-[5px] text-brand 4xl:items-start">
-        <Icon icon="carbon:calendar" className="size-[17px] shrink-0 4xl:mt-px" aria-hidden="true" />
+        <Icon icon="ph:calendar-blank" className="size-[17px] shrink-0 4xl:mt-px" aria-hidden="true" />
         <h2 className="m-0 min-w-0 truncate font-body text-base font-medium leading-[1.06] 4xl:whitespace-normal">
           {title}
           {detail ? (
@@ -175,7 +175,7 @@ function PlanningListView({ monday, selectedDay, events, statusOn, accentFor, no
             </ul>
           ) : (
             <p className="planning-list-free">
-              <Icon icon="carbon:sun" className="size-4 shrink-0" aria-hidden="true" />
+              <Icon icon="ph:sun" className="size-4 shrink-0" aria-hidden="true" />
               <span>Aucun cours</span>
             </p>
           )}

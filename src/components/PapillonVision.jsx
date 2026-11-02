@@ -49,7 +49,7 @@ function PapillonVision({ className = '' }) {
           rel="noopener noreferrer"
           className="mt-8 inline-flex min-h-12 items-center gap-2.5 whitespace-nowrap rounded-full bg-brand px-6 text-[16px] font-semibold text-bg no-underline transition-transform duration-150 hover:scale-[1.03] active:scale-[0.98] max-md:gap-2 max-md:px-5 max-md:text-[15px]"
         >
-          <Icon icon="carbon:user-multiple" className="size-5" aria-hidden="true" />
+          <Icon icon="ph:users" className="size-5" aria-hidden="true" />
           {copyText(copy.papillon.cta)}
         </a>
       </div>

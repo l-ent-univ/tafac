@@ -84,7 +84,7 @@ function LaunchCard({ entryId, launch, stage, title, line, ctaLabel, closeLabel,
               onClick={handleOpen}
             >
               <span className="font-body text-[14px] font-semibold leading-none whitespace-nowrap max-md:text-[13px]">{ctaLabel}</span>
-              <Icon icon="carbon:arrow-right" className="launch-card-cta-arrow h-4 w-4 max-md:h-3.5 max-md:w-3.5" aria-hidden="true" />
+              <Icon icon="ph:arrow-right" className="launch-card-cta-arrow h-4 w-4 max-md:h-3.5 max-md:w-3.5" aria-hidden="true" />
             </button>
           </div>
 
@@ -96,7 +96,7 @@ function LaunchCard({ entryId, launch, stage, title, line, ctaLabel, closeLabel,
             aria-label={closeLabel}
             title="Fermer"
           >
-            <Icon icon="carbon:close" className="h-4 w-4" aria-hidden="true" />
+            <Icon icon="ph:x" className="h-4 w-4" aria-hidden="true" />
           </button>
         </section>
       </div>

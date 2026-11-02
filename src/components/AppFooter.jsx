@@ -20,7 +20,7 @@ function AppFooter({ heroCredit = null }) {
         onClick={() => setAboutOpen(true)}
         aria-label="À propos"
       >
-        <Icon icon="carbon:information" className="h-[14px] w-[14px]" />
+        <Icon icon="ph:info" className="h-[14px] w-[14px]" />
       </button>
       {heroCredit?.author ? (
         <>

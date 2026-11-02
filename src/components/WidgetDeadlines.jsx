@@ -3,6 +3,7 @@ import { Icon } from '@iconify/react'
 import { useWidgetLoadReport } from '../analytics'
 import { publishBriefingSource } from '../briefingSources'
 import { getMoodleDeadlines } from '../entApi'
+import useFitListItems from '../useFitListItems'
 import WidgetListStatus from './WidgetListStatus'
 import {
   HOUR_MS,
@@ -25,14 +26,24 @@ const URGENT_WINDOW_MS = 48 * HOUR_MS
 const MOODLE_HREF_KEY = 'l-ent:moodle-href'
 
 // Phones: 44px rows (touch targets), hence the taller card there.
+// `large` (the « Accueil » page): the card as tall as its cell, at least
+// three rows high; as many rows show as fit whole (useFitListItems), out of
+// the first LARGE_MAX_DEADLINES. The list's own height doesn't size the
+// cell (contain: size), so a taller cell shows more, a tight one less.
+// Three rows and the gaps between them (rem, as the gaps: a larger text size
+// keeps all three), the empty and failed states as tall.
+const LARGE_MAX_DEADLINES = 10
+const LARGE_ROOM_CLASSES = 'min-h-[calc(114px+0.5rem)] max-md:min-h-[calc(108px+0.5rem)] max-xs:min-h-[8.75rem]'
+const LARGE_LIST_CLASSES = `[contain:size] overflow-hidden ${LARGE_ROOM_CLASSES}`
+const LARGE_CARD_CLASSES = 'moodle-deadlines-widget widget-card shadow-md p-4 border border-white card-corners overflow-hidden bg-widget-bg text-base leading-6 min-w-0 max-md:p-3 relative flex flex-col gap-2 text-text'
 const CARD_CLASSES = 'moodle-deadlines-widget widget-card shadow-md flex-[0_1_360px] h-[140px] p-4 border border-white card-corners overflow-hidden bg-widget-bg text-base leading-6 min-w-0 max-2xl:flex-[1_1_calc(50%-6px)] max-2xl:min-w-0 max-md:h-[124px] max-md:p-3 max-xs:flex-[1_1_100%] max-xs:h-[140px] relative flex flex-col gap-[6px] text-text'
 const ROW_CLASSES = 'grid grid-cols-[14px_minmax(0,1fr)_auto] content-center items-center gap-x-[7px] gap-y-[3px] h-[38px] px-1.5 corners-[10px] min-w-0 max-md:h-[36px] max-xs:h-11'
 
 const TYPE_ICONS = {
-  assign: 'carbon:document',
-  quiz: 'carbon:list-checked',
-  forum: 'carbon:forum',
-  other: 'carbon:calendar',
+  assign: 'ph:file-text',
+  quiz: 'ph:list-checks',
+  forum: 'ph:chats-circle',
+  other: 'ph:calendar-blank',
 }
 const TYPE_LABELS = {
   assign: 'Devoir',
@@ -115,9 +126,11 @@ const DUE_TONE_CLASSES = {
   muted: 'font-medium text-text-muted',
 }
 
-function DeadlinesHeader({ urgentCount = 0, hasOverdue = false }) {
+// `icon`: an image before the title (the « Accueil » page's).
+function DeadlinesHeader({ urgentCount = 0, hasOverdue = false, icon = null }) {
   return (
     <div className="flex items-center gap-[5px] min-w-0 pr-5">
+      {icon ? <img src={icon} alt="" width="22" height="22" draggable="false" className="mr-[3px] size-[22px] shrink-0 select-none" aria-hidden="true" /> : null}
       <span className="m-0 min-w-0 leading-[1.06] text-base font-medium text-text-muted overflow-hidden text-ellipsis whitespace-nowrap max-md:text-[15px]">Échéances</span>
       {urgentCount > 0 ? (
         <span
@@ -172,7 +185,7 @@ function DeadlineRow({ item, fallbackHref, now }) {
   const content = (
     <>
       {submitted ? (
-        <Icon icon="carbon:checkmark-filled" className="deadline-submitted-icon w-[14px] h-[14px] shrink-0" aria-hidden="true" />
+        <Icon icon="ph:check-circle-fill" className="deadline-submitted-icon w-[14px] h-[14px] shrink-0" aria-hidden="true" />
       ) : (
         <Icon
           icon={TYPE_ICONS[item.type] ?? TYPE_ICONS.other}
@@ -209,13 +222,14 @@ function DeadlineRow({ item, fallbackHref, now }) {
 
 // `preview`: a getMoodleDeadlines() result to show as is (the landing page,
 // which changes it): nothing loaded or reported, no link to Moodle.
-function WidgetDeadlines({ visible = false, preview = null }) {
+function WidgetDeadlines({ visible = false, preview = null, icon = null, large = false }) {
   const [loadedState, setState] = useState({ status: 'loading', moodleHref: null, items: [] })
   const state = preview ?? loadedState
   const [storedMoodleHref, setStoredMoodleHref] = useState(() => readStoredHref(MOODLE_HREF_KEY))
   const [now, setNow] = useState(() => new Date())
   const lastLoadAtRef = useRef(0)
   const loadingRef = useRef(false)
+  const [listRef] = useFitListItems()
   useWidgetLoadReport('deadlines', preview ? null : getLoadOutcome(state))
 
   const loadDeadlines = useCallback(async ({ background = false } = {}) => {
@@ -281,14 +295,15 @@ function WidgetDeadlines({ visible = false, preview = null }) {
   }, [loadDeadlines, preview, state.status])
 
   // Hidden when Moodle can't be reached; the background refresh brings the
-  // card back once it answers again.
-  if (state.status === 'disabled' || state.status === 'unauthenticated' || state.status === 'error') {
+  // card back once it answers again. On « Accueil » (`large`) a failed load
+  // stays, with « Réessayer ».
+  if (state.status === 'disabled' || state.status === 'unauthenticated' || (state.status === 'error' && !large)) {
     return null
   }
 
   const moodleHref = preview ? null : state.moodleHref || storedMoodleHref
   const pending = state.status === 'ok' ? prioritizeDeadlines(state.items, now) : []
-  const rows = pending.slice(0, MAX_VISIBLE_DEADLINES)
+  const rows = pending.slice(0, large ? LARGE_MAX_DEADLINES : MAX_VISIBLE_DEADLINES)
   const urgentItems = pending.filter((item) => isUrgent(item, now))
   const urgentCount = urgentItems.length
   const hasOverdue = urgentItems.some((item) => isOverdue(item, parseDate(item.dueAt), now))
@@ -296,7 +311,7 @@ function WidgetDeadlines({ visible = false, preview = null }) {
 
   return (
     <article
-      className={`${CARD_CLASSES} ${moodleHref ? 'cursor-pointer' : ''} ${visible ? 'widget-card-visible' : ''}`}
+      className={`${large ? LARGE_CARD_CLASSES : CARD_CLASSES} ${moodleHref ? 'cursor-pointer' : ''} ${visible ? 'widget-card-visible' : ''}`}
       aria-label={urgentCount > 0 ? `Échéances Moodle, ${urgentCount} à rendre sous 48 h` : 'Échéances Moodle'}
       aria-busy={state.status === 'loading' || undefined}
       onClick={moodleHref ? openMoodle : undefined}
@@ -311,16 +326,16 @@ function WidgetDeadlines({ visible = false, preview = null }) {
           title="Ouvrir Moodle"
           onClick={(event) => event.stopPropagation()}
         >
-          <Icon icon="carbon:arrow-up-right" className="w-[14px] h-[14px] shrink-0" aria-hidden="true" />
+          <Icon icon="ph:arrow-up-right" className="w-[14px] h-[14px] shrink-0" aria-hidden="true" />
         </a>
       ) : null}
 
-      <DeadlinesHeader urgentCount={urgentCount} hasOverdue={hasOverdue} />
+      <DeadlinesHeader urgentCount={urgentCount} hasOverdue={hasOverdue} icon={icon} />
 
       {state.status === 'loading' ? <DeadlineRowsPlaceholder /> : null}
 
       {state.status === 'ok' && rows.length > 0 ? (
-        <ul className="flex-1 flex flex-col gap-1 min-h-0 m-0 p-0 list-none -mx-1.5" aria-label="Prochaines échéances Moodle">
+        <ul ref={large ? listRef : null} className={`flex-1 flex flex-col gap-1 min-h-0 m-0 p-0 list-none -mx-1.5 ${large ? LARGE_LIST_CLASSES : ''}`} aria-label="Prochaines échéances Moodle">
           {rows.map((item, index) => (
             <DeadlineRow key={item.id ?? index} item={item} fallbackHref={moodleHref} now={now} />
           ))}
@@ -328,7 +343,20 @@ function WidgetDeadlines({ visible = false, preview = null }) {
       ) : null}
 
       {state.status === 'ok' && rows.length === 0 ? (
-        <WidgetListStatus icon="carbon:checkmark-outline" title="Aucune échéance à venir" body="Rien à rendre pour l’instant, profites-en !" />
+        <div className={`flex flex-1 flex-col ${large ? LARGE_ROOM_CLASSES : ''}`}>
+          <WidgetListStatus icon="ph:check-circle" title="Aucune échéance à venir" body="Rien à rendre pour l’instant, profites-en !" />
+        </div>
+      ) : null}
+
+      {state.status === 'error' ? (
+        <div className={`flex flex-1 flex-col ${LARGE_ROOM_CLASSES}`}>
+          <WidgetListStatus
+            icon="ph:warning"
+            title="Moodle indisponible"
+            body="Impossible de charger tes échéances"
+            action={{ label: 'Réessayer', onClick: () => void loadDeadlines() }}
+          />
+        </div>
       ) : null}
 
     </article>

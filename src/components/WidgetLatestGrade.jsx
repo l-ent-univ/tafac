@@ -159,11 +159,11 @@ function LiveWidgetLatestGrade({ visible, user = null, onOpenGrade = null, previ
   // Its right-click menu (a long press): what a click does, the grade as
   // text.
   const menuProps = useContextMenu(grade && !preview ? () => [
-    canOpen ? { id: 'open', label: 'Voir la note', icon: 'carbon:view', onSelect: open } : null,
+    canOpen ? { id: 'open', label: 'Voir la note', icon: 'ph:eye', onSelect: open } : null,
     {
       id: 'copy',
       label: 'Copier',
-      icon: 'carbon:copy',
+      icon: 'ph:copy',
       onSelect: () => void copyToClipboard(gradeCopyText({
         title: grade.description || grade.resourceTitle,
         value: Number.isFinite(parseFloat(grade.note)) ? parseFloat(grade.note) : grade.note,

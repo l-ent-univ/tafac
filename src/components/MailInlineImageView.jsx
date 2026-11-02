@@ -21,7 +21,7 @@ function MailInlineImageView({ node, selected, deleteNode }) {
     <NodeViewWrapper as="div" className="mail-inline-image group/image relative my-2 w-fit max-w-full" contentEditable={false} data-inline-cid={cid}>
       {missing ? (
         <div className="flex min-h-[72px] w-[min(360px,100%)] items-center gap-2 corners-[14px] border border-dashed border-border-input bg-bg-subtle px-4 font-body text-[13.5px] font-medium text-text-muted">
-          <Icon icon="carbon:image" className="size-4 shrink-0" aria-hidden="true" />
+          <Icon icon="ph:image" className="size-4 shrink-0" aria-hidden="true" />
           <span>Image indisponible</span>
         </div>
       ) : (
@@ -43,7 +43,7 @@ function MailInlineImageView({ node, selected, deleteNode }) {
       {failed ? (
         <span className="absolute bottom-3 left-3 flex flex-wrap items-center gap-2" role="alert">
           <span className="inline-flex items-center gap-[6px] rounded-full bg-widget-bg/95 px-3 py-[7px] font-body text-[12.5px] font-semibold leading-none text-error shadow-xs">
-            <Icon icon="carbon:warning-alt" className="size-[14px]" aria-hidden="true" />
+            <Icon icon="ph:warning" className="size-[14px]" aria-hidden="true" />
             <span>Image non chargée, elle ne partira pas</span>
           </span>
           <button
@@ -51,7 +51,7 @@ function MailInlineImageView({ node, selected, deleteNode }) {
             onClick={() => images?.retry(cid)}
             className="inline-flex items-center gap-[6px] rounded-full border-0 bg-text px-3 py-[7px] text-bg shadow-xs cursor-pointer hover:brightness-110 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-text"
           >
-            <Icon icon="carbon:renew" className="size-[14px]" aria-hidden="true" />
+            <Icon icon="ph:arrows-clockwise" className="size-[14px]" aria-hidden="true" />
             <span className="font-body text-[12.5px] font-semibold leading-none">Réessayer</span>
           </button>
         </span>
@@ -62,7 +62,7 @@ function MailInlineImageView({ node, selected, deleteNode }) {
         aria-label="Retirer l’image"
         className="absolute top-2 right-2 inline-flex size-8 items-center justify-center rounded-full border-0 bg-widget-bg/90 p-0 text-text shadow-xs cursor-pointer opacity-0 transition-opacity duration-150 group-hover/image:opacity-100 focus-visible:opacity-100 focus-visible:outline-2 focus-visible:outline-text max-4xl:opacity-100"
       >
-        <Icon icon="carbon:close" className="size-[18px]" aria-hidden="true" />
+        <Icon icon="ph:x" className="size-[18px]" aria-hidden="true" />
       </button>
     </NodeViewWrapper>
   )

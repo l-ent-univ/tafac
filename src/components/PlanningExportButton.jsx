@@ -34,7 +34,7 @@ function PlanningExportButton({ selection, from = 'header', className = '' }) {
       >
         {isLoading
           ? <LoadingDots label={null} className="w-4" />
-          : <Icon icon="carbon:calendar-add" className="size-4 shrink-0 max-md:size-[18px]" aria-hidden="true" />}
+          : <Icon icon="ph:calendar-plus" className="size-4 shrink-0 max-md:size-[18px]" aria-hidden="true" />}
         {/* Round at rest; its word slides out beside the icon under the
             pointer or the keyboard's focus (a phone keeps the icon). */}
         <span className="planning-export-label max-md:hidden" aria-hidden="true">Exporter</span>

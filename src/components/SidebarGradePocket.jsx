@@ -23,7 +23,7 @@ function DisabledSidebarGradePocket() {
 
   return (
     <SidebarStatPocket
-      icon="carbon:chart-pie"
+      icon="ph:chart-pie-slice"
       label="Dernière note"
       value={noteDisplay}
       max={noteMax}
@@ -60,7 +60,7 @@ function LiveSidebarGradePocket({ onOpen }) {
 
   return (
     <SidebarStatPocket
-      icon="carbon:chart-pie"
+      icon="ph:chart-pie-slice"
       label="Dernière note"
       value={noteDisplay}
       max={noteMax}

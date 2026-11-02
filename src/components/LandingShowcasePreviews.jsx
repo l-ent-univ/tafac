@@ -85,7 +85,7 @@ function GradesPreview() {
         <WidgetUes releve={grades.releve} config={grades.config} visible />
       </div>
       <p className="m-0 mt-2 flex items-center gap-[6px] font-body text-base font-medium leading-none text-text">
-        <Icon icon="carbon:recently-viewed" className="size-[17px]" aria-hidden="true" />
+        <Icon icon="ph:clock-counter-clockwise" className="size-[17px]" aria-hidden="true" />
         Dernières notes
       </p>
       <ul className="m-0 grid list-none grid-cols-3 gap-3 p-0 max-md:grid-cols-2 max-md:gap-2">
@@ -124,7 +124,7 @@ function PlanningPreview() {
         return (
           <div key={day} className={`relative grid gap-2.5 ${dayIndex > 0 ? 'max-md:hidden' : ''}`}>
             <p className="m-0 flex min-w-0 items-center gap-[5px] font-body text-base font-medium leading-[1.06] text-brand">
-              <Icon icon="carbon:calendar" className="size-[17px] shrink-0" aria-hidden="true" />
+              <Icon icon="ph:calendar-blank" className="size-[17px] shrink-0" aria-hidden="true" />
               <span className="min-w-0 truncate">
                 {heading.title}
                 {heading.detail ? <span className="text-text-muted"> · {heading.detail}</span> : null}
@@ -139,9 +139,9 @@ function PlanningPreview() {
                     <StillContextMenu
                       className="top-[58%] right-8 max-md:right-2"
                       items={[
-                        { label: 'Voir le détail', icon: 'carbon:view' },
-                        { label: 'Écrire au sujet de ce cours', icon: 'carbon:email', active: true },
-                        { label: 'Copier', icon: 'carbon:copy' },
+                        { label: 'Voir le détail', icon: 'ph:eye' },
+                        { label: 'Écrire au sujet de ce cours', icon: 'ph:envelope-simple', active: true },
+                        { label: 'Copier', icon: 'ph:copy' },
                       ]}
                     />
                   ) : null}
@@ -168,7 +168,7 @@ function MailPreview() {
     <div className="landing-preview-mail relative grid min-w-0 pb-16 max-md:pb-0">
       <div className="landing-preview-sheet min-w-0 corners-[22px] border px-4 pt-3 pb-1 w-[86%] max-md:w-auto max-md:px-3">
         <p className="m-0 flex items-center gap-2 pb-1 font-body text-[15px] font-semibold text-text">
-          <Icon icon="carbon:email" className="size-[17px]" aria-hidden="true" />
+          <Icon icon="ph:envelope-simple" className="size-[17px]" aria-hidden="true" />
           Réception
           <span className="mail-unread-pill inline-flex h-[18px] min-w-[18px] items-center justify-center rounded-full px-[6px] text-[11px] font-semibold leading-none tabular-nums">{mail.unreadCount}</span>
         </p>
@@ -190,11 +190,11 @@ function MailPreview() {
         <div className="landing-preview-composer absolute right-0 bottom-0 w-[min(400px,64%)] min-w-0 overflow-hidden corners-[22px] border text-text max-md:relative max-md:-mt-8 max-md:ml-auto max-md:w-[94%]">
           <div className="flex items-center gap-3 px-4 pt-3 pb-2.5">
             <span className="inline-flex size-[30px] shrink-0 items-center justify-center rounded-full bg-bg-subtle text-text" aria-hidden="true">
-              <Icon icon="carbon:close" className="size-4" />
+              <Icon icon="ph:x" className="size-4" />
             </span>
             <span className="min-w-0 flex-1 truncate text-[14px] font-semibold leading-tight">{composer.subject}</span>
             <span className="inline-flex size-[30px] shrink-0 items-center justify-center rounded-full bg-text text-bg" aria-hidden="true">
-              <Icon icon="carbon:arrow-up" className="size-4" />
+              <Icon icon="ph:arrow-up" className="size-4" />
             </span>
           </div>
           <div className="border-t border-border text-[13px]">

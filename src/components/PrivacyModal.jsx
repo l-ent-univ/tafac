@@ -180,7 +180,7 @@ export function PrivacyContent({ embedded = false, control = null, actions = nul
             <ul className="m-0 flex list-none flex-col gap-2 p-0">
               {MAIL_LINES.map((line) => (
                 <li key={line} className="flex items-start gap-2 text-[14px] font-medium leading-[1.35] opacity-80">
-                  <Icon icon="carbon:checkmark" className="mt-[2px] size-[14px] shrink-0" aria-hidden="true" />
+                  <Icon icon="ph:check" className="mt-[2px] size-[14px] shrink-0" aria-hidden="true" />
                   <span>{line}</span>
                 </li>
               ))}

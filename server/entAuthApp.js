@@ -6528,8 +6528,8 @@ app.post('/__ent_auth/ade/upcoming', async (req, res) => {
     const requestedDate = typeof req.body?.date === 'string' && req.body.date.trim()
       ? req.body.date.trim()
       : new Date().toISOString().slice(0, 10)
-    // Upper bound matches the largest step offered by the account-modal
-    // lookahead slider (ADE_LOOKAHEAD_DAY_OPTIONS in src/profileStorage.js).
+    // The client asks NEXT_CLASS_LOOKAHEAD_DAYS (src/upcomingClasses.js);
+    // capped at 60 whatever it sends.
     const lookaheadDays = Math.max(
       1,
       Math.min(60, Number.parseInt(String(req.body?.lookaheadDays ?? '21'), 10) || 21),

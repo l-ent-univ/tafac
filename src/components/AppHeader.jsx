@@ -29,7 +29,7 @@ function AppHeader({ authenticated, checking, establishment = null, showUniversi
                 disabled={checking}
                 aria-label={actionLabel}
               >
-                <Icon icon="carbon:login" className="w-4 h-4 shrink-0 max-md:w-[1.1rem] max-md:h-[1.1rem]" aria-hidden="true" />
+                <Icon icon="ph:sign-in" className="w-4 h-4 shrink-0 max-md:w-[1.1rem] max-md:h-[1.1rem]" aria-hidden="true" />
                 <span className="max-md:hidden">{actionLabel}</span>
               </button>
 
@@ -40,7 +40,7 @@ function AppHeader({ authenticated, checking, establishment = null, showUniversi
                 disabled={checking}
                 aria-label="Mon compte"
               >
-                <Icon icon="carbon:user-avatar" className="w-4 h-4 shrink-0 max-md:w-[1.1rem] max-md:h-[1.1rem]" aria-hidden="true" />
+                <Icon icon="ph:user-circle" className="w-4 h-4 shrink-0 max-md:w-[1.1rem] max-md:h-[1.1rem]" aria-hidden="true" />
                 <span className="max-md:hidden">Mon compte</span>
               </button>
             </>

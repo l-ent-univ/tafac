@@ -141,7 +141,7 @@ function LandingHeader({ onLogin }) {
               ))}
               {repoUrl ? (
                 <a href={repoUrl} target="_blank" rel="noopener noreferrer" className={LINK_CLASSES}>
-                  <Icon icon="carbon:logo-github" className="size-4" aria-hidden="true" />
+                  <Icon icon="ph:github-logo" className="size-4" aria-hidden="true" />
                   {copyText(copy.header.code)}
                 </a>
               ) : null}
@@ -162,7 +162,7 @@ function LandingHeader({ onLogin }) {
                 onClick={() => setMenuOpen((current) => !current)}
                 className="landing-header-burger hidden size-10 shrink-0 cursor-pointer items-center justify-center rounded-full border-0 bg-transparent text-text transition-colors hover:bg-white/60 dark:hover:bg-white/10 max-4xl:inline-flex"
               >
-                <Icon icon={isMenuOpen ? 'carbon:close' : 'carbon:menu'} className="size-6" aria-hidden="true" />
+                <Icon icon={isMenuOpen ? 'ph:x' : 'ph:list'} className="size-6" aria-hidden="true" />
               </button>
             </div>
 
@@ -181,7 +181,7 @@ function LandingHeader({ onLogin }) {
               ))}
               {repoUrl ? (
                 <a href={repoUrl} target="_blank" rel="noopener noreferrer" className={MENU_LINK_CLASSES} onClick={() => setMenuOpen(false)}>
-                  <Icon icon="carbon:logo-github" className="size-5" aria-hidden="true" />
+                  <Icon icon="ph:github-logo" className="size-5" aria-hidden="true" />
                   {copyText(copy.header.code)}
                 </a>
               ) : null}

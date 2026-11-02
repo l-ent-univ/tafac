@@ -1293,7 +1293,7 @@
 
 /* Phones: a soft black fade from the top of the photo, so the white logo and
    the header buttons read on bright photos. Gone by the first cards. */
-@media (width < 640px) {
+@media (width < 1024px) {
   .dashboard-hero::before {
     content: '';
     position: absolute;
@@ -1831,6 +1831,61 @@
   animation: wave 1s ease-in-out 0.4s;
 }
 
+/* ── « Accueil » icon row (HomeDraftPage) ──
+   On arrival each icon comes into focus: from a little to the right,
+   slightly small, untilted and blurred, it slides to its place and settles
+   on its tilt, one after the other (45ms apart), on a long ease-out. Short
+   and on six small images, the blur stays cheap. Each icon carries its
+   index (--i) and tilt (--r). */
+
+.home-icon-deal {
+  animation: home-icon-deal 700ms cubic-bezier(0.16, 1, 0.3, 1) backwards;
+  animation-delay: calc(60ms + var(--i) * 45ms);
+}
+
+@keyframes home-icon-deal {
+  from {
+    opacity: 0;
+    filter: blur(6px);
+    transform: translateX(14px) rotate(0deg) scale(0.86);
+  }
+  to {
+    opacity: 1;
+    filter: blur(0);
+    transform: rotate(var(--r));
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .home-icon-deal {
+    animation: none;
+  }
+}
+
+/* ── « Accueil » briefing (HomeDraftPage's BlurInText) ──
+   Each character of the day's sentence comes into focus in turn: from
+   transparent and blurred to sharp, opacity and filter only, once (no fill
+   left behind). Its delay (--delay) set per character, capped. Shown as is
+   when motion is reduced. */
+
+.blur-in-char {
+  animation: blur-in-char 420ms cubic-bezier(0.2, 0.8, 0.2, 1) backwards;
+  animation-delay: var(--delay, 0ms);
+}
+
+@keyframes blur-in-char {
+  from {
+    opacity: 0;
+    filter: blur(4px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .blur-in-char {
+    animation: none;
+  }
+}
+
 /* ── Widget card visibility ── */
 
 .widget-card-visible {
@@ -2256,7 +2311,7 @@
   }
 }
 
-@media (width < 640px) {
+@media (width < 1024px) {
   .landing-showcase-stage {
     padding: 14px;
   }
@@ -2465,7 +2520,7 @@
 /* On phones, on the sky's blue: the wordmark, the Papillon line and the
    burger white, with a faint shadow for the clouds; back to the text colour
    in the pill. */
-@media (width < 640px) {
+@media (width < 1024px) {
   .landing-header:not([data-floating]) .landing-header-wordmark {
     filter: brightness(0) invert(1) drop-shadow(0 1px 2px rgb(0 0 0 / 0.3));
   }
@@ -4841,7 +4896,7 @@
 
 /* Phones: the header buttons float over the photo as frosted glass, like the
    tab bar (same tint and sheen, with a softer white edge). */
-@media (width < 640px) {
+@media (width < 1024px) {
   .header-account-btn,
   .header-logout-btn {
     background-color: rgb(252 251 248 / 0.5);
@@ -4903,7 +4958,7 @@
   background-color: #5b9dff;
 }
 
-@media (width < 640px) {
+@media (width < 1024px) {
   .changelog-pill {
     background-color: rgb(252 251 248 / 0.5);
     background-image: linear-gradient(180deg, rgb(255 255 255 / 0.45), rgb(255 255 255 / 0.08));
@@ -5063,6 +5118,21 @@
 @media (width < 768px) {
   .launch-card-slot {
     margin: -12px 0 20px;
+  }
+}
+
+/* On « Accueil », right under the band: its room above, folding up with it. */
+.home-draft-page .launch-card-slot {
+  margin: 24px 0 0;
+}
+
+.home-draft-page .launch-card-slot.is-leaving {
+  margin: 0;
+}
+
+@media (width < 768px) {
+  .home-draft-page .launch-card-slot {
+    margin-top: 16px;
   }
 }
 
@@ -5869,7 +5939,7 @@
   animation: weather-modal-card-in 240ms cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 
-@media (max-width: 639.98px) {
+@media (max-width: 1023.98px) {
   .gd-dialog {
     animation: gd-sheet-in 360ms cubic-bezier(0.16, 1, 0.3, 1);
   }
@@ -5885,7 +5955,7 @@
   clip-path: inset(0 round calc(var(--modal-radius, 26px) - 1px));
 }
 
-@media (max-width: 639.98px) {
+@media (max-width: 1023.98px) {
   .gd-clip {
     clip-path: inset(0 round calc(var(--modal-radius, 26px) - 1px) calc(var(--modal-radius, 26px) - 1px) 0 0);
   }
@@ -7238,4 +7308,25 @@ li:has(> .planning-row.is-link:active) + li > .planning-row .planning-row-text,
    pointer, so its ring does too. */
 .mail-toast--steady:hover .mail-toast-ring {
   animation-play-state: running;
+}
+
+/* ── Réglages › Accueil: the last card shown refuses to go ──
+   A short sideways shake (HomeLayoutSetting), replayed on each try. */
+
+.home-tile-refuse {
+  animation: home-tile-refuse 360ms cubic-bezier(0.36, 0.07, 0.19, 0.97);
+}
+
+@keyframes home-tile-refuse {
+  0%, 100% { translate: 0; }
+  20% { translate: -5px; }
+  40% { translate: 4px; }
+  60% { translate: -3px; }
+  80% { translate: 2px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .home-tile-refuse {
+    animation: none;
+  }
 }

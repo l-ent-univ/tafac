@@ -18,7 +18,7 @@ export function AttachDrawerError({ text, onRetry }) {
     <div className="grid justify-items-center gap-3 px-2 py-8 text-center" role="alert">
       <p className="m-0 max-w-[340px] font-body text-[14px] font-medium leading-[1.4] text-text-secondary">{text}</p>
       <button type="button" className="material inline-flex cursor-pointer items-center gap-1.5 rounded-full px-3.5 py-2" onClick={onRetry}>
-        <Icon icon="carbon:renew" className="size-4" aria-hidden="true" />
+        <Icon icon="ph:arrows-clockwise" className="size-4" aria-hidden="true" />
         <span className="font-body text-[14px] font-semibold text-text">Réessayer</span>
       </button>
     </div>
@@ -98,7 +98,7 @@ function MailAttachDrawer({ titleId, title, subtitle = null, search = null, onSu
   }
 
   return (
-    <div className="absolute inset-0 z-40 flex items-end" role="presentation">
+    <div className="absolute inset-0 z-40 flex items-end pl-[env(safe-area-inset-left)] pr-[env(safe-area-inset-right)]" role="presentation">
       <div className="absolute inset-0 bg-backdrop animate-modal-backdrop-in" onClick={onClose} aria-hidden="true" />
       <section
         ref={dialogRef}

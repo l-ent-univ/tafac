@@ -20,11 +20,13 @@ import {
 // widest card of the overview's strip, its texts a size down to fit.
 const CARD_CLASSES = 'average-grade-widget widget-card shadow-md w-full max-w-[443px] min-h-[188px] p-4 border card-corners overflow-hidden text-base leading-6 min-w-0 max-md:w-auto max-md:max-w-none max-md:min-h-[160px] max-md:flex-[1_0_clamp(140px,50%,200px)] max-md:snap-start max-md:p-3 relative'
 
-function AverageGradeHeader({ estimated = false, final = false }) {
+// `icon`: an image before the title (« Accueil »'s and « Mes notes »').
+function AverageGradeHeader({ estimated = false, final = false, icon = null }) {
   return (
     <div className="relative z-10 flex items-center gap-[5px] min-w-0">
+      {icon ? <img src={icon} alt="" width="22" height="22" draggable="false" className="mr-[3px] size-[22px] shrink-0 select-none" aria-hidden="true" /> : null}
       <span className="m-0 min-w-0 leading-[1.06] text-base font-medium text-text-muted overflow-hidden text-ellipsis whitespace-nowrap max-md:text-[14px]">
-        Moyenne<span className="max-md:hidden"> Générale</span>
+        Moyenne<span className="max-md:hidden"> générale</span>
       </span>
       {/* Only when the department hides ScoDoc's average and the card shows the estimate. */}
       {estimated ? (
@@ -86,7 +88,7 @@ function AverageGradeValues({ avgDisplay, promoDisplay, ranks = null }) {
 
 // features.grades === 'disabled': demo numbers, blurred, behind an
 // "unavailable" pill. No data is fetched.
-function DisabledWidgetAverageGrade({ visible }) {
+function DisabledWidgetAverageGrade({ visible, icon }) {
   const avgDisplay = String(parseFloat(DEMO_AVERAGE_GRADE.average))
   const promoDisplay = String(parseFloat(DEMO_AVERAGE_GRADE.promoAverage))
 
@@ -100,7 +102,7 @@ function DisabledWidgetAverageGrade({ visible }) {
       onPointerMove={positionGradeTooltipFromPointer}
     >
       <div className="grade-disabled-content flex h-full flex-col gap-[6px]">
-        <AverageGradeHeader />
+        <AverageGradeHeader icon={icon} />
         <AverageGradeValues avgDisplay={avgDisplay} promoDisplay={promoDisplay} />
       </div>
       <span className="grade-disabled-pill" aria-hidden="true">{GRADES_DISABLED_PILL_LABEL}</span>
@@ -116,7 +118,7 @@ function DisabledWidgetAverageGrade({ visible }) {
 // relevé the page passes in (the semester picked on "Mes notes"). Not a
 // link: the card is read where it is, nothing to open on ScoDoc. Renders
 // nothing without an average.
-function LiveWidgetAverageGrade({ releve, visible }) {
+function LiveWidgetAverageGrade({ releve, visible, icon }) {
   const data = useMemo(() => (releve ? summarizeAverage(releve) : null), [releve])
   // buildGradesReport leaves ranks out when the department hides them.
   const ranks = useMemo(() => {
@@ -141,18 +143,18 @@ function LiveWidgetAverageGrade({ releve, visible }) {
         // Behind the title and the number: from under the title to the bottom edge.
         <AverageSparkline history={data.history} semesterEnd={data.semesterEnd} className="absolute inset-x-0 top-[38px] bottom-0 max-md:top-[32px]" />
       ) : null}
-      <AverageGradeHeader estimated={Boolean(data.estimated)} final={data.final} />
+      <AverageGradeHeader estimated={Boolean(data.estimated)} final={data.final} icon={icon} />
       <AverageGradeValues avgDisplay={avgDisplay} promoDisplay={promoDisplay} ranks={ranks} />
     </article>
   )
 }
 
-function WidgetAverageGrade({ releve = null, visible = false }) {
+function WidgetAverageGrade({ releve = null, visible = false, icon = null }) {
   if (GRADES_FEATURE_DISABLED) {
-    return <DisabledWidgetAverageGrade visible={visible} />
+    return <DisabledWidgetAverageGrade visible={visible} icon={icon} />
   }
 
-  return <LiveWidgetAverageGrade releve={releve} visible={visible} />
+  return <LiveWidgetAverageGrade releve={releve} visible={visible} icon={icon} />
 }
 
 export default WidgetAverageGrade

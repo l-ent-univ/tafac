@@ -217,11 +217,11 @@ function PlanningPage({ selection = null, user = null, showWeekend = false, onOp
     const event = events.find((entry) => entry.id === id)
     if (!event) return null
     return [
-      { id: 'open', label: 'Voir le détail', icon: 'carbon:view', onSelect: () => openSheet(event) },
-      isWeek ? { id: 'day', label: 'Afficher le jour', icon: 'carbon:calendar', onSelect: () => openDay(event.day) } : null,
-      writeAboutCourse ? { id: 'write', label: 'Écrire au sujet de ce cours', icon: 'carbon:email', onSelect: () => void writeAboutCourse(event) } : null,
+      { id: 'open', label: 'Voir le détail', icon: 'ph:eye', onSelect: () => openSheet(event) },
+      isWeek ? { id: 'day', label: 'Afficher le jour', icon: 'ph:calendar-blank', onSelect: () => openDay(event.day) } : null,
+      writeAboutCourse ? { id: 'write', label: 'Écrire au sujet de ce cours', icon: 'ph:envelope-simple', onSelect: () => void writeAboutCourse(event) } : null,
       'separator',
-      { id: 'copy', label: 'Copier', icon: 'carbon:copy', onSelect: () => void copyToClipboard(classCopyText(event)) },
+      { id: 'copy', label: 'Copier', icon: 'ph:copy', onSelect: () => void copyToClipboard(classCopyText(event)) },
     ]
   })
 

@@ -92,12 +92,12 @@ function LatestGradesList({ grades, ueColors = {}, subjectIcon = () => null, onO
     const grade = grades[Number(key)]
     if (!grade) return null
     return [
-      onOpen ? { id: 'open', label: 'Voir la note', icon: 'carbon:view', onSelect: () => onOpen(grade) } : null,
-      write ? { id: 'write', label: 'Écrire au sujet de cette note', icon: 'carbon:email', onSelect: () => void write({ moduleCode: grade.moduleCode, evaluationId: grade.id }) } : null,
+      onOpen ? { id: 'open', label: 'Voir la note', icon: 'ph:eye', onSelect: () => onOpen(grade) } : null,
+      write ? { id: 'write', label: 'Écrire au sujet de cette note', icon: 'ph:envelope-simple', onSelect: () => void write({ moduleCode: grade.moduleCode, evaluationId: grade.id }) } : null,
       {
         id: 'copy',
         label: 'Copier',
-        icon: 'carbon:copy',
+        icon: 'ph:copy',
         onSelect: () => void copyToClipboard(gradeCopyText({ title: grade.description || grade.moduleTitle, value: grade.grade.value, subject: grade.moduleTitle })),
       },
     ]

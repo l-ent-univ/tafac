@@ -127,12 +127,12 @@ export function EvaluationRow({ evaluation, moduleCode = null, showPromoStats, w
   // Its right-click menu (a long press): the detail sheet, a mail about it,
   // the grade as text.
   const menuProps = useContextMenu(() => [
-    canOpen ? { id: 'open', label: 'Voir la note', icon: 'carbon:view', onSelect: open } : null,
-    canOpen && gradeDetail.write ? { id: 'write', label: 'Écrire au sujet de cette note', icon: 'carbon:email', onSelect: () => void gradeDetail.write({ moduleCode, evaluationId: evaluation.id }) } : null,
+    canOpen ? { id: 'open', label: 'Voir la note', icon: 'ph:eye', onSelect: open } : null,
+    canOpen && gradeDetail.write ? { id: 'write', label: 'Écrire au sujet de cette note', icon: 'ph:envelope-simple', onSelect: () => void gradeDetail.write({ moduleCode, evaluationId: evaluation.id }) } : null,
     {
       id: 'copy',
       label: 'Copier',
-      icon: 'carbon:copy',
+      icon: 'ph:copy',
       onSelect: () => void copyToClipboard(gradeCopyText({ title: evaluation.description, value: isNumber ? evaluation.grade.value : evaluation.grade.label })),
     },
   ])
@@ -178,7 +178,7 @@ export function EvaluationRow({ evaluation, moduleCode = null, showPromoStats, w
         {...menuProps()}
       >
         {content}
-        <Icon icon="carbon:chevron-right" className="subject-evaluation-chevron -ml-1 -mr-[2px] size-[14px] shrink-0 text-text-30" aria-hidden="true" />
+        <Icon icon="ph:caret-right" className="subject-evaluation-chevron -ml-1 -mr-[2px] size-[14px] shrink-0 text-text-30" aria-hidden="true" />
       </button>
     </li>
   )
@@ -231,14 +231,14 @@ function SubjectRow({ module, isOpen, onToggle, icon, wash, ueTitles, showPromoS
     isEmpty ? null : {
       id: 'toggle',
       label: isOpen ? 'Masquer les évaluations' : 'Afficher les évaluations',
-      icon: isOpen ? 'carbon:chevron-up' : 'carbon:chevron-down',
+      icon: isOpen ? 'ph:caret-up' : 'ph:caret-down',
       onSelect: onToggle,
     },
     'separator',
     ...(onOpenUe ? module.ueCoefs.map((link) => ({
       id: `ue-${link.ue}`,
       label: `Voir dans ${link.ue}`,
-      icon: 'carbon:arrow-right',
+      icon: 'ph:arrow-right',
       hint: ueTitles[link.ue] || undefined,
       onSelect: () => onOpenUe(link.ue, module.code),
     })) : []),
@@ -266,7 +266,7 @@ function SubjectRow({ module, isOpen, onToggle, icon, wash, ueTitles, showPromoS
           <span className="truncate font-body text-[13px] font-medium leading-[1.3] text-text-muted">{module.code} · {progress}</span>
         </span>
         {module.average != null ? <ScoreText value={module.average} /> : null}
-        {isEmpty ? <span className="size-4 shrink-0" aria-hidden="true" /> : <Icon icon="carbon:chevron-down" className="subject-row-chevron size-4 shrink-0 text-text-muted" aria-hidden="true" />}
+        {isEmpty ? <span className="size-4 shrink-0" aria-hidden="true" /> : <Icon icon="ph:caret-down" className="subject-row-chevron size-4 shrink-0 text-text-muted" aria-hidden="true" />}
       </Header>
       {isEmpty ? null : (
       <div id={panelId} role="region" aria-labelledby={buttonId} className="subject-panel">

@@ -24,9 +24,9 @@ const CARD = 'gd-card gd-rise grid gap-4 modal-inner-corners border border-borde
 
 // What a grade that isn't a number means for the averages.
 const STATE_NOTES = {
-  absent: { icon: 'carbon:misuse-outline', text: 'Une absence non justifiée compte 0 dans tes moyennes.' },
-  excused: { icon: 'carbon:checkmark-outline', text: 'Absence justifiée : cette évaluation est neutralisée, elle ne compte pas dans tes moyennes.' },
-  pending: { icon: 'carbon:hourglass', text: 'La note n’est pas encore saisie sur ScoDoc.' },
+  absent: { icon: 'ph:prohibit', text: 'Une absence non justifiée compte 0 dans tes moyennes.' },
+  excused: { icon: 'ph:check-circle', text: 'Absence justifiée : cette évaluation est neutralisée, elle ne compte pas dans tes moyennes.' },
+  pending: { icon: 'ph:hourglass', text: 'La note n’est pas encore saisie sur ScoDoc.' },
 }
 
 // What a rattrapage, a session 2 or a bonus does, in place of a weight share.
@@ -69,7 +69,7 @@ function Hero({ evaluation, gap, summaryId }) {
         </p>
         {gap ? (
           <span className="mb-[2px] inline-flex items-center gap-[5px] rounded-full border border-border bg-widget-bg/70 py-[6px] pr-[11px] pl-[8px] text-text-secondary" aria-hidden="true">
-            <Icon icon={gap.gap > 0 ? 'carbon:arrow-up-right' : gap.gap < 0 ? 'carbon:arrow-down-right' : 'carbon:subtract-alt'} className="size-[14px]" />
+            <Icon icon={gap.gap > 0 ? 'ph:arrow-up-right' : gap.gap < 0 ? 'ph:arrow-down-right' : 'ph:minus-circle'} className="size-[14px]" />
             <span className="font-body text-[13px] font-semibold leading-none">{gap.text}</span>
           </span>
         ) : null}
@@ -81,7 +81,7 @@ function Hero({ evaluation, gap, summaryId }) {
     <div className="gd-rise grid gap-[10px]" style={{ '--d': '40ms' }}>
       <p id={summaryId} className="m-0 flex items-center gap-[10px] leading-none">
         <span className={`gd-state inline-flex size-11 items-center justify-center rounded-full border ${grade.kind === 'pending' ? 'border-dashed border-border-input' : 'border-border'} bg-widget-bg/70`} aria-hidden="true">
-          <Icon icon={note?.icon ?? 'carbon:information'} className="size-[22px] text-text-secondary" />
+          <Icon icon={note?.icon ?? 'ph:info'} className="size-[22px] text-text-secondary" />
         </span>
         <span className="font-display text-[34px] font-bold leading-none text-text max-sm:text-[30px]">{grade.label}</span>
         {note ? <span className="sr-only">. {note.text}</span> : null}
@@ -206,7 +206,7 @@ function WeightCard({ report, module, evaluation, titleId }) {
 
   return (
     <section className={CARD} style={{ '--d': '200ms' }} aria-labelledby={titleId}>
-      <SectionTitle id={titleId} icon="carbon:scales">Poids</SectionTitle>
+      <SectionTitle id={titleId} icon="ph:scales">Poids</SectionTitle>
       {evaluation.coef != null ? (
         <div className="flex items-center justify-between gap-3">
           <span className="grid gap-[4px]">
@@ -218,7 +218,7 @@ function WeightCard({ report, module, evaluation, titleId }) {
       ) : null}
       {typeNote ? (
         <p className="m-0 flex items-start gap-2 corners-[14px] bg-bg-subtle px-3 py-[10px] font-body text-[13px] font-medium leading-[1.4] text-text-secondary dark:bg-white/[0.04]">
-          <Icon icon="carbon:information" className="mt-[1px] size-[15px] shrink-0" aria-hidden="true" />
+          <Icon icon="ph:info" className="mt-[1px] size-[15px] shrink-0" aria-hidden="true" />
           {typeNote}
         </p>
       ) : null}
@@ -259,7 +259,7 @@ function PromoCard({ evaluation, semesterId, showPromoStats, titleId }) {
 
   return (
     <section className={CARD} style={{ '--d': '120ms' }} aria-labelledby={titleId}>
-      <SectionTitle id={titleId} icon="carbon:user-multiple" aside={total ? `${total} ${total > 1 ? 'notes' : 'note'}` : null}>Dans la promo</SectionTitle>
+      <SectionTitle id={titleId} icon="ph:users" aside={total ? `${total} ${total > 1 ? 'notes' : 'note'}` : null}>Dans la promo</SectionTitle>
       {hasStats ? <PromoScale evaluation={evaluation} /> : null}
       <div className={`grid gap-3 ${hasStats ? 'border-t border-border pt-4' : ''}`}>
         {/* The chart's title says what the bars count; the key names the
@@ -409,7 +409,7 @@ function GradeDetailModal({ report, module, evaluation, semesterId, icon = null,
               <span className="gd-grabber relative mx-auto hidden h-[4px] w-9 rounded-full bg-text-30 max-sm:block max-sm:translate-y-2" aria-hidden="true" />
               <div className="relative flex items-center gap-3 px-6 pt-5 pb-3 max-sm:px-4 max-sm:pt-[14px]">
                 <span className="inline-flex size-10 shrink-0 items-center justify-center corners-[12px] border border-border bg-widget-bg/80" aria-hidden="true">
-                  {icon ? <Icon icon={icon} className="size-5 text-text" /> : <Icon icon="carbon:book" className="size-5 text-text" />}
+                  {icon ? <Icon icon={icon} className="size-5 text-text" /> : <Icon icon="ph:book" className="size-5 text-text" />}
                 </span>
                 <span className="grid min-w-0 flex-1 gap-[4px]">
                   <span className="truncate font-body text-[14px] font-semibold leading-[1.2] text-text" title={module.title}>{module.title}</span>
@@ -440,7 +440,7 @@ function GradeDetailModal({ report, module, evaluation, semesterId, icon = null,
                       onClick={onWrite}
                       className="close-button glass-close-button group relative inline-flex size-[34px] shrink-0 cursor-pointer items-center justify-center rounded-full border-0 p-0 text-text focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-text"
                     >
-                      <Icon icon="carbon:email" className="size-[16px]" aria-hidden="true" />
+                      <Icon icon="ph:envelope-simple" className="size-[16px]" aria-hidden="true" />
                       <Tooltip title="Écrire au sujet de cette note" side="bottom-end" className="max-4xl:hidden" />
                     </button>
                   ) : null}
@@ -455,7 +455,7 @@ function GradeDetailModal({ report, module, evaluation, semesterId, icon = null,
                 <div className="flex flex-wrap items-center gap-x-2 gap-y-[6px]">
                   {date ? (
                     <span className="inline-flex items-center gap-[5px] font-body text-[13px] font-medium leading-none text-text-muted">
-                      <Icon icon="carbon:calendar" className="size-[14px]" aria-hidden="true" />
+                      <Icon icon="ph:calendar-blank" className="size-[14px]" aria-hidden="true" />
                       {date}
                     </span>
                   ) : null}

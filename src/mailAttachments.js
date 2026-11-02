@@ -169,13 +169,13 @@ export function getAttachmentKind(attachment) {
 }
 
 export function getAttachmentIcon(type) {
-  if (!type) return 'carbon:document'
-  if (type.startsWith('image/')) return 'carbon:image'
-  if (type === 'application/pdf') return 'carbon:document-pdf'
-  if (type.startsWith('audio/')) return 'carbon:music'
-  if (type.startsWith('video/')) return 'carbon:video'
-  if (/zip|compressed|tar|rar|7z/.test(type)) return 'carbon:archive'
-  if (type === 'text/calendar') return 'carbon:calendar'
-  if (type === 'message/rfc822') return 'carbon:email'
-  return 'carbon:document'
+  if (!type) return 'ph:file-text'
+  if (type.startsWith('image/')) return 'ph:image'
+  if (type === 'application/pdf') return 'ph:file-pdf'
+  if (type.startsWith('audio/')) return 'ph:music-note'
+  if (type.startsWith('video/')) return 'ph:video-camera'
+  if (/zip|compressed|tar|rar|7z/.test(type)) return 'ph:archive'
+  if (type === 'text/calendar') return 'ph:calendar-blank'
+  if (type === 'message/rfc822') return 'ph:envelope-simple'
+  return 'ph:file-text'
 }

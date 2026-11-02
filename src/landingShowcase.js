@@ -12,35 +12,35 @@ export const SHOWCASE_TABS = Object.freeze([
   {
     id: 'accueil',
     key: 'home',
-    icon: 'carbon:home',
+    icon: 'ph:house',
     features: [],
-    itemIcons: ['ph:hand-waving', 'carbon:time', 'carbon:email', 'carbon:task', 'carbon:app-switcher'],
+    itemIcons: ['ph:hand-waving', 'ph:clock', 'ph:envelope-simple', 'ph:check-square', 'ph:squares-four'],
     itemFeatures: [[], ['ade'], ['mail'], ['moodleDeadlines'], []],
   },
   {
     id: 'mes-notes',
     key: 'grades',
-    icon: 'carbon:chart-pie',
+    icon: 'ph:chart-pie-slice',
     features: ['grades'],
-    itemIcons: ['carbon:chart-ring', 'carbon:chart-histogram', 'carbon:calculator', 'carbon:email'],
+    itemIcons: ['ph:chart-donut', 'ph:chart-bar-horizontal', 'ph:calculator', 'ph:envelope-simple'],
     itemFeatures: [[], [], [], ['mail']],
   },
   {
     id: 'planning',
     key: 'planning',
-    icon: 'carbon:calendar',
+    icon: 'ph:calendar-blank',
     features: ['planning'],
-    itemIcons: ['carbon:list-boxes', 'carbon:email', 'carbon:download', 'carbon:arrows-horizontal'],
+    itemIcons: ['ph:rows', 'ph:envelope-simple', 'ph:download-simple', 'ph:arrows-horizontal'],
     itemFeatures: [[], ['mail'], [], []],
   },
   {
     id: 'messagerie',
     key: 'mail',
-    icon: 'carbon:email',
+    icon: 'ph:envelope-simple',
     features: ['mail'],
     // The in-app page, not the webmail's link (mail.page: false).
     mailPage: true,
-    itemIcons: ['carbon:chat', 'carbon:edit', 'carbon:undo', 'carbon:document-attachment', 'carbon:warning-alt'],
+    itemIcons: ['ph:chat-circle', 'ph:pencil-simple', 'ph:arrow-u-up-left', 'ph:files', 'ph:warning'],
     itemFeatures: [[], [], [], [], []],
   },
 ])
@@ -68,12 +68,12 @@ function hasMailPage(config) {
 // `features.items`, by index): each one's icon and what a university needs
 // on for it, as the tabs'.
 export const DEVICE_FEATURES = Object.freeze([
-  { icon: 'carbon:location', features: ['ade'] },
-  { icon: 'carbon:calendar', features: ['planning'] },
-  { icon: 'carbon:chart-line', features: ['grades'] },
-  { icon: 'carbon:email', features: ['mail'], mailPage: true },
-  { icon: 'carbon:task', features: ['moodleDeadlines'] },
-  { icon: 'carbon:app-switcher', features: [] },
+  { icon: 'ph:map-pin', features: ['ade'] },
+  { icon: 'ph:calendar-blank', features: ['planning'] },
+  { icon: 'ph:chart-line', features: ['grades'] },
+  { icon: 'ph:envelope-simple', features: ['mail'], mailPage: true },
+  { icon: 'ph:check-square', features: ['moodleDeadlines'] },
+  { icon: 'ph:squares-four', features: [] },
 ])
 
 // The device section's features this landing shows, by index: every one

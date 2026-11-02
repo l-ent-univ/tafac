@@ -55,8 +55,8 @@ function formatNearestCity(address = {}) {
 }
 
 function getWeatherDescriptor(weatherCode, isDay) {
-  const dayPartlyCloudyIcon = isDay ? 'carbon:partly-cloudy' : 'carbon:partly-cloudy-night'
-  const dayMostlyCloudyIcon = isDay ? 'carbon:mostly-cloudy' : 'carbon:mostly-cloudy-night'
+  const dayPartlyCloudyIcon = isDay ? 'ph:cloud-sun' : 'ph:cloud-moon'
+  const dayMostlyCloudyIcon = isDay ? 'ph:cloud' : 'ph:cloud-moon'
 
   if (weatherCode === 0) {
     return {
@@ -96,7 +96,7 @@ function getWeatherDescriptor(weatherCode, isDay) {
   if ([45, 48].includes(weatherCode)) {
     return {
       label: 'Brouillard',
-      icon: 'carbon:cloudy',
+      icon: 'ph:cloud',
       gradient: buildWeatherGradient('#d4cce8'),
       gradientDark: buildWeatherGradientDark('#221e38'),
     }
@@ -105,7 +105,7 @@ function getWeatherDescriptor(weatherCode, isDay) {
   if ([51, 53, 55, 56, 57].includes(weatherCode)) {
     return {
       label: 'Bruine',
-      icon: 'carbon:cloudy',
+      icon: 'ph:cloud',
       gradient: buildWeatherGradient('#bae6fd'),
       gradientDark: buildWeatherGradientDark('#0e2a48'),
     }
@@ -114,7 +114,7 @@ function getWeatherDescriptor(weatherCode, isDay) {
   if ([61, 63, 65, 66, 67, 80, 81, 82].includes(weatherCode)) {
     return {
       label: 'Pluie',
-      icon: 'carbon:cloudy',
+      icon: 'ph:cloud',
       gradient: buildWeatherGradient('#a5b4fc'),
       gradientDark: buildWeatherGradientDark('#1a2558'),
     }
@@ -123,7 +123,7 @@ function getWeatherDescriptor(weatherCode, isDay) {
   if ([71, 73, 75, 77, 85, 86].includes(weatherCode)) {
     return {
       label: 'Neige',
-      icon: 'carbon:cloudy',
+      icon: 'ph:cloud',
       gradient: buildWeatherGradient('#c7d2fe'),
       gradientDark: buildWeatherGradientDark('#1c2450'),
     }
@@ -132,7 +132,7 @@ function getWeatherDescriptor(weatherCode, isDay) {
   if ([95, 96, 99].includes(weatherCode)) {
     return {
       label: 'Orage',
-      icon: 'carbon:cloudy',
+      icon: 'ph:cloud',
       gradient: buildWeatherGradient('#c4b5fd'),
       gradientDark: buildWeatherGradientDark('#2a1060'),
     }
@@ -140,7 +140,7 @@ function getWeatherDescriptor(weatherCode, isDay) {
 
   return {
     label: 'Conditions variables',
-    icon: 'carbon:cloudy',
+    icon: 'ph:cloud',
     gradient: buildWeatherGradient('#bfdbfe'),
     gradientDark: buildWeatherGradientDark('#1a2540'),
   }

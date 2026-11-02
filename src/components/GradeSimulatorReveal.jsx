@@ -211,7 +211,7 @@ function DeltaChip({ move }) {
   const up = move.delta > 0
   return (
     <span className={`inline-flex shrink-0 items-center gap-[3px] rounded-full font-display font-bold leading-none px-[7px] py-[4px] text-[12.5px] ${up ? 'bg-success-bg text-success-text' : 'bg-bg-subtle text-text-secondary'}`}>
-      <Icon icon={up ? 'carbon:arrow-up' : 'carbon:arrow-down'} className="size-[12px]" aria-hidden="true" />
+      <Icon icon={up ? 'ph:arrow-up' : 'ph:arrow-down'} className="size-[12px]" aria-hidden="true" />
       {formatDelta(move.delta).slice(1)}
     </span>
   )
@@ -531,7 +531,7 @@ function GradeSimulatorReveal({ ue, ues, releve, overrides, flyFrom = null, onEd
                   <MoveRow
                     badge={(
                       <span className="inline-flex size-9 shrink-0 items-center justify-center corners-[11px] bg-brand-subtle">
-                        <Icon icon="carbon:chart-line" className="size-[18px] text-text" />
+                        <Icon icon="ph:chart-line" className="size-[18px] text-text" />
                       </span>
                     )}
                     label="Moyenne générale"
@@ -561,7 +561,7 @@ function GradeSimulatorReveal({ ue, ues, releve, overrides, flyFrom = null, onEd
           className="inline-flex min-h-[44px] items-center justify-center gap-2 whitespace-nowrap corners-[32px] border border-border-input bg-transparent px-5 font-body text-[16px] font-semibold text-text transition-colors duration-150 hover:bg-bg-subtle max-sm:flex-1 max-sm:px-4"
           onClick={() => onEdit(badgeRef.current?.getBoundingClientRect() ?? null)}
         >
-          <Icon icon="carbon:arrow-left" className="size-[18px]" aria-hidden="true" />
+          <Icon icon="ph:arrow-left" className="size-[18px]" aria-hidden="true" />
           Modifier mes notes
         </button>
         <LentButton className="ml-auto" onClick={onClose}>

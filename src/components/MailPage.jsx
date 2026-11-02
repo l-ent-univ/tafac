@@ -68,7 +68,7 @@ const ROW_PREFETCH_DELAY_MS = 100
 // mailbox's: getMailFolders).
 const INBOX_FOLDER = '2'
 const FOLDER_LABELS = { inbox: 'Réception', sent: 'Envoyés', drafts: 'Brouillons', junk: 'Spam', trash: 'Corbeille' }
-const FOLDER_ICONS = { inbox: 'carbon:email', sent: 'carbon:send-alt', drafts: 'carbon:document-blank', junk: 'carbon:misuse-outline', trash: 'carbon:trash-can' }
+const FOLDER_ICONS = { inbox: 'ph:envelope-simple', sent: 'ph:paper-plane-tilt', drafts: 'ph:file', junk: 'ph:prohibit', trash: 'ph:trash' }
 
 function getFolderLabel(folder) {
   return FOLDER_LABELS[folder.kind] ?? folder.name
@@ -84,7 +84,7 @@ function getSearchingLabel(folderId, folders) {
 
 function getFolderIcon(folder) {
   if (FOLDER_ICONS[folder.kind]) return FOLDER_ICONS[folder.kind]
-  return /archiv/i.test(folder.name) ? 'carbon:archive' : 'carbon:folder'
+  return /archiv/i.test(folder.name) ? 'ph:archive' : 'ph:folder'
 }
 
 // Typing stops this long before the server searches the whole inbox.
@@ -344,7 +344,7 @@ function SignInAgainButton({ onClick }) {
 function MailSessionNotice({ onSignInAgain, className = '' }) {
   return (
     <div className={`flex min-w-0 items-center gap-3 rounded-[14px] bg-bg-subtle px-4 py-3 ${className}`} role="status">
-      <Icon icon="carbon:locked" className="size-[18px] shrink-0 text-text-muted" aria-hidden="true" />
+      <Icon icon="ph:lock" className="size-[18px] shrink-0 text-text-muted" aria-hidden="true" />
       <div className="grid min-w-0 flex-1 gap-0.5">
         <p className="m-0 text-[14px] font-semibold leading-tight text-text">Session expirée</p>
         <p className="m-0 text-[13px] font-medium leading-snug text-text-muted">Reconnecte-toi pour retrouver tes mails</p>
@@ -555,7 +555,7 @@ function MailFolderPills({ folders, currentId, currentUnread, onSelect, onOpenMe
           {...pillProps('__folders', (event) => onOpenMenu?.(event.currentTarget.getBoundingClientRect()))}
         >
           <span className="relative inline-flex shrink-0">
-            <Icon icon={currentMenuFolder ? getFolderIcon(currentMenuFolder) : 'carbon:folder'} className="size-[18px]" aria-hidden="true" />
+            <Icon icon={currentMenuFolder ? getFolderIcon(currentMenuFolder) : 'ph:folder'} className="size-[18px]" aria-hidden="true" />
             {menuUnread ? <span className={`mail-unread-dot absolute -right-[3px] -top-[2px] size-[7px] rounded-full ${currentMenuFolder ? 'mail-unread-dot--on-pill ring-2' : ''}`} aria-hidden="true" /> : null}
           </span>
           <span
@@ -564,7 +564,7 @@ function MailFolderPills({ folders, currentId, currentUnread, onSelect, onOpenMe
           >
             <span className="text-[14px] font-semibold leading-none">{currentFolderLabel}</span>
           </span>
-          <Icon icon="carbon:chevron-down" className="size-[12px] shrink-0 -ml-1 max-md:hidden" aria-hidden="true" />
+          <Icon icon="ph:caret-down" className="size-[12px] shrink-0 -ml-1 max-md:hidden" aria-hidden="true" />
           <Tooltip title={currentMenuFolder ? getFolderPath(currentMenuFolder, folders) : 'Dossiers'} side="bottom-end" className="max-4xl:hidden" />
         </button>
       ) : null}
@@ -582,7 +582,7 @@ function MailSelection({ count, onClear }) {
         <span className="absolute inset-0 rotate-[-8deg] rounded-[16px] border border-border bg-bg-subtle" />
         <span className="absolute inset-0 rotate-[5deg] rounded-[16px] border border-border bg-bg-muted" />
         <span className="material relative inline-flex size-16 items-center justify-center rounded-[16px]">
-          <Icon icon="carbon:email" className="size-7 text-text-muted" />
+          <Icon icon="ph:envelope-simple" className="size-7 text-text-muted" />
         </span>
       </span>
       <p className="m-0 text-[17px] font-semibold leading-tight text-text" role="status">{count} mails sélectionnés</p>
@@ -1815,38 +1815,38 @@ function MailPage({ onReaderOpenChange, onSignInAgain, sender = null, composeReq
     const described = describeTargets(ids)
     const single = ids.length === 1
     return [
-      ...(single && ids[0] !== openId ? [{ id: 'open', label: 'Ouvrir', icon: 'carbon:email', onSelect: () => handleRowClick(ids[0]) }, 'separator'] : []),
+      ...(single && ids[0] !== openId ? [{ id: 'open', label: 'Ouvrir', icon: 'ph:envelope-simple', onSelect: () => handleRowClick(ids[0]) }, 'separator'] : []),
       {
         id: 'unread',
         label: described?.unread ? 'Marquer comme lu' : 'Marquer comme non lu',
-        icon: described?.unread ? 'carbon:email' : 'carbon:email-new',
+        icon: described?.unread ? 'ph:envelope-simple' : 'ph:envelope-simple-open',
         onSelect: () => setMessagesFlag(ids, 'unread', !described?.unread, 'context_menu'),
       },
       {
         id: 'flag',
         label: described?.flagged ? 'Retirer le drapeau' : 'Ajouter un drapeau',
-        icon: described?.flagged ? 'carbon:flag' : 'carbon:flag-filled',
+        icon: described?.flagged ? 'ph:flag' : 'ph:flag-fill',
         onSelect: () => setMessagesFlag(ids, 'flagged', !described?.flagged, 'context_menu'),
       },
       'separator',
       // One mail (or thread) at a time.
       ...(single ? [
-        { id: 'print', label: 'Imprimer', icon: 'carbon:printer', onSelect: () => void exportMail(ids[0], 'print') },
-        { id: 'pdf', label: 'Enregistrer en PDF', icon: 'carbon:document-pdf', onSelect: () => void exportMail(ids[0], 'pdf') },
+        { id: 'print', label: 'Imprimer', icon: 'ph:printer', onSelect: () => void exportMail(ids[0], 'print') },
+        { id: 'pdf', label: 'Enregistrer en PDF', icon: 'ph:file-pdf', onSelect: () => void exportMail(ids[0], 'pdf') },
         'separator',
       ] : []),
       // The folder picker where the menu was (the menu closes first).
-      { id: 'move', label: 'Déplacer…', icon: 'carbon:folder-move-to', onSelect: () => openFolderMenu('move', { left: contextMenu.x, top: contextMenu.y, bottom: contextMenu.y }, ids, 'context_menu') },
+      { id: 'move', label: 'Déplacer…', icon: 'ph:folder-open', onSelect: () => openFolderMenu('move', { left: contextMenu.x, top: contextMenu.y, bottom: contextMenu.y }, ids, 'context_menu') },
       // The trash: back to the inbox, or gone for good. The junk folder:
       // out of it, or gone for good. Elsewhere: junk, or the trash. Gone for
       // good asks first (ConfirmDialog).
       ...({
-        trash: [{ id: 'restore', label: 'Restaurer', icon: 'carbon:undo', onSelect: () => removeMessages(ids, 'restore', { via: 'context_menu' }) }],
-        junk: [{ id: 'not-spam', label: 'Pas indésirable', icon: 'carbon:checkmark-outline', onSelect: () => removeMessages(ids, 'inbox', { via: 'context_menu' }) }],
-      }[folderKind] ?? [{ id: 'spam', label: 'Indésirable', icon: 'carbon:misuse-outline', onSelect: () => removeMessages(ids, 'spam', { via: 'context_menu' }) }]),
+        trash: [{ id: 'restore', label: 'Restaurer', icon: 'ph:arrow-u-up-left', onSelect: () => removeMessages(ids, 'restore', { via: 'context_menu' }) }],
+        junk: [{ id: 'not-spam', label: 'Pas indésirable', icon: 'ph:check-circle', onSelect: () => removeMessages(ids, 'inbox', { via: 'context_menu' }) }],
+      }[folderKind] ?? [{ id: 'spam', label: 'Indésirable', icon: 'ph:prohibit', onSelect: () => removeMessages(ids, 'spam', { via: 'context_menu' }) }]),
       folderKind === 'trash' || folderKind === 'junk'
-        ? { id: 'delete-forever', label: single ? 'Supprimer définitivement' : `Supprimer ${ids.length} mails définitivement`, icon: 'carbon:trash-can', destructive: true, onSelect: () => setConfirmation({ kind: 'delete', ids, via: 'context_menu' }) }
-        : { id: 'trash', label: single ? 'Supprimer' : `Supprimer ${ids.length} mails`, icon: 'carbon:trash-can', destructive: true, onSelect: () => removeMessages(ids, 'trash', { via: 'context_menu' }) },
+        ? { id: 'delete-forever', label: single ? 'Supprimer définitivement' : `Supprimer ${ids.length} mails définitivement`, icon: 'ph:trash', destructive: true, onSelect: () => setConfirmation({ kind: 'delete', ids, via: 'context_menu' }) }
+        : { id: 'trash', label: single ? 'Supprimer' : `Supprimer ${ids.length} mails`, icon: 'ph:trash', destructive: true, onSelect: () => removeMessages(ids, 'trash', { via: 'context_menu' }) },
     ]
   })()
 
@@ -1901,13 +1901,13 @@ function MailPage({ onReaderOpenChange, onSignInAgain, sender = null, composeReq
     const unread = folder.id === state.folder && Number.isFinite(state.unreadCount) ? state.unreadCount : folder.unread
     const isEmpty = folder.count === 0 && !(folder.id === state.folder && state.messages.length)
     return [
-      { id: 'read-all', label: 'Tout marquer comme lu', icon: 'carbon:email', disabled: !(unread > 0), onSelect: () => markFolderRead(folder.id) },
+      { id: 'read-all', label: 'Tout marquer comme lu', icon: 'ph:envelope-simple', disabled: !(unread > 0), onSelect: () => markFolderRead(folder.id) },
       ...(folder.kind === 'trash' || folder.kind === 'junk' ? [
         'separator',
         {
           id: 'empty',
           label: folder.kind === 'trash' ? 'Vider la corbeille' : 'Vider les indésirables',
-          icon: 'carbon:trash-can',
+          icon: 'ph:trash',
           destructive: true,
           disabled: isEmpty,
           onSelect: () => setConfirmation({ kind: 'empty', folder: folder.id }),
@@ -1928,7 +1928,7 @@ function MailPage({ onReaderOpenChange, onSignInAgain, sender = null, composeReq
         {
           id: 'unread',
           label: message.unread ? 'Lu' : 'Non lu',
-          icon: message.unread ? 'carbon:email' : 'carbon:email-new',
+          icon: message.unread ? 'ph:envelope-simple' : 'ph:envelope-simple-open',
           tone: 'blue',
           full: true,
           onSelect: () => setMessagesFlag(ids, 'unread', !message.unread, 'swipe'),
@@ -1938,20 +1938,20 @@ function MailPage({ onReaderOpenChange, onSignInAgain, sender = null, composeReq
         // In the trash, back to the inbox instead (gone for good is in the
         // long press's menu: it asks first, which a swipe can't).
         ...(folderKind === 'trash' ? [
-          { id: 'restore', label: 'Restaurer', icon: 'carbon:undo', tone: 'blue', full: true, removes: true, onSelect: () => removeMessages(ids, 'restore', { via: 'swipe' }) },
+          { id: 'restore', label: 'Restaurer', icon: 'ph:arrow-u-up-left', tone: 'blue', full: true, removes: true, onSelect: () => removeMessages(ids, 'restore', { via: 'swipe' }) },
         ] : [
-          { id: 'trash', label: 'Supprimer', icon: 'carbon:trash-can', tone: 'red', full: true, removes: true, onSelect: () => removeMessages(ids, 'trash', { via: 'swipe' }) },
+          { id: 'trash', label: 'Supprimer', icon: 'ph:trash', tone: 'red', full: true, removes: true, onSelect: () => removeMessages(ids, 'trash', { via: 'swipe' }) },
         ]),
         {
           id: 'flag',
           label: message.flagged ? 'Sans drapeau' : 'Drapeau',
-          icon: message.flagged ? 'carbon:flag' : 'carbon:flag-filled',
+          icon: message.flagged ? 'ph:flag' : 'ph:flag-fill',
           tone: 'orange',
           onSelect: () => setMessagesFlag(ids, 'flagged', !message.flagged, 'swipe'),
         },
         folderKind === 'junk'
-          ? { id: 'not-spam', label: 'Pas indésirable', icon: 'carbon:checkmark-outline', tone: 'gray', removes: true, onSelect: () => removeMessages(ids, 'inbox', { via: 'swipe' }) }
-          : { id: 'spam', label: 'Indésirable', icon: 'carbon:misuse-outline', tone: 'gray', removes: true, onSelect: () => removeMessages(ids, 'spam', { via: 'swipe' }) },
+          ? { id: 'not-spam', label: 'Pas indésirable', icon: 'ph:check-circle', tone: 'gray', removes: true, onSelect: () => removeMessages(ids, 'inbox', { via: 'swipe' }) }
+          : { id: 'spam', label: 'Indésirable', icon: 'ph:prohibit', tone: 'gray', removes: true, onSelect: () => removeMessages(ids, 'spam', { via: 'swipe' }) },
       ],
     }
   }
@@ -1995,7 +1995,6 @@ function MailPage({ onReaderOpenChange, onSignInAgain, sender = null, composeReq
             message={isPanelClosing ? null : targetState}
             multiple={isMultiple}
             folderKind={folderKind}
-            onCompose={() => void startCompose('new')}
             onReply={() => void startCompose('reply')}
             onReplyAll={() => void startCompose('reply-all')}
             onForward={() => void startCompose('forward')}
@@ -2056,9 +2055,12 @@ function MailPage({ onReaderOpenChange, onSignInAgain, sender = null, composeReq
       {/* Above the folder pills (z-10): the refresh button's glass makes its
           own stacking context, so its tooltip couldn't rise over them. */}
       <div className="group/search relative z-10 flex min-w-0 items-center" data-searching={query ? '' : undefined}>
+        {/* Folded away too while a mail is open beside the list (from 4xl):
+            the reader takes the room, the search and the button keep theirs.
+            Still read out (folded, not removed). */}
         <h1
           id="mail-page-title"
-          className="m-0 shrink-0 overflow-hidden whitespace-nowrap max-w-[220px] mr-4 max-md:mr-3 leading-[1.15] text-2xl font-bold max-md:text-[22px] max-md:tracking-[-0.01em] transition-[max-width,margin,opacity] duration-[300ms] ease-[cubic-bezier(0.32,0.72,0,1)] group-has-[input:focus]/search:max-w-0 group-has-[input:focus]/search:mr-0 group-has-[input:focus]/search:opacity-0 group-data-searching/search:max-w-0 group-data-searching/search:mr-0 group-data-searching/search:opacity-0"
+          className={`m-0 shrink-0 overflow-hidden whitespace-nowrap max-w-[220px] mr-4 max-md:mr-3 leading-[1.15] text-2xl font-bold max-md:text-[22px] max-md:tracking-[-0.01em] transition-[max-width,margin,opacity] duration-[300ms] ease-[cubic-bezier(0.32,0.72,0,1)] group-has-[input:focus]/search:max-w-0 group-has-[input:focus]/search:mr-0 group-has-[input:focus]/search:opacity-0 group-data-searching/search:max-w-0 group-data-searching/search:mr-0 group-data-searching/search:opacity-0 ${openId || isMultiple ? '4xl:max-w-0 4xl:mr-0 4xl:opacity-0' : ''}`}
         >
           Messagerie
         </h1>
@@ -2071,21 +2073,20 @@ function MailPage({ onReaderOpenChange, onSignInAgain, sender = null, composeReq
           disabled={isRefreshing}
           onClick={() => void refresh()}
         >
-          <Icon icon="carbon:renew" className={`size-[18px] ${isRefreshing ? 'mail-refresh-spin' : ''}`} aria-hidden="true" />
+          <Icon icon="ph:arrows-clockwise" className={`size-[18px] ${isRefreshing ? 'mail-refresh-spin' : ''}`} aria-hidden="true" />
           <Tooltip title="Actualiser" side="bottom-end" className="max-4xl:hidden" />
         </button>
-        {/* On a phone the only way to a new mail (the reader's toolbar is
-            about the open one there). From 4xl, hidden while the reader's
-            panel is open: its toolbar has the same button. The page's
-            primary button, its label beside the icon, but on a phone (the
-            icon alone there, the search keeping its room). */}
+        {/* The only way to a new mail (the reader's toolbar is about the
+            open one), the reader open or not. The page's primary button,
+            its label beside the icon, but on a phone (the icon alone there,
+            the search keeping its room). */}
         <button
           type="button"
-          className={`${PRIMARY_COMPOSE_CLASSES} ml-2 h-11 pl-4 pr-[18px] max-sm:w-11 max-sm:px-0 ${openId || isMultiple ? '4xl:hidden' : ''}`}
+          className={`${PRIMARY_COMPOSE_CLASSES} ml-2 h-11 pl-4 pr-[18px] max-sm:w-11 max-sm:px-0`}
           aria-label="Nouveau message"
           onClick={() => void startCompose('new')}
         >
-          <Icon icon="carbon:edit" className="size-[18px] shrink-0" aria-hidden="true" />
+          <Icon icon="ph:pencil-simple" className="size-[18px] shrink-0" aria-hidden="true" />
           <span className="whitespace-nowrap text-[14px] font-semibold leading-none max-sm:hidden" aria-hidden="true">Nouveau message</span>
         </button>
       </div>
@@ -2124,7 +2125,7 @@ function MailPage({ onReaderOpenChange, onSignInAgain, sender = null, composeReq
           >
             {/* The red on the icon and the text: .material sets the button's
                 colour outside Tailwind's layers. */}
-            <Icon icon="carbon:trash-can" className="size-[14px] shrink-0 text-[#d1342f] dark:text-[#ff6b63]" aria-hidden="true" />
+            <Icon icon="ph:trash" className="size-[14px] shrink-0 text-[#d1342f] dark:text-[#ff6b63]" aria-hidden="true" />
             <span className="text-[13px] font-semibold leading-none text-[#d1342f] dark:text-[#ff6b63]">{listFolderKind === 'trash' ? 'Vider la corbeille' : 'Vider les indésirables'}</span>
           </button>
         </div>
@@ -2193,7 +2194,7 @@ function MailPage({ onReaderOpenChange, onSignInAgain, sender = null, composeReq
         // Of the folder whose list it stands for, dimmed as that list while
         // another loads.
         <div key={state.folder} className={`mail-list-swap transition-opacity duration-200 ease-out ${isFolderSwitching ? 'opacity-40' : ''}`}>
-          <PageEmptyState icon="carbon:checkmark-outline" title="Aucun mail">{listFolderKind === 'inbox' ? 'Ta boîte de réception est vide' : 'Ce dossier est vide'}</PageEmptyState>
+          <PageEmptyState icon="ph:check-circle" title="Aucun mail">{listFolderKind === 'inbox' ? 'Ta boîte de réception est vide' : 'Ce dossier est vide'}</PageEmptyState>
         </div>
       ) : null}
 
@@ -2202,14 +2203,14 @@ function MailPage({ onReaderOpenChange, onSignInAgain, sender = null, composeReq
           former when another mail route said the session is gone. */}
       {state.status === 'unauthenticated' || (state.status === 'error' && isSessionExpired) ? (
         <PageEmptyState
-          icon="carbon:locked"
+          icon="ph:lock"
           title="Session expirée"
           action={onSignInAgain ? <SignInAgainButton onClick={onSignInAgain} /> : null}
         >
           Reconnecte-toi pour retrouver tes mails
         </PageEmptyState>
       ) : state.status === 'error' || state.status === 'disabled' ? (
-        <PageEmptyState icon="carbon:email" title="Mails indisponibles">La messagerie ne répond pas, réessaie dans un moment</PageEmptyState>
+        <PageEmptyState icon="ph:envelope-simple" title="Mails indisponibles">La messagerie ne répond pas, réessaie dans un moment</PageEmptyState>
       ) : null}
       </div>
 

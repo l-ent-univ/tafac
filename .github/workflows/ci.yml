@@ -163,6 +163,10 @@ jobs:
             id=$(docker create --platform "linux/$platform" "$IMAGE@$DIGEST")
             docker cp "$id:/app/dist" "dist-$platform"
             docker rm "$id" > /dev/null
+            # One multi-platform digest can't be pulled for a second
+            # platform while the first is stored ("cannot overwrite
+            # digest"): dropped before the next.
+            docker image rm "$IMAGE@$DIGEST" > /dev/null
           done
           diff -r dist-amd64 dist-arm64
           (cd dist-amd64 && find . -type f ! -path './.prerender/*' ! -name robots.txt | sed 's|^\./||' | LC_ALL=C sort | xargs -d '\n' sha256sum) > dist-manifest.sha256

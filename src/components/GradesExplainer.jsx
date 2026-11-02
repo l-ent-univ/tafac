@@ -87,7 +87,7 @@ function UesFigure({ ues }) {
         ))}
       </ul>
       <span className="gx-pop inline-flex items-center gap-[6px] rounded-full bg-widget-bg py-[7px] pr-3 pl-[9px] shadow-sm gx-card" style={{ '--d': `${450 + shown.length * 110}ms` }}>
-        <Icon icon="carbon:checkmark-filled" className="gx-success size-4" aria-hidden="true" />
+        <Icon icon="ph:check-circle-fill" className="gx-success size-4" aria-hidden="true" />
         <span className="font-body text-[13px] font-semibold leading-none text-text">Validée dès 10/20</span>
       </span>
     </div>
@@ -179,7 +179,7 @@ function FlowFigure({ ues, example }) {
             <span className="flex items-end gap-[3px]">
               <span className="gx-fade font-display text-[22px] font-bold leading-none text-text" style={{ '--d': '1900ms' }}>{formatScore(average)}</span>
               <span className="gx-fade pb-[1px] font-body text-[12px] font-medium leading-none text-text-muted" style={{ '--d': '1900ms' }}>/20</span>
-              {average < PASS_MARK ? <Icon icon="carbon:warning-alt-filled" className="gx-pop ue-below-warning mb-[2px] ml-[2px] size-[15px]" style={{ '--d': '2500ms' }} aria-hidden="true" /> : null}
+              {average < PASS_MARK ? <Icon icon="ph:warning-fill" className="gx-pop ue-below-warning mb-[2px] ml-[2px] size-[15px]" style={{ '--d': '2500ms' }} aria-hidden="true" /> : null}
             </span>
             <Gauge value={average} color={ues[index].color} delay={1500 + index * 150} />
           </div>
@@ -238,8 +238,8 @@ function CompensationFigure({ ue, average }) {
             </span>
             <span className="gx-fade absolute right-0 inline-flex items-center gap-[3px]" style={{ top: 8, '--d': `${delays[index] + (row.isYear ? 900 : 600)}ms` }}>
               <span className={`font-display font-bold leading-none text-text ${row.isYear ? 'text-[18px]' : 'text-[16px]'}`}>{formatScore(row.value)}</span>
-              {row.value < PASS_MARK ? <Icon icon="carbon:warning-alt-filled" className="gx-pop ue-below-warning size-[14px]" style={{ '--d': `${delays[index] + 800}ms` }} aria-hidden="true" /> : null}
-              {row.isYear ? <Icon icon="carbon:checkmark-filled" className="gx-pop gx-success size-[15px]" style={{ '--d': '3300ms' }} aria-hidden="true" /> : null}
+              {row.value < PASS_MARK ? <Icon icon="ph:warning-fill" className="gx-pop ue-below-warning size-[14px]" style={{ '--d': `${delays[index] + 800}ms` }} aria-hidden="true" /> : null}
+              {row.isYear ? <Icon icon="ph:check-circle-fill" className="gx-pop gx-success size-[15px]" style={{ '--d': '3300ms' }} aria-hidden="true" /> : null}
             </span>
           </div>
         )
@@ -287,7 +287,7 @@ function EctsFigure({ ues }) {
                 <span className="font-display text-[16px] font-bold leading-none text-text">{formatScore(row.average)}</span>
                 <span className="font-body text-[11px] font-medium leading-none text-text-muted">/20</span>
               </span>
-              {!isValidated ? <Icon icon="carbon:warning-alt-filled" className="ue-below-warning size-[14px]" aria-hidden="true" /> : null}
+              {!isValidated ? <Icon icon="ph:warning-fill" className="ue-below-warning size-[14px]" aria-hidden="true" /> : null}
               <span
                 className={`gx-pop ml-auto inline-flex items-center gap-[5px] rounded-full px-[8px] py-[5px] ${isValidated ? 'bg-bg-subtle' : 'border border-dashed border-border-input'}`}
                 style={{ '--d': `${550 + index * 150}ms` }}
@@ -360,7 +360,7 @@ function PageFigure({ ues, example }) {
             <span className="font-body text-[12px] font-medium leading-none text-text-muted">/20</span>
           </span>
           <Spot index={1} className="size-7 items-center justify-center rounded-full text-text-muted">
-            <Icon icon="carbon:maximize" className="size-[15px]" aria-hidden="true" />
+            <Icon icon="ph:arrows-out" className="size-[15px]" aria-hidden="true" />
           </Spot>
         </span>
         <span className="truncate px-1 font-body text-[14px] font-semibold leading-[1.25] text-text">{ue.title}</span>
@@ -370,13 +370,13 @@ function PageFigure({ ues, example }) {
             <span className="shrink-0 rounded-full bg-brand px-[7px] py-[3px] font-body text-[11px] font-semibold leading-none text-bg">2 nouvelles notes</span>
           </Spot>
           <span className="min-w-0 flex-1 truncate font-body text-[12px] font-medium leading-none text-text-muted">{newsTitles}</span>
-          <Icon icon="carbon:arrow-right" className="size-[13px] shrink-0 text-text-muted" aria-hidden="true" />
+          <Icon icon="ph:arrow-right" className="size-[13px] shrink-0 text-text-muted" aria-hidden="true" />
         </span>
       </div>
       <div className="gx-card grid gap-[8px] corners-[18px] bg-widget-bg p-[10px] shadow-sm">
         <span className="flex items-center gap-[10px]">
           <span className="inline-flex size-8 shrink-0 items-center justify-center corners-[10px] border border-border bg-bg-subtle">
-            <Icon icon="carbon:book" className="size-4 text-text-secondary" aria-hidden="true" />
+            <Icon icon="ph:book" className="size-4 text-text-secondary" aria-hidden="true" />
           </span>
           <span className="grid min-w-0 flex-1 gap-[3px]">
             <span className="flex items-center gap-[6px]">
@@ -450,7 +450,7 @@ function buildSteps(ues, example) {
       isExample: true,
       body: (
         <p className="m-0">
-          L’icône <Icon icon="carbon:warning-alt-filled" className="ue-below-warning inline size-[15px] align-[-0.15em]" aria-label="attention" /> à côté d’une moyenne d’UE veut dire qu’elle n’est pas validée pour l’instant. Tant que le jury n’a pas statué, elle peut encore l’être par compensation : si sa moyenne avec l’UE du même niveau de l’autre semestre de l’année atteint 10. Une fois le jury passé, s’il ne l’a pas validée, son code (AJ, RAT, ATT…) s’affiche en rouge à la place : touche-le pour savoir ce qu’il veut dire.
+          L’icône <Icon icon="ph:warning-fill" className="ue-below-warning inline size-[15px] align-[-0.15em]" aria-label="attention" /> à côté d’une moyenne d’UE veut dire qu’elle n’est pas validée pour l’instant. Tant que le jury n’a pas statué, elle peut encore l’être par compensation : si sa moyenne avec l’UE du même niveau de l’autre semestre de l’année atteint 10. Une fois le jury passé, s’il ne l’a pas validée, son code (AJ, RAT, ATT…) s’affiche en rouge à la place : touche-le pour savoir ce qu’il veut dire.
         </p>
       ),
     },
@@ -607,7 +607,7 @@ function ExplainerDialog({ ues, onClose }) {
                 onClick={() => setReplay((count) => count + 1)}
                 aria-label="Rejouer l’animation"
               >
-                <Icon icon="carbon:renew" className="size-4" aria-hidden="true" />
+                <Icon icon="ph:arrows-clockwise" className="size-4" aria-hidden="true" />
               </button>
             </div>
             <div key={stepIndex} className="gx-step grid gap-2 px-1">
@@ -627,7 +627,7 @@ function ExplainerDialog({ ues, onClose }) {
             onClick={() => goTo(stepIndex - 1)}
             disabled={stepIndex === 0}
           >
-            <Icon icon="carbon:arrow-left" className="size-4" aria-hidden="true" />
+            <Icon icon="ph:arrow-left" className="size-4" aria-hidden="true" />
             <span className="font-body text-[14px] font-semibold leading-none max-xs:sr-only">Précédent</span>
           </button>
           <div className="flex items-center">
@@ -646,7 +646,7 @@ function ExplainerDialog({ ues, onClose }) {
           </div>
           <LentButton ref={nextRef} className="min-h-[40px]! px-4! text-[14px]!" onClick={() => (isLast ? onClose() : goTo(stepIndex + 1))}>
             {isLast ? 'Compris' : 'Suivant'}
-            {!isLast ? <Icon icon="carbon:arrow-right" className="size-4" aria-hidden="true" /> : null}
+            {!isLast ? <Icon icon="ph:arrow-right" className="size-4" aria-hidden="true" /> : null}
           </LentButton>
         </footer>
         <p className="sr-only" aria-live="polite">{announcement}</p>
@@ -674,7 +674,7 @@ function GradesExplainer({ ues = [] }) {
           setIsOpen(true)
         }}
       >
-        <Icon icon="carbon:help" className="size-[15px]" aria-hidden="true" />
+        <Icon icon="ph:question" className="size-[15px]" aria-hidden="true" />
         {/* Shorter on phones, so the section title stays on one line; its
             touch area reaches 44px there (::after). */}
         <span className="font-body text-[13px] font-semibold leading-none max-xs:hidden">Comment ça marche ?</span>

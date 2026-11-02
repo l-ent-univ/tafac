@@ -60,7 +60,9 @@
 
   --breakpoint-xs: 520px;
   --breakpoint-sm: 600px;
-  --breakpoint-md: 640px;
+  /* md: the phone layout's edge (max-md: …) at the sidebar's (4xl), so a
+     tablet gets the phone layout: no in-between one. */
+  --breakpoint-md: 1024px;
   --breakpoint-lg: 720px;
   --breakpoint-xl: 860px;
   --breakpoint-2xl: 900px;

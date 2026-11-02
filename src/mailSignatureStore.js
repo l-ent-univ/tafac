@@ -14,10 +14,15 @@ import { track } from './analytics'
 const SIGNATURE_KEY = 'l-ent:mail-signature'
 const SIGNATURE_KIND_KEY = 'l-ent:mail-signature-kind'
 
+// The kinds Réglages offers. « Partage » is hidden for now: a device that
+// chose it reads as the automatic one (its stored value is left as is).
+const OFFERED_KINDS = ['auto', 'custom']
+const isOfferedKind = (kind) => isSignatureKind(kind) && OFFERED_KINDS.includes(kind)
+
 function readPrefs() {
   try {
     const kind = localStorage.getItem(SIGNATURE_KIND_KEY)
-    return { enabled: localStorage.getItem(SIGNATURE_KEY) !== 'none', kind: isSignatureKind(kind) ? kind : 'auto' }
+    return { enabled: localStorage.getItem(SIGNATURE_KEY) !== 'none', kind: isOfferedKind(kind) ? kind : 'auto' }
   } catch {
     return { enabled: true, kind: 'auto' }
   }
@@ -61,7 +66,7 @@ export const setMailSignatureEnabled = (enabled) => {
   setPrefs({ enabled: next })
 }
 export const setMailSignatureKind = (kind) => {
-  const next = isSignatureKind(kind) ? kind : 'auto'
+  const next = isOfferedKind(kind) ? kind : 'auto'
   if (next !== prefs.kind) track('setting_changed', { setting: 'mail_signature_kind', value: next })
   setPrefs({ kind: next })
 }

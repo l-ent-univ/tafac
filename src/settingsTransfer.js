@@ -8,7 +8,8 @@ const MAX_PAYLOAD_LENGTH = 100_000
 const MAX_VALUE_LENGTH = 20_000
 
 // Settings only: caches rebuild themselves, the session cookie can't move,
-// and the custom background is a whole image, too big for a link.
+// and the custom background and profile photo are whole images, too big
+// for a link.
 export const TRANSFERABLE_KEYS = [
   'l-ent:establishment',
   'l-ent:student-tp',

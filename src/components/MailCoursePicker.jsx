@@ -24,7 +24,7 @@ function DayHeading({ day, todayKey, count }) {
   return (
     <div className="flex min-w-0 items-center gap-2">
       <div className="flex min-w-0 items-center gap-[5px] text-brand">
-        <Icon icon="carbon:calendar" className="size-[17px] shrink-0" aria-hidden="true" />
+        <Icon icon="ph:calendar-blank" className="size-[17px] shrink-0" aria-hidden="true" />
         <h3 className="m-0 min-w-0 truncate font-body text-base font-medium leading-[1.06]">
           {title}
           {detail ? <span className="text-text-muted"> · {detail}</span> : null}

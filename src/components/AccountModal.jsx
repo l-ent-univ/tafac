@@ -1,11 +1,11 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Icon } from '@iconify/react'
 import universityConfig from '@university'
 import { openChangelog, useChangelog } from '../changelogStore'
 import { getPillIds } from '../changelogState'
 import { downloadSchoolCertificate, getCachedSchoolCertificateStatus, getSchoolCertificateStatus } from '../entApi'
 import { usePlanningExport } from '../usePlanningExport'
-import { AboutContent, AboutHelp, AboutTeam } from './AboutModal'
+import { AboutPage } from './AboutModal'
 import SettingsGroup, { RowText } from './SettingsGroup'
 import { CARD_CLASSES, MUTED_FILL_CLASSES, PRESSABLE_ROW_CLASSES, ROW_CLASSES } from '../settingsStyles'
 import { PrivacyContent } from './PrivacyModal'
@@ -14,6 +14,7 @@ import LoadingDots from './LoadingDots'
 import CloseButton from './CloseButton'
 import Switch from './Switch'
 import MailSignatureSettings from './MailSignatureSettings'
+import HomeLayoutSetting from './HomeLayoutSetting'
 
 // Also the debug menu's toggles (src/components/debug/).
 export { Switch }
@@ -41,205 +42,6 @@ function AccountModalLoadingDots({ label }) {
     >
       <LoadingDots label={null} />
       <span className="font-body">{label}</span>
-    </div>
-  )
-}
-
-// Knob is intentionally larger than the 26px track so it pokes out above and
-// below the bar, and the blue fill runs up to its trailing edge — the circle
-// visually caps the end of the progress bar.
-const STEP_SLIDER_KNOB_PX = 34
-
-function clampIndex(index, count) {
-  if (index < 0) {
-    return 0
-  }
-  if (index > count - 1) {
-    return count - 1
-  }
-  return index
-}
-
-function findNearestIndex(options, value) {
-  const exactIndex = options.indexOf(value)
-  if (exactIndex !== -1) {
-    return exactIndex
-  }
-
-  let nearestIndex = 0
-  let nearestDistance = Infinity
-  options.forEach((option, index) => {
-    const distance = Math.abs(option - value)
-    if (distance < nearestDistance) {
-      nearestDistance = distance
-      nearestIndex = index
-    }
-  })
-  return nearestIndex
-}
-
-// Discrete pill slider (see the account modal "prochain cours" setting):
-// a rounded track with a blue fill up to a draggable white knob and a tick
-// dot for every available step.
-function StepSlider({ options, value, onChange, ariaLabel, disabled = false }) {
-  const trackRef = useRef(null)
-  const pressedRef = useRef(false)
-  const [dragRatio, setDragRatio] = useState(null)
-  const isDragging = dragRatio != null
-
-  const count = options.length
-  const activeIndex = findNearestIndex(options, value)
-  const stepRatio = count > 1 ? activeIndex / (count - 1) : 0
-  // While dragging, the knob tracks the pointer 1:1; otherwise it sits on the
-  // active step (and CSS-animates towards it).
-  const displayRatio = dragRatio ?? stepRatio
-
-  const commitIndex = useCallback((nextIndex) => {
-    const safeIndex = clampIndex(nextIndex, count)
-    const nextValue = options[safeIndex]
-    if (nextValue !== value) {
-      onChange(nextValue)
-    }
-  }, [count, onChange, options, value])
-
-  const ratioFromClientX = useCallback((clientX) => {
-    const track = trackRef.current
-    if (!track || count <= 1) {
-      return null
-    }
-
-    const rect = track.getBoundingClientRect()
-    const railWidth = rect.width - STEP_SLIDER_KNOB_PX
-    if (railWidth <= 0) {
-      return null
-    }
-
-    const rawRatio = (clientX - rect.left - STEP_SLIDER_KNOB_PX / 2) / railWidth
-    return Math.min(1, Math.max(0, rawRatio))
-  }, [count])
-
-  const handlePointerDown = useCallback((event) => {
-    if (disabled) {
-      return
-    }
-
-    const ratio = ratioFromClientX(event.clientX)
-    if (ratio == null) {
-      return
-    }
-
-    event.currentTarget.setPointerCapture?.(event.pointerId)
-    pressedRef.current = true
-    // A simple press glides the knob to the tapped step; free-form dragging
-    // only starts once the pointer moves.
-    commitIndex(Math.round(ratio * (count - 1)))
-  }, [commitIndex, count, disabled, ratioFromClientX])
-
-  const handlePointerMove = useCallback((event) => {
-    if (!pressedRef.current) {
-      return
-    }
-
-    const ratio = ratioFromClientX(event.clientX)
-    if (ratio == null) {
-      return
-    }
-
-    setDragRatio(ratio)
-    commitIndex(Math.round(ratio * (count - 1)))
-  }, [commitIndex, count, ratioFromClientX])
-
-  const endDragging = useCallback((event) => {
-    if (event?.pointerId != null) {
-      event.currentTarget.releasePointerCapture?.(event.pointerId)
-    }
-    pressedRef.current = false
-    // Releasing lets the knob snap-animate from the pointer to its step.
-    setDragRatio(null)
-  }, [])
-
-  const handleKeyDown = useCallback((event) => {
-    if (disabled) {
-      return
-    }
-
-    switch (event.key) {
-      case 'ArrowLeft':
-      case 'ArrowDown':
-        event.preventDefault()
-        commitIndex(activeIndex - 1)
-        break
-      case 'ArrowRight':
-      case 'ArrowUp':
-        event.preventDefault()
-        commitIndex(activeIndex + 1)
-        break
-      case 'Home':
-        event.preventDefault()
-        commitIndex(0)
-        break
-      case 'End':
-        event.preventDefault()
-        commitIndex(count - 1)
-        break
-      default:
-        break
-    }
-  }, [activeIndex, commitIndex, count, disabled])
-
-  const knobLeft = `calc(${STEP_SLIDER_KNOB_PX / 2}px + (100% - ${STEP_SLIDER_KNOB_PX}px) * ${displayRatio})`
-  // Fill runs to the knob's trailing edge, so the knob always caps the bar.
-  const fillWidth = `calc(${STEP_SLIDER_KNOB_PX}px + (100% - ${STEP_SLIDER_KNOB_PX}px) * ${displayRatio})`
-  const snapEasing = 'cubic-bezier(0.22, 1, 0.36, 1)'
-
-  return (
-    <div
-      ref={trackRef}
-      role="slider"
-      tabIndex={disabled ? -1 : 0}
-      aria-label={ariaLabel}
-      aria-orientation="horizontal"
-      aria-valuemin={options[0]}
-      aria-valuemax={options[count - 1]}
-      aria-valuenow={value}
-      aria-valuetext={`${value} jours`}
-      aria-disabled={disabled}
-      onPointerDown={handlePointerDown}
-      onPointerMove={handlePointerMove}
-      onPointerUp={endDragging}
-      onPointerCancel={endDragging}
-      onKeyDown={handleKeyDown}
-      className={`relative h-[26px] w-full touch-none select-none rounded-full bg-[#e7e4dc] outline-none transition-shadow dark:bg-[var(--color-bg-muted)] ${disabled ? 'cursor-not-allowed opacity-60' : 'cursor-pointer'} focus-visible:ring-2 focus-visible:ring-brand/45`}
-    >
-      <div
-        className="pointer-events-none absolute inset-y-0 left-0 rounded-full bg-brand"
-        style={{ width: fillWidth, transition: isDragging ? 'none' : `width 260ms ${snapEasing}` }}
-        aria-hidden="true"
-      />
-
-      {options.map((option, index) => {
-        const dotRatio = count > 1 ? index / (count - 1) : 0
-        const isFilled = index <= activeIndex
-        return (
-          <span
-            key={option}
-            className={`pointer-events-none absolute top-1/2 h-[5px] w-[5px] -translate-x-1/2 -translate-y-1/2 rounded-full transition-colors duration-200 ${isFilled ? 'bg-white/75' : 'bg-black/25 dark:bg-white/25'}`}
-            style={{ left: `calc(${STEP_SLIDER_KNOB_PX / 2}px + (100% - ${STEP_SLIDER_KNOB_PX}px) * ${dotRatio})` }}
-            aria-hidden="true"
-          />
-        )
-      })}
-
-      <span
-        className={`absolute top-1/2 -translate-x-1/2 -translate-y-1/2 touch-none rounded-full border border-black/5 bg-white shadow-[0_1px_4px_rgba(0,0,0,0.28)] ${isDragging ? 'scale-110' : ''} ${disabled ? '' : 'cursor-grab active:cursor-grabbing'}`}
-        style={{
-          left: knobLeft,
-          height: `${STEP_SLIDER_KNOB_PX}px`,
-          width: `${STEP_SLIDER_KNOB_PX}px`,
-          transition: isDragging ? 'transform 160ms ease' : `left 260ms ${snapEasing}, transform 160ms ease`,
-        }}
-        aria-hidden="true"
-      />
     </div>
   )
 }
@@ -286,7 +88,7 @@ function CopyableEmail({ email }) {
     >
       <span className="truncate">{email}</span>
       <Icon
-        icon={copied ? 'carbon:checkmark' : 'carbon:copy'}
+        icon={copied ? 'ph:check' : 'ph:copy'}
         className={`size-[14px] shrink-0 transition-opacity ${copied ? 'text-brand opacity-100' : 'opacity-60 group-hover:opacity-100'}`}
         aria-hidden="true"
       />
@@ -314,40 +116,6 @@ function PlanningSelect({ label, value, options, placeholder, disabled, onChange
         triggerClassName={`flex h-9 w-full items-center justify-between gap-2 rounded-full border-0 ${MUTED_FILL_CLASSES} pl-[13px] pr-[11px] font-body text-[15px] font-medium text-[var(--color-text)] outline-none cursor-pointer focus-visible:ring-2 focus-visible:ring-brand/45 disabled:cursor-wait disabled:opacity-60`}
         chevronClassName="h-4 w-4 text-[var(--color-text)]"
       />
-    </div>
-  )
-}
-
-function LookaheadSetting({ days, options, onChange }) {
-  const stepCount = options.length
-
-  return (
-    <div className="flex flex-col gap-[12px] px-4 pb-4 pt-[13px]">
-      <div className="flex items-center justify-between gap-3">
-        <span className="font-body text-[14px] font-medium leading-[1.35] text-text-60">
-          Chercher le prochain cours sur
-        </span>
-        <span className={`inline-flex items-center rounded-full ${MUTED_FILL_CLASSES} px-[10px] py-[4px] font-body text-[13px] font-semibold leading-none text-[var(--color-text)]`}>
-          {days} jours
-        </span>
-      </div>
-      <StepSlider
-        options={options}
-        value={days}
-        onChange={onChange}
-        ariaLabel="Nombre de jours de recherche du prochain cours"
-      />
-      <div className="relative h-[15px]" aria-hidden="true">
-        {options.map((option, index) => (
-          <span
-            key={option}
-            className="absolute top-0 -translate-x-1/2 font-body text-[12px] font-medium leading-none text-text-50"
-            style={{ left: `calc(${STEP_SLIDER_KNOB_PX / 2}px + (100% - ${STEP_SLIDER_KNOB_PX}px) * ${stepCount > 1 ? index / (stepCount - 1) : 0})` }}
-          >
-            {option}
-          </span>
-        ))}
-      </div>
     </div>
   )
 }
@@ -395,13 +163,13 @@ function SchoolCertificateGroup() {
           disabled={busy}
         >
           <RowText
-            icon="carbon:document-pdf"
+            icon="ph:file-pdf"
             label="Certificat de scolarité"
             description={busy ? 'Téléchargement…' : status.schoolYear ? `Année ${status.schoolYear} · PDF` : 'PDF'}
           />
           {busy
             ? <LoadingDots label={null} className="w-4 shrink-0 text-text-60" />
-            : <Icon icon="carbon:download" className="h-4 w-4 shrink-0 text-text-60" aria-hidden="true" />}
+            : <Icon icon="ph:download-simple" className="h-4 w-4 shrink-0 text-text-60" aria-hidden="true" />}
         </button>
       </SettingsGroup>
       {error ? (
@@ -434,10 +202,10 @@ function PlanningExportGroup({ selection }) {
         disabled={busy}
         aria-busy={busy || undefined}
       >
-        <RowText icon="carbon:calendar-add" label="Exporter vers un agenda" description={EXPORT_DESCRIPTIONS[state] ?? EXPORT_DESCRIPTIONS.idle} />
+        <RowText icon="ph:calendar-plus" label="Exporter vers un agenda" description={EXPORT_DESCRIPTIONS[state] ?? EXPORT_DESCRIPTIONS.idle} />
         {busy
           ? <LoadingDots label={null} className="w-4 shrink-0 text-text-60" />
-          : <Icon icon="carbon:download" className="h-4 w-4 shrink-0 text-text-60" aria-hidden="true" />}
+          : <Icon icon="ph:download-simple" className="h-4 w-4 shrink-0 text-text-60" aria-hidden="true" />}
       </button>
     </SettingsGroup>
   )
@@ -445,7 +213,8 @@ function PlanningExportGroup({ selection }) {
 
 // « Nouveautés » (À propos): the whole changelog, pill or not. The list
 // opens above Réglages and closes back to it. Its dot follows the pill's.
-function ChangelogGroup() {
+// « Nouveautés », the first row of À propos' links.
+function ChangelogRow() {
   const { entries, unseenIds: allUnseenIds } = useChangelog()
   const unseenIds = getPillIds(entries, allUnseenIds)
 
@@ -454,31 +223,29 @@ function ChangelogGroup() {
   }
 
   return (
-    <SettingsGroup>
-      <button
-        type="button"
-        className={PRESSABLE_ROW_CLASSES}
-        onClick={openChangelog}
-      >
-        <RowText icon="ph:sparkle" label="Nouveautés" description="Ce qui a changé récemment" />
-        <span className="flex shrink-0 items-center gap-2">
-          {unseenIds.length > 0 ? (
-            <>
-              <span className="changelog-new-dot h-[7px] w-[7px] rounded-full" aria-hidden="true" />
-              <span className="sr-only">{`${unseenIds.length} à découvrir`}</span>
-            </>
-          ) : null}
-          <Icon icon="carbon:chevron-right" className="h-4 w-4 text-text-60" aria-hidden="true" />
-        </span>
-      </button>
-    </SettingsGroup>
+    <button
+      type="button"
+      className={PRESSABLE_ROW_CLASSES}
+      onClick={openChangelog}
+    >
+      <RowText icon="ph:sparkle" label="Nouveautés" description="Ce qui a changé récemment" />
+      <span className="flex shrink-0 items-center gap-2">
+        {unseenIds.length > 0 ? (
+          <>
+            <span className="changelog-new-dot h-[7px] w-[7px] rounded-full" aria-hidden="true" />
+            <span className="sr-only">{`${unseenIds.length} à découvrir`}</span>
+          </>
+        ) : null}
+        <Icon icon="ph:caret-right" className="h-4 w-4 text-text-60" aria-hidden="true" />
+      </span>
+    </button>
   )
 }
 
 const THEME_CHOICES = [
-  { id: 'auto', label: 'Automatique', icon: 'carbon:screen' },
-  { id: 'light', label: 'Clair', icon: 'carbon:sun' },
-  { id: 'dark', label: 'Sombre', icon: 'carbon:moon' },
+  { id: 'auto', label: 'Automatique', icon: 'ph:monitor' },
+  { id: 'light', label: 'Clair', icon: 'ph:sun' },
+  { id: 'dark', label: 'Sombre', icon: 'ph:moon' },
 ]
 
 // Three-way pill: follow the device, or force light or dark.
@@ -525,7 +292,7 @@ function LogoSetting({ shown, onShownChange, establishmentLabel, source, onSourc
   return (
     <SettingsGroup title="Logo">
       <SwitchRow
-        icon="carbon:building"
+        icon="ph:buildings"
         label="Logo de l’université"
         description="Afficher le logo de ton établissement dans la barre latérale"
         checked={shown}
@@ -573,6 +340,86 @@ function LogoSetting({ shown, onShownChange, establishmentLabel, source, onSourc
 
 // Dashboard background: large preview, an on/off switch, and (when on) pick
 // an image or go back to the default photo.
+// The account card: the photo (the student's own, kept on this device, or
+// the ENT's), the name and address. With `onChange`, the badge on the photo
+// is the only control: a camera picks a photo, then a bin removes it and
+// the camera comes back.
+function ProfileCard({ photoSrc, displayInfo, hasCustom, onChange, onReset }) {
+  const inputRef = useRef(null)
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState('')
+  const canPick = typeof onChange === 'function'
+  const fullName = [displayInfo.firstName, displayInfo.lastName].filter(Boolean).join(' ')
+
+  const handleFile = async (event) => {
+    const file = event.target.files?.[0]
+    event.target.value = ''
+    if (!file) return
+
+    setBusy(true)
+    setError('')
+    try {
+      await onChange(file)
+    } catch (changeError) {
+      setError(changeError instanceof Error ? changeError.message : String(changeError))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const handleBadgeClick = () => {
+    setError('')
+    if (hasCustom) {
+      onReset()
+    } else {
+      inputRef.current?.click()
+    }
+  }
+
+  return (
+    <div className={`${CARD_CLASSES} flex items-center gap-[18px] p-[18px]`}>
+      <div className="relative shrink-0">
+        <div className={`flex h-[72px] w-[72px] items-center justify-center overflow-hidden rounded-full border border-[rgba(27,27,27,0.16)] ${MUTED_FILL_CLASSES} dark:border-[var(--color-border)]`}>
+          {photoSrc ? (
+            <img
+              className="h-full w-full object-cover"
+              src={photoSrc}
+              alt={`Photo de profil de ${displayInfo.firstName || displayInfo.email || 'l’utilisateur'}`}
+            />
+          ) : (
+            <Icon icon="ph:user-circle-fill" className="h-9 w-9 text-[var(--color-text)]" aria-hidden="true" />
+          )}
+        </div>
+        {canPick ? (
+          <>
+            <button
+              type="button"
+              className="absolute -bottom-[3px] -right-[3px] flex h-[28px] w-[28px] cursor-pointer items-center justify-center rounded-full border-2 border-white bg-[var(--color-text)] p-0 text-white transition-transform duration-[120ms] hover:scale-110 disabled:cursor-wait disabled:opacity-60 dark:border-[var(--color-bg-surface)] dark:text-[var(--color-bg-surface)]"
+              onClick={handleBadgeClick}
+              disabled={busy}
+              aria-label={hasCustom ? 'Retirer ma photo de profil' : 'Choisir une photo de profil'}
+              title={hasCustom ? 'Retirer ma photo' : 'Choisir une photo'}
+            >
+              <Icon icon={hasCustom ? 'ph:trash' : 'ph:camera'} className="h-[14px] w-[14px]" aria-hidden="true" />
+            </button>
+            <input ref={inputRef} type="file" accept="image/*" className="hidden" onChange={handleFile} />
+          </>
+        ) : null}
+      </div>
+      <div className="flex min-w-0 flex-col gap-[4px]">
+        <p className="m-0 truncate font-body text-[19px] font-semibold leading-[1.2] tracking-[-0.3125px]">
+          {fullName || '—'}
+        </p>
+        {/* No line without an address (none from the portal nor the webmail). */}
+        {displayInfo.email ? <CopyableEmail email={displayInfo.email} /> : null}
+        {error ? (
+          <p className="m-0 font-body text-[13px] font-semibold leading-[1.2] text-[#b91c1c] dark:text-[var(--color-error)]" role="alert">{error}</p>
+        ) : null}
+      </div>
+    </div>
+  )
+}
+
 function WallpaperSetting({ previewSrc, hasCustom, enabled, onEnabledChange, onChange, onReset }) {
   const inputRef = useRef(null)
   const [busy, setBusy] = useState(false)
@@ -619,7 +466,7 @@ function WallpaperSetting({ previewSrc, hasCustom, enabled, onEnabledChange, onC
       {canToggle ? (
         <SwitchRow
           label="Afficher le fond d’écran"
-          description="Photo en haut du tableau de bord"
+          description="Photo en haut de l’accueil"
           checked={enabled}
           onChange={onEnabledChange}
         />
@@ -628,12 +475,12 @@ function WallpaperSetting({ previewSrc, hasCustom, enabled, onEnabledChange, onC
         <div className="flex flex-col gap-2 px-4 py-3">
           <div className="flex flex-wrap items-center gap-2">
             <button type="button" className={SETTING_BUTTON_CLASSES} onClick={() => inputRef.current?.click()} disabled={busy}>
-              <Icon icon="carbon:upload" className="h-[15px] w-[15px] shrink-0" aria-hidden="true" />
+              <Icon icon="ph:upload-simple" className="h-[15px] w-[15px] shrink-0" aria-hidden="true" />
               {busy ? 'Enregistrement…' : hasCustom ? 'Changer d’image' : 'Choisir une image'}
             </button>
             {hasCustom ? (
               <button type="button" className={SETTING_BUTTON_CLASSES} onClick={() => { setError(''); onReset() }} disabled={busy}>
-                <Icon icon="carbon:reset" className="h-[15px] w-[15px] shrink-0" aria-hidden="true" />
+                <Icon icon="ph:arrow-counter-clockwise" className="h-[15px] w-[15px] shrink-0" aria-hidden="true" />
                 Photo par défaut
               </button>
             ) : null}
@@ -648,8 +495,10 @@ function WallpaperSetting({ previewSrc, hasCustom, enabled, onEnabledChange, onC
   )
 }
 
+// `initialSectionId`: the section shown on opening (else the last one).
 function AccountModal({
   open,
+  initialSectionId = null,
   onClose,
   onManageAccount,
   onYearChange,
@@ -659,9 +508,6 @@ function AccountModal({
   profilePhotoSrc,
   planningState,
   planningFieldLabels = null,
-  lookaheadDays,
-  lookaheadOptions,
-  onLookaheadChange,
   widgetToggles = [],
   onWidgetVisibilityChange,
   backgroundPreviewSrc = null,
@@ -677,6 +523,9 @@ function AccountModal({
   hasCustomBackground = false,
   onCustomBackgroundChange,
   onCustomBackgroundReset,
+  hasCustomProfilePhoto = false,
+  onCustomProfilePhotoChange = null,
+  onCustomProfilePhotoReset,
   showAppDescriptions = false,
   onShowAppDescriptionsChange,
   sidebarCompact = false,
@@ -690,8 +539,15 @@ function AccountModal({
   // without); `auto` the automatic signature's lines.
   mailSignature = null,
 }) {
-  const [activeSectionId, setActiveSectionId] = useState('account')
+  const [activeSectionId, setActiveSectionId] = useState(initialSectionId ?? 'account')
   const tabRefs = useRef({})
+  // On opening, the section asked for (set while rendering, not after: no
+  // frame on the previous one).
+  const [wasOpen, setWasOpen] = useState(open)
+  if (open !== wasOpen) {
+    setWasOpen(open)
+    if (open && initialSectionId) setActiveSectionId(initialSectionId)
+  }
 
   useEffect(() => {
     if (!open) {
@@ -733,14 +589,7 @@ function AccountModal({
     tp: planningFieldLabels?.tp || 'Classe TP',
   }
 
-  const canConfigureLookahead = typeof onLookaheadChange === 'function'
-    && Array.isArray(lookaheadOptions)
-    && lookaheadOptions.length > 1
   const canToggleWidgets = typeof onWidgetVisibilityChange === 'function' && widgetToggles.length > 0
-  const nextClassToggle = canToggleWidgets ? widgetToggles.find((widget) => widget.id === 'nextClass') : null
-  // The lookahead only tunes the "Prochain cours" card, so it lives under that
-  // card's switch. Without the card in the list it falls back to Planning.
-  const lookaheadInDashboard = canConfigureLookahead && Boolean(nextClassToggle)
   const hasAppearance = typeof onThemeChange === 'function'
     || typeof onCustomBackgroundChange === 'function'
     || typeof onShowWallpaperChange === 'function'
@@ -748,13 +597,13 @@ function AccountModal({
   const hasPrivacy = typeof onAnonymousAnalyticsChange === 'function'
 
   const sections = [
-    { id: 'account', label: 'Compte', icon: 'carbon:user-avatar' },
-    { id: 'planning', label: 'Planning', icon: 'carbon:calendar' },
-    mailSignature ? { id: 'mail', label: 'Messagerie', icon: 'carbon:email' } : null,
-    canToggleWidgets ? { id: 'dashboard', label: 'Tableau de bord', icon: 'carbon:dashboard' } : null,
-    hasAppearance ? { id: 'appearance', label: 'Apparence', icon: 'carbon:image' } : null,
-    hasPrivacy ? { id: 'privacy', label: 'Confidentialité', icon: 'carbon:locked' } : null,
-    { id: 'about', label: 'À propos', icon: 'carbon:information' },
+    { id: 'account', label: 'Compte', icon: 'ph:user-circle' },
+    { id: 'planning', label: 'Planning', icon: 'ph:calendar-blank' },
+    mailSignature ? { id: 'mail', label: 'Messagerie', icon: 'ph:envelope-simple' } : null,
+    canToggleWidgets ? { id: 'dashboard', label: 'Accueil', icon: 'ph:layout' } : null,
+    hasAppearance ? { id: 'appearance', label: 'Apparence', icon: 'ph:image' } : null,
+    hasPrivacy ? { id: 'privacy', label: 'Confidentialité', icon: 'ph:lock' } : null,
+    { id: 'about', label: 'À propos', icon: 'ph:info' },
   ].filter(Boolean)
   const activeSection = sections.find((section) => section.id === activeSectionId) ?? sections[0]
 
@@ -801,32 +650,19 @@ function AccountModal({
       case 'account':
         return (
           <>
-            <div className={`${CARD_CLASSES} flex items-center gap-[18px] p-[18px]`}>
-              <div className={`flex h-[72px] w-[72px] shrink-0 items-center justify-center overflow-hidden rounded-full border border-[rgba(27,27,27,0.16)] ${MUTED_FILL_CLASSES} dark:border-[var(--color-border)]`}>
-                {profilePhotoSrc ? (
-                  <img
-                    className="h-full w-full object-cover"
-                    src={profilePhotoSrc}
-                    alt={`Photo de profil de ${displayInfo.firstName || displayInfo.email || 'l’utilisateur'}`}
-                  />
-                ) : (
-                  <Icon icon="carbon:user-avatar-filled-alt" className="h-9 w-9 text-[var(--color-text)]" aria-hidden="true" />
-                )}
-              </div>
-              <div className="flex min-w-0 flex-col gap-[4px]">
-                <p className="m-0 truncate font-body text-[19px] font-semibold leading-[1.2] tracking-[-0.3125px]">
-                  {[displayInfo.firstName, displayInfo.lastName].filter(Boolean).join(' ') || '—'}
-                </p>
-                {/* No line without an address (none from the portal nor the webmail). */}
-                {displayInfo.email ? <CopyableEmail email={displayInfo.email} /> : null}
-              </div>
-            </div>
+            <ProfileCard
+              photoSrc={profilePhotoSrc}
+              displayInfo={displayInfo}
+              hasCustom={hasCustomProfilePhoto}
+              onChange={onCustomProfilePhotoChange}
+              onReset={onCustomProfilePhotoReset}
+            />
 
             {typeof onManageAccount === 'function' ? (
               <SettingsGroup>
                 <button type="button" className={PRESSABLE_ROW_CLASSES} onClick={onManageAccount}>
-                  <RowText icon="carbon:password" label="Gérer mon compte sur Sésame" />
-                  <Icon icon="carbon:launch" className="h-4 w-4 shrink-0 text-text-60" aria-hidden="true" />
+                  <RowText icon="ph:password" label="Gérer mon compte sur Sésame" />
+                  <Icon icon="ph:arrow-square-out" className="h-4 w-4 shrink-0 text-text-60" aria-hidden="true" />
                 </button>
               </SettingsGroup>
             ) : null}
@@ -887,7 +723,7 @@ function AccountModal({
             {typeof onShowPlanningWeekendChange === 'function' ? (
               <SettingsGroup title="Semaine">
                 <SwitchRow
-                  icon="carbon:calendar"
+                  icon="ph:calendar-blank"
                   label="Week-end"
                   description="Afficher le week-end dans l’emploi du temps"
                   checked={showPlanningWeekend}
@@ -898,11 +734,6 @@ function AccountModal({
 
             <PlanningExportGroup selection={planningSelection} />
 
-            {canConfigureLookahead && !lookaheadInDashboard ? (
-              <SettingsGroup title="Prochain cours">
-                <LookaheadSetting days={lookaheadDays} options={lookaheadOptions} onChange={onLookaheadChange} />
-              </SettingsGroup>
-            ) : null}
           </>
         )
 
@@ -911,23 +742,12 @@ function AccountModal({
 
       case 'dashboard':
         return (
-          <SettingsGroup title="Cartes affichées" footer="Les cartes masquées disparaissent du haut du tableau de bord.">
-            {widgetToggles.map((widget) => (
-              <div key={widget.id}>
-                <SwitchRow
-                  icon={widget.icon}
-                  label={widget.label}
-                  checked={widget.visible}
-                  onChange={(visible) => onWidgetVisibilityChange(widget.id, visible)}
-                />
-                {widget.id === 'nextClass' && lookaheadInDashboard && widget.visible ? (
-                  <div className="border-t border-[var(--color-border)]">
-                    <LookaheadSetting days={lookaheadDays} options={lookaheadOptions} onChange={onLookaheadChange} />
-                  </div>
-                ) : null}
-              </div>
-            ))}
-          </SettingsGroup>
+          <HomeLayoutSetting
+            widgets={widgetToggles}
+            onChange={onWidgetVisibilityChange}
+            wallpaperSrc={showWallpaper ? backgroundPreviewSrc : null}
+            firstName={displayInfo.firstName}
+          />
         )
 
       case 'appearance':
@@ -958,7 +778,7 @@ function AccountModal({
             {typeof onShowAppDescriptionsChange === 'function' ? (
               <SettingsGroup title="Applications">
                 <SwitchRow
-                  icon="carbon:text-short-paragraph"
+                  icon="ph:text-align-left"
                   label="Descriptions des applications"
                   description="Une ligne d’explication sous chaque application"
                   checked={showAppDescriptions}
@@ -971,7 +791,7 @@ function AccountModal({
               <div className="hidden 4xl:block">
                 <SettingsGroup title="Barre latérale" footer="La barre latérale peut également se replier en maintenant le curseur et en glissant vers la gauche">
                   <SwitchRow
-                    icon="carbon:side-panel-close"
+                    icon="ph:sidebar-simple"
                     label="Barre latérale compacte"
                     description="Afficher les icônes sans les libellés"
                     checked={sidebarCompact}
@@ -990,7 +810,7 @@ function AccountModal({
             control={(
               <SettingsGroup>
                 <SwitchRow
-                  icon="carbon:chart-line"
+                  icon="ph:chart-line"
                   label="Statistiques anonymes"
                   description={anonymousAnalytics ? 'Activées, merci !' : 'Désactivées, plus rien n’est envoyé'}
                   checked={anonymousAnalytics}
@@ -1003,14 +823,10 @@ function AccountModal({
 
       case 'about':
         return (
-          <>
-            <ChangelogGroup />
-            <div className={`${CARD_CLASSES} p-[18px]`}>
-              <AboutContent onPrivacyClick={hasPrivacy ? () => selectSection('privacy') : null} />
-            </div>
-            <AboutHelp />
-            <AboutTeam />
-          </>
+          <AboutPage
+            leading={<ChangelogRow />}
+            onPrivacyClick={hasPrivacy ? () => selectSection('privacy') : null}
+          />
         )
 
       default:

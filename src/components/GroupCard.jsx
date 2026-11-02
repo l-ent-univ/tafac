@@ -17,7 +17,7 @@ export const GROUP_CARD_CLASSES = 'widget-card widget-card-visible m-0 list-none
 // (useContextMenu), on the link or the button. `onClick` on a link
 // or a download is only told of the click (the link still goes).
 export function GroupRow({ icon, title, detail, onClick, href, download, trailing = null, wrap = false, hint, compact = false, menuProps = null }) {
-  const trailingIcon = href ? (download ? 'carbon:download' : 'carbon:launch') : onClick ? 'carbon:chevron-right' : null
+  const trailingIcon = href ? (download ? 'ph:download-simple' : 'ph:arrow-square-out') : onClick ? 'ph:caret-right' : null
   const content = (
     <>
       {icon && compact ? <Icon icon={icon} className="size-[18px] shrink-0 text-text-muted" aria-hidden="true" /> : null}

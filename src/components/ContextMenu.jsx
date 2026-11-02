@@ -111,7 +111,7 @@ function ContextMenu({ x, y, items, title = null, label, above = false, anchor =
           ) : item.icon ? <Icon icon={item.icon} className={`size-[16px] shrink-0 ${item.destructive ? '' : 'text-text-muted'}`} aria-hidden="true" /> : null}
           <span className="min-w-0 flex-1 truncate text-[14px] font-medium leading-tight">{item.label}</span>
           {item.detail != null ? <span className="shrink-0 text-[12px] font-semibold leading-none tabular-nums text-text-muted">{item.detail}</span> : null}
-          {item.checked ? <Icon icon="carbon:checkmark" className="size-[14px] shrink-0 text-text" aria-hidden="true" /> : null}
+          {item.checked ? <Icon icon="ph:check" className="size-[14px] shrink-0 text-text" aria-hidden="true" /> : null}
         </button>
       )))}
     </div>,

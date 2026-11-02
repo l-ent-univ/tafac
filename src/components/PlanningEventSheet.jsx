@@ -102,7 +102,7 @@ function PlanningEventSheet({ event, accent, events, todayKey, searching, onWrit
                     onClick={onWrite}
                     className="close-button glass-close-button group relative inline-flex size-[34px] shrink-0 cursor-pointer items-center justify-center rounded-full border-0 p-0 text-text focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-text"
                   >
-                    <Icon icon="carbon:email" className="size-[16px]" aria-hidden="true" />
+                    <Icon icon="ph:envelope-simple" className="size-[16px]" aria-hidden="true" />
                     <Tooltip title="Écrire au sujet de ce cours" side="bottom-end" className="max-4xl:hidden" />
                   </button>
                 ) : null}
@@ -117,19 +117,19 @@ function PlanningEventSheet({ event, accent, events, todayKey, searching, onWrit
                   <PlanningEventBlock event={event} accent={accent} variant="regular" width={contentWidth} height={FULL_BLOCK_HEIGHT} style={{ position: 'relative' }} />
                 ) : <div style={{ height: FULL_BLOCK_HEIGHT }} />}
                 <ul className={GROUP_CARD_CLASSES}>
-                  <GroupRow icon="carbon:time" title={`De ${formatTime(event.start)} à ${formatTime(event.end)}`} />
-                  <GroupRow icon="carbon:calendar" title={`${dayText(event.day)} · ${durationText(event.start, event.end)}`} />
-                  {event.group ? <GroupRow icon="carbon:events" title={event.group} /> : null}
-                  {event.notes ? <GroupRow icon="carbon:information" title={event.notes} wrap /> : null}
+                  <GroupRow icon="ph:clock" title={`De ${formatTime(event.start)} à ${formatTime(event.end)}`} />
+                  <GroupRow icon="ph:calendar-blank" title={`${dayText(event.day)} · ${durationText(event.start, event.end)}`} />
+                  {event.group ? <GroupRow icon="ph:users-three" title={event.group} /> : null}
+                  {event.notes ? <GroupRow icon="ph:info" title={event.notes} wrap /> : null}
                   {event.link ? (
-                    <GroupRow icon="carbon:link" title={event.linkLabel ?? 'Lien'} detail={linkHost(event.link)} href={event.link} />
+                    <GroupRow icon="ph:link" title={event.linkLabel ?? 'Lien'} detail={linkHost(event.link)} href={event.link} />
                   ) : null}
                 </ul>
               </div>
               {/* Titled like the sections of Mes notes. */}
               <section className="gd-rise grid gap-3" style={{ '--d': '80ms' }} aria-labelledby="planning-occurrences-title">
                 <div className="flex items-center gap-[5px] text-brand">
-                  <Icon icon="carbon:calendar-heat-map" className="w-[17px] h-[17px] shrink-0" aria-hidden="true" />
+                  <Icon icon="ph:calendar-dots" className="w-[17px] h-[17px] shrink-0" aria-hidden="true" />
                   <h3 id="planning-occurrences-title" className="m-0 font-body text-base font-medium leading-[1.06]">Occurrences</h3>
                   <span className="ml-auto font-body text-[13px] font-medium leading-none text-text-muted">sur 30 jours</span>
                 </div>

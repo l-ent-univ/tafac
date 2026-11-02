@@ -3,6 +3,7 @@ import { Icon } from '@iconify/react'
 import { useWidgetLoadReport } from '../analytics'
 import { publishBriefingSource } from '../briefingSources'
 import { getRecentMail } from '../entApi'
+import useFitListItems from '../useFitListItems'
 import { addressMenuItems } from '../contextMenuItems'
 import { copyToClipboard, useContextMenu } from '../useContextMenu'
 import WidgetListStatus from './WidgetListStatus'
@@ -24,6 +25,16 @@ const MAIL_REFRESH_MS = 5 * 60 * 1000
 const WEBMAIL_HREF_KEY = 'l-ent:webmail-href'
 
 // Phones: 44px rows (touch targets), hence the taller card there.
+// `large` (the « Accueil » page): the card as tall as its cell, at least
+// two mails high; as many mails show as fit whole (useFitListItems), out of
+// the newest LARGE_MAX_MESSAGES. The list's own height doesn't size the
+// cell (contain: size), so a taller cell shows more mails, a tight one less.
+// Two rows and the gap between them (rem, as the gap: a larger text size
+// keeps both), the empty and failed states as tall.
+const LARGE_MAX_MESSAGES = 10
+const LARGE_ROOM_CLASSES = 'min-h-[calc(80px+0.25rem)] max-md:min-h-[calc(76px+0.25rem)] max-xs:min-h-[5.75rem]'
+const LARGE_LIST_CLASSES = `[contain:size] overflow-hidden ${LARGE_ROOM_CLASSES}`
+const LARGE_CARD_CLASSES = 'recent-mail-widget widget-card shadow-md flex-[0_1_420px] p-4 border border-white card-corners overflow-hidden bg-widget-bg text-base leading-6 min-w-0 max-md:flex-[1_1_100%] max-md:p-3 relative flex flex-col gap-2 text-text'
 const CARD_CLASSES = 'recent-mail-widget widget-card shadow-md flex-[0_1_360px] h-[140px] p-4 border border-white card-corners overflow-hidden bg-widget-bg text-base leading-6 min-w-0 max-2xl:flex-[1_1_calc(50%-6px)] max-2xl:min-w-0 max-md:h-[124px] max-md:p-3 max-xs:flex-[1_1_100%] max-xs:h-[140px] relative flex flex-col gap-[6px] text-text'
 // As the mail page's rows (MailListItem), on two lines to fit the card: the
 // sender's badge spanning both, their name (and domain, from outside the
@@ -41,9 +52,11 @@ function getLoadOutcome(state) {
   return null
 }
 
-function MailHeader({ unreadCount = 0 }) {
+// `icon`: an image before the title (the « Accueil » page's).
+function MailHeader({ unreadCount = 0, icon = null }) {
   return (
     <div className="flex items-center gap-[5px] min-w-0 pr-5">
+      {icon ? <img src={icon} alt="" width="22" height="22" draggable="false" className="mr-[3px] size-[22px] shrink-0 select-none" aria-hidden="true" /> : null}
       <span className="m-0 min-w-0 leading-[1.06] text-base font-medium text-text-muted overflow-hidden text-ellipsis whitespace-nowrap max-md:text-[15px]">Mails récents</span>
       {unreadCount > 0 ? (
         <span className="mail-unread-pill ml-[3px] inline-flex items-center justify-center min-w-[18px] h-[18px] px-[6px] rounded-full text-[11px] font-semibold leading-none tabular-nums shrink-0" aria-label={`${unreadCount} non lu${unreadCount > 1 ? 's' : ''}`}>
@@ -98,8 +111,8 @@ function MailRow({ message, fallbackHref, now, onOpen = null }) {
         {senderDomain ? <span className="max-w-[55%] shrink-0 truncate text-[11.5px] leading-[1.15] font-medium text-text-muted" aria-hidden="true">{senderDomain}</span> : null}
       </span>
       <span className="flex shrink-0 items-center gap-[5px]">
-        {message.forwarded ? <Icon icon="carbon:reply" className="size-3 text-text-muted [transform:scaleX(-1)]" aria-label="Transféré" /> : message.replied ? <Icon icon="carbon:reply" className="size-3 text-text-muted" aria-label="Répondu" /> : null}
-        {message.flagged ? <Icon icon="carbon:flag-filled" className="size-3 text-[#f0932b]" aria-label="Drapeau" /> : null}
+        {message.forwarded ? <Icon icon="ph:arrow-bend-up-left" className="size-3 text-text-muted [transform:scaleX(-1)]" aria-label="Transféré" /> : message.replied ? <Icon icon="ph:arrow-bend-up-left" className="size-3 text-text-muted" aria-label="Répondu" /> : null}
+        {message.flagged ? <Icon icon="ph:flag-fill" className="size-3 text-[#f0932b]" aria-label="Drapeau" /> : null}
         <span className={`text-[12px] leading-none tabular-nums font-medium whitespace-nowrap ${unread ? 'text-text-70' : 'text-text-muted'}`}>{timeLabel}</span>
       </span>
       <span className="col-start-2 col-span-2 flex min-w-0 items-center gap-[6px]">
@@ -117,8 +130,8 @@ function MailRow({ message, fallbackHref, now, onOpen = null }) {
   // address copied.
   const menuProps = useContextMenu(() => [
     onOpen && message.id
-      ? { id: 'open', label: 'Ouvrir', icon: 'carbon:email', onSelect: () => onOpen(message.id) }
-      : href ? { id: 'open', label: 'Ouvrir', icon: 'carbon:launch', onSelect: () => openInNewTab(href) } : null,
+      ? { id: 'open', label: 'Ouvrir', icon: 'ph:envelope-simple', onSelect: () => onOpen(message.id) }
+      : href ? { id: 'open', label: 'Ouvrir', icon: 'ph:arrow-square-out', onSelect: () => openInNewTab(href) } : null,
     'separator',
     ...addressMenuItems(message.from, { copy: copyToClipboard }),
   ])
@@ -170,13 +183,14 @@ function MailRow({ message, fallbackHref, now, onOpen = null }) {
 // `onOpenMail(id)`: the app's mail page, on that mail (`id` null: the page
 // itself). Without it (no in-app mail page), the card leads to the webmail
 // as before.
-function WidgetRecentMail({ visible = false, preview = null, onOpenMail = null }) {
+function WidgetRecentMail({ visible = false, preview = null, onOpenMail = null, icon = null, large = false }) {
   const [loadedState, setState] = useState({ status: 'loading', unreadCount: null, webmailHref: null, messages: [] })
   const state = preview ?? loadedState
   const [storedWebmailHref, setStoredWebmailHref] = useState(() => readStoredHref(WEBMAIL_HREF_KEY))
   const [now, setNow] = useState(() => new Date())
   const lastLoadAtRef = useRef(0)
   const loadingRef = useRef(false)
+  const [listRef] = useFitListItems()
   useWidgetLoadReport('mail', preview ? null : getLoadOutcome(state))
 
   const loadMail = useCallback(async ({ background = false } = {}) => {
@@ -233,13 +247,14 @@ function WidgetRecentMail({ visible = false, preview = null, onOpenMail = null }
   useEffect(() => () => publishBriefingSource('mailCount', null), [])
 
   // Hidden when the mailbox can't be loaded; the background refresh brings
-  // the card back once the webmail answers again.
-  if (state.status === 'disabled' || state.status === 'unauthenticated' || state.status === 'error') {
+  // the card back once the webmail answers again. On « Accueil » (`large`)
+  // a failed load stays, with « Réessayer ».
+  if (state.status === 'disabled' || state.status === 'unauthenticated' || (state.status === 'error' && !large)) {
     return null
   }
 
   const webmailHref = preview ? null : state.webmailHref || storedWebmailHref
-  const messages = state.messages.slice(0, MAX_VISIBLE_MESSAGES)
+  const messages = state.messages.slice(0, large ? LARGE_MAX_MESSAGES : MAX_VISIBLE_MESSAGES)
   const unreadCount = state.status === 'ok'
     ? (state.unreadCount ?? state.messages.filter((message) => message.unread).length)
     : 0
@@ -248,7 +263,7 @@ function WidgetRecentMail({ visible = false, preview = null, onOpenMail = null }
 
   return (
     <article
-      className={`${CARD_CLASSES} ${openCard ? 'cursor-pointer' : ''} ${visible ? 'widget-card-visible' : ''}`}
+      className={`${large ? LARGE_CARD_CLASSES : CARD_CLASSES} ${openCard ? 'cursor-pointer' : ''} ${visible ? 'widget-card-visible' : ''}`}
       aria-label={unreadCount > 0 ? `Mails récents, ${unreadCount} non lu${unreadCount > 1 ? 's' : ''}` : 'Mails récents'}
       aria-busy={state.status === 'loading' || undefined}
       onClick={openCard ?? undefined}
@@ -265,16 +280,16 @@ function WidgetRecentMail({ visible = false, preview = null, onOpenMail = null }
           title="Ouvrir la messagerie"
           onClick={(event) => event.stopPropagation()}
         >
-          <Icon icon="carbon:arrow-up-right" className="w-[14px] h-[14px] shrink-0" aria-hidden="true" />
+          <Icon icon="ph:arrow-up-right" className="w-[14px] h-[14px] shrink-0" aria-hidden="true" />
         </a>
       ) : null}
 
-      <MailHeader unreadCount={unreadCount} />
+      <MailHeader unreadCount={unreadCount} icon={icon} />
 
       {state.status === 'loading' ? <MailRowsPlaceholder /> : null}
 
       {state.status === 'ok' && messages.length > 0 ? (
-        <ul className="flex-1 flex flex-col gap-1 min-h-0 m-0 p-0 list-none -mx-1.5" aria-label="Derniers mails reçus">
+        <ul ref={large ? listRef : null} className={`flex-1 flex flex-col gap-1 min-h-0 m-0 p-0 list-none -mx-1.5 ${large ? LARGE_LIST_CLASSES : ''}`} aria-label="Derniers mails reçus">
           {messages.map((message, index) => (
             <MailRow key={message.id ?? index} message={message} fallbackHref={webmailHref} now={now} onOpen={inApp ? onOpenMail : null} />
           ))}
@@ -282,7 +297,20 @@ function WidgetRecentMail({ visible = false, preview = null, onOpenMail = null }
       ) : null}
 
       {state.status === 'ok' && messages.length === 0 ? (
-        <WidgetListStatus icon="carbon:checkmark-outline" title="Aucun nouveau mail" body="Ta boîte de réception est à jour" />
+        <div className={`flex flex-1 flex-col ${large ? LARGE_ROOM_CLASSES : ''}`}>
+          <WidgetListStatus icon="ph:check-circle" title="Aucun nouveau mail" body="Ta boîte de réception est à jour" />
+        </div>
+      ) : null}
+
+      {state.status === 'error' ? (
+        <div className={`flex flex-1 flex-col ${LARGE_ROOM_CLASSES}`}>
+          <WidgetListStatus
+            icon="ph:warning"
+            title="Messagerie indisponible"
+            body="Impossible de charger tes mails"
+            action={{ label: 'Réessayer', onClick: () => void loadMail() }}
+          />
+        </div>
       ) : null}
 
     </article>

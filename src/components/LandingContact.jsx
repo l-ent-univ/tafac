@@ -26,7 +26,7 @@ function LandingContact({ className = '' }) {
         className="landing-contact flex w-full max-w-[720px] flex-col items-center gap-5 corners-[32px] border border-white bg-white px-10 py-10 text-center shadow-[0_1px_3px_rgb(52_18_0/0.06),0_10px_28px_-14px_rgb(52_18_0/0.16)] dark:border-white/10 dark:bg-[#1c1c1c] max-md:corners-[28px] max-md:px-5 max-md:py-8"
       >
         <span className="inline-flex items-center gap-1.5 rounded-full bg-success-bg px-3 py-1 text-[13px] font-bold uppercase tracking-[0.06em] text-success-text">
-          <Icon icon="carbon:checkmark-outline" className="size-4" aria-hidden="true" />
+          <Icon icon="ph:check-circle" className="size-4" aria-hidden="true" />
           {copyText(copy.contact.badge)}
         </span>
         <h2 id="landing-contact-title" className="m-0 max-w-[22ch] text-balance text-[clamp(26px,3vw,36px)] font-bold leading-[1.05] text-text">
@@ -69,7 +69,7 @@ function LandingContact({ className = '' }) {
             rel="noopener noreferrer"
             className="inline-flex min-h-12 items-center gap-2 rounded-full bg-brand px-6 text-[16px] font-semibold text-bg no-underline transition-transform duration-150 hover:scale-[1.03] active:scale-[0.98]"
           >
-            <Icon icon="carbon:logo-github" className="size-5" aria-hidden="true" />
+            <Icon icon="ph:github-logo" className="size-5" aria-hidden="true" />
             {copyText(copy.contact.cta)}
           </a>
         ) : null}
