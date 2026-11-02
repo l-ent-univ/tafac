@@ -57,7 +57,8 @@ export function moveToTafac() {
   try {
     localStorage.setItem(MOVED_TO_TAFAC_KEY, '1')
   } catch {
-    // Storage unavailable: they'll see the sheet again next time
+    // Storage unavailable: the settings go over again next time
   }
-  window.location.assign(transferUrl)
+  // replace(): going back mustn't land on this address and redirect again
+  window.location.replace(transferUrl)
 }

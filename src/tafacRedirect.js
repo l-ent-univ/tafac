@@ -1,6 +1,8 @@
-// First import of main.jsx: once a user moved to Tafac, this address only
-// redirects there, and the app isn't rendered at all.
-import { MOVED_TO_TAFAC_KEY, TAFAC_URL } from './settingsTransfer'
+// First import of main.jsx: this address now only redirects to Tafac, and
+// the app isn't rendered at all. The first visit carries this browser's
+// settings over (see settingsTransfer.js); later visits land on Tafac as is,
+// so they never overwrite settings changed there since.
+import { MOVED_TO_TAFAC_KEY, TAFAC_URL, moveToTafac } from './settingsTransfer'
 
 function hasMovedToTafac() {
   try {
@@ -10,6 +12,5 @@ function hasMovedToTafac() {
   }
 }
 
-export const movedToTafac = hasMovedToTafac()
-
-if (movedToTafac) window.location.replace(TAFAC_URL)
+if (hasMovedToTafac()) window.location.replace(TAFAC_URL)
+else moveToTafac()

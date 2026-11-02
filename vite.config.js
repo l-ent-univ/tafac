@@ -100,6 +100,10 @@ export default defineConfig({
     entDevAuthPlugin,
     VitePWA({
       registerType: 'prompt',
+      // Replaces the installed service worker with one that unregisters
+      // itself and reloads open pages, so the PWA stops serving the old
+      // cached app and runs the redirect to Tafac.
+      selfDestroying: true,
       includeAssets: ['icon.svg', 'apple-touch-icon.png'],
       workbox: {
         navigateFallbackDenylist: [/^\/__ent_auth/, /^\/__ent_proxy/],
