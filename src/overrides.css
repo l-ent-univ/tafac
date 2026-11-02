@@ -7330,3 +7330,12 @@ li:has(> .planning-row.is-link:active) + li > .planning-row .planning-row-text,
     animation: none;
   }
 }
+
+/* ── Skeletons (skullet: « Accueil »'s cards while they load) ──
+   In the app's shimmer colours (SHIMMER_CLASSES), its lines of text as
+   pills; dark follows from the colour tokens. */
+:root {
+  --skullet-base: var(--color-bg-muted);
+  --skullet-highlight: var(--color-bg-subtle);
+  --skullet-radius: 999px;
+}

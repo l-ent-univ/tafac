@@ -1,8 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Icon } from '@iconify/react'
+import { Skeleton } from 'skullet/react'
 import { useWidgetLoadReport } from '../analytics'
 import { publishBriefingSource } from '../briefingSources'
 import { getRecentMail } from '../entApi'
+import { FORCE_SKELETONS, SAMPLE_MESSAGES } from '../homeSkeletonSamples'
 import useFitListItems from '../useFitListItems'
 import { addressMenuItems } from '../contextMenuItems'
 import { copyToClipboard, useContextMenu } from '../useContextMenu'
@@ -63,21 +65,6 @@ function MailHeader({ unreadCount = 0, icon = null }) {
           {unreadCount > 99 ? '99+' : unreadCount}
         </span>
       ) : null}
-    </div>
-  )
-}
-
-function MailRowsPlaceholder() {
-  return (
-    <div className="flex-1 flex flex-col gap-1 -mx-1.5" role="status" aria-label="Chargement des mails">
-      {[['w-[38%]', 'w-[78%]'], ['w-[30%]', 'w-[64%]']].map(([senderWidth, subjectWidth]) => (
-        <div key={senderWidth} className={ROW_CLASSES} aria-hidden="true">
-          <span className={`text-placeholder-shimmer row-span-2 block size-5 rounded-[6px] ${SHIMMER_CLASSES}`} />
-          <span className={`text-placeholder-shimmer block h-2.5 rounded-full ${senderWidth} ${SHIMMER_CLASSES}`} />
-          <span className={`text-placeholder-shimmer block h-2.5 w-8 rounded-full ${SHIMMER_CLASSES}`} />
-          <span className={`text-placeholder-shimmer block h-2 rounded-full col-span-2 ${subjectWidth} ${SHIMMER_CLASSES}`} />
-        </div>
-      ))}
     </div>
   )
 }
@@ -286,14 +273,18 @@ function WidgetRecentMail({ visible = false, preview = null, onOpenMail = null, 
 
       <MailHeader unreadCount={unreadCount} icon={icon} />
 
-      {state.status === 'loading' ? <MailRowsPlaceholder /> : null}
-
-      {state.status === 'ok' && messages.length > 0 ? (
-        <ul ref={large ? listRef : null} className={`flex-1 flex flex-col gap-1 min-h-0 m-0 p-0 list-none -mx-1.5 ${large ? LARGE_LIST_CLASSES : ''}`} aria-label="Derniers mails reçus">
-          {messages.map((message, index) => (
-            <MailRow key={message.id ?? index} message={message} fallbackHref={webmailHref} now={now} onOpen={inApp ? onOpenMail : null} />
-          ))}
-        </ul>
+      {/* Loading: a skeleton (skullet) of the last rows shown (`id`, kept
+          across visits), of sample rows before there were any. */}
+      {state.status === 'loading' || (state.status === 'ok' && messages.length > 0) ? (
+        <Skeleton loading={FORCE_SKELETONS || undefined} data={state.status === 'ok' ? messages : null} sample={SAMPLE_MESSAGES} id={large ? 'home-mail' : 'dashboard-mail'} label="Chargement des mails" className="flex min-h-0 flex-1 flex-col">
+          {(shown) => (
+            <ul ref={large ? listRef : null} className={`flex-1 flex flex-col gap-1 min-h-0 m-0 p-0 list-none -mx-1.5 ${large ? LARGE_LIST_CLASSES : ''}`} aria-label="Derniers mails reçus">
+              {shown.map((message, index) => (
+                <MailRow key={message.id ?? index} message={message} fallbackHref={webmailHref} now={now} onOpen={inApp ? onOpenMail : null} />
+              ))}
+            </ul>
+          )}
+        </Skeleton>
       ) : null}
 
       {state.status === 'ok' && messages.length === 0 ? (

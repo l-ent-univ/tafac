@@ -1,8 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Icon } from '@iconify/react'
+import { Skeleton } from 'skullet/react'
 import { useWidgetLoadReport } from '../analytics'
 import { publishBriefingSource } from '../briefingSources'
 import { getMoodleDeadlines } from '../entApi'
+import { FORCE_SKELETONS, SAMPLE_DEADLINES } from '../homeSkeletonSamples'
 import useFitListItems from '../useFitListItems'
 import WidgetListStatus from './WidgetListStatus'
 import {
@@ -141,22 +143,6 @@ function DeadlinesHeader({ urgentCount = 0, hasOverdue = false, icon = null }) {
           {urgentCount > 99 ? '99+' : urgentCount}
         </span>
       ) : null}
-    </div>
-  )
-}
-
-function DeadlineRowsPlaceholder() {
-  return (
-    <div className="flex-1 flex flex-col gap-1 -mx-1.5" role="status" aria-label="Chargement des échéances">
-      {[['w-[70%]', 'w-[46%]'], ['w-[56%]', 'w-[52%]']].map(([titleWidth, courseWidth]) => (
-        <div key={titleWidth} className={ROW_CLASSES} aria-hidden="true">
-          <span className={`text-placeholder-shimmer block w-3 h-3 corners-[4px] ${SHIMMER_CLASSES}`} />
-          <span className={`text-placeholder-shimmer block h-2.5 rounded-full ${titleWidth} ${SHIMMER_CLASSES}`} />
-          <span className={`text-placeholder-shimmer block h-2.5 w-14 rounded-full ${SHIMMER_CLASSES}`} />
-          <span />
-          <span className={`text-placeholder-shimmer block h-2 rounded-full col-span-2 ${courseWidth} ${SHIMMER_CLASSES}`} />
-        </div>
-      ))}
     </div>
   )
 }
@@ -332,14 +318,18 @@ function WidgetDeadlines({ visible = false, preview = null, icon = null, large =
 
       <DeadlinesHeader urgentCount={urgentCount} hasOverdue={hasOverdue} icon={icon} />
 
-      {state.status === 'loading' ? <DeadlineRowsPlaceholder /> : null}
-
-      {state.status === 'ok' && rows.length > 0 ? (
-        <ul ref={large ? listRef : null} className={`flex-1 flex flex-col gap-1 min-h-0 m-0 p-0 list-none -mx-1.5 ${large ? LARGE_LIST_CLASSES : ''}`} aria-label="Prochaines échéances Moodle">
-          {rows.map((item, index) => (
-            <DeadlineRow key={item.id ?? index} item={item} fallbackHref={moodleHref} now={now} />
-          ))}
-        </ul>
+      {/* Loading: a skeleton (skullet) of the last rows shown (`id`, kept
+          across visits), of sample rows before there were any. */}
+      {state.status === 'loading' || (state.status === 'ok' && rows.length > 0) ? (
+        <Skeleton loading={FORCE_SKELETONS || undefined} data={state.status === 'ok' ? rows : null} sample={SAMPLE_DEADLINES} id={large ? 'home-deadlines' : 'dashboard-deadlines'} label="Chargement des échéances" className="flex min-h-0 flex-1 flex-col">
+          {(shown) => (
+            <ul ref={large ? listRef : null} className={`flex-1 flex flex-col gap-1 min-h-0 m-0 p-0 list-none -mx-1.5 ${large ? LARGE_LIST_CLASSES : ''}`} aria-label="Prochaines échéances Moodle">
+              {shown.map((item, index) => (
+                <DeadlineRow key={item.id ?? index} item={item} fallbackHref={moodleHref} now={now} />
+              ))}
+            </ul>
+          )}
+        </Skeleton>
       ) : null}
 
       {state.status === 'ok' && rows.length === 0 ? (

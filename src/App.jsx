@@ -60,6 +60,7 @@ import MobileTabBar from './components/MobileTabBar'
 import { getMobileTabItems } from './navItems'
 import { getHomeWidgets } from './dashboardWidgets'
 import { bindHistorySession, readHistoryNav, writeHistoryNav } from './appHistory'
+import { forgetShapes } from 'skullet'
 import { clearMailReadCache } from './mailReadCache'
 import { clearMailSignatures } from './mailSignatureStore'
 import { clearMailSends, flushMailSends } from './useMailSend'
@@ -110,6 +111,9 @@ function clearLegacySensitiveClientCaches() {
 
   clearGradesCache()
   clearAdeTimetableCache()
+  // The shapes of « Accueil »'s skeletons (layout only, no text, but
+  // shaped by this student's mails and classes).
+  forgetShapes()
 }
 
 // What the mail page keeps at the module's level for the signed-in student:
