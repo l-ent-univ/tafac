@@ -199,20 +199,24 @@ function GradeHistogram({ state, studentBucket = null, isPending = false, onRetr
         </div>
       ) : null}
       <p id={`${id}-summary`} className="sr-only">{spokenSummary}</p>
-      <table className="sr-only">
-        <caption>Nombre d’étudiants par tranche de notes</caption>
-        <thead>
-          <tr><th scope="col">Notes</th><th scope="col">Étudiants</th></tr>
-        </thead>
-        <tbody>
-          {BUCKETS.filter((index) => counts[index] > 0).map((index) => (
-            <tr key={index}>
-              <th scope="row">{describeBucket(index).long}{index === studentBucket ? ' (ta note)' : ''}</th>
-              <td>{counts[index]}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
+      {/* Hidden from a wrapper: a table's caption sits outside the table's
+          own box, so sr-only on the table left it showing. */}
+      <div className="sr-only">
+        <table>
+          <caption>Nombre d’étudiants par tranche de notes</caption>
+          <thead>
+            <tr><th scope="col">Notes</th><th scope="col">Étudiants</th></tr>
+          </thead>
+          <tbody>
+            {BUCKETS.filter((index) => counts[index] > 0).map((index) => (
+              <tr key={index}>
+                <th scope="row">{describeBucket(index).long}{index === studentBucket ? ' (ta note)' : ''}</th>
+                <td>{counts[index]}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
     </div>
   )
 }
