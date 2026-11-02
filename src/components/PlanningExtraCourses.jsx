@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Icon } from '@iconify/react'
-import { searchAde } from '../entApi'
+import { getAdeTree, searchAde } from '../entApi'
 import { MAX_EXTRA_RESOURCES } from '../profileStorage'
 import { MUTED_FILL_CLASSES, PRESSABLE_ROW_CLASSES, ROW_CLASSES } from '../settingsStyles'
 import SettingsGroup, { RowText } from './SettingsGroup'
@@ -15,6 +15,28 @@ function describePath(result) {
   const parts = String(result.path ?? '').split(/\s*[/>]\s*/).filter(Boolean)
   if (parts.at(-1) === result.name) parts.pop()
   return parts.filter((part) => !/^(ressources|etudiants|étudiants)$/i.test(part)).slice(-3).join(' / ') || null
+}
+
+// The planning's students node: where browsing starts.
+const STUDENTS_NODE_ID = '-1'
+
+function findNode(node, id) {
+  if (!node) return null
+  if (String(node.id) === String(id)) return node
+  for (const child of node.children ?? []) {
+    const match = findNode(child, id)
+    if (match) return match
+  }
+  return null
+}
+
+// One level of the planning's tree: the node's children, a group or a whole
+// branch (an ENSSAT student's « Commun », « Info », majeure…) each.
+async function loadLevel(id) {
+  const { tree } = await getAdeTree(id)
+  return (findNode(tree?.root, id)?.children ?? [])
+    .filter((child) => child?.id != null && child.name)
+    .map((child) => ({ id: String(child.id), name: String(child.name) }))
 }
 
 // Réglages › Planning: courses taken beside the group (a major, a minor,
@@ -49,15 +71,39 @@ function PlanningExtraCourses({ extraResources, onChange }) {
     }
   }, [trimmed])
 
+  // Browsing the tree: null when closed, else the nodes opened from the
+  // students' level down ([] at that level).
+  const [trail, setTrail] = useState(null)
+  const [level, setLevel] = useState({ status: 'idle', children: [] })
+  const levelId = trail ? (trail.at(-1)?.id ?? STUDENTS_NODE_ID) : null
+
+  useEffect(() => {
+    if (!levelId) return undefined
+    let cancelled = false
+    setLevel({ status: 'loading', children: [] })
+    loadLevel(levelId)
+      .then((children) => {
+        if (!cancelled) setLevel({ status: 'ok', children })
+      })
+      .catch(() => {
+        if (!cancelled) setLevel({ status: 'error', children: [] })
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [levelId])
+
   const addedIds = new Set(extraResources.map((entry) => entry.resourceId))
   const results = search.results
     .filter((result) => result?.id != null && result.name && !addedIds.has(String(result.id)))
     .slice(0, SHOWN_RESULTS)
 
+  const addEntry = (resourceId, label, path) => onChange([...extraResources, { resourceId, label, path }])
   const add = (result) => {
-    onChange([...extraResources, { resourceId: String(result.id), label: String(result.name), path: describePath(result) }])
+    addEntry(String(result.id), String(result.name), describePath(result))
     setQuery('')
   }
+  const addFromTree = (node) => addEntry(node.id, node.name, trail.slice(-3).map(({ name }) => name).join(' / ') || null)
   const remove = (resourceId) => onChange(extraResources.filter((entry) => entry.resourceId !== resourceId))
 
   return (
@@ -112,6 +158,54 @@ function PlanningExtraCourses({ extraResources, onChange }) {
           ))
         )
       ) : null}
+      {isFull || trimmed.length >= 2 ? null : trail === null ? (
+        <button type="button" className={PRESSABLE_ROW_CLASSES} onClick={() => setTrail([])}>
+          <RowText icon="ph:tree-structure" label="Parcourir le planning" description="Ajoute des groupes de plusieurs branches : commun, majeure, options…" />
+          <Icon icon="ph:caret-right" className="size-4 shrink-0 text-text-60" aria-hidden="true" />
+        </button>
+      ) : (
+        <>
+          <button type="button" className={PRESSABLE_ROW_CLASSES} onClick={() => setTrail(trail.length > 0 ? trail.slice(0, -1) : null)}>
+            <RowText icon="ph:arrow-left" label={trail.at(-1)?.name ?? 'Étudiants'} description={trail.length > 0 ? 'Revenir en arrière' : 'Fermer'} />
+          </button>
+          {level.status === 'loading' ? (
+            <div className="flex h-[54px] items-center justify-center">
+              <LoadingDots label="Chargement…" className="text-text-60" />
+            </div>
+          ) : level.status === 'error' ? (
+            <p className={`${ROW_CLASSES} m-0 font-body text-[14px] font-medium text-text-60`} role="alert">Le planning n’a pas répondu</p>
+          ) : level.children.length === 0 ? (
+            <p className={`${ROW_CLASSES} m-0 font-body text-[14px] font-medium text-text-60`}>Pas de sous-groupe ici</p>
+          ) : (
+            level.children.map((node) => (
+              <div key={node.id} className={`${ROW_CLASSES} pr-3`}>
+                <button
+                  type="button"
+                  className="flex min-w-0 flex-1 items-center justify-between gap-2 border-0 bg-transparent p-0 text-left cursor-pointer"
+                  onClick={() => setTrail([...trail, node])}
+                >
+                  <RowText icon="ph:folder" label={node.name} />
+                  <Icon icon="ph:caret-right" className="size-4 shrink-0 text-text-60" aria-hidden="true" />
+                </button>
+                {addedIds.has(node.id) ? (
+                  <span className="inline-flex size-8 shrink-0 items-center justify-center text-success-text" aria-label={`${node.name} ajouté`}>
+                    <Icon icon="ph:check-bold" className="size-[15px]" aria-hidden="true" />
+                  </span>
+                ) : (
+                  <button
+                    type="button"
+                    className={`inline-flex size-8 shrink-0 items-center justify-center rounded-full border-0 ${MUTED_FILL_CLASSES} text-text cursor-pointer transition-transform duration-100 active:scale-[0.94] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-text`}
+                    aria-label={`Ajouter ${node.name}`}
+                    onClick={() => addFromTree(node)}
+                  >
+                    <Icon icon="ph:plus" className="size-[15px]" aria-hidden="true" />
+                  </button>
+                )}
+              </div>
+            ))
+          )}
+        </>
+      )}
     </SettingsGroup>
   )
 }
