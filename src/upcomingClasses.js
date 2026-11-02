@@ -19,12 +19,15 @@ export function getTodayDateString() {
   return formatDateOnly(new Date())
 }
 
+// As the server's getAdeSelectionResourceIds (adeApi.js): the group's, then
+// its added courses (major, minor, options).
 export function buildResourceIdsFromSelection(selection) {
   const candidates = [
     selection?.tpResourceId,
     selection?.tdResourceId,
     selection?.yearResourceId,
     selection?.resourceId,
+    ...(selection?.extraResources ?? []).map((entry) => entry.resourceId),
   ]
 
   return candidates.filter((value, index) => {

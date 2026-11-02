@@ -4,7 +4,9 @@
 import logo from './assets/logo.svg'
 import iutLannionLogo from './assets/establishments/iutlan.svg'
 import iutLannionLogoDark from './assets/establishments/iutlan-dark.svg'
+import heroLannionBrelevenez from './assets/hero/lannion-brelevenez.webp'
 import heroLannionIut from './assets/hero/lannion-iut.webp'
+import heroLannionLeguer from './assets/hero/lannion-leguer.webp'
 import heroLannionQuais from './assets/hero/lannion-quais.webp'
 import heroLannionRochers from './assets/hero/lannion-rochers.webp'
 import heroRennesBeaulieu1 from './assets/hero/rennes-beaulieu-1.webp'
@@ -119,6 +121,7 @@ export default {
   establishments: {
     // Ordered substring rules, matched against the lowercased ADE tree path.
     detectFromAdeTree: [
+      { includes: ['enssat'], id: 'enssat' },
       { includes: ['iut lannion'], id: 'iutlan' },
       { includes: ['iut saint-brieuc'], id: 'iutsaib' },
       { includes: ['iut saint-malo'], id: 'iutsai' },
@@ -182,6 +185,41 @@ export default {
             title: 'Loxya',
             description: 'Location de matériel audiovisuel',
             href: 'https://iut-lannion.loxya.app/external/login',
+            target: '_blank',
+          },
+        ],
+      },
+      // The engineering school in Lannion: its grades aren't on ScoDoc (no
+      // grade widgets, its students' file is on Pégase); a specialisation's
+      // courses are added in Réglages › Planning (majeure, mineure, options).
+      enssat: {
+        label: establishmentNames.enssat,
+        heroImages: [
+          {
+            src: heroLannionBrelevenez,
+            credit: {
+              author: 'Laurent',
+              license: 'CC BY-SA 3.0',
+              url: 'https://commons.wikimedia.org/wiki/File:VueDeLannionEtBrelevenez.jpg',
+            },
+          },
+          {
+            src: heroLannionLeguer,
+            credit: {
+              author: 'Kev22',
+              license: 'CC BY-SA 4.0',
+              url: 'https://commons.wikimedia.org/wiki/File:Lannion_-_Le_L%C3%A9guer_03.jpg',
+            },
+          },
+        ],
+        gradeWidgets: false,
+        nextClassWidget: true,
+        extraServices: [
+          {
+            id: 'enssat-pegase',
+            title: 'Dossier étudiant (Pégase)',
+            description: 'Consulter ses notes et son dossier étudiant',
+            href: 'https://mdw-pegase.univ-rennes.fr',
             target: '_blank',
           },
         ],

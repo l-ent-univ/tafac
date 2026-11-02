@@ -565,13 +565,18 @@ function detectEstablishmentFromAdeTree(treePayload) {
     String(node.path ?? ''),
   ]).join(' | ').toLowerCase()
 
-  for (const rule of establishments.detectFromAdeTree ?? []) {
-    if ((rule.includes ?? []).some((needle) => searchHaystack.includes(needle))) {
+  return matchEstablishmentRule(searchHaystack) ?? establishments.fallbackId ?? null
+}
+
+// The config's first establishment rule found in a lowercased text.
+function matchEstablishmentRule(haystack) {
+  for (const rule of universityConfig.establishments?.detectFromAdeTree ?? []) {
+    if ((rule.includes ?? []).some((needle) => haystack.includes(needle))) {
       return rule.id
     }
   }
 
-  return establishments.fallbackId ?? null
+  return null
 }
 
 function normalizeAdePathLabels(nodes) {
@@ -624,6 +629,25 @@ function buildTpSelectionOptions(nodes, parentNode, contextLabel, extraFields = 
 
 function buildInitialTpOnboardingState(treePayload) {
   const pathNodes = getAdeTreePathNodes(treePayload)
+
+  // A planning account with no group of its own (an ENSSAT student's, with
+  // no ScoDoc group to stand in): the students' programmes to start from.
+  if (pathNodes.length === 0 && treePayload?.root) {
+    const root = treePayload.root
+    const studentsNode = String(root.id) === '-1'
+      ? root
+      : (root.children ?? []).find((child) => String(child.id) === '-1' || /etudiant/i.test(child.name)) ?? root
+    const programmes = studentsNode.children ?? []
+    if (programmes.length > 0) {
+      return createEmptyTpOnboardingState({
+        contextLabel: 'Formations',
+        program: null,
+        yearOptions: buildTpSelectionOptions(programmes, studentsNode, 'Formations'),
+        detectedSelections: { year: null, td: null, tp: null },
+        errorMessage: '',
+      })
+    }
+  }
   const pathLabels = normalizeAdePathLabels(pathNodes)
   const programNode = pathNodes.length >= 2 ? pathNodes[1] : pathNodes[0] ?? null
   const programIndex = programNode
@@ -1515,6 +1539,13 @@ function App() {
     persistTpSelection(storedSelection, sessionState.user)
     clearAdeTimetableCache()
     setSelectedTp(storedSelection)
+    // A planning account without a group of its own (an ENSSAT student's)
+    // told nothing of the establishment: the group picked says it.
+    const pickedEstablishment = matchEstablishmentRule([contextLabel, program?.label, year?.label].filter(Boolean).join(' | ').toLowerCase())
+    if (pickedEstablishment) {
+      persistEstablishment(pickedEstablishment, sessionState.user)
+      setEstablishment(pickedEstablishment)
+    }
     setTpOnboardingState(createEmptyTpOnboardingState({
       contextLabel,
       program,
@@ -1774,7 +1805,7 @@ function App() {
       return
     }
 
-    const nextSelection = buildStoredTpSelection(
+    const draftSelection = buildStoredTpSelection(
       accountModalPlanningState.program,
       accountModalPlanningState.draftYear,
       accountModalPlanningState.draftTd,
@@ -1782,9 +1813,12 @@ function App() {
       accountModalPlanningState.contextLabel,
     )
 
-    if (!nextSelection) {
+    if (!draftSelection) {
       return
     }
+
+    // A new group keeps the courses added beside it.
+    const nextSelection = { ...draftSelection, extraResources: selectedTp?.extraResources ?? [] }
 
     const isSameSelection = Boolean(selectedTp)
       && selectedTp.resourceId === nextSelection.resourceId
@@ -1806,6 +1840,19 @@ function App() {
       selectedTd: accountModalPlanningState.draftTd,
     }))
   }, [accountModalPlanningState, selectedTp, sessionState.user])
+
+  // Réglages › Planning's added courses (a major, a minor, options): saved
+  // at once, beside the group.
+  const handleExtraResourcesChange = useCallback((extraResources) => {
+    if (!selectedTp?.resourceId) {
+      return
+    }
+
+    const nextSelection = { ...selectedTp, extraResources }
+    persistTpSelection(nextSelection, sessionState.user)
+    clearAdeTimetableCache()
+    setSelectedTp(nextSelection)
+  }, [selectedTp, sessionState.user])
 
   const heroImage = useMemo(() => (
     customBackground
@@ -2797,6 +2844,7 @@ function App() {
         showPlanningWeekend={showPlanningWeekend}
         onShowPlanningWeekendChange={handleShowPlanningWeekendChange}
         planningSelection={selectedTp}
+        onPlanningExtraResourcesChange={HAS_PERSONAL_PLANNING ? null : handleExtraResourcesChange}
         anonymousAnalytics={anonymousAnalytics}
         onAnonymousAnalyticsChange={isAnalyticsAvailable ? handleAnonymousAnalyticsChange : null}
         mailSignature={hasMailPage && sessionState.authenticated ? { auto: mailSenderName ? mailSender.signature : null } : null}

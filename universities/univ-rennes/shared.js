@@ -17,6 +17,7 @@ export const university = {
 // mail's signature in server.js), by their ids.
 export const establishmentNames = {
   iutlan: 'IUT de Lannion',
+  enssat: 'ENSSAT',
 }
 
 // Branding text (no assets here — the logo lives in client.js so this file
