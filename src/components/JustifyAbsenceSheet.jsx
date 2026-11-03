@@ -264,9 +264,10 @@ function ReviewStep({ entry, answers, file, toTeacher, onToTeacher, findsClassTe
 // `entry`: the absence (buildAbsenceReport's); `extraReasons`: the
 // establishment's own reasons (listAbsenceReasons); `findsClassTeacher`:
 // the composer can look the class's teacher up in the planning (App's
-// in-app Planning); `onCompose(request)`: the composer's restore;
-// `onClose`.
-function JustifyAbsenceSheet({ entry, extraReasons = [], findsClassTeacher = false, onCompose, onClose }) {
+// in-app Planning); `onStep(step, { reach, proof })`: the steps for the
+// anonymous analytics (never the reason); `onCompose(request)`: the
+// composer's restore; `onClose`.
+function JustifyAbsenceSheet({ entry, extraReasons = [], findsClassTeacher = false, onStep = () => {}, onCompose, onClose }) {
   const titleId = useId()
   const dialogRef = useRef(null)
   const bodyRef = useRef(null)
@@ -304,21 +305,33 @@ function JustifyAbsenceSheet({ entry, extraReasons = [], findsClassTeacher = fal
   // raison » waits for its words.
   const advanceTimer = useRef(null)
   useEffect(() => () => window.clearTimeout(advanceTimer.current), [])
+  // The steps reported (onStep), forward moves only: never the reason
+  // itself, only that one was given.
+  const reasonGiven = () => onStep('reason_picked', { reach: 'proof' })
+  const toReview = () => {
+    onStep('review_shown', { reach: 'review' })
+    goTo('review')
+  }
   const pickReason = (id) => {
     setReason(id)
     window.clearTimeout(advanceTimer.current)
-    if (id !== 'other') advanceTimer.current = window.setTimeout(() => goTo('proof'), 260)
+    if (id === 'other') return
+    reasonGiven()
+    advanceTimer.current = window.setTimeout(() => goTo('proof'), 260)
   }
   const chooseProof = (choice) => {
     setFile(null)
     setProof(choice)
-    goTo('review')
+    onStep('proof_chosen', { proof: choice })
+    toReview()
   }
   const pickFile = (picked) => {
     setFile(picked)
     setProof(picked ? 'attached' : null)
+    if (picked) onStep('proof_chosen', { proof: 'attached' })
   }
   const compose = () => {
+    onStep('composed', { reach: 'composed', proof: answers.proof })
     onCompose(prepareJustificationMail(entry, { ...answers, file, toTeacher }))
   }
 
@@ -405,9 +418,9 @@ function JustifyAbsenceSheet({ entry, extraReasons = [], findsClassTeacher = fal
         <div ref={bodyRef} className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-6 pt-3 pb-6 max-sm:px-4 max-sm:pb-[max(24px,env(safe-area-inset-bottom))]">
           <div key={step} className="semester-fade">
             {step === 'reason' ? (
-              <ReasonStep entry={entry} extraReasons={extraReasons} reason={reason} details={details} onReason={pickReason} onDetails={setDetails} onNext={() => goTo('proof')} />
+              <ReasonStep entry={entry} extraReasons={extraReasons} reason={reason} details={details} onReason={pickReason} onDetails={setDetails} onNext={() => { reasonGiven(); goTo('proof') }} />
             ) : step === 'proof' ? (
-              <ProofStep file={file} onFile={pickFile} onChoose={chooseProof} onNext={() => goTo('review')} />
+              <ProofStep file={file} onFile={pickFile} onChoose={chooseProof} onNext={toReview} />
             ) : (
               <ReviewStep entry={entry} answers={answers} file={file} toTeacher={toTeacher} onToTeacher={setToTeacher} findsClassTeacher={findsClassTeacher} onCompose={compose} />
             )}

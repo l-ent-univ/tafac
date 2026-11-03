@@ -14,7 +14,7 @@
 export const ANALYTICS_MAX_BODY_BYTES = 8 * 1024
 export const ANALYTICS_MAX_EVENTS_PER_BATCH = 20
 
-const WIDGET_IDS = ['greeting', 'nextClass', 'latestGrade', 'mail', 'deadlines']
+const WIDGET_IDS = ['greeting', 'nextClass', 'latestGrade', 'mail', 'deadlines', 'assiduity']
 export const DURATION_BUCKETS = ['<500ms', '<1s', '<3s', '<10s', '10s+']
 const ERROR_KINDS = ['http_4xx', 'http_5xx', 'network', 'timeout', 'other']
 // How the student arrived on « Mes notes » (see src/gradesAnalytics.js).
@@ -25,7 +25,14 @@ const PLANNING_PAGE_SOURCES = ['nav', 'tabbar', 'tile', 'dashboard_card', 'launc
 // And on the Messagerie (see src/mailAnalytics.js): `grades` is « Écrire au
 // sujet de cette note », `planning` « Écrire au sujet de ce cours ».
 const MAIL_PAGE_SOURCES = ['nav', 'tabbar', 'tile', 'dashboard_card', 'launch_card', 'grades', 'planning', 'assiduity', 'history', 'other']
-const PAGE_SOURCES = { grades: GRADES_PAGE_SOURCES, planning: PLANNING_PAGE_SOURCES, mail: MAIL_PAGE_SOURCES }
+// And on « Assiduité » (see src/assiduityAnalytics.js): `dashboard_card` is
+// « Accueil »'s « Assiduité » card.
+const ASSIDUITY_PAGE_SOURCES = ['nav', 'tabbar', 'dashboard_card', 'history', 'other']
+const PAGE_SOURCES = { grades: GRADES_PAGE_SOURCES, planning: PLANNING_PAGE_SOURCES, mail: MAIL_PAGE_SOURCES, assiduity: ASSIDUITY_PAGE_SOURCES }
+const ASSIDUITY_ACTIONS = ['semester_changed', 'mark_picked', 'subject_filtered', 'status_filtered', 'justify_opened']
+// « Justifier »'s steps (src/assiduityAnalytics.js): never the reason given.
+const JUSTIFY_STEPS = ['opened', 'reason_picked', 'proof_chosen', 'review_shown', 'composed', 'closed']
+const JUSTIFY_REACHED = ['reason', 'proof', 'review', 'composed']
 const PLANNING_VIEWS = ['day', 'two_days', 'week', 'list']
 const PLANNING_ACTIONS = [
   'view_changed', 'day_changed', 'week_changed', 'today', 'calendar_picked', 'day_opened',
@@ -153,7 +160,7 @@ export const ANALYTICS_EVENTS = {
   },
   setting_changed: {
     properties: {
-      setting: oneOf('widget_visibility', 'app_descriptions', 'custom_background', 'profile_photo', 'wallpaper', 'university_logo', 'theme', 'analytics', 'mail_signature', 'mail_signature_kind'),
+      setting: oneOf('widget_visibility', 'app_descriptions', 'custom_background', 'profile_photo', 'wallpaper', 'university_logo', 'theme', 'analytics', 'mail_signature', 'mail_signature_kind', 'assiduity_tab'),
       value: oneOf('on', 'off', 'auto', 'light', 'dark', 'partage', 'custom'),
       widget: oneOf(...WIDGET_IDS),
     },
@@ -193,13 +200,13 @@ export const ANALYTICS_EVENTS = {
     required: ['has_settings'],
     allowWithoutSession: true,
   },
-  // « Mes notes », the Planning and the Messagerie: one per arrival on the
-  // page (not per re-render), each with its own sources. The planning's
-  // also says the view it opens in.
+  // « Mes notes », the Planning, the Messagerie and « Assiduité »: one per
+  // arrival on the page (not per re-render), each with its own sources.
+  // The planning's also says the view it opens in.
   page_viewed: {
     properties: {
-      page: oneOf('grades', 'planning', 'mail'),
-      source: oneOf(...new Set([...GRADES_PAGE_SOURCES, ...PLANNING_PAGE_SOURCES, ...MAIL_PAGE_SOURCES])),
+      page: oneOf('grades', 'planning', 'mail', 'assiduity'),
+      source: oneOf(...new Set([...GRADES_PAGE_SOURCES, ...PLANNING_PAGE_SOURCES, ...MAIL_PAGE_SOURCES, ...ASSIDUITY_PAGE_SOURCES])),
       view: oneOf(...PLANNING_VIEWS),
     },
     required: ['page', 'source'],
@@ -334,6 +341,51 @@ export const ANALYTICS_EVENTS = {
       if ((MAIL_ACTION_REQUIRED[props.action] ?? []).some((name) => !Object.hasOwn(props, name))) return null
       // A pdf is saved or fails: nothing partial or undone.
       if (props.action === 'pdf' && !['ok', 'error'].includes(props.result)) return null
+      return props
+    },
+  },
+  // The semester « Assiduité » opens on, once per arrival: absences listed
+  // (`ok`), none (`empty`), not published by the department (`hidden`), no
+  // relevé (`missing`) or a failed request (`error`, with its error_kind).
+  // Never how many, nor what.
+  assiduity_loaded: {
+    properties: {
+      status: oneOf('ok', 'empty', 'hidden', 'missing', 'error'),
+      duration_bucket: oneOf(...DURATION_BUCKETS),
+      error_kind: oneOf(...ERROR_KINDS),
+    },
+    required: ['status'],
+    refine: (props) => {
+      if (props.status !== 'error') delete props.error_kind
+      return props
+    },
+  },
+  // One thing done on « Assiduité »; « Justifier » opened says from where
+  // (a row's button, a countdown card, the right-click menu).
+  assiduity_action: {
+    properties: {
+      action: oneOf(...ASSIDUITY_ACTIONS),
+      from: oneOf('row', 'countdown', 'menu'),
+    },
+    required: ['action'],
+    refine: (props) => {
+      if (props.action !== 'justify_opened') delete props.from
+      return props
+    },
+  },
+  // « Justifier »'s walkthrough: its steps, never the reason given. With
+  // `proof_chosen` and `composed`: what becomes of the justificatif; with
+  // `closed`: the furthest step reached.
+  justify_step: {
+    properties: {
+      step: oneOf(...JUSTIFY_STEPS),
+      proof: oneOf('attached', 'later', 'none'),
+      reached: oneOf(...JUSTIFY_REACHED),
+    },
+    required: ['step'],
+    refine: (props) => {
+      if (props.step !== 'proof_chosen' && props.step !== 'composed') delete props.proof
+      if (props.step !== 'closed') delete props.reached
       return props
     },
   },

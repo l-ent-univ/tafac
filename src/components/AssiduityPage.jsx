@@ -16,6 +16,8 @@ import {
   sumAbsenceHours,
 } from '../assiduity'
 import { ABSENCE_STATUS_LABELS } from '../absenceMail'
+import { trackAssiduityAction, trackJustifyStep, useAssiduityPageReport } from '../analytics'
+import { advanceJustifyReach, describeAssiduityLoad, toAssiduityPageSource } from '../assiduityAnalytics'
 import { assignSubjectIcons } from '../subjectIcons'
 import { copyToClipboard, useContextMenu } from '../useContextMenu'
 import { useHistorySheet } from '../useHistorySheet'
@@ -437,7 +439,7 @@ function AbsenceHistory({ entries, filter, onFilter, subject, onClearSubject, hi
     const entry = entries.find((item) => item.id === key)
     if (!entry) return null
     return [
-      onJustify && canJustify(entry) ? { id: 'justify', label: 'Justifier', icon: 'ph:seal-check', onSelect: () => onJustify(entry) } : null,
+      onJustify && canJustify(entry) ? { id: 'justify', label: 'Justifier', icon: 'ph:seal-check', onSelect: () => onJustify(entry, 'menu') } : null,
       { id: 'copy', label: 'Copier', icon: 'ph:copy', onSelect: () => void copyToClipboard(describeEntry(entry)) },
     ].filter(Boolean)
   })
@@ -506,7 +508,9 @@ function AbsenceHistory({ entries, filter, onFilter, subject, onClearSubject, hi
 // for « Justifier » (client.js › establishments.byId, `absenceReasons`).
 // `findsClassTeacher`: the in-app Planning, where the composer looks for
 // the teacher of an absence's class (Cc) when ScoDoc names none.
-function AssiduityPage({ onComposeMail = null, absenceReasons = [], findsClassTeacher = false }) {
+// `arrivalSource`: how the student got here, for the anonymous analytics
+// (src/assiduityAnalytics.js); the page mounts once per arrival.
+function AssiduityPage({ arrivalSource = 'other', onComposeMail = null, absenceReasons = [], findsClassTeacher = false }) {
   const { base, semesters, activeId, selectSemester, entry, releve, config } = useScodocReleve()
   const status = base.status === 'error' ? base : entry
   const now = useMinuteClock()
@@ -538,6 +542,22 @@ function AssiduityPage({ onComposeMail = null, absenceReasons = [], findsClassTe
     universityConfig.appIconStyle,
   ), [gradesReport, subjects])
 
+  // Anonymous analytics: page_viewed, then how the semester it opens on
+  // loaded (categories only, never what the absences are).
+  useAssiduityPageReport(toAssiduityPageSource(arrivalSource), describeAssiduityLoad({
+    status: status.status,
+    errorKind: status.errorKind,
+    unavailable: status.unavailable,
+    hasReleve: Boolean(releve),
+    visible: Boolean(absences?.visible),
+    count: entries.length,
+  }))
+  // The semester menu: only an actual change counts.
+  const changeSemester = (id) => {
+    if (id !== activeId) trackAssiduityAction('semester_changed')
+    selectSemester(id)
+  }
+
   const [filter, setFilter] = useState('all')
   const [subjectKey, setSubjectKey] = useState(null)
   const [highlightId, setHighlightId] = useState(null)
@@ -568,8 +588,19 @@ function AssiduityPage({ onComposeMail = null, absenceReasons = [], findsClassTe
   useEffect(() => () => window.clearTimeout(highlightTimer.current), [])
 
   const selectSubject = (key) => {
+    if (key) trackAssiduityAction('subject_filtered')
     setSubjectKey(key)
     if (key) setFilter('all')
+  }
+  const changeFilter = (value) => {
+    if (value !== filter && value !== 'all') trackAssiduityAction('status_filtered')
+    setFilter(value)
+  }
+  // A mark of the semester line picked (the countdown cards' fallback,
+  // without « Justifier », isn't one).
+  const pickMark = (id) => {
+    trackAssiduityAction('mark_picked')
+    pickEntry(id)
   }
 
   // « Justifier »: the walkthrough over the page (its own history entry,
@@ -577,10 +608,32 @@ function AssiduityPage({ onComposeMail = null, absenceReasons = [], findsClassTe
   // Messagerie's composer. Not offered without the in-app Messagerie.
   const justifySheet = useHistorySheet('tafacAbsenceJustify')
   const [justifyEntry, setJustifyEntry] = useState(null)
-  const openJustify = useMemo(() => (onComposeMail ? (item) => {
+  // `from`: a row's button, a countdown card, the right-click menu.
+  const openJustify = useMemo(() => (onComposeMail ? (item, from = 'row') => {
+    trackAssiduityAction('justify_opened', { from })
     setJustifyEntry(item)
     justifySheet.open()
   } : null), [onComposeMail, justifySheet])
+  // Anonymous analytics of the walkthrough (justify_step): `opened` and
+  // `closed` follow the sheet itself, however it closes (its buttons,
+  // Escape, Back, the mail written), `closed` with the furthest step
+  // reached; the sheet reports the steps in between (onStep). Never the
+  // reason given.
+  const isJustifyShown = justifySheet.isOpen && Boolean(justifyEntry)
+  const justifyReachedRef = useRef(null)
+  useEffect(() => {
+    if (isJustifyShown) {
+      justifyReachedRef.current = 'reason'
+      trackJustifyStep('opened')
+    } else if (justifyReachedRef.current) {
+      trackJustifyStep('closed', { reached: justifyReachedRef.current })
+      justifyReachedRef.current = null
+    }
+  }, [isJustifyShown])
+  const reportJustifyStep = useCallback((step, { reach = null, proof = null } = {}) => {
+    if (reach) justifyReachedRef.current = advanceJustifyReach(justifyReachedRef.current, reach)
+    trackJustifyStep(step, proof ? { proof } : {})
+  }, [])
 
   const isReady = status.status === 'ok' && absences?.visible
   let body = null
@@ -610,7 +663,7 @@ function AssiduityPage({ onComposeMail = null, absenceReasons = [], findsClassTe
     body = (
       <div key={activeId} className="semester-fade grid gap-8 max-md:gap-6">
         {openJustifications.length ? (
-          <ToJustify open={openJustifications} subjectIcon={subjectIcon} canJustify={Boolean(openJustify)} onPick={openJustify ?? ((item) => pickEntry(item.id))} />
+          <ToJustify open={openJustifications} subjectIcon={subjectIcon} canJustify={Boolean(openJustify)} onPick={openJustify ? (item) => openJustify(item, 'countdown') : (item) => pickEntry(item.id)} />
         ) : null}
         {subjects.length > 1 ? (
           <SubjectBreakdown subjects={subjects} subjectIcon={subjectIcon} selected={subjectKey} onSelect={selectSubject} />
@@ -618,7 +671,7 @@ function AssiduityPage({ onComposeMail = null, absenceReasons = [], findsClassTe
         <AbsenceHistory
           entries={entries}
           filter={filter}
-          onFilter={setFilter}
+          onFilter={changeFilter}
           subject={selectedSubject}
           onClearSubject={() => setSubjectKey(null)}
           highlightId={highlightId}
@@ -641,13 +694,13 @@ function AssiduityPage({ onComposeMail = null, absenceReasons = [], findsClassTe
         <ServiceNotice />
         <div className="flex flex-wrap items-baseline gap-x-3 gap-y-2 max-md:flex-nowrap max-md:items-center max-md:gap-x-2">
           <h1 id="assiduity-page-title" className="m-0 leading-[1.15] text-2xl font-bold max-md:mr-auto max-md:flex max-md:min-h-10 max-md:min-w-0 max-md:items-center max-md:text-[26px] max-md:tracking-[-0.01em]">Assiduité</h1>
-          <SemesterSelect semesters={semesters} value={activeId} onChange={selectSemester} />
+          <SemesterSelect semesters={semesters} value={activeId} onChange={changeSemester} />
         </div>
         {isReady ? (
           <div key={activeId} className="semester-fade grid gap-4 max-md:gap-3">
             <div className="flex flex-wrap items-stretch gap-3 max-md:gap-2">
               <TotalsCard totals={absences.totals} sums={sums} counts={counts} />
-              {timeline ? <SemesterLine timeline={timeline} entriesById={entriesById} onPick={pickEntry} activeId={highlightId} /> : null}
+              {timeline ? <SemesterLine timeline={timeline} entriesById={entriesById} onPick={pickMark} activeId={highlightId} /> : null}
             </div>
             {absences.notice ? (
               <GradesNotice icon="ph:info" label="Règle du département" title="Justifier une absence" collapsible>
@@ -658,8 +711,8 @@ function AssiduityPage({ onComposeMail = null, absenceReasons = [], findsClassTe
         ) : null}
       </div>
       {body}
-      {justifySheet.isOpen && justifyEntry ? (
-        <JustifyAbsenceSheet entry={justifyEntry} extraReasons={absenceReasons} findsClassTeacher={findsClassTeacher} onCompose={onComposeMail} onClose={justifySheet.close} />
+      {isJustifyShown ? (
+        <JustifyAbsenceSheet entry={justifyEntry} extraReasons={absenceReasons} findsClassTeacher={findsClassTeacher} onStep={reportJustifyStep} onCompose={onComposeMail} onClose={justifySheet.close} />
       ) : null}
     </section>
   )

@@ -928,6 +928,7 @@ function App() {
   const [planningArrivalSource, setPlanningArrivalSource] = useState(() => (readHistoryNav().page === 'planning' ? 'history' : 'other'))
   // And the mail page (src/mailAnalytics.js).
   const [mailArrivalSource, setMailArrivalSource] = useState(() => (readHistoryNav().page === 'mail' ? 'history' : 'other'))
+  const [assiduityArrivalSource, setAssiduityArrivalSource] = useState(() => (readHistoryNav().page === 'assiduity' ? 'history' : 'other'))
   // Page-switch animations only once the user has switched, not on first load.
   const [hasSwitchedPage, setHasSwitchedPage] = useState(false)
   const [theme, setTheme] = useState(() => getStoredTheme())
@@ -1983,6 +1984,7 @@ function App() {
     if (page === 'grades') setGradesArrivalSource(source)
     if (page === 'planning') setPlanningArrivalSource(source)
     if (page === 'mail') setMailArrivalSource(source)
+    if (page === 'assiduity') setAssiduityArrivalSource(source)
     setActivePage(page)
     setHasSwitchedPage(true)
     window.requestAnimationFrame(() => {
@@ -2099,6 +2101,7 @@ function App() {
   const handleAssiduityTabChange = useCallback((show) => {
     persistAssiduityTab(show, sessionState.user)
     setShowAssiduityTab(show)
+    track('setting_changed', { setting: 'assiduity_tab', value: show ? 'on' : 'off' })
   }, [sessionState.user])
   // Réglages › Apparence offers it where there's an « Assiduité » page;
   // its words say whether Moodle gives way.
@@ -2755,7 +2758,7 @@ function App() {
             ) : null}
             {isAssiduityPage ? (
               <div className="page-enter flex-1 min-h-0 4xl:flex-none 4xl:min-h-0">
-                <AssiduityPage onComposeMail={hasMailPage ? handleComposeMail : null} absenceReasons={universityConfig.establishments?.byId?.[establishment]?.absenceReasons} findsClassTeacher={hasPlanningPage} />
+                <AssiduityPage arrivalSource={assiduityArrivalSource} onComposeMail={hasMailPage ? handleComposeMail : null} absenceReasons={universityConfig.establishments?.byId?.[establishment]?.absenceReasons} findsClassTeacher={hasPlanningPage} />
               </div>
             ) : null}
             {isMailPage ? (

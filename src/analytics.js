@@ -288,6 +288,47 @@ export function flushPlanningNavigation() {
   planningNavigation.flush()
 }
 
+// « Assiduité », once per arrival (AssiduityPage's mount; refs survive
+// StrictMode's second effect run): page_viewed with how the student got
+// there (`source`, see src/assiduityAnalytics.js), then assiduity_loaded
+// when `outcome` (describeAssiduityLoad) first settles for the semester it
+// opens on. Semester switches and background refreshes are never reported.
+export function useAssiduityPageReport(source, outcome) {
+  const startedAtRef = useRef(null)
+  const reportedRef = useRef({ view: false, load: false })
+  const status = outcome?.status ?? null
+  const errorKind = outcome?.errorKind ?? null
+
+  useEffect(() => {
+    if (startedAtRef.current === null) startedAtRef.current = performance.now()
+    const reported = reportedRef.current
+    if (!reported.view) {
+      reported.view = true
+      track('page_viewed', { page: 'assiduity', source })
+    }
+    if (!status || reported.load) return
+
+    reported.load = true
+    track('assiduity_loaded', {
+      status,
+      duration_bucket: getDurationBucket(performance.now() - startedAtRef.current),
+      ...(status === 'error' ? { error_kind: errorKind ?? 'other' } : null),
+    })
+  }, [source, status, errorKind])
+}
+
+// One thing done on « Assiduité » (assiduity_action): `action` and, for
+// « Justifier » opened, where `from` ('row', 'countdown', 'menu').
+export function trackAssiduityAction(action, { from = null } = {}) {
+  track('assiduity_action', { action, ...(from ? { from } : null) })
+}
+
+// A step of « Justifier »'s walkthrough (justify_step), never its reason:
+// `proof` with proof_chosen and composed, `reached` with closed.
+export function trackJustifyStep(step, properties = {}) {
+  track('justify_step', { step, ...properties })
+}
+
 // The Messagerie, once per arrival (MailPage's mount; refs survive
 // StrictMode's second effect run): page_viewed with how the student got
 // there (`source`, see src/mailAnalytics.js), then mail_loaded when `outcome`
