@@ -17,14 +17,18 @@ export const university = {
   devOnly: true,
 }
 
+// How the app addresses the student: 'vous' (the default) or 'tu'. An
+// establishment can have its own (client.js › establishments.byId.<id>.register).
+export const register = 'vous'
+
 export const branding = {
   appName: 'Tafac',
-  defaultTitle: "Tafac | Cours, notes et services de ton université",
+  defaultTitle: "Tafac | Cours, notes et services de votre université",
   seoTitle: "Tafac | Client alternatif ENT Université Exemple",
   seoDescription:
     "Instance de démonstration de Tafac pour l'Université Exemple : découvrez le client alternatif d'ENT avec le compte de démo.",
   pwaDescription:
-    "Tafac réunit ta vie universitaire avec tes cours, notes et messagerie dans une seule application rapide et agréable à utiliser.",
+    "Tafac réunit votre vie universitaire avec vos cours, notes et messagerie dans une seule application rapide et agréable à utiliser.",
   logoAlt: 'Université Exemple',
   sidebarLogoAlt: "Tafac — Université Exemple",
   loginFooterLine: "Projet non officiel, non affilié à l'Université Exemple (démo)",

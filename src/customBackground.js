@@ -1,3 +1,5 @@
+import { r } from './register.js'
+
 // User-picked dashboard background. The image never leaves the browser: it is
 // downscaled and re-encoded client-side, then kept in localStorage (scoped to
 // the signed-in user) as a data URL.
@@ -59,7 +61,7 @@ function encodeCanvas(canvas, quality) {
 // Throws an Error with a French, user-facing message on failure.
 export async function saveCustomBackground(file, userId = null) {
   if (!file || !/^image\//.test(file.type)) {
-    throw new Error('Choisis un fichier image (JPEG, PNG, WebP…)')
+    throw new Error(r('Choisis un fichier image (JPEG, PNG, WebP…)', 'Choisissez un fichier image (JPEG, PNG, WebP…)'))
   }
 
   let image

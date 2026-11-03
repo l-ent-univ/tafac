@@ -11,9 +11,13 @@ export const university = {
   slug: 'monuniv',
 }
 
+// How the app addresses the student: 'vous' (the default) or 'tu'. An
+// establishment can have its own (client.js › establishments.byId.<id>.register).
+export const register = 'vous'
+
 export const branding = {
   appName: 'Tafac',
-  defaultTitle: "Tafac | Cours, notes et services de ton université",
+  defaultTitle: "Tafac | Cours, notes et services de votre université",
   seoTitle: "Tafac | Client alternatif ENT Mon Université",
   seoDescription: "Client alternatif non officiel à l'ENT de Mon Université.",
   logoAlt: 'Mon Université',

@@ -12,6 +12,7 @@ import {
 import { parseDay } from '../assiduity'
 import CloseButton from './CloseButton'
 import LentButton from './LentButton'
+import { r } from '../register.js'
 
 // « Justifier » (« Assiduité »): a short walkthrough, one question a step,
 // as the grade simulator's sheet (GradeSimulatorModal): why the student
@@ -60,7 +61,7 @@ function ReasonStep({ entry, extraReasons, reason, details, onReason, onDetails,
     <div className="grid gap-5">
       <div className="grid gap-2 text-center">
         <h3 tabIndex={-1} className={QUESTION}>{entry.status === 'late' ? 'Pourquoi ce retard ?' : 'Pourquoi cette absence ?'}</h3>
-        <p className={HINT}>Elle sera écrite dans le mail, que tu pourras relire</p>
+        <p className={HINT}>{r('Elle sera écrite dans le mail, que tu pourras relire', 'Elle sera écrite dans le mail, que vous pourrez relire')}</p>
       </div>
       <div className="grid grid-cols-2 gap-2 max-xs:grid-cols-1" role="radiogroup" aria-label="Raison">
         {reasons.map((option, index) => {
@@ -93,7 +94,7 @@ function ReasonStep({ entry, extraReasons, reason, details, onReason, onDetails,
             maxLength={MAX_DETAILS}
             onChange={(event) => onDetails(event.target.value)}
             rows={3}
-            placeholder="Ce qui t’a empêché de venir"
+            placeholder={r('Ce qui t’a empêché de venir', 'Ce qui vous a empêché de venir')}
             className="w-full resize-none rounded-[16px] border border-border-input bg-bg-input px-3.5 py-3 font-body text-[15px] leading-[1.4] text-text outline-none focus:border-brand"
           />
           <div className="flex justify-end">
@@ -120,7 +121,7 @@ function ProofStep({ file, onFile, onChoose, onNext }) {
   return (
     <div className="grid gap-5">
       <div className="grid gap-2 text-center">
-        <h3 tabIndex={-1} className={QUESTION}>As-tu un justificatif ?</h3>
+        <h3 tabIndex={-1} className={QUESTION}>{r('As-tu un justificatif ?', 'Avez-vous un justificatif ?')}</h3>
         <p className={HINT}>Certificat médical, convocation, attestation…</p>
       </div>
       <input
@@ -199,8 +200,8 @@ function ReviewStep({ entry, answers, file, toTeacher, onToTeacher, findsClassTe
   return (
     <div className="grid gap-5">
       <div className="grid gap-2 text-center">
-        <h3 tabIndex={-1} className={QUESTION}>Ton mail est prêt</h3>
-        <p className={HINT}>Ajoute l’adresse du secrétariat de ton département dans le mail, puis envoie-le</p>
+        <h3 tabIndex={-1} className={QUESTION}>{r('Ton mail est prêt', 'Votre mail est prêt')}</h3>
+        <p className={HINT}>{r('Ajoute l’adresse du secrétariat de ton département dans le mail, puis envoie-le', 'Ajoutez l’adresse du secrétariat de votre département dans le mail, puis envoyez-le')}</p>
       </div>
       <article className="justify-letter grid gap-3 rounded-[20px] border border-border bg-widget-bg p-4 text-left shadow-md max-sm:p-3.5">
         <div className="grid gap-2 border-b border-border pb-3">
@@ -222,7 +223,7 @@ function ReviewStep({ entry, answers, file, toTeacher, onToTeacher, findsClassTe
                 <Icon icon={toTeacher ? 'ph:check-bold' : 'ph:plus-bold'} className="size-[12px] shrink-0" aria-hidden="true" />
                 <span className="truncate font-body text-[13px] font-semibold leading-none">{ccLabel}</span>
               </button>
-              {!teacher && toTeacher ? <span className="font-body text-[13px] font-medium leading-none text-text-muted">cherché dans ton planning</span> : null}
+              {!teacher && toTeacher ? <span className="font-body text-[13px] font-medium leading-none text-text-muted">{r('cherché dans ton planning', 'cherché dans votre planning')}</span> : null}
             </div>
           ) : null}
           <div className="flex min-w-0 items-baseline gap-2">

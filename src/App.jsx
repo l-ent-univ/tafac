@@ -92,6 +92,7 @@ import {
   logoutFromEnt,
   preloadSchoolCertificateStatus,
 } from './entApi'
+import { r, resolveRegister, setRegister } from './register.js'
 
 // The planning is the student's own (TEMPO): no group to choose in Mon compte.
 const HAS_PERSONAL_PLANNING = universityConfig.planning?.personal === true
@@ -430,8 +431,8 @@ function getFrenchAuthErrorMessage(error, context = 'login') {
   if (error?.status === 429) {
     const minutes = Math.ceil((error.retryAfterSeconds ?? 0) / 60)
     return minutes > 0
-      ? `Trop de tentatives de connexion, réessaie dans ${minutes} min`
-      : 'Trop de tentatives de connexion. Réessaie dans quelques instants'
+      ? r(`Trop de tentatives de connexion, réessaie dans ${minutes} min`, `Trop de tentatives de connexion, réessayez dans ${minutes} min`)
+      : r('Trop de tentatives de connexion. Réessaie dans quelques instants', 'Trop de tentatives de connexion. Réessayez dans quelques instants')
   }
 
   const rawMessage = getErrorMessage(error).trim()
@@ -450,7 +451,7 @@ function getFrenchAuthErrorMessage(error, context = 'login') {
     || normalizedMessage.includes('missing password')
     || normalizedMessage.includes('mot de passe requis')
   ) {
-    return 'Remplis ton identifiant et ton mot de passe'
+    return r('Remplis ton identifiant et ton mot de passe', 'Remplissez votre identifiant et votre mot de passe')
   }
 
   if (
@@ -471,7 +472,7 @@ function getFrenchAuthErrorMessage(error, context = 'login') {
   }
 
   if (normalizedMessage.includes('status 429') || normalizedMessage.includes('too many requests')) {
-    return 'Trop de tentatives de connexion. Réessaie dans quelques instants'
+    return r('Trop de tentatives de connexion. Réessaie dans quelques instants', 'Trop de tentatives de connexion. Réessayez dans quelques instants')
   }
 
   if (
@@ -482,8 +483,8 @@ function getFrenchAuthErrorMessage(error, context = 'login') {
     || normalizedMessage.includes('fetch')
   ) {
     return context === 'session'
-      ? 'Impossible de vérifier la session, réessaie dans quelques instants'
-      : 'Impossible de joindre le service de connexion, vérifie ta connexion puis réessaie'
+      ? r('Impossible de vérifier la session, réessaie dans quelques instants', 'Impossible de vérifier la session, réessayez dans quelques instants')
+      : r('Impossible de joindre le service de connexion, vérifie ta connexion puis réessaie', 'Impossible de joindre le service de connexion, vérifiez votre connexion puis réessayez')
   }
 
   if (normalizedMessage.includes('status 5') || normalizedMessage.includes('internal server error')) {
@@ -494,13 +495,13 @@ function getFrenchAuthErrorMessage(error, context = 'login') {
 
   return context === 'session'
     ? 'Impossible de vérifier la session pour le moment'
-    : 'La connexion a échoué, vérifie tes identifiants puis réessaie'
+    : r('La connexion a échoué, vérifie tes identifiants puis réessaie', 'La connexion a échoué, vérifiez vos identifiants puis réessayez')
 }
 
 // Signed in without the CAS ticket the other services sign in with (the
 // session's `degraded`): signed out completely rather than left with some
 // services missing, and told why on the login form.
-const DEGRADED_SESSION_MESSAGE = 'Ta session a expiré, reconnecte-toi'
+const degradedSessionMessage = () => r('Ta session a expiré, reconnecte-toi', 'Votre session a expiré, reconnectez-vous')
 
 function buildDebugSnapshot(label, data, error = '') {
   return {
@@ -838,7 +839,7 @@ function getFrenchTpLoadErrorMessage(error) {
     || normalizedMessage.includes('load failed')
     || normalizedMessage.includes('network request failed')
   ) {
-    return "Impossible de récupérer les groupes TP pour le moment, vérifie ta connexion puis réessaie"
+    return r('Impossible de récupérer les groupes TP pour le moment, vérifie ta connexion puis réessaie', 'Impossible de récupérer les groupes TP pour le moment, vérifiez votre connexion puis réessayez')
   }
 
   return 'ADE est indisponible pour le moment'
@@ -904,6 +905,10 @@ function App() {
     password: '',
   })
   const [establishment, setEstablishment] = useState(() => getStoredEstablishment())
+  // « tu » or « vous » for every string built from here on (src/register.js):
+  // set before anything below renders, and again when the establishment
+  // changes (every component re-renders with App).
+  setRegister(resolveRegister(universityConfig, establishment))
   const [selectedTp, setSelectedTp] = useState(() => getStoredTpSelection())
   const [hiddenWidgets, setHiddenWidgets] = useState(() => getStoredHiddenWidgets())
   const [customBackground, setCustomBackground] = useState(() => getStoredCustomBackground())
@@ -1064,11 +1069,11 @@ function App() {
           degradedReason: null,
           sessionSource: null,
           canUseServerLaunch: false,
-          error: DEGRADED_SESSION_MESSAGE,
+          error: degradedSessionMessage(),
         })
         navigate(LOGIN_PATH, { replace: true })
         if (exposeOutput) {
-          commitDebugState('Session', session, DEGRADED_SESSION_MESSAGE)
+          commitDebugState('Session', session, degradedSessionMessage())
         }
         return null
       }
@@ -1288,7 +1293,7 @@ function App() {
     setTpOnboardingState((current) => createEmptyTpOnboardingState({
       ...current,
       loadingStep: 'year',
-      loadingMessage: "Récupération de ton groupe...",
+      loadingMessage: r('Récupération de ton groupe...', 'Récupération de votre groupe...'),
       errorMessage: '',
     }))
 

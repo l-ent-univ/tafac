@@ -13,6 +13,7 @@ import {
   positionGradeTooltipFromElement,
   positionGradeTooltipFromPointer,
 } from '../gradeFeatureState'
+import { r } from '../register.js'
 
 // Card on the "Mes notes" page: the Figma width (443), at least 20px taller
 // than its 168 so the evolution line keeps a clear gap above the number (the
@@ -31,7 +32,7 @@ function AverageGradeHeader({ estimated = false, final = false, icon = null }) {
       {/* Only when the department hides ScoDoc's average and the card shows the estimate. */}
       {estimated ? (
         <CardInfoTip label="Moyenne approximative : pourquoi ?">
-          Moyenne approximative : ton département masque la moyenne officielle. Elle est recalculée à partir de tes moyennes d’UE, pondérées par leurs ECTS.
+          {r('Moyenne approximative : ton département masque la moyenne officielle. Elle est recalculée à partir de tes moyennes d’UE, pondérées par leurs ECTS.', 'Moyenne approximative : votre département masque la moyenne officielle. Elle est recalculée à partir de vos moyennes d’UE, pondérées par leurs ECTS.')}
         </CardInfoTip>
       ) : null}
       {/* The jury has ruled (ScoDoc's decision on the semester or its year). */}
@@ -54,8 +55,8 @@ function SemesterRank({ rank, groups }) {
       <span className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap">{rank.text}</span>
       {groups.length ? (
         <span className="pointer-events-auto inline-flex">
-          <CardInfoTip label="Ton rang dans tes groupes">
-            <span className="block">Dans tes groupes :</span>
+          <CardInfoTip label={r('Ton rang dans tes groupes', 'Votre rang dans vos groupes')}>
+            <span className="block">{r('Dans tes groupes', 'Dans vos groupes')} :</span>
             {groups.map((group) => (
               <span key={group.name} className="block">{group.name} : {formatRank(group).text.replace(/^Rang /, '')}</span>
             ))}

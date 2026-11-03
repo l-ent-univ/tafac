@@ -12,6 +12,7 @@ import GradeSimulatorReveal from './GradeSimulatorReveal'
 import GradeSimulatorUe from './GradeSimulatorUe'
 import LentButton from './LentButton'
 import CloseButton from './CloseButton'
+import { r } from '../register.js'
 
 const FOCUSABLE_SELECTOR = 'button:not([disabled]), input:not([disabled]), [href], [tabindex]:not([tabindex="-1"])'
 
@@ -501,7 +502,7 @@ function GradeSimulatorModal({ report = null, releve = null, config = null, seme
           <div className="flex min-h-[160px] flex-1 flex-col items-center justify-center gap-5 overflow-y-auto overscroll-contain px-6 py-4 text-center max-sm:min-h-[24dvh] max-sm:px-4">
             <div className="grid max-w-[420px] gap-2">
               <h3 className="m-0 text-balance font-display text-[24px] font-bold leading-[1.15] text-text max-sm:text-[22px]">
-                Choisis l’UE que tu veux simuler
+                {r('Choisis l’UE que tu veux simuler', 'Choisissez l’UE que vous voulez simuler')}
               </h3>
               <p key={activeUe?.code} className="semester-fade m-0 line-clamp-2 min-h-[2.8em] text-balance font-body text-[15px] font-medium leading-[1.4] text-text-secondary" aria-live="polite">
                 {activeUe ? activeUe.title || formatUeCode(activeUe.code) : 'Aucune UE'}

@@ -2,6 +2,7 @@ import { Icon } from '@iconify/react'
 import { useContextMenu } from '../useContextMenu'
 import useDailyBriefing from '../useDailyBriefing'
 import LoadingDots from './LoadingDots'
+import { r } from '../register.js'
 
 // `headingAs`: the greeting's tag ('p' where the card is only a demo, as on
 // the landing page).
@@ -41,7 +42,7 @@ function GreetingCard({
         <Heading className="m-0 min-w-0 leading-[1.15] text-2xl font-bold overflow-hidden text-ellipsis whitespace-nowrap max-md:text-[22px] max-xs:text-xl" title={`Salut ${displayName} !`}>Salut {displayName} !</Heading>
       </div>
       {isLoading ? (
-        <LoadingDots label="Chargement du résumé de ta journée" className="h-[18px] text-text-muted" />
+        <LoadingDots label={r('Chargement du résumé de ta journée', 'Chargement du résumé de votre journée')} className="h-[18px] text-text-muted" />
       ) : subtitle ? (
         <p className="m-0 leading-[1.2] text-[15px] font-medium line-clamp-2" title={subtitle}>{subtitle}</p>
       ) : null}

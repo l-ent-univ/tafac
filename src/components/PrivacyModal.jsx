@@ -14,6 +14,7 @@ import butterflyImage from '../assets/privacy/butterfly.webp'
 import { APP_NAME } from '../seo'
 import CloseButton from './CloseButton'
 import LentButton from './LentButton'
+import { r } from '../register.js'
 
 // "Tes données restent à toi": what the anonymous audience measurement does
 // and doesn't do, in the illustrated style of the Figma presentation screens
@@ -78,7 +79,7 @@ const ANALYTICS_DOC_URL = universityConfig.branding.about?.repoUrl
 
 function getToolsSentence() {
   return isPostHogAvailable()
-    ? 'Un seul outil, hébergé dans l’Union européenne\u202f: PostHog, appelé par le serveur, jamais par ton navigateur'
+    ? r('Un seul outil, hébergé dans l’Union européenne\u202f: PostHog, appelé par le serveur, jamais par ton navigateur', 'Un seul outil, hébergé dans l’Union européenne\u202f: PostHog, appelé par le serveur, jamais par votre navigateur')
     : 'L’outil de mesure est hébergé dans l’Union européenne'
 }
 
@@ -91,7 +92,7 @@ const getSections = (embedded) => [
   {
     emoji: '🍪',
     title: 'Sans cookie',
-    body: () => 'Rien n’est déposé sur ton appareil pour te suivre, aucun suivi permanent.',
+    body: () => r('Rien n’est déposé sur ton appareil pour te suivre, aucun suivi permanent.', 'Rien n’est déposé sur votre appareil pour vous suivre, aucun suivi permanent.'),
   },
   {
     emoji: '🇪🇺',
@@ -100,10 +101,10 @@ const getSections = (embedded) => [
   },
   {
     emoji: '🎚️',
-    title: 'Tu gardes la main',
+    title: r('Tu gardes la main', 'Vous gardez la main'),
     body: () => (embedded
-      ? 'Coupe « Statistiques anonymes » juste au-dessus et plus rien n’est envoyé'
-      : 'Désactive « Statistiques anonymes » dans les réglages et plus rien n’est envoyé'),
+      ? r('Coupe « Statistiques anonymes » juste au-dessus et plus rien n’est envoyé', 'Coupez « Statistiques anonymes » juste au-dessus et plus rien n’est envoyé')
+      : r('Désactive « Statistiques anonymes » dans les réglages et plus rien n’est envoyé', 'Désactivez « Statistiques anonymes » dans les réglages et plus rien n’est envoyé')),
   },
 ]
 
@@ -118,10 +119,11 @@ const getSections = (embedded) => [
 const HAS_MAIL_PAGE = Boolean(universityConfig.neutral)
   || (Boolean(universityConfig.features?.mail) && universityConfig.mail?.page !== false)
 
-const MAIL_LINES = [
-  `La Messagerie les lit et les envoie dans le webmail de ton université, en passant par le serveur de ${APP_NAME}`,
-  'Rien n’est écrit sur disque\u202f: la connexion au webmail et la dernière liste de mails restent en mémoire, le temps de ta session, et s’effacent à la déconnexion',
-  'Brouillons et signature sont enregistrés dans ton compte de messagerie de l’université',
+// Built when shown: the lines address the student (src/register.js).
+const mailLines = () => [
+  r(`La Messagerie les lit et les envoie dans le webmail de ton université, en passant par le serveur de ${APP_NAME}`, `La Messagerie les lit et les envoie dans le webmail de votre université, en passant par le serveur de ${APP_NAME}`),
+  r('Rien n’est écrit sur disque\u202f: la connexion au webmail et la dernière liste de mails restent en mémoire, le temps de ta session, et s’effacent à la déconnexion', 'Rien n’est écrit sur disque\u202f: la connexion au webmail et la dernière liste de mails restent en mémoire, le temps de votre session, et s’effacent à la déconnexion'),
+  r('Brouillons et signature sont enregistrés dans ton compte de messagerie de l’université', 'Brouillons et signature sont enregistrés dans votre compte de messagerie de l’université'),
   'Les statistiques ne contiennent jamais leur objet, leurs adresses ni leur contenu',
 ]
 
@@ -143,7 +145,7 @@ export function PrivacyContent({ embedded = false, control = null, actions = nul
             aria-level={embedded ? 4 : 2}
             className={`m-0 font-display font-bold leading-[1.05] tracking-[-0.01em] ${embedded ? 'text-[28px] max-sm:text-[24px]' : 'text-[32px] max-sm:text-[28px]'}`}
           >
-            Tes données restent à toi
+            {r('Tes données restent à toi', 'Vos données restent à vous')}
           </p>
           <p className="m-0 text-[15px] font-medium leading-[1.35] opacity-90">
             {APP_NAME} compte ses visites pour savoir ce qui sert vraiment et réparer ce qui casse
@@ -175,10 +177,10 @@ export function PrivacyContent({ embedded = false, control = null, actions = nul
               className="m-0 flex items-center gap-2.5 font-display text-[19px] font-bold leading-[1.1] tracking-[-0.01em]"
             >
               <span className="privacy-modal-emoji text-[28px] leading-none" aria-hidden="true">📬</span>
-              Tes mails
+              {r('Tes mails', 'Vos mails')}
             </p>
             <ul className="m-0 flex list-none flex-col gap-2 p-0">
-              {MAIL_LINES.map((line) => (
+              {mailLines().map((line) => (
                 <li key={line} className="flex items-start gap-2 text-[14px] font-medium leading-[1.35] opacity-80">
                   <Icon icon="ph:check" className="mt-[2px] size-[14px] shrink-0" aria-hidden="true" />
                   <span>{line}</span>

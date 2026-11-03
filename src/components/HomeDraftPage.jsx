@@ -26,6 +26,7 @@ import WidgetNextClasses from './WidgetNextClasses'
 import WidgetRecentGrades from './WidgetRecentGrades'
 import WidgetRecentMail from './WidgetRecentMail'
 import { SHIMMER_CLASSES } from './widgetListUtils'
+import { r } from '../register.js'
 
 // The row above the greeting, in place of the card's wave: each icon
 // tilted its own way, on one line.
@@ -529,7 +530,7 @@ function HomeDraftPage({
               <Icon icon="ph:squares-four" className="size-[18px] shrink-0 opacity-70" aria-hidden="true" />
               Aucune carte sur l’accueil
             </span>
-            <p className="m-0 font-body text-sm leading-[1.35] text-text-muted">Choisis celles à afficher dans Réglages › Accueil</p>
+            <p className="m-0 font-body text-sm leading-[1.35] text-text-muted">{r('Choisis celles à afficher dans Réglages › Accueil', 'Choisissez celles à afficher dans Réglages › Accueil')}</p>
             {onOpenCardsSettings ? (
               <button
                 type="button"

@@ -69,6 +69,7 @@ import {
   tidyQuotedText,
 } from '../mailCompose'
 import { composeOrigin, pickDefaultIdentity, sendFailureText } from '../mailSendPayload'
+import { r } from '../register.js'
 
 // The window a new mail is written in, in the spirit of Apple Mail's: a
 // toolbar of glass pills (the kind of reply, attachments, then the round
@@ -1896,7 +1897,7 @@ function MailComposer({ initialKind = 'new', message = null, sender = null, iden
   const fromIdentity = identities.find((identity) => identity.id === identityId) ?? identities[0] ?? null
   const fromName = fromIdentity?.name || sender?.name || ''
   const fromEmail = fromIdentity?.email || sender?.email || ''
-  const fromLabel = fromName && fromEmail ? `${fromName} – ${fromEmail}` : fromEmail || fromName || 'Ton adresse'
+  const fromLabel = fromName && fromEmail ? `${fromName} – ${fromEmail}` : fromEmail || fromName || r('Ton adresse', 'Votre adresse')
   // Only a failed save is said: a saved draft goes without a word.
   const draftLine = draftStatus === 'error' ? 'Brouillon non enregistré' : null
   const canSwitchKind = Boolean(message)
@@ -2343,7 +2344,7 @@ function MailComposer({ initialKind = 'new', message = null, sender = null, iden
         onConfirm={saveAndClose}
         onCancel={cancelClose}
       >
-        Tu pourras le reprendre depuis Brouillons
+        {r('Tu pourras le reprendre depuis Brouillons', 'Vous pourrez le reprendre depuis Brouillons')}
       </ConfirmDialog>
     </section>,
     document.body,

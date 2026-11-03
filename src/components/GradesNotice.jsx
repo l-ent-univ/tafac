@@ -3,6 +3,7 @@ import { Icon } from '@iconify/react'
 import { trackGradesAction } from '../analytics'
 import { shadeHex } from '../colorContrast'
 import { describeJuryDecision, formatJuryDate, hashNoticeText, readDismissedMessageHash, writeDismissedMessageHash } from '../gradesNotices'
+import { r } from '../register.js'
 
 // One notice under the "Mes notes" cards: an icon in a soft disc (or any
 // `media`), a bold line with an optional `badge`, an optional text.
@@ -157,7 +158,7 @@ function JuryCoin({ tone }) {
 
 function JuryDecisionNotice({ decision }) {
   const when = formatJuryDate(decision.date)
-  const scope = decision.scope === 'year' ? 'ton année' : 'ce semestre'
+  const scope = decision.scope === 'year' ? r('ton année', 'votre année') : 'ce semestre'
   const detail = `${decision.label ? 'Décision du jury pour' : 'Pour'} ${scope}${when ? `, le ${when}` : ''}`
 
   return (
@@ -197,7 +198,7 @@ function GradesNotices({ releve, departmentMessage }) {
     <div className="grid gap-3 max-md:gap-2">
       {decision ? <JuryDecisionNotice decision={decision} /> : null}
       {showMessage ? (
-        <GradesNotice icon="ph:megaphone" label="Message de ton département" title="Message de ton département" collapsible onDismiss={dismissMessage} onExpand={() => trackGradesAction('department_message_expanded')}>
+        <GradesNotice icon="ph:megaphone" label={r('Message de ton département', 'Message de votre département')} title={r('Message de ton département', 'Message de votre département')} collapsible onDismiss={dismissMessage} onExpand={() => trackGradesAction('department_message_expanded')}>
           {departmentMessage}
         </GradesNotice>
       ) : null}

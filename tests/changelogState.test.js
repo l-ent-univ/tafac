@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import { CHANGELOG } from '../src/changelog.js'
+import { setRegister } from '../src/register.js'
 import {
   CHANGELOG_SEEN_KEY,
   formatEntryDate,
@@ -312,4 +313,25 @@ test('only spotlight entries get a card, and only unseen ones', () => {
   assert.equal(getLaunchId(entries, ['launch', 'later'], ['later']), 'launch', 'a held launch is skipped')
   assert.deepEqual(getHeldLaunchIds(entries, ['launch', 'later', 'new-global'], 'later'), ['launch'], 'the pill’s entries are never held')
   assert.deepEqual(getHeldLaunchIds(entries, ['later'], 'later'), [])
+})
+
+test('the entries’ texts follow the register: « vous » by default, « tu » once set', () => {
+  // \b is ASCII-only: « êtes » would match « tes ».
+  const TU = /(?<!\p{L})(tu|te|toi|ton|ta|tes|t’\p{L}+)(?!\p{L})/iu
+  const VOUS = /(?<!\p{L})(vous|votre|vos)(?!\p{L})/iu
+  const texts = () => CHANGELOG.flatMap((entry) => [entry.title, entry.body])
+
+  for (const text of texts()) {
+    assert.equal(typeof text, 'string')
+    assert.ok(!TU.test(text), `vous by default: ${text}`)
+  }
+  assert.ok(texts().some((text) => VOUS.test(text)), 'some entries address the student')
+
+  setRegister('tu')
+  try {
+    for (const text of texts()) assert.ok(!VOUS.test(text), `tu once set: ${text}`)
+    assert.ok(texts().some((text) => TU.test(text)))
+  } finally {
+    setRegister('vous')
+  }
 })

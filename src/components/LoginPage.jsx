@@ -12,6 +12,7 @@ import PapillonBadge from './PapillonBadge'
 import ServiceNotice from './ServiceNotice'
 import { APP_NAME } from '../seo'
 import { getListedUniversities, getLoadedUniversityId, writeUniversityChoice } from '../universityRuntime'
+import { r } from '../register.js'
 
 const universityLogo = universityConfig.branding.logo
 const universityLogoAlt = universityConfig.branding.logoAlt ?? universityConfig.university?.name ?? ''
@@ -112,10 +113,10 @@ function UniversityPicker() {
       </nav>
       {issuesUrl ? (
         <p className="m-0 mt-2 text-[13px] font-medium leading-[1.4] text-text-muted font-body">
-          Ton université n'est pas dans la liste{'\u202f'}?{' '}
-          <a className={LINK_CLASS} href={issuesUrl} target="_blank" rel="noopener noreferrer">Dis-le-nous</a>
+          {r("Ton université n'est pas dans la liste", "Votre université n'est pas dans la liste")}{'\u202f'}?{' '}
+          <a className={LINK_CLASS} href={issuesUrl} target="_blank" rel="noopener noreferrer">{r('Dis-le-nous', 'Dites-le-nous')}</a>
           {' '}ou{' '}
-          <a className={LINK_CLASS} href={addUniversityUrl} target="_blank" rel="noopener noreferrer">ajoute-la</a>
+          <a className={LINK_CLASS} href={addUniversityUrl} target="_blank" rel="noopener noreferrer">{r('ajoute-la', 'ajoutez-la')}</a>
         </p>
       ) : null}
     </div>
@@ -160,7 +161,7 @@ function LoginPage({
             <PapillonBadge size="lg" className="text-white/85 hover:text-white" logoClassName="[filter:brightness(0)_invert(1)]" />
           </div>
           <div className="flex w-full flex-col items-start gap-[10px] text-white">
-            <h1 className="m-0 w-full text-[clamp(40px,6.7vh,60px)] font-bold leading-[0.9]">Cours, notes et services de ton université</h1>
+            <h1 className="m-0 w-full text-[clamp(40px,6.7vh,60px)] font-bold leading-[0.9]">{r('Cours, notes et services de ton université', 'Cours, notes et services de votre université')}</h1>
             <p className="m-0 w-full text-[20px] font-semibold leading-[0.9] font-body">Une solution alternative, libre et ouverte</p>
           </div>
         </div>
@@ -226,7 +227,7 @@ function LoginPage({
                   <PapillonBadge className="text-text-muted hover:text-text" />
                 </div>
               </div>
-              <p className="m-0 text-[15px] font-medium leading-[1.25] text-text-muted font-body">Cours, notes et services de ton université</p>
+              <p className="m-0 text-[15px] font-medium leading-[1.25] text-text-muted font-body">{r('Cours, notes et services de ton université', 'Cours, notes et services de votre université')}</p>
             </div>
 
             <div className="flex w-full flex-col items-center text-center">
@@ -249,8 +250,8 @@ function LoginPage({
                   <h2 className="m-0 text-[32px] leading-none max-md:text-[28px]">Connexion</h2>
                   <p className="m-0 text-[15px] font-medium leading-[1.35] text-text-70 font-body">
                     {isPicker
-                      ? 'Choisis ton université'
-                      : "Utilise tes codes fournis par ton établissement d'enseignement supérieur"}
+                      ? r('Choisis ton université', 'Choisissez votre université')
+                      : r("Utilise tes codes fournis par ton établissement d'enseignement supérieur", "Utilisez vos codes fournis par votre établissement d'enseignement supérieur")}
                   </p>
                 </div>
               </header>

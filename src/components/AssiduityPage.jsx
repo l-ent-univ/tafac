@@ -24,6 +24,7 @@ import LoadingDots from './LoadingDots'
 import PageEmptyState from './PageEmptyState'
 import SemesterSelect from './SemesterSelect'
 import ServiceNotice from './ServiceNotice'
+import { r } from '../register.js'
 
 // « Assiduité »: the absences and lateness ScoDoc holds for the semester
 // picked next to the title (shared with « Mes notes »), from the relevé's
@@ -594,7 +595,7 @@ function AssiduityPage({ onComposeMail = null, absenceReasons = [], findsClassTe
   } else if (!absences?.visible) {
     body = (
       <PageEmptyState key={activeId} icon="ph:eye-slash" title="Absences non publiées">
-        Ton département ne publie pas les absences sur ScoDoc
+        {r('Ton département ne publie pas les absences sur ScoDoc', 'Votre département ne publie pas les absences sur ScoDoc')}
       </PageEmptyState>
     )
   } else if (!entries.length) {

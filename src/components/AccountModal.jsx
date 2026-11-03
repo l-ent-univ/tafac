@@ -15,6 +15,7 @@ import CloseButton from './CloseButton'
 import Switch from './Switch'
 import MailSignatureSettings from './MailSignatureSettings'
 import HomeLayoutSetting from './HomeLayoutSetting'
+import { r } from '../register.js'
 
 // Also the debug menu's toggles (src/components/debug/).
 export { Switch }
@@ -294,7 +295,7 @@ function LogoSetting({ shown, onShownChange, establishmentLabel, source, onSourc
       <SwitchRow
         icon="ph:buildings"
         label="Logo de l’université"
-        description="Afficher le logo de ton établissement dans la barre latérale"
+        description={r('Afficher le logo de ton établissement dans la barre latérale', 'Afficher le logo de votre établissement dans la barre latérale')}
         checked={shown}
         onChange={onShownChange}
       />
@@ -446,7 +447,7 @@ function WallpaperSetting({ previewSrc, hasCustom, enabled, onEnabledChange, onC
   return (
     <SettingsGroup
       title="Fond d’écran"
-      footer={canPick ? 'Ton image reste sur cet appareil, elle n’est envoyée nulle part.' : null}
+      footer={canPick ? r('Ton image reste sur cet appareil, elle n’est envoyée nulle part.', 'Votre image reste sur cet appareil, elle n’est envoyée nulle part.') : null}
     >
       {previewSrc ? (
         <div className="p-2">
@@ -682,7 +683,7 @@ function AccountModal({
             {HAS_GROUP_CHOICE ? (
               <SettingsGroup
                 title="Mon groupe"
-                footer="Sert à trouver tes cours. Le changement s’applique quand tu fermes les réglages."
+                footer={r('Sert à trouver tes cours. Le changement s’applique quand tu fermes les réglages.', 'Sert à trouver vos cours. Le changement s’applique quand vous fermez les réglages.')}
               >
                 {shouldShowPlanningLoader ? (
                   <div className="flex h-[162px] w-full items-center justify-center">

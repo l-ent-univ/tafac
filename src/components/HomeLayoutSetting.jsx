@@ -9,6 +9,7 @@ import homeworkIcon from '../assets/home-icons/homework.png'
 import mailIcon from '../assets/home-icons/mail.png'
 import menuIcon from '../assets/home-icons/menu.png'
 import { HOME_CARD_ORDER, layoutHomeCards } from '../homeCardsLayout'
+import { r } from '../register.js'
 
 // « Accueil »'s icons, as its cards and greeting row show them.
 const CARD_ICONS = {
@@ -174,9 +175,9 @@ function HomeLayoutSetting({ widgets, onChange, wallpaperSrc = null, firstName =
         {refusal ? (
           <>
             <Icon icon="ph:info-bold" className="size-[14px] shrink-0" aria-hidden="true" />
-            Garde au moins une carte sur l’accueil
+            {r('Garde au moins une carte sur l’accueil', 'Gardez au moins une carte sur l’accueil')}
           </>
-        ) : 'Touche une carte pour l’afficher ou la masquer'}
+        ) : r('Touche une carte pour l’afficher ou la masquer', 'Touchez une carte pour l’afficher ou la masquer')}
       </p>
     </div>
   )

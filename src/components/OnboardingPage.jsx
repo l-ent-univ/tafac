@@ -1,20 +1,21 @@
 import { useEffect, useState } from 'react'
 import LoadingDots from './LoadingDots'
+import { r } from '../register.js'
 
 const STEP_CONFIG = {
   year: {
     label: 'Année',
-    title: 'Choisis ton année',
-    description: "Sélectionne ta promo ou ton année d'étude",
+    get title() { return r('Choisis ton année', 'Choisissez votre année') },
+    get description() { return r("Sélectionne ta promo ou ton année d'étude", "Sélectionnez votre promo ou votre année d'étude") },
   },
   td: {
     label: 'TD',
-    title: 'Choisis ton groupe TD',
+    get title() { return r('Choisis ton groupe TD', 'Choisissez votre groupe TD') },
     description: 'Groupe de travaux dirigés',
   },
   tp: {
     label: 'TP',
-    title: 'Choisis ton groupe TP',
+    get title() { return r('Choisis ton groupe TP', 'Choisissez votre groupe TP') },
     description: "Groupe de travaux pratiques",
   },
 }
@@ -153,8 +154,8 @@ function OnboardingPage({
   const shouldShowTpStepActions = !isTpStep || hasOptions || Boolean(errorMessage) || tpLoadingTooLong
 
   const specialStepTitle = isTdStep
-    ? 'Choisis ton TD pour commencer'
-    : (isTpStep ? 'Et enfin... ton groupe de TP' : '')
+    ? r('Choisis ton TD pour commencer', 'Choisissez votre TD pour commencer')
+    : (isTpStep ? r('Et enfin... ton groupe de TP', 'Et enfin... votre groupe de TP') : '')
   const specialStepCardStyle = isTpStep
     ? {
         '--td-card-bg': '#ffffff',
@@ -309,8 +310,8 @@ function OnboardingPage({
               </h1>
               <p className="text-lg font-medium leading-[1.2] text-text-muted m-0 font-body max-sm:text-base">
                 {contextLabel
-                  ? `Tu es dans ${contextLabel}, choisis maintenant ton groupe exact.`
-                  : "Choisis ton groupe exact"}
+                  ? r(`Tu es dans ${contextLabel}, choisis maintenant ton groupe exact.`, `Vous êtes dans ${contextLabel}, choisissez maintenant votre groupe exact.`)
+                  : r('Choisis ton groupe exact', 'Choisissez votre groupe exact')}
               </p>
             </div>
 
@@ -447,7 +448,7 @@ function OnboardingPage({
                   ) : null}
                 </div>
               ) : (
-                <p className="m-0 text-sm text-text-muted font-body">Réessaie dans quelques instants</p>
+                <p className="m-0 text-sm text-text-muted font-body">{r('Réessaie dans quelques instants', 'Réessayez dans quelques instants')}</p>
               )}
             </div>
           </div>
