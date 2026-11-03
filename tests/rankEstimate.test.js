@@ -43,6 +43,10 @@ test('the rank ScoDoc sends though the department hides it', () => {
   assert.deepEqual(poc.hidden, { value: '9', total: 84 })
   assert.equal(poc.estimate.total, 84)
   assert.ok(poc.estimate.position >= 1 && poc.estimate.position <= 84)
+  // Masked as « - » with the promo's size: the estimate alone.
+  const masked = { ...releve, semestre: { ...releve.semestre, rang: { value: '-', total: 84 } } }
+  assert.equal(readHiddenRank(masked), null)
+  assert.deepEqual(describePocRank(masked), { hidden: null, estimate: poc.estimate })
   // No rank sent at all: the promo's size isn't known either, so nothing.
   const stripped = { ...releve, semestre: { ...releve.semestre, rang: undefined } }
   assert.equal(describePocRank(stripped), null)

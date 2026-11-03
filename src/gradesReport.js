@@ -603,10 +603,13 @@ export function hasCountedGrade(releve) {
 // Proof of concept (src/rankPoc.js): the semester rank ScoDoc sends even
 // when the department hides ranks (options.show_rangs off), which
 // buildGradesReport leaves out. Null when ranks are shown (the report has
-// it) or when ScoDoc sent none.
+// it) or when ScoDoc sent none: a hidden rank usually comes as « - », the
+// promo's size alone (seen on a Rennes relevé, 2026-11-03).
 export function readHiddenRank(releve) {
   if (readOption(releve?.options, 'show_rangs')) return null
-  return readRank(releve?.semestre?.rang?.value, releve?.semestre?.rang?.total)
+  const value = releve?.semestre?.rang?.value
+  if (!/\d/.test(String(value ?? ''))) return null
+  return readRank(value, releve?.semestre?.rang?.total)
 }
 
 export function summarizeAverage(releve) {

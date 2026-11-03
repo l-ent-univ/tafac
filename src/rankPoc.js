@@ -1,8 +1,8 @@
 // Proof of concept, off by default: the semester rank where the department
-// hides ranks. ScoDoc sends it anyway (seen on a Rennes relevé, 2026-11-03):
-// the « Moyenne générale » card can show it, marked as hidden, with an
-// estimate from the promo's spread (src/rankEstimate.js) to compare; where
-// none is sent, the estimate alone. Turned on per browser:
+// hides ranks. Where ScoDoc sends it anyway, the « Moyenne générale » card
+// can show it, marked as hidden, with an estimate from the promo's spread
+// (src/rankEstimate.js) to compare; where it's masked (« - », the promo's
+// size alone, as on a Rennes relevé seen 2026-11-03), the estimate alone. Turned on per browser:
 //   localStorage.setItem('l-ent:poc-rank', '1')
 // A developer's switch, not a setting: not transferred nor kept per
 // university.
