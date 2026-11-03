@@ -45,6 +45,32 @@ import { r } from './register.js'
 
 export const CHANGELOG = [
   {
+    id: 'assiduite',
+    date: '2026-11-03',
+    title: 'Assiduité',
+    get body() {
+      return r(
+        'Tes absences et retards du semestre, justifiés ou non, par matière et au fil du semestre. « Justifier » prépare le mail au secrétariat, justificatif en photo ou en PDF compris. Une carte sur l’accueil, et sur téléphone l’onglet s’ajoute dans Réglages › Apparence.',
+        'Vos absences et retards du semestre, justifiés ou non, par matière et au fil du semestre. « Justifier » prépare le mail au secrétariat, justificatif en photo ou en PDF compris. Une carte sur l’accueil, et sur téléphone l’onglet s’ajoute dans Réglages › Apparence.',
+      )
+    },
+    icon: 'ph:user-check',
+    // The page comes with « Mes notes » (the relevé's absences).
+    audience: ['grades-page'],
+  },
+  {
+    id: 'bonjour-bonsoir',
+    date: '2026-11-03',
+    title: 'Bonjour ou bonsoir',
+    get body() {
+      return r(
+        'L’accueil te salue selon l’heure : « Bonsoir » à partir de 18 h.',
+        'L’accueil vous salue selon l’heure : « Bonsoir » à partir de 18 h.',
+      )
+    },
+    icon: 'ph:moon-stars',
+  },
+  {
     id: 'nouvel-accueil',
     date: '2026-11-02',
     title: 'Un nouvel accueil',
