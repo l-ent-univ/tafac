@@ -1,13 +1,12 @@
-import { r } from '../register.js'
-
-// Without a first name: « Super toi ! » for the IUT, nothing for « vous ».
+// The student's first name, when known: « Super Camille ! Tout est prêt ! »;
+// without one, « Super ! Tout est prêt ! » (the same in « tu » and « vous »).
 function getCompletionName(userName) {
   if (typeof userName !== 'string') {
-    return r('toi', '')
+    return ''
   }
 
   const [firstName] = userName.trim().split(/\s+/)
-  return firstName || r('toi', '')
+  return firstName || ''
 }
 
 function OnboardingCompletionPage({ userName, isLeaving = false }) {

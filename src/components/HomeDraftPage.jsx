@@ -11,6 +11,7 @@ import { trackDashboardView } from '../analytics'
 import { isWidgetAvailable } from '../dashboardWidgets'
 import { getGrades, peekGrades } from '../entApi'
 import { listGradesSemesters } from '../gradesReport'
+import { buildGreeting } from '../greeting'
 import { layoutHomeCards } from '../homeCardsLayout'
 import { NEXT_CLASS_LOOKAHEAD_DAYS, buildNextClassCacheEntryKey, buildResourceIdsFromSelection } from '../upcomingClasses'
 import useDailyBriefing from '../useDailyBriefing'
@@ -270,7 +271,8 @@ function BlurInText({ text }) {
 
 // « Accueil » (sidebar, below « Toutes les applications »): a canvas for a
 // new home screen. For now its tinted top band (Mes notes' page-top-band)
-// with the dashboard greeting inline: a row of icons, « Salut … ! » and the
+// with the dashboard greeting inline: a row of icons, « Bonjour … » (or
+// « Bonsoir », src/greeting.js) and the
 // day's briefing, read from the same sources as the greeting card (the
 // dashboard stays mounted behind, its cards publish them), the wallpaper
 // (when on) on the band's right. Below the band, the
@@ -345,7 +347,7 @@ function HomeDraftPage({
   const creditRef = useRef(null)
   const creditInk = useCreditInk(wallpaper?.src ?? null, wallpaper?.position ?? null, wallpaperRef, creditRef)
   const credit = wallpaper?.src ? wallpaper.credit : null
-  const greeting = displayName ? `Salut ${displayName} !` : 'Salut !'
+  const greeting = buildGreeting(displayName)
 
   return (
     <section className="home-draft-page w-full grid pt-4 px-6 pb-6 4xl:pt-5 max-md:px-3 max-md:pt-3 max-md:pb-5" aria-labelledby="home-draft-title">

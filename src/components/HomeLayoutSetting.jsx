@@ -8,6 +8,7 @@ import gradesIcon from '../assets/home-icons/grades.png'
 import homeworkIcon from '../assets/home-icons/homework.png'
 import mailIcon from '../assets/home-icons/mail.png'
 import menuIcon from '../assets/home-icons/menu.png'
+import { buildGreeting } from '../greeting'
 import { HOME_CARD_ORDER, layoutHomeCards } from '../homeCardsLayout'
 import { r } from '../register.js'
 
@@ -108,7 +109,7 @@ function HomeLayoutSetting({ widgets, onChange, wallpaperSrc = null, firstName =
     onToggle: toggle,
     refusing: refusal?.id === id ? refusal.count : null,
   })
-  const greeting = firstName ? `Salut ${firstName} !` : 'Salut !'
+  const greeting = buildGreeting(firstName)
 
   return (
     <div className="flex flex-col gap-[7px]">
