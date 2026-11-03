@@ -8,6 +8,7 @@ import UeBadge from './UeBadge'
 import { useUeColor } from '../useUeColor'
 import CloseButton from './CloseButton'
 import LentButton from './LentButton'
+import { r } from '../register.js'
 
 const FOCUSABLE_SELECTOR = 'button:not([disabled]), [href], [tabindex]:not([tabindex="-1"])'
 const PASS_MARK = 10
@@ -95,7 +96,7 @@ function UesFigure({ ues }) {
 }
 
 function describeUes(ues) {
-  return `Tes UE : ${ues.slice(0, 6).map((ue) => `${formatUeCode(ue.code)}, ${ue.title}${ue.ects?.total != null ? `, ${ue.ects.total} ECTS` : ''}`).join(' ; ')}. Chacune est validée dès 10 sur 20.`
+  return `${r('Tes UE', 'Vos UE')} : ${ues.slice(0, 6).map((ue) => `${formatUeCode(ue.code)}, ${ue.title}${ue.ects?.total != null ? `, ${ue.ects.total} ECTS` : ''}`).join(' ; ')}. Chacune est validée dès 10 sur 20.`
 }
 
 // ── Step 2: subjects feed UEs ──────────────────────────────────────────────
@@ -404,11 +405,12 @@ function PageFigure({ ues, example }) {
   )
 }
 
-const PAGE_TIPS = [
-  <>Touche une UE pour l’ouvrir en grand, avec toutes ses matières.</>,
+// Built when shown: the tips address the student (src/register.js).
+const pageTips = () => [
+  <>{r('Touche une UE pour l’ouvrir en grand, avec toutes ses matières.', 'Touchez une UE pour l’ouvrir en grand, avec toutes ses matières.')}</>,
   <><strong className="font-semibold text-text">« x nouvelles notes »</strong> sur une UE : les matières qui ont du nouveau.</>,
-  <><strong className="font-semibold text-text">« Nouveau »</strong> : une note que tu n’as pas encore lue. Le badge s’efface une fois la matière ouverte.</>,
-  <><strong className="font-semibold text-text">« Compte aussi dans »</strong> t’emmène à la même matière dans l’autre UE.</>,
+  <><strong className="font-semibold text-text">« Nouveau »</strong> : {r('une note que tu n’as pas encore lue', 'une note que vous n’avez pas encore lue')}. Le badge s’efface une fois la matière ouverte.</>,
+  <><strong className="font-semibold text-text">« Compte aussi dans »</strong> {r('t’emmène', 'vous emmène')} à la même matière dans l’autre UE.</>,
 ]
 
 // ── Steps ──────────────────────────────────────────────────────────────────
@@ -423,12 +425,12 @@ function buildSteps(ues, example) {
       isExample: false,
       body: (
         <p className="m-0">
-          Une UE (unité d’enseignement), c’est une compétence de ton BUT. Chacune a sa couleur et rapporte des crédits ECTS. Elle est validée quand sa moyenne atteint 10/20.
+          {r('Une UE (unité d’enseignement), c’est une compétence de ton BUT.', 'Une UE (unité d’enseignement), c’est une compétence de votre BUT.')} Chacune a sa couleur et rapporte des crédits ECTS. Elle est validée quand sa moyenne atteint 10/20.
         </p>
       ),
     },
     {
-      title: 'Tes matières nourrissent tes UE',
+      title: r('Tes matières nourrissent tes UE', 'Vos matières nourrissent vos UE'),
       figure: <FlowFigure ues={ues} example={example} />,
       label: describeFlow(ues, example),
       isExample: true,
@@ -462,10 +464,10 @@ function buildSteps(ues, example) {
       body: (
         <>
           <p className="m-0">
-            Chaque UE validée te rapporte ses crédits ECTS. La moyenne générale est indicative : en BUT, ce sont les moyennes d’UE qui comptent.
+            {r('Chaque UE validée te rapporte ses crédits ECTS.', 'Chaque UE validée vous rapporte ses crédits ECTS.')} La moyenne générale est indicative : en BUT, ce sont les moyennes d’UE qui comptent.
           </p>
           <p className="m-0">
-            Dans « Matières et SAÉ », chaque matière a sa propre moyenne (tes notes pondérées par leur coefficient) : indicative elle aussi.
+            Dans « Matières et SAÉ », chaque matière a sa propre moyenne ({r('tes notes', 'vos notes')} pondérées par leur coefficient) : indicative elle aussi.
           </p>
         </>
       ),
@@ -477,7 +479,7 @@ function buildSteps(ues, example) {
       isExample: true,
       body: (
         <ol className="gx-tips m-0 grid list-none gap-[2px] p-0">
-          {PAGE_TIPS.map((tip, index) => (
+          {pageTips().map((tip, index) => (
             <li key={index} className="gx-tip flex items-start gap-[10px] corners-[12px] px-2 py-[7px]" style={{ '--i': index }}>
               <span className="gx-tip-number" aria-hidden="true">{index + 1}</span>
               <span>{tip}</span>
@@ -584,7 +586,7 @@ function ExplainerDialog({ ues, onClose }) {
       >
         <header className="flex items-start justify-between gap-3 px-6 pt-[21px] pb-3 max-sm:px-4 max-sm:pt-[18px]">
           <div className="grid min-w-0 gap-[6px]">
-            <h2 id={titleId} className="m-0 text-[22px] font-bold leading-[1.1]">Comment lire tes notes</h2>
+            <h2 id={titleId} className="m-0 text-[22px] font-bold leading-[1.1]">{r('Comment lire tes notes', 'Comment lire vos notes')}</h2>
             <p className="m-0 font-body text-[13px] font-medium leading-none text-text-muted">Étape {stepIndex + 1} sur {steps.length}</p>
           </div>
           <CloseButton onClick={onClose} />

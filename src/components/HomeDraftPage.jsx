@@ -11,6 +11,7 @@ import { trackDashboardView } from '../analytics'
 import { isWidgetAvailable } from '../dashboardWidgets'
 import { getGrades, peekGrades } from '../entApi'
 import { listGradesSemesters } from '../gradesReport'
+import { buildGreeting } from '../greeting'
 import { layoutHomeCards } from '../homeCardsLayout'
 import { NEXT_CLASS_LOOKAHEAD_DAYS, buildNextClassCacheEntryKey, buildResourceIdsFromSelection } from '../upcomingClasses'
 import useDailyBriefing from '../useDailyBriefing'
@@ -19,12 +20,14 @@ import GradesLaunchCard from './GradesLaunchCard'
 import MailLaunchCard from './MailLaunchCard'
 import PlanningLaunchCard from './PlanningLaunchCard'
 import ServiceNotice from './ServiceNotice'
+import WidgetAssiduity from './WidgetAssiduity'
 import WidgetAverageGrade from './WidgetAverageGrade'
 import WidgetDeadlines from './WidgetDeadlines'
 import WidgetNextClasses from './WidgetNextClasses'
 import WidgetRecentGrades from './WidgetRecentGrades'
 import WidgetRecentMail from './WidgetRecentMail'
 import { SHIMMER_CLASSES } from './widgetListUtils'
+import { r } from '../register.js'
 
 // The row above the greeting, in place of the card's wave: each icon
 // tilted its own way, on one line.
@@ -44,6 +47,8 @@ const GREETING_ICONS = [
 // failed: « Dernières notes » says so, with « Réessayer »).
 function readNewestGrades(payload, status = payload?.['relevé'] ? 'ok' : 'loading') {
   return {
+    // The whole answer: « Assiduité » reads its `absences`.
+    payload: payload ?? null,
     releve: payload?.['relevé'] ?? null,
     config: payload?.config ?? null,
     semesterId: listGradesSemesters(payload?.semestres)[0]?.id ?? null,
@@ -266,7 +271,8 @@ function BlurInText({ text }) {
 
 // « Accueil » (sidebar, below « Toutes les applications »): a canvas for a
 // new home screen. For now its tinted top band (Mes notes' page-top-band)
-// with the dashboard greeting inline: a row of icons, « Salut … ! » and the
+// with the dashboard greeting inline: a row of icons, « Bonjour … » (or
+// « Bonsoir », src/greeting.js) and the
 // day's briefing, read from the same sources as the greeting card (the
 // dashboard stays mounted behind, its cards publish them), the wallpaper
 // (when on) on the band's right. Below the band, the
@@ -293,6 +299,10 @@ function HomeDraftPage({
   onOpenGradesPage = null,
   onOpenPlanningPage = null,
   onOpenMailPage = null,
+  // « Assiduité »'s card, where the page exists (with « Mes notes »): the
+  // card opens it.
+  showAssiduity = false,
+  onOpenAssiduity = null,
   appsSlotRef = null,
 }) {
   const displayName = userName?.trim() || ''
@@ -326,8 +336,9 @@ function HomeDraftPage({
   // in Réglages › Accueil.
   const showAverageCard = showAverage && !hiddenWidgets.includes('average')
   const showRecentGrades = showAverage && !hiddenWidgets.includes('latestGrade')
-  const [grades, retryGrades] = useNewestGrades(showAverageCard || showRecentGrades)
-  const anyCard = isShown('nextClass') || showAverageCard || showRecentGrades || isShown('deadlines') || isShown('mail')
+  const showAssiduityCard = showAssiduity && !hiddenWidgets.includes('assiduity')
+  const [grades, retryGrades] = useNewestGrades(showAverageCard || showRecentGrades || showAssiduityCard)
+  const anyCard = isShown('nextClass') || showAverageCard || showRecentGrades || isShown('deadlines') || isShown('mail') || showAssiduityCard
   const gridRef = useRef(null)
   const [gridBoxRef, twoColumns] = useMinWidth(600, anyCard)
   const place = layoutHomeCards(useDrawnCards(gridRef))
@@ -336,7 +347,7 @@ function HomeDraftPage({
   const creditRef = useRef(null)
   const creditInk = useCreditInk(wallpaper?.src ?? null, wallpaper?.position ?? null, wallpaperRef, creditRef)
   const credit = wallpaper?.src ? wallpaper.credit : null
-  const greeting = displayName ? `Salut ${displayName} !` : 'Salut !'
+  const greeting = buildGreeting(displayName)
 
   return (
     <section className="home-draft-page w-full grid pt-4 px-6 pb-6 4xl:pt-5 max-md:px-3 max-md:pt-3 max-md:pb-5" aria-labelledby="home-draft-title">
@@ -490,6 +501,26 @@ function HomeDraftPage({
                 <WidgetDeadlines visible large icon={homeworkIcon} />
               </div>
             ) : null}
+            {showAssiduityCard ? (
+              // The card opens « Assiduité » (Enter or Space too), as
+              // « Moyenne » opens « Mes notes ».
+              <div
+                data-card="assiduity"
+                className={`${cellClasses('assiduity')} ${onOpenAssiduity ? 'cursor-pointer rounded-[31px] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-text' : ''}`}
+                role={onOpenAssiduity ? 'link' : undefined}
+                tabIndex={onOpenAssiduity ? 0 : undefined}
+                aria-label={onOpenAssiduity ? 'Assiduité, voir la page' : undefined}
+                onClick={onOpenAssiduity ?? undefined}
+                onKeyDown={onOpenAssiduity ? (event) => {
+                  if (event.key !== 'Enter' && event.key !== ' ') return
+                  if (event.target !== event.currentTarget) return
+                  event.preventDefault()
+                  onOpenAssiduity()
+                } : undefined}
+              >
+                <WidgetAssiduity payload={grades.payload} releve={grades.releve} config={grades.config} status={grades.status} />
+              </div>
+            ) : null}
           </div>
         </div>
       ) : (
@@ -501,7 +532,7 @@ function HomeDraftPage({
               <Icon icon="ph:squares-four" className="size-[18px] shrink-0 opacity-70" aria-hidden="true" />
               Aucune carte sur l’accueil
             </span>
-            <p className="m-0 font-body text-sm leading-[1.35] text-text-muted">Choisis celles à afficher dans Réglages › Accueil</p>
+            <p className="m-0 font-body text-sm leading-[1.35] text-text-muted">{r('Choisis celles à afficher dans Réglages › Accueil', 'Choisissez celles à afficher dans Réglages › Accueil')}</p>
             {onOpenCardsSettings ? (
               <button
                 type="button"

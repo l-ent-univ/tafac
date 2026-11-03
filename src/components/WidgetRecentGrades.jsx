@@ -9,6 +9,7 @@ import { useUeColor } from '../useUeColor'
 import { CARD_CLASSES, LatestGradeCardBody } from './LatestGradesList'
 import WidgetListStatus from './WidgetListStatus'
 import { SHIMMER_CLASSES } from './widgetListUtils'
+import { r } from '../register.js'
 
 const MAX_GRADES = 6
 // « Mes notes »'s grade card, its corners nested in this card's: the card's
@@ -57,7 +58,7 @@ function WidgetRecentGrades({ releve = null, config = null, semesterId = null, s
         <WidgetListStatus
           icon="ph:warning"
           title="Notes indisponibles"
-          body="Impossible de charger tes notes"
+          body={r('Impossible de charger tes notes', 'Impossible de charger vos notes')}
           action={onRetry ? { label: 'Réessayer', onClick: onRetry } : null}
         />
       ) : !report ? (

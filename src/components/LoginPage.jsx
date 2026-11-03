@@ -1,9 +1,7 @@
 import { useMemo, useState } from 'react'
 import { Icon } from '@iconify/react'
 import universityConfig from '@university'
-import loginClouds from '../assets/login/login-clouds.webp'
-import loginIsland from '../assets/login/login-island.webp'
-import loginSky from '../assets/login/login-sky.webp'
+import loginHands from '../assets/login/login-hands.webp'
 import LentButton from './LentButton'
 import BetaTag from './BetaTag'
 import LogoBut1 from './LogoBut1'
@@ -12,6 +10,7 @@ import PapillonBadge from './PapillonBadge'
 import ServiceNotice from './ServiceNotice'
 import { APP_NAME } from '../seo'
 import { getListedUniversities, getLoadedUniversityId, writeUniversityChoice } from '../universityRuntime'
+import { r } from '../register.js'
 
 const universityLogo = universityConfig.branding.logo
 const universityLogoAlt = universityConfig.branding.logoAlt ?? universityConfig.university?.name ?? ''
@@ -22,8 +21,6 @@ const repoUrl = universityConfig.branding.about?.repoUrl ?? null
 const loginLinks = universityConfig.links ?? {}
 // "Mot de passe oublié" / "Activer mon compte" under the button, hidden for now.
 const SHOW_ACCOUNT_LINKS = false
-// Width of the login page's left panel, matching its flex-basis.
-const PANEL_WIDTH = 'min(529px, 47vw)'
 
 // Pill fields like the rest of the app's inputs, in the widget colour so they
 // stand out on the page. Focus keeps the app-wide outline (index.css).
@@ -112,10 +109,10 @@ function UniversityPicker() {
       </nav>
       {issuesUrl ? (
         <p className="m-0 mt-2 text-[13px] font-medium leading-[1.4] text-text-muted font-body">
-          Ton université n'est pas dans la liste{'\u202f'}?{' '}
-          <a className={LINK_CLASS} href={issuesUrl} target="_blank" rel="noopener noreferrer">Dis-le-nous</a>
+          {r("Ton université n'est pas dans la liste", "Votre université n'est pas dans la liste")}{'\u202f'}?{' '}
+          <a className={LINK_CLASS} href={issuesUrl} target="_blank" rel="noopener noreferrer">{r('Dis-le-nous', 'Dites-le-nous')}</a>
           {' '}ou{' '}
-          <a className={LINK_CLASS} href={addUniversityUrl} target="_blank" rel="noopener noreferrer">ajoute-la</a>
+          <a className={LINK_CLASS} href={addUniversityUrl} target="_blank" rel="noopener noreferrer">{r('ajoute-la', 'ajoutez-la')}</a>
         </p>
       ) : null}
     </div>
@@ -140,56 +137,33 @@ function LoginPage({
 
   return (
     <section className="flex w-full min-h-screen bg-bg" aria-label="Page de connexion">
-      <div
-        className="login-left-panel relative flex flex-[0_0_min(529px,47vw)] flex-col max-w-[529px] min-w-0 min-h-screen overflow-hidden bg-[#5688af] max-4xl:hidden max-3xl:flex-[0_0_44vw] max-3xl:max-w-[529px]"
-      >
-        <img
-          className="absolute inset-0 block h-full w-full max-w-none object-cover"
-          src={loginSky}
-          alt=""
-          aria-hidden="true"
-        />
-
-        <div className="relative z-10 ml-10 flex w-[381px] max-w-[calc(100%_-_80px)] shrink-0 flex-col items-start gap-5 pt-10 max-3xl:ml-8 max-3xl:max-w-[calc(100%_-_64px)]">
-          {/* The Tafac logo, its wordmark in white on the sky. */}
-          <LogoBut1 className="h-[64px]" wordmarkClassName="[filter:brightness(0)_invert(1)]" />
-          {/* Under the logo: in beta, and the family it belongs to (as on the
-              landing page's header), in white on the sky. */}
-          <div className="flex flex-wrap items-center gap-3">
-            <BetaTag size="lg" onSky />
-            <PapillonBadge size="lg" className="text-white/85 hover:text-white" logoClassName="[filter:brightness(0)_invert(1)]" />
-          </div>
-          <div className="flex w-full flex-col items-start gap-[10px] text-white">
-            <h1 className="m-0 w-full text-[clamp(40px,6.7vh,60px)] font-bold leading-[0.9]">Cours, notes et services de ton université</h1>
-            <p className="m-0 w-full text-[20px] font-semibold leading-[0.9] font-body">Une solution alternative, libre et ouverte</p>
-          </div>
+      {/* The photo of the app in hand on its own grey (#EEEEEE), the panel
+          in the same grey so it runs seamless; the text in the brand's
+          brown. Fixed colours, not the theme's: the photo stays light in
+          dark mode, so does the panel. The screen's height, never more: the
+          logo's band follows the height, and the panel's width
+          (.login-left-panel) is what lets the photo fit whole under it. */}
+      <div className="login-left-panel relative flex h-screen min-w-0 flex-col overflow-hidden bg-[#eeeeee] max-4xl:hidden">
+        {/* At the top, centred: the Tafac logo (its wordmark kept dark in
+            dark mode too), what it is, small, under it. */}
+        <div className="relative z-10 flex shrink-0 flex-col items-center gap-[clamp(8px,1.4vh,14px)] px-10 pt-[clamp(28px,6vh,64px)] text-center max-3xl:px-8">
+          <LogoBut1 className="h-[clamp(44px,7.5vh,72px)]" wordmarkClassName="dark:[filter:none]!" />
+          <p className="m-0 font-body text-[clamp(13px,1.9vh,17px)] font-semibold leading-[1.2] text-[#341200]/70">{r('Cours, notes et services de ton université', 'Cours, notes et services de votre université')}</p>
         </div>
 
-        {/* The island shrinks to the space left under the text, so it never
-            covers it on short screens. Its clouds are a separate layer sized
-            on the panel width, so they always run edge to edge. Geometry
-            (in island units, 529 × 488.5): clouds 779 × 524, top 93.5,
-            centre 32 right of the island's. */}
-        <div className="relative z-0 mt-6 min-h-0 flex-1">
-          <div className="absolute inset-x-0 bottom-0 mx-auto aspect-[1058/977] max-h-full">
-            <img
-              className="absolute top-[19.14%] left-[56.07%] block h-auto max-w-none -translate-x-1/2"
-              style={{ width: `calc(${PANEL_WIDTH} * 1.473)` }}
-              src={loginClouds}
-              alt=""
-              aria-hidden="true"
-              width="1558"
-              height="1048"
-            />
-            <img
-              className="absolute inset-0 block h-full w-full"
-              src={loginIsland}
-              alt=""
-              aria-hidden="true"
-              width="1058"
-              height="977"
-            />
-          </div>
+        {/* The hands and the phone centred in the room under the logo,
+            always the panel's width (the hands against both edges) and never
+            cropped; the panel's width keeps them and the logo's band within
+            the screen. The photo's grey melts into the panel's. */}
+        <div className="relative z-0 flex min-h-0 flex-1 items-center">
+          <img
+            className="block h-auto w-full max-w-none shrink-0"
+            src={loginHands}
+            alt=""
+            aria-hidden="true"
+            width="1080"
+            height="1070"
+          />
         </div>
       </div>
 
@@ -226,7 +200,7 @@ function LoginPage({
                   <PapillonBadge className="text-text-muted hover:text-text" />
                 </div>
               </div>
-              <p className="m-0 text-[15px] font-medium leading-[1.25] text-text-muted font-body">Cours, notes et services de ton université</p>
+              <p className="m-0 text-[15px] font-medium leading-[1.25] text-text-muted font-body">{r('Cours, notes et services de ton université', 'Cours, notes et services de votre université')}</p>
             </div>
 
             <div className="flex w-full flex-col items-center text-center">
@@ -249,8 +223,8 @@ function LoginPage({
                   <h2 className="m-0 text-[32px] leading-none max-md:text-[28px]">Connexion</h2>
                   <p className="m-0 text-[15px] font-medium leading-[1.35] text-text-70 font-body">
                     {isPicker
-                      ? 'Choisis ton université'
-                      : "Utilise tes codes fournis par ton établissement d'enseignement supérieur"}
+                      ? r('Choisis ton université', 'Choisissez votre université')
+                      : r("Utilise tes codes fournis par ton établissement d'enseignement supérieur", "Utilisez vos codes fournis par votre établissement d'enseignement supérieur")}
                   </p>
                 </div>
               </header>

@@ -2,6 +2,7 @@ import { attachmentReferences } from './mailAttachments.js'
 import { isValidAddress } from './mailCompose.js'
 import { inlineImageKey, inlineImageReferences } from './mailInlineImages.js'
 import { isSignatureKind } from './mailSignatureChoice.js'
+import { r } from './register.js'
 
 // What the composer sends to POST /__ent_auth/mail/send and /mail/draft
 // (server/mailSend.js's normalizeComposePayload checks all of it again).
@@ -103,15 +104,17 @@ export function sendFailureText(result) {
     case 'too-large':
       return 'Le message est trop volumineux'
     case 'quota':
-      return 'Ta boîte mail est pleine'
+      return r('Ta boîte mail est pleine', 'Votre boîte mail est pleine')
     case 'rate':
-      return result.retryAfter && result.retryAfter < 120 ? `Trop d’envois, réessaie dans ${result.retryAfter} s` : 'Trop d’envois, réessaie plus tard'
+      return result.retryAfter && result.retryAfter < 120
+        ? r(`Trop d’envois, réessaie dans ${result.retryAfter} s`, `Trop d’envois, réessayez dans ${result.retryAfter} s`)
+        : r('Trop d’envois, réessaie plus tard', 'Trop d’envois, réessayez plus tard')
     case 'expired':
-      return 'Session expirée, reconnecte-toi'
+      return r('Session expirée, reconnecte-toi', 'Session expirée, reconnectez-vous')
     case 'identity':
       return 'Cette adresse d’envoi n’est plus disponible'
     default:
-      return 'Le message n’est pas parti, réessaie'
+      return r('Le message n’est pas parti, réessaie', 'Le message n’est pas parti, réessayez')
   }
 }
 

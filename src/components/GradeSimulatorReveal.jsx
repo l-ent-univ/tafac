@@ -7,6 +7,7 @@ import { describeMove, describeUeOutcome, formatDelta, parseLinearEasing, sample
 import { buildSegmentPath, pointAt } from '../ueRingGeometry'
 import LentButton from './LentButton'
 import UeBadge from './UeBadge'
+import { r } from '../register.js'
 
 const CARD_CLASSES = 'widget-card widget-card-visible shadow-md border border-white card-corners bg-widget-bg text-text p-2 min-w-0'
 
@@ -47,11 +48,11 @@ const PASS_MARK = 10
 const UP_TONES = new Set(['crossed', 'up', 'closer'])
 
 const COPY = {
-  crossed: { title: 'Tu valides l’UE !', text: () => 'Avec ces notes, ta moyenne passe au-dessus de 10.' },
-  up: { title: 'Ta moyenne monte', text: () => 'L’UE reste validée, avec plus de marge.' },
-  closer: { title: 'Tu te rapproches', text: (missing) => `Plus que ${points(missing)} pour valider l’UE.` },
-  down: { title: 'L’UE reste validée', text: () => 'Ta moyenne baisse un peu, mais tu restes au-dessus de 10.' },
-  dropped: { title: 'Ça se jouerait de peu', text: (missing) => `Il te manquerait ${points(missing)} pour valider l’UE. Rien n’est joué.` },
+  crossed: { get title() { return r('Tu valides l’UE !', 'Vous validez l’UE !') }, text: () => r('Avec ces notes, ta moyenne passe au-dessus de 10.', 'Avec ces notes, votre moyenne passe au-dessus de 10.') },
+  up: { get title() { return r('Ta moyenne monte', 'Votre moyenne monte') }, text: () => 'L’UE reste validée, avec plus de marge.' },
+  closer: { get title() { return r('Tu te rapproches', 'Vous vous rapprochez') }, text: (missing) => `Plus que ${points(missing)} pour valider l’UE.` },
+  down: { title: 'L’UE reste validée', text: () => r('Ta moyenne baisse un peu, mais tu restes au-dessus de 10.', 'Votre moyenne baisse un peu, mais vous restez au-dessus de 10.') },
+  dropped: { title: 'Ça se jouerait de peu', text: (missing) => r(`Il te manquerait ${points(missing)} pour valider l’UE. Rien n’est joué.`, `Il vous manquerait ${points(missing)} pour valider l’UE. Rien n’est joué.`) },
   short: { title: 'Encore un effort', text: (missing) => `Il manque ${points(missing)} pour valider l’UE. Tout reste jouable.` },
   same: { title: 'Rien ne bouge', text: () => 'Avec ces notes, la moyenne de l’UE reste la même.' },
 }
@@ -512,7 +513,7 @@ function GradeSimulatorReveal({ ue, ues, releve, overrides, flyFrom = null, onEd
                   <span className="font-body text-[5.4cqw] font-semibold text-text-muted">/20</span>
                 </span>
                 <span key={phase === 'intro' ? 'now' : 'then'} className="ue-reveal-caption whitespace-nowrap font-body text-[max(12px,4.2cqw)] font-medium leading-none text-text-muted">
-                  {phase === 'intro' ? 'Ta moyenne actuelle' : 'Avec tes notes'}
+                  {phase === 'intro' ? r('Ta moyenne actuelle', 'Votre moyenne actuelle') : r('Avec tes notes', 'Avec vos notes')}
                 </span>
               </span>
             </div>

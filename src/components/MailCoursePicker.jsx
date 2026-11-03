@@ -8,6 +8,7 @@ import { usePlanningWeeks, useEventAccents } from '../usePlanningWeeks'
 import MailAttachDrawer, { ATTACH_CARD_CLASS, AttachDrawerError, AttachDrawerNote } from './MailAttachDrawer'
 import { PlanningListCard } from './PlanningListView'
 import { SHIMMER_CLASSES } from './widgetListUtils'
+import { r } from '../register.js'
 
 // The planning service's name (planning.providerName), ADE by default.
 const PROVIDER = universityConfig.planning?.providerName ?? 'ADE'
@@ -86,7 +87,7 @@ function MailCoursePicker({ planning, onPick, onClose }) {
 
   let body
   if (statuses.includes('unconfigured')) {
-    body = <AttachDrawerNote>Indique ton groupe de TD/TP dans Mon compte pour voir tes cours</AttachDrawerNote>
+    body = <AttachDrawerNote>{r('Indique ton groupe de TD/TP dans Mon compte pour voir tes cours', 'Indiquez votre groupe de TD/TP dans Mon compte pour voir vos cours')}</AttachDrawerNote>
   } else if (!count && isLoading) {
     body = (
       <ul className="mx-auto grid w-full max-w-[760px] list-none gap-2 p-0" aria-label="Chargement des cours" aria-busy="true">
@@ -102,12 +103,12 @@ function MailCoursePicker({ planning, onPick, onClose }) {
   } else if (!count && statuses.includes('unavailable')) {
     body = (
       <AttachDrawerError
-        text={`${PROVIDER} n’a pas répondu. Vérifie ta connexion, puis réessaie`}
+        text={r(`${PROVIDER} n’a pas répondu. Vérifie ta connexion, puis réessaie`, `${PROVIDER} n’a pas répondu. Vérifiez votre connexion, puis réessayez`)}
         onRetry={() => mondays.forEach((monday) => statusOn(monday) === 'unavailable' && retry(monday))}
       />
     )
   } else if (!count) {
-    body = <AttachDrawerNote>{statuses.every((status) => status === 'no-timetable') ? `${PROVIDER} n’a aucun cours pour toi` : `Aucun cours entre le ${fromLabel} et le ${toLabel}`}</AttachDrawerNote>
+    body = <AttachDrawerNote>{statuses.every((status) => status === 'no-timetable') ? r(`${PROVIDER} n’a aucun cours pour toi`, `${PROVIDER} n’a aucun cours pour vous`) : `Aucun cours entre le ${fromLabel} et le ${toLabel}`}</AttachDrawerNote>
   } else if (!shown.length) {
     body = <AttachDrawerNote>Aucun cours trouvé</AttachDrawerNote>
   } else {

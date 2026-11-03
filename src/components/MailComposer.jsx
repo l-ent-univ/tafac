@@ -21,9 +21,9 @@ import { buildGradeInsertion, gradeAttachFields } from '../mailGradeAttach'
 import { pickAboutInsertIndex } from '../mailAboutBlocks'
 import { buildCourseInsertion, courseAttachSubject, prepareCourseImage } from '../courseMail'
 import { lookupTeacherRecipients, offerOnly } from '../teacherRecipients'
-import { findModuleTeacherNames, moduleWindowMondays } from '../moduleTeachers'
+import { findClassTeacherNames, findModuleTeacherNames, moduleWindowMondays } from '../moduleTeachers'
 import { readPlanningEvents } from '../usePlanningWeeks'
-import { toDayKey } from '../planningDates'
+import { startOfWeek, toDayKey } from '../planningDates'
 import CloseButton from './CloseButton'
 import ConfirmDialog from './ConfirmDialog'
 import ContextMenu from './ContextMenu'
@@ -69,6 +69,7 @@ import {
   tidyQuotedText,
 } from '../mailCompose'
 import { composeOrigin, pickDefaultIdentity, sendFailureText } from '../mailSendPayload'
+import { r } from '../register.js'
 
 // The window a new mail is written in, in the spirit of Apple Mail's: a
 // toolbar of glass pills (the kind of reply, attachments, then the round
@@ -1236,7 +1237,12 @@ function readInitialFields(restore, sendError, kind, message, ownEmails) {
 // teachers as the planning names them (« Écrire au sujet de ce cours »),
 // looked up for À (suggestTeachers). `restore.moduleCode`: a grade's
 // module (« Écrire au sujet de cette note »), its teachers in the planning
-// offered under À (suggestModuleTeachers). `onSend(snapshot)`: « Envoyer », MailPage closes it and sends
+// offered under À (suggestModuleTeachers). `restore.attachFiles`: files
+// to attach as it opens (« Justifier »'s justificatif, « Assiduité »),
+// uploaded like any added by hand. `restore.absenceClass`: an absence's
+// { day, startHours, endHours, moduleCode } (« Justifier »), whose class's
+// teacher is looked up in the planning and put in Cc
+// (suggestClassTeachers). `onSend(snapshot)`: « Envoyer », MailPage closes it and sends
 // (src/useMailSend.js); false when it can't (a send already waiting). `ref` gets { isDirty,
 // saveNow }, for MailPage to save it before another draft takes its place.
 // Keyed by MailPage: each draft starts afresh.
@@ -1263,6 +1269,20 @@ function MailComposer({ initialKind = 'new', message = null, sender = null, iden
   const [subject, setSubject] = useState(initialFields.subject)
   const limits = readAttachmentLimits(attachmentLimits)
   const { items: attachments, add: addAttachments, remove: removeAttachment, retry: retryAttachment, setMessageItems, markExpired, filesRef: attachmentFilesRef } = useAttachments(initialFields.attachments, limits, restore?.files)
+  // Files handed over to attach (restore.attachFiles), once. A tick later,
+  // so StrictMode's trial mount (whose cleanup stops every upload) doesn't
+  // start them.
+  const handedFilesRef = useRef(false)
+  useEffect(() => {
+    const files = restore?.attachFiles
+    if (handedFilesRef.current || !files?.length) return undefined
+    const timer = window.setTimeout(() => {
+      handedFilesRef.current = true
+      addAttachments(files)
+    }, 0)
+    return () => window.clearTimeout(timer)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
   // The text's images (src/useInlineImages.js).
   const inlineImages = useInlineImages(restore?.inlineImages, sendError?.aids)
   const { add: addInlineImage, markExpired: markImagesExpired, isUploading: isImageUploading } = inlineImages
@@ -1434,11 +1454,20 @@ function MailComposer({ initialKind = 'new', message = null, sender = null, iden
   }, [to, cc, bcc, toInput])
   // The trombone's last lookup (a class's or a grade's teachers).
   const lookupRef = useRef(null)
-  const suggestTeachers = useCallback(async (teachers, { signal, focusLine = null, prefill = true } = {}) => {
+  // `field` 'cc': into Cc instead (an absence's teacher, the mail going to
+  // the secretariat), whatever À holds; those not surely found offered
+  // under Cc.
+  const suggestTeachers = useCallback(async (teachers, { signal, focusLine = null, prefill = true, field = 'to' } = {}) => {
     const found = await lookupTeacherRecipients(teachers, { search: getMailRecipientSuggestions, signal })
     if (signal?.aborted) return
     const plan = prefill ? found : offerOnly(found)
     const fields = fieldsRef.current
+    if (field === 'cc') {
+      if (plan.prefill.length) setCc((current) => mergeAddresses(current, plan.prefill, [...fields.to, ...fields.bcc]))
+      setTeacherHints(!plan.prefill.length && plan.suggestions.length ? { groups: plan.suggestions, canAddAll: plan.canAddAll, field: 'cc' } : null)
+      if (plan.prefill.length || plan.suggestions.length) setShowCc(true)
+      return
+    }
     if (plan.prefill.length && !fields.to.length && !fields.toInput.trim()) {
       const waiting = document.activeElement === toInputRef.current
       setTo((current) => (current.length ? current : mergeAddresses([], plan.prefill, [...fields.cc, ...fields.bcc])))
@@ -1462,13 +1491,24 @@ function MailComposer({ initialKind = 'new', message = null, sender = null, iden
     const names = findModuleTeacherNames(events, moduleCode, todayKey)
     if (names.length) await suggestTeachers(names.join('\n'), { signal, prefill: false })
   }, [planning, suggestTeachers])
-  // « Écrire au sujet de ce cours » or « … de cette note »: its teachers,
-  // as it opens (asked again after StrictMode's second run, the first one
-  // called off).
+  // An absence's class (« Justifier »): its teachers from the planning
+  // that day (the week asked for, past ones included), in Cc. No planning
+  // in the app, no class found: nothing.
+  const suggestClassTeachers = useCallback(async (absence, { signal } = {}) => {
+    if (!planning?.selection || !absence?.day) return
+    const events = await readPlanningEvents({ selection: planning.selection, user: planning.user, mondays: [startOfWeek(absence.day)] }).catch(() => [])
+    if (signal?.aborted) return
+    const names = findClassTeacherNames(events, absence)
+    if (names.length) await suggestTeachers(names.join('\n'), { signal, field: 'cc' })
+  }, [planning, suggestTeachers])
+  // « Écrire au sujet de ce cours », « … de cette note » or « Justifier »:
+  // its teachers, as it opens (asked again after StrictMode's second run,
+  // the first one called off).
   useEffect(() => {
-    if (!restore?.teachers && !restore?.moduleCode) return undefined
+    if (!restore?.teachers && !restore?.moduleCode && !restore?.absenceClass) return undefined
     const controller = new AbortController()
-    if (restore.teachers) void suggestTeachers(restore.teachers, { signal: controller.signal, focusLine: restore.focusBlock ?? null })
+    if (restore.absenceClass) void suggestClassTeachers(restore.absenceClass, { signal: controller.signal })
+    else if (restore.teachers) void suggestTeachers(restore.teachers, { signal: controller.signal, focusLine: restore.focusBlock ?? null })
     else void suggestModuleTeachers(restore.moduleCode, { signal: controller.signal })
     return () => controller.abort()
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -1826,8 +1866,10 @@ function MailComposer({ initialKind = 'new', message = null, sender = null, iden
   const shownAddresses = new Set([...to, ...cc, ...bcc].map(recipientKey))
   const hintGroups = (teacherHints?.groups ?? [])
     .filter((group) => !group.matches.some((match) => shownAddresses.has(recipientKey(match))))
+  const hintField = teacherHints?.field === 'cc' ? 'cc' : 'to'
   const addTeachers = (matches) => {
-    setTo((current) => mergeAddresses(current, matches, [...cc, ...bcc]))
+    if (hintField === 'cc') setCc((current) => mergeAddresses(current, matches, [...to, ...bcc]))
+    else setTo((current) => mergeAddresses(current, matches, [...cc, ...bcc]))
     const taken = new Set(matches.map(recipientKey))
     setTeacherHints((current) => {
       const groups = (current?.groups ?? []).filter((group) => !group.matches.some((match) => taken.has(recipientKey(match))))
@@ -1836,13 +1878,26 @@ function MailComposer({ initialKind = 'new', message = null, sender = null, iden
     toInputRef.current?.focus({ preventScroll: true })
   }
 
+  // Offered under the field they'd go to (À, or Cc for an absence's teacher).
+  const teacherSuggestions = (
+    <TeacherSuggestions
+      groups={hintGroups}
+      canAddAll={Boolean(teacherHints?.canAddAll)}
+      onAdd={addTeachers}
+      onDismiss={() => {
+        setTeacherHints(null)
+        toInputRef.current?.focus({ preventScroll: true })
+      }}
+    />
+  )
+
   const kindTitle = KIND_TITLES[kind]
   // « De : »: the identity picked (the account's default until the list
   // comes), else the account's own name and address.
   const fromIdentity = identities.find((identity) => identity.id === identityId) ?? identities[0] ?? null
   const fromName = fromIdentity?.name || sender?.name || ''
   const fromEmail = fromIdentity?.email || sender?.email || ''
-  const fromLabel = fromName && fromEmail ? `${fromName} – ${fromEmail}` : fromEmail || fromName || 'Ton adresse'
+  const fromLabel = fromName && fromEmail ? `${fromName} – ${fromEmail}` : fromEmail || fromName || r('Ton adresse', 'Votre adresse')
   // Only a failed save is said: a saved draft goes without a word.
   const draftLine = draftStatus === 'error' ? 'Brouillon non enregistré' : null
   const canSwitchKind = Boolean(message)
@@ -2142,22 +2197,14 @@ function MailComposer({ initialKind = 'new', message = null, sender = null, iden
               </button>
             )}
           </FieldRow>
-          {hintGroups.length ? (
-            <TeacherSuggestions
-              groups={hintGroups}
-              canAddAll={Boolean(teacherHints?.canAddAll)}
-              onAdd={addTeachers}
-              onDismiss={() => {
-                setTeacherHints(null)
-                toInputRef.current?.focus({ preventScroll: true })
-              }}
-            />
-          ) : null}
+          {hintGroups.length && hintField === 'to' ? teacherSuggestions : null}
           {showCc ? (
             <>
               <FieldRow label="Cc :" htmlFor={`${fieldId}-cc`} top>
                 <RecipientInput {...recipientProps('cc')} label="Destinataires en copie" />
               </FieldRow>
+              {/* An absence's teacher, not surely found: under Cc. */}
+              {hintGroups.length && hintField === 'cc' ? teacherSuggestions : null}
               <FieldRow label="Cci :" htmlFor={`${fieldId}-bcc`} top>
                 <RecipientInput {...recipientProps('bcc')} label="Destinataires en copie cachée" />
               </FieldRow>
@@ -2297,7 +2344,7 @@ function MailComposer({ initialKind = 'new', message = null, sender = null, iden
         onConfirm={saveAndClose}
         onCancel={cancelClose}
       >
-        Tu pourras le reprendre depuis Brouillons
+        {r('Tu pourras le reprendre depuis Brouillons', 'Vous pourrez le reprendre depuis Brouillons')}
       </ConfirmDialog>
     </section>,
     document.body,

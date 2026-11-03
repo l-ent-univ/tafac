@@ -6,6 +6,7 @@ export const GREETING_HIDDEN_KEY = 'l-ent:greeting-hidden'
 export const HIDDEN_WIDGETS_KEY = 'l-ent:hidden-widgets'
 export const APP_DESCRIPTIONS_KEY = 'l-ent:show-app-descriptions'
 export const PLANNING_WEEKEND_KEY = 'l-ent:planning-weekend'
+export const TABBAR_ASSIDUITY_KEY = 'l-ent:tabbar-assiduity'
 export const WALLPAPER_KEY = 'l-ent:show-wallpaper'
 export const UNIVERSITY_LOGO_KEY = 'l-ent:show-university-logo'
 export const LOGO_SOURCE_KEY = 'l-ent:logo-source'
@@ -183,6 +184,23 @@ export function getStoredShowPlanningWeekend(userId = null) {
 export function persistShowPlanningWeekend(show, userId = null) {
   try {
     localStorage.setItem(PLANNING_WEEKEND_KEY, JSON.stringify({
+      user: userId || null,
+      value: Boolean(show),
+    }))
+  } catch {
+    // Storage unavailable
+  }
+}
+
+// « Assiduité » in the phone's tab bar, in Moodle's place (Réglages ›
+// Apparence): off unless this user switched it on.
+export function getStoredAssiduityTab(userId = null) {
+  return readScopedStorageValue(TABBAR_ASSIDUITY_KEY, userId) === true
+}
+
+export function persistAssiduityTab(show, userId = null) {
+  try {
+    localStorage.setItem(TABBAR_ASSIDUITY_KEY, JSON.stringify({
       user: userId || null,
       value: Boolean(show),
     }))

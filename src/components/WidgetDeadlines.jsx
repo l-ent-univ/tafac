@@ -16,6 +16,7 @@ import {
   readStoredHref,
   storeHref,
 } from './widgetListUtils'
+import { r } from '../register.js'
 
 const MAX_VISIBLE_DEADLINES = 2
 const DEADLINES_REFRESH_MS = 5 * 60 * 1000
@@ -353,7 +354,7 @@ function WidgetDeadlines({ visible = false, preview = null, icon = null, large =
           <WidgetListStatus
             icon="ph:warning"
             title="Moodle indisponible"
-            body="Impossible de charger tes échéances"
+            body={r('Impossible de charger tes échéances', 'Impossible de charger vos échéances')}
             action={{ label: 'Réessayer', onClick: () => void loadDeadlines() }}
           />
         </div>

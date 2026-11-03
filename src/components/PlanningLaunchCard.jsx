@@ -1,6 +1,7 @@
 import { Icon } from '@iconify/react'
 import LaunchCard from './LaunchCard'
 import { accentStyle } from '../eventAccents'
+import { r } from '../register.js'
 
 // The « Nouveautés » entry this card launches (src/changelog.js, a
 // `spotlight` one): see LaunchCard for when it shows.
@@ -76,8 +77,8 @@ function PlanningLaunchCard({ onOpen }) {
     <LaunchCard
       entryId={ENTRY_ID}
       launch="planning"
-      title="Ton emploi du temps dans l’appli"
-      line="Jour, semaine ou liste, la fiche de chaque cours et l’export vers ton agenda"
+      title={r('Ton emploi du temps dans l’appli', 'Votre emploi du temps dans l’appli')}
+      line={r('Jour, semaine ou liste, la fiche de chaque cours et l’export vers ton agenda', 'Jour, semaine ou liste, la fiche de chaque cours et l’export vers votre agenda')}
       ctaLabel="Voir mon planning"
       closeLabel="Fermer l’annonce du Planning"
       onOpen={onOpen}

@@ -4,7 +4,7 @@ import { searchDemoMailContacts } from '../server/mailAutocomplete.js'
 import { buildDemoGradesPayload, buildDemoTimetablePayload } from '../src/demoAccount.js'
 import { prepareGradeMail } from '../src/gradeMail.js'
 import { buildGradesReport } from '../src/gradesReport.js'
-import { findModuleTeacherNames, isModuleCode, moduleWindowMondays, normalizeModuleCode, titleModuleCodes } from '../src/moduleTeachers.js'
+import { findClassTeacherNames, findModuleTeacherNames, isModuleCode, moduleWindowMondays, normalizeModuleCode, titleModuleCodes } from '../src/moduleTeachers.js'
 import { mergeEvents, toPlanningEvent } from '../src/planningEvents.js'
 import { lookupTeacherRecipients, offerOnly } from '../src/teacherRecipients.js'
 
@@ -81,4 +81,29 @@ test('a grade\'s mail keeps its relevé teacher in À and names its module for t
   assert.equal(request.moduleCode, 'R5.11')
   assert.equal(request.kind, 'grade')
   assert.equal(request.teachers, undefined)
+})
+
+test('the teacher of the class an absence covers: same day, overlapping hours, its module first', () => {
+  const slot = (title, day, from, to, teacher) => toPlanningEvent({ uid: `${title}-${day}-${from}`, title, startMs: new Date(2026, 8, day, from).getTime(), endMs: new Date(2026, 8, day, to).getTime(), teacher })
+  const events = [
+    slot('R5.11 Relations presse', 25, 8, 10, 'M. Lemoine'),
+    slot('R5.02 Anglais', 25, 10, 12, 'Mme Morvan'),
+    slot('Réunion de rentrée', 25, 8, 9, 'M. Le Goff'),
+    slot('R5.11 Relations presse', 26, 8, 10, 'M. Lemoine - Mme Le Fur'),
+  ]
+  const absence = { day: '2026-09-25', startHours: 8.25, endHours: 10.25, moduleCode: 'R5.11' }
+  // The module's class, not the other one at the same hour.
+  assert.deepEqual(findClassTeacherNames(events, absence), ['M. Lemoine'])
+  // Without a module (or one no title carries): every class it overlaps.
+  assert.deepEqual(findClassTeacherNames(events, { ...absence, moduleCode: null }), ['M. Lemoine', 'M. Le Goff'])
+  assert.deepEqual(findClassTeacherNames(events, { ...absence, moduleCode: 'R5.99' }), ['M. Lemoine', 'M. Le Goff'])
+  // A lateness (a quarter of an hour) meets its class.
+  assert.deepEqual(findClassTeacherNames(events, { day: '2026-09-25', startHours: 10.25, endHours: 10.5, moduleCode: 'R5.02' }), ['Mme Morvan'])
+  assert.deepEqual(findClassTeacherNames(events, { day: '2026-09-25', startHours: 10, endHours: 10, moduleCode: null }), ['Mme Morvan'])
+  // Several teachers on the class.
+  assert.deepEqual(findClassTeacherNames(events, { ...absence, day: '2026-09-26' }), ['M. Lemoine', 'Mme Le Fur'])
+  // Nothing that day or at those hours.
+  assert.deepEqual(findClassTeacherNames(events, { ...absence, day: '2026-09-27' }), [])
+  assert.deepEqual(findClassTeacherNames(events, { ...absence, startHours: 14, endHours: 16 }), [])
+  assert.deepEqual(findClassTeacherNames(events, { day: 'nope', startHours: 8 }), [])
 })

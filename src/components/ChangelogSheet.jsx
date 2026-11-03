@@ -3,6 +3,7 @@ import { Icon } from '@iconify/react'
 import { closeChangelog, useChangelog } from '../changelogStore'
 import { formatEntryDate, groupEntriesByDate } from '../changelogState'
 import CloseButton from './CloseButton'
+import { r } from '../register.js'
 
 const FOCUSABLE_SELECTOR = 'button, [href], [tabindex]:not([tabindex="-1"])'
 
@@ -71,7 +72,7 @@ function ChangelogSheet() {
 
   const highlighted = new Set(highlightIds)
   const subtitle = highlighted.size > 0
-    ? `${highlighted.size} nouveauté${highlighted.size > 1 ? 's' : ''} depuis ta dernière visite`
+    ? `${highlighted.size} nouveauté${highlighted.size > 1 ? 's' : ''} ${r('depuis ta dernière visite', 'depuis votre dernière visite')}`
     : 'Ce qui a changé récemment'
 
   return (

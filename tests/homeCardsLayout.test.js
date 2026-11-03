@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import { HOME_CARD_ORDER, layoutHomeCards } from '../src/homeCardsLayout.js'
 
-// Every subset of the five cards.
+// Every subset of the cards.
 const SUBSETS = Array.from({ length: 2 ** HOME_CARD_ORDER.length }, (_, mask) => (
   HOME_CARD_ORDER.filter((_, index) => mask & (1 << index))
 ))
@@ -55,8 +55,9 @@ test('a card alone spans the row', () => {
 })
 
 test('« Prochains cours » runs down the left beside two cards', () => {
+  // « Assiduité », last, alone across its row.
   assert.deepEqual(layoutHomeCards(HOME_CARD_ORDER), {
-    nextClass: 'tall', average: 'half', mail: 'half', latestGrade: 'half', deadlines: 'half',
+    nextClass: 'tall', average: 'half', mail: 'half', latestGrade: 'half', deadlines: 'half', assiduity: 'full',
   })
   assert.deepEqual(layoutHomeCards(['deadlines', 'nextClass', 'latestGrade']), {
     nextClass: 'tall', latestGrade: 'half', deadlines: 'half',

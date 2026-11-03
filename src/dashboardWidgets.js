@@ -47,6 +47,14 @@ export const DASHBOARD_WIDGETS = [
     isAvailable: hasGradeWidgets,
   },
   {
+    // The relevé's absences, with « Mes notes » (the « Assiduité » page).
+    id: 'assiduity',
+    label: 'Assiduité',
+    icon: 'ph:user-check',
+    grades: true,
+    isAvailable: hasGradeWidgets,
+  },
+  {
     id: 'deadlines',
     label: 'Échéances',
     icon: 'ph:check-square',

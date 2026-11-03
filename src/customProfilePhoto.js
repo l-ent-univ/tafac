@@ -1,3 +1,5 @@
+import { r } from './register.js'
+
 // User-picked profile photo (Mon compte). Like the custom background, the
 // image never leaves the browser: it is cropped to a square, downscaled and
 // re-encoded client-side, then kept in localStorage (scoped to the signed-in
@@ -83,7 +85,7 @@ function encodeCanvas(canvas, quality) {
 export async function saveCustomProfilePhoto(file, userId = null) {
   // Some pickers (Android, Files) give no type: let decoding decide then.
   if (!file || (file.type && !/^image\//.test(file.type))) {
-    throw new Error('Choisis un fichier image (JPEG, PNG, WebP…)')
+    throw new Error(r('Choisis un fichier image (JPEG, PNG, WebP…)', 'Choisissez un fichier image (JPEG, PNG, WebP…)'))
   }
 
   let image
