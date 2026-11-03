@@ -600,6 +600,15 @@ export function hasCountedGrade(releve) {
 // Everything the "Moyenne générale" card shows for one semester's relevé, or
 // null when there's no average to show: also without a single grade yet, even
 // if ScoDoc sends an average (capitalised UEs, bonus…), as it means nothing yet.
+// Proof of concept (src/rankPoc.js): the semester rank ScoDoc sends even
+// when the department hides ranks (options.show_rangs off), which
+// buildGradesReport leaves out. Null when ranks are shown (the report has
+// it) or when ScoDoc sent none.
+export function readHiddenRank(releve) {
+  if (readOption(releve?.options, 'show_rangs')) return null
+  return readRank(releve?.semestre?.rang?.value, releve?.semestre?.rang?.total)
+}
+
 export function summarizeAverage(releve) {
   if (!hasCountedGrade(releve)) return null
   const { average, promoAverage, source } = computeGeneralAverage(releve)
