@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Icon } from '@iconify/react'
 import universityConfig from '@university'
+import calendarIcon from '../assets/home-icons/calendar.png'
+import personIcon from '../assets/home-icons/person.png'
 import { buildAbsenceReport, buildGradesReport, formatDuration, summarizeAbsencesBySubject } from '../gradesReport'
 import {
   buildSemesterTimeline,
@@ -115,7 +117,7 @@ function TotalsCard({ totals, sums, counts }) {
   return (
     <article className={`${CARD} flex flex-[1_1_300px] flex-col gap-4 p-4 md:max-w-[443px] max-md:p-3`} aria-labelledby="assiduity-totals-title">
       <div className="flex items-center gap-[5px] min-w-0">
-        <Icon icon="ph:user-check" className="mr-[3px] size-[20px] shrink-0 text-text-muted" aria-hidden="true" />
+        <img src={personIcon} alt="" width="22" height="22" draggable="false" className="mr-[3px] size-[22px] shrink-0 select-none" aria-hidden="true" />
         <h2 id="assiduity-totals-title" className="m-0 min-w-0 truncate text-base font-medium leading-[1.06] text-text-muted max-md:text-[14px]">Ce semestre</h2>
         {missed > 0 ? (
           <span className="ml-auto shrink-0 font-body text-[13px] font-medium leading-none text-text-muted">{formatDuration(missed)} manquées</span>
@@ -171,7 +173,7 @@ function SemesterLine({ timeline, entriesById, onPick, activeId }) {
   return (
     <article className={`${CARD} flex flex-[3_1_380px] flex-col gap-3 p-4 max-md:flex-[1_1_100%] max-md:p-3`} aria-labelledby="assiduity-line-title">
       <div className="flex items-center gap-[5px] min-w-0">
-        <Icon icon="ph:calendar-dots" className="mr-[3px] size-[20px] shrink-0 text-text-muted" aria-hidden="true" />
+        <img src={calendarIcon} alt="" width="22" height="22" draggable="false" className="mr-[3px] size-[22px] shrink-0 select-none" aria-hidden="true" />
         <h2 id="assiduity-line-title" className="m-0 min-w-0 truncate text-base font-medium leading-[1.06] text-text-muted max-md:text-[14px]">Au fil du semestre</h2>
         <span className="ml-auto shrink-0 font-body text-[13px] font-medium leading-none text-text-muted">
           {RANGE_DAY.format(timeline.start).replace('.', '')} – {RANGE_DAY.format(timeline.end).replace('.', '')}
