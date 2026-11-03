@@ -67,8 +67,11 @@ export function buildNavItems(establishment, { gradesSupported = true } = {}) {
     // The in-app mail page (MailPage), or the webmail link (MAIL_ITEM).
     // shortLabel: the tab bar's narrower tabs.
     ...(universityConfig.features?.mail ? [MAIL_ITEM] : []),
-    // « Assiduité » (AssiduityPage): the student's attendance, empty for now.
-    { id: 'assiduity', label: 'Assiduité', icon: 'ph:user-check', page: 'assiduity' },
+    // « Assiduité » (AssiduityPage): the absences of the ScoDoc relevé,
+    // so on the same terms as the live « Mes notes » page.
+    ...(gradesNavItem?.page === 'grades'
+      ? [{ id: 'assiduity', label: 'Assiduité', icon: 'ph:user-check', page: 'assiduity' }]
+      : []),
     ...(MOODLE_HREF
       ? [{ id: 'moodle', label: 'Moodle', icon: 'devicon-plain:moodle', href: MOODLE_HREF, target: '_blank' }]
       : []),

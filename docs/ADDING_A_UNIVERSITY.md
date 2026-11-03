@@ -100,6 +100,7 @@ Un feature à `false` : le serveur répond `{ disabled: true }` sur les endpoint
         label: 'IUT de Lannion',
         gradeWidgets: true,       // widgets de notes
         nextClassWidget: true,    // widget prochain cours
+        absenceReasons: ['protest'], // optionnel : raisons en plus dans « Assiduité › Justifier » (ids de src/absenceMail.js, `optional`)
         extraServices: [{ id: '…', title: '…', href: '…', target: '_blank' }],
         logo: iutLannionLogo,     // optionnel, à la place du logo de l'université
         logoDark: iutLannionLogoDark,

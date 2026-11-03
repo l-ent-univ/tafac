@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { Icon } from '@iconify/react'
 import appsIcon from '../assets/home-icons/apps.png'
+import assiduityIcon from '../assets/home-icons/assiduity.png'
 import averageIcon from '../assets/home-icons/average.png'
 import calendarIcon from '../assets/home-icons/calendar.png'
 import gradesIcon from '../assets/home-icons/grades.png'
@@ -16,6 +17,7 @@ const CARD_ICONS = {
   mail: mailIcon,
   latestGrade: gradesIcon,
   deadlines: homeworkIcon,
+  assiduity: assiduityIcon,
 }
 
 // A tile's place in the miniature's grid (layoutHomeCards).

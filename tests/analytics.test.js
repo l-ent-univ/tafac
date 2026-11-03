@@ -387,6 +387,8 @@ test('mail_action keeps only the properties of its action, never a subject, an a
   const courseLeaks = { course: 'R5.12 Développement back-end', room: 'A08', teacher: 'M. Lemoine', day: '2026-11-03', title: 'R5.12' }
   assert.deepEqual(keep({ action: 'compose_opened', kind: 'course', ...leaks, ...courseLeaks }), { action: 'compose_opened', kind: 'course' })
   assert.deepEqual(keep({ action: 'course_attached', ...leaks, ...courseLeaks }), { action: 'course_attached' })
+  // An absence's mail: never its day, hours, subject or teacher.
+  assert.deepEqual(keep({ action: 'compose_opened', kind: 'absence', ...leaks, ...courseLeaks }), { action: 'compose_opened', kind: 'absence' })
   assert.deepEqual(
     keep({ action: 'sent', result: 'partial', attachments: '2-3', inline_images: true, ...leaks }),
     { action: 'sent', result: 'partial', attachments: '2-3', inline_images: true },

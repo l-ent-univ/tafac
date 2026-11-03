@@ -32,6 +32,7 @@ import {
   getStoredHiddenWidgets,
   getStoredShowAppDescriptions,
   getStoredShowPlanningWeekend,
+  getStoredAssiduityTab,
   getStoredLogoSource,
   getStoredShowUniversityLogo,
   getStoredShowWallpaper,
@@ -41,6 +42,7 @@ import {
   persistHiddenWidgets,
   persistShowAppDescriptions,
   persistShowPlanningWeekend,
+  persistAssiduityTab,
   persistLogoSource,
   persistShowUniversityLogo,
   persistShowWallpaper,
@@ -931,6 +933,8 @@ function App() {
   const [mailReaderOpen, setMailReaderOpen] = useState(false)
   const [sidebarAutoCompactDismissed, setSidebarAutoCompactDismissed] = useState(false)
   const [showPlanningWeekend, setShowPlanningWeekend] = useState(() => getStoredShowPlanningWeekend())
+  // « Assiduité » in the phone's tab bar instead of Moodle (Réglages › Apparence).
+  const [showAssiduityTab, setShowAssiduityTab] = useState(() => getStoredAssiduityTab())
   const [anonymousAnalytics, setAnonymousAnalytics] = useState(() => getStoredAnonymousAnalytics())
   const isAnalyticsAvailable = useAnalyticsAvailable()
   const [profileUser, setProfileUser] = useState(null)
@@ -1258,6 +1262,7 @@ function App() {
     setLogoSource(getStoredLogoSource(sessionState.user))
     setShowAppDescriptions(getStoredShowAppDescriptions(sessionState.user))
     setShowPlanningWeekend(getStoredShowPlanningWeekend(sessionState.user))
+    setShowAssiduityTab(getStoredAssiduityTab(sessionState.user))
     // Applied to the analytics module right away (not in an effect) so the
     // first dashboard events already honour this user's choice.
     const storedAnonymousAnalytics = getStoredAnonymousAnalytics(sessionState.user)
@@ -1868,10 +1873,13 @@ function App() {
     () => activePage === 'mail' && getMobileTabItems(establishment, { gradesSupported }).some((item) => item.page === 'mail'),
     [activePage, establishment, gradesSupported],
   )
+  // Likewise for « Assiduité » (the ScoDoc relevé's absences, with « Mes notes »).
+  const isAssiduityPage = useMemo(
+    () => activePage === 'assiduity' && getMobileTabItems(establishment, { gradesSupported }).some((item) => item.page === 'assiduity'),
+    [activePage, establishment, gradesSupported],
+  )
   // « Accueil » (HomeDraftPage), every university: the page shown when no
   // other is.
-  // « Assiduité » (AssiduityPage), every university.
-  const isAssiduityPage = activePage === 'assiduity'
   const isHomePage = !isGradesPage && !isPlanningPage && !isMailPage && !isAssiduityPage
   // The « Accueil » band's tint (--page-top-band, overrides.css): the
   // wallpaper's main colour when it shows one, else the brand's.
@@ -2024,14 +2032,15 @@ function App() {
     }
     handleNavigatePage('mail', 'dashboard_card')
   }, [showPage, handleNavigatePage])
-  // « Écrire au sujet de cette note » (« Mes notes ») or « … de ce cours »
-  // (the Planning): the mail page, its composer open on that mail
-  // (`request`: the composer's `restore`, see MailComposer; its `kind`
-  // 'course' from the Planning), taken once by the page as it mounts.
+  // « Écrire au sujet de cette note » (« Mes notes »), « … de ce cours »
+  // (the Planning) or « Écrire à l’enseignant » (« Assiduité »): the mail
+  // page, its composer open on that mail (`request`: the composer's
+  // `restore`, see MailComposer; its `kind` 'course' from the Planning,
+  // 'absence' from « Assiduité »), taken once by the page as it mounts.
   const [pendingMailCompose, setPendingMailCompose] = useState(null)
   const handleComposeMail = useCallback((request) => {
     setPendingMailCompose(request)
-    handleNavigatePage('mail', request?.kind === 'course' ? 'planning' : 'grades')
+    handleNavigatePage('mail', request?.kind === 'course' ? 'planning' : request?.kind === 'absence' ? 'assiduity' : 'grades')
   }, [handleNavigatePage])
   const clearPendingMailCompose = useCallback(() => setPendingMailCompose(null), [])
   // The composer's « Un cours… »: the Planning's weeks, where it's in the app.
@@ -2080,6 +2089,17 @@ function App() {
     persistShowPlanningWeekend(show, sessionState.user)
     setShowPlanningWeekend(show)
   }, [sessionState.user])
+  // « Accueil »'s « Assiduité » card: the page, as a dashboard card.
+  const handleOpenAssiduityFromCard = useCallback(() => handleNavigatePage('assiduity', 'dashboard_card'), [handleNavigatePage])
+  const handleAssiduityTabChange = useCallback((show) => {
+    persistAssiduityTab(show, sessionState.user)
+    setShowAssiduityTab(show)
+  }, [sessionState.user])
+  // Réglages › Apparence offers it where there's an « Assiduité » page;
+  // its words say whether Moodle gives way.
+  const tabBarShortcuts = useMemo(() => getMobileTabItems(establishment, { gradesSupported }), [establishment, gradesSupported])
+  const hasAssiduityPage = tabBarShortcuts.some((item) => item.page === 'assiduity')
+  const hasMoodleTab = tabBarShortcuts.some((item) => item.id === 'moodle')
 
   // `persist` false: live under the pointer, stored on release.
   const handleSidebarCompactChange = useCallback((compact, { persist = true } = {}) => {
@@ -2710,6 +2730,8 @@ function App() {
                   onOpenMail={hasMailPage ? handleOpenMail : null}
                   onOpenCardsSettings={handleOpenCardsSettings}
                   onOpenGradesPage={hasGradesPage ? handleOpenGradesPage : null}
+                  showAssiduity={hasAssiduityPage}
+                  onOpenAssiduity={hasAssiduityPage ? handleOpenAssiduityFromCard : null}
                   onOpenPlanningPage={hasPlanningPage ? handleOpenPlanningPage : null}
                   onOpenMailPage={hasMailPage ? handleOpenMailPage : null}
                   appsSlotRef={setHomeAppsSlotEl}
@@ -2728,7 +2750,7 @@ function App() {
             ) : null}
             {isAssiduityPage ? (
               <div className="page-enter flex-1 min-h-0 4xl:flex-none 4xl:min-h-0">
-                <AssiduityPage />
+                <AssiduityPage onComposeMail={hasMailPage ? handleComposeMail : null} absenceReasons={universityConfig.establishments?.byId?.[establishment]?.absenceReasons} findsClassTeacher={hasPlanningPage} />
               </div>
             ) : null}
             {isMailPage ? (
@@ -2753,6 +2775,7 @@ function App() {
             establishment={establishment}
             gradesSupported={gradesSupported}
             activePage={shownPage}
+            showAssiduity={showAssiduityTab}
             onNavigatePage={handleNavigatePage}
           />
         </div>
@@ -2804,6 +2827,9 @@ function App() {
         onSidebarCompactChange={handleSidebarCompactChange}
         showPlanningWeekend={showPlanningWeekend}
         onShowPlanningWeekendChange={handleShowPlanningWeekendChange}
+        assiduityTab={showAssiduityTab}
+        onAssiduityTabChange={hasAssiduityPage ? handleAssiduityTabChange : null}
+        assiduityTabReplacesMoodle={hasMoodleTab}
         planningSelection={selectedTp}
         anonymousAnalytics={anonymousAnalytics}
         onAnonymousAnalyticsChange={isAnalyticsAvailable ? handleAnonymousAnalyticsChange : null}

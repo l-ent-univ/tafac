@@ -724,11 +724,16 @@ export function formatHour(value) {
   return `${hours}h${String(minutes).padStart(2, '0')}`
 }
 
-function formatDuration(hours) {
+// 2 → "2h", 1.5 → "1h30".
+export function formatDuration(hours) {
   if (hours <= 0) return '0h'
   const formatted = formatHour(hours)
   return formatted.endsWith('h00') ? formatted.slice(0, -2) : formatted
 }
+
+// What the passerelle writes for an absence tied to no subject
+// (« Non défini »): no subject at all.
+const NO_SUBJECT = /^(?:non[\s-]+(?:défini|definie?|définie|renseignée?|précisée?)|aucune?|inconnue?|[-–—]+)$/i
 
 function findModuleLabel(releve, subject) {
   if (Number.isInteger(subject)) {
@@ -738,7 +743,38 @@ function findModuleLabel(releve, subject) {
   }
 
   const text = String(subject ?? '').trim()
-  return text || null
+  return text && !NO_SUBJECT.test(text) ? text : null
+}
+
+// The relevé's module an absence is about (`matiereComplet`: its ScoDoc id,
+// or « R5.02 - Anglais » whose code leads), as { code, title }. Null when
+// the relevé has no such module.
+function findAbsenceModule(releve, subject) {
+  const modules = Object.entries({ ...releve?.ressources, ...releve?.saes })
+  if (Number.isInteger(subject) || /^\d+$/.test(String(subject ?? ''))) {
+    const entry = modules.find(([, module]) => String(module?.id) === String(subject))
+    return entry ? { code: entry[0], title: String(entry[1]?.titre ?? '').trim() || entry[0] } : null
+  }
+
+  const text = String(subject ?? '').trim()
+  const entry = text
+    ? modules
+        .filter(([code]) => text === code || (text.startsWith(code) && /^[\s\-–:]/.test(text.slice(code.length))))
+        .sort(([left], [right]) => right.length - left.length)[0]
+    : null
+  return entry ? { code: entry[0], title: String(entry[1]?.titre ?? '').trim() || entry[0] } : null
+}
+
+// The subject's name without its code: « R5.02 - Anglais » → « Anglais ».
+function stripModuleCode(label) {
+  const text = String(label ?? '').trim()
+  const match = text.match(/^(?:R|SA[EÉ])\s?\d+(?:\.\d+)*\s*[-–:]\s*(.+)$/i)
+  return match ? match[1].trim() : text || null
+}
+
+function readTeacherEmail(value) {
+  const email = String(value ?? '').trim()
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) ? email : null
 }
 
 function formatTeacher(value) {
@@ -782,14 +818,26 @@ export function buildAbsenceReport(payload, releve, config) {
       const endDate = absence.dateFin && absence.dateFin !== date ? absence.dateFin : null
       if (endDate) spansSeveralDays = true
 
+      const module = findAbsenceModule(releve, absence.matiereComplet)
+      const subject = findModuleLabel(releve, absence.matiereComplet)
       const entry = {
         id: `${date}-${start}-${entries.length}`,
         date,
         endDate,
         start: formatHour(start),
         end: formatHour(end),
-        subject: findModuleLabel(releve, absence.matiereComplet),
+        // Hours as decimals (8.25 = 8h15), and how long it lasted (a
+        // lateness counts as one, not in hours).
+        startHours: start,
+        endHours: end,
+        hours: status === 'late' ? 0 : Math.max(0, end - start),
+        subject,
+        // The relevé's module (code and title) when it's one of its own;
+        // else the name as the passerelle gives it.
+        moduleCode: module?.code ?? null,
+        subjectTitle: module?.title ?? stripModuleCode(subject),
         teacher: formatTeacher(absence.enseignant),
+        teacherEmail: readTeacherEmail(absence.enseignant),
         status,
       }
       entries.push(entry)
@@ -825,6 +873,38 @@ export function buildAbsenceReport(payload, releve, config) {
     // Hour totals mean nothing once an absence spans several days.
     totals: spansSeveralDays && !scodocTotals ? null : totalLabels,
   }
+}
+
+// Hours missed per subject (lateness counted apart), most missed first.
+// From Klaynight's « Absences » page (PR #11), keyed by module so a
+// subject named two ways by the passerelle stays one.
+export function summarizeAbsencesBySubject(entries) {
+  const bySubject = new Map()
+
+  for (const entry of Array.isArray(entries) ? entries : []) {
+    const key = entry.moduleCode ?? entry.subjectTitle ?? entry.subject ?? ''
+    const current = bySubject.get(key) ?? {
+      key,
+      moduleCode: entry.moduleCode ?? null,
+      subject: entry.subjectTitle ?? entry.subject ?? 'Matière non précisée',
+      hours: 0,
+      unjustifiedHours: 0,
+      count: 0,
+      late: 0,
+    }
+    if (entry.status === 'late') {
+      current.late += 1
+    } else {
+      current.hours += entry.hours ?? 0
+      current.count += 1
+      if (entry.status === 'unjustified') current.unjustifiedHours += entry.hours ?? 0
+    }
+    bySubject.set(key, current)
+  }
+
+  return [...bySubject.values()].sort((left, right) => right.hours - left.hours
+    || right.late - left.late
+    || left.subject.localeCompare(right.subject, 'fr'))
 }
 
 const HTML_ENTITIES = {

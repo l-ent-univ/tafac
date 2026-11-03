@@ -1371,8 +1371,9 @@ function MailPage({ onReaderOpenChange, onSignInAgain, sender = null, composeReq
   useEffect(() => {
     if (!composeRequest || handledComposeRef.current === composeRequest) return
     handledComposeRef.current = composeRequest
-    // About a class (the Planning) or a grade (« Mes notes »).
-    trackMailAction('compose_opened', { kind: composeRequest.kind === 'course' ? 'course' : 'grade' })
+    // About a class (the Planning), an absence (« Assiduité ») or a grade
+    // (« Mes notes »).
+    trackMailAction('compose_opened', { kind: ['course', 'absence'].includes(composeRequest.kind) ? composeRequest.kind : 'grade' })
     showComposer({ key: Date.now(), kind: 'new', message: null, saver: newDraftSaver(), restore: composeRequest })
     onComposeRequestHandled()
   // eslint-disable-next-line react-hooks/exhaustive-deps

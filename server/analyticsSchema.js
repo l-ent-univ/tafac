@@ -24,7 +24,7 @@ const GRADES_ACTIONS = ['semester_changed', 'ue_view_opened', 'grade_detail_open
 const PLANNING_PAGE_SOURCES = ['nav', 'tabbar', 'tile', 'dashboard_card', 'launch_card', 'history', 'other']
 // And on the Messagerie (see src/mailAnalytics.js): `grades` is « Écrire au
 // sujet de cette note », `planning` « Écrire au sujet de ce cours ».
-const MAIL_PAGE_SOURCES = ['nav', 'tabbar', 'tile', 'dashboard_card', 'launch_card', 'grades', 'planning', 'history', 'other']
+const MAIL_PAGE_SOURCES = ['nav', 'tabbar', 'tile', 'dashboard_card', 'launch_card', 'grades', 'planning', 'assiduity', 'history', 'other']
 const PAGE_SOURCES = { grades: GRADES_PAGE_SOURCES, planning: PLANNING_PAGE_SOURCES, mail: MAIL_PAGE_SOURCES }
 const PLANNING_VIEWS = ['day', 'two_days', 'week', 'list']
 const PLANNING_ACTIONS = [
@@ -319,7 +319,7 @@ export const ANALYTICS_EVENTS = {
       from: oneOf('list', 'widget', 'history'),
       folder_kind: oneOf(...MAIL_FOLDER_KINDS),
       scope: oneOf('local', 'server'),
-      kind: oneOf('new', 'reply', 'reply_all', 'forward', 'draft', 'grade', 'course'),
+      kind: oneOf('new', 'reply', 'reply_all', 'forward', 'draft', 'grade', 'course', 'absence'),
       result: oneOf('ok', 'partial', 'error', 'undone'),
       attachments: oneOf('0', '1', '2-3', '4+'),
       inline_images: boolean,

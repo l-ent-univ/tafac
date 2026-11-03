@@ -19,6 +19,7 @@ import GradesLaunchCard from './GradesLaunchCard'
 import MailLaunchCard from './MailLaunchCard'
 import PlanningLaunchCard from './PlanningLaunchCard'
 import ServiceNotice from './ServiceNotice'
+import WidgetAssiduity from './WidgetAssiduity'
 import WidgetAverageGrade from './WidgetAverageGrade'
 import WidgetDeadlines from './WidgetDeadlines'
 import WidgetNextClasses from './WidgetNextClasses'
@@ -44,6 +45,8 @@ const GREETING_ICONS = [
 // failed: « Dernières notes » says so, with « Réessayer »).
 function readNewestGrades(payload, status = payload?.['relevé'] ? 'ok' : 'loading') {
   return {
+    // The whole answer: « Assiduité » reads its `absences`.
+    payload: payload ?? null,
     releve: payload?.['relevé'] ?? null,
     config: payload?.config ?? null,
     semesterId: listGradesSemesters(payload?.semestres)[0]?.id ?? null,
@@ -293,6 +296,10 @@ function HomeDraftPage({
   onOpenGradesPage = null,
   onOpenPlanningPage = null,
   onOpenMailPage = null,
+  // « Assiduité »'s card, where the page exists (with « Mes notes »): the
+  // card opens it.
+  showAssiduity = false,
+  onOpenAssiduity = null,
   appsSlotRef = null,
 }) {
   const displayName = userName?.trim() || ''
@@ -326,8 +333,9 @@ function HomeDraftPage({
   // in Réglages › Accueil.
   const showAverageCard = showAverage && !hiddenWidgets.includes('average')
   const showRecentGrades = showAverage && !hiddenWidgets.includes('latestGrade')
-  const [grades, retryGrades] = useNewestGrades(showAverageCard || showRecentGrades)
-  const anyCard = isShown('nextClass') || showAverageCard || showRecentGrades || isShown('deadlines') || isShown('mail')
+  const showAssiduityCard = showAssiduity && !hiddenWidgets.includes('assiduity')
+  const [grades, retryGrades] = useNewestGrades(showAverageCard || showRecentGrades || showAssiduityCard)
+  const anyCard = isShown('nextClass') || showAverageCard || showRecentGrades || isShown('deadlines') || isShown('mail') || showAssiduityCard
   const gridRef = useRef(null)
   const [gridBoxRef, twoColumns] = useMinWidth(600, anyCard)
   const place = layoutHomeCards(useDrawnCards(gridRef))
@@ -488,6 +496,26 @@ function HomeDraftPage({
             {isShown('deadlines') ? (
               <div data-card="deadlines" className={cellClasses('deadlines')}>
                 <WidgetDeadlines visible large icon={homeworkIcon} />
+              </div>
+            ) : null}
+            {showAssiduityCard ? (
+              // The card opens « Assiduité » (Enter or Space too), as
+              // « Moyenne » opens « Mes notes ».
+              <div
+                data-card="assiduity"
+                className={`${cellClasses('assiduity')} ${onOpenAssiduity ? 'cursor-pointer rounded-[31px] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-text' : ''}`}
+                role={onOpenAssiduity ? 'link' : undefined}
+                tabIndex={onOpenAssiduity ? 0 : undefined}
+                aria-label={onOpenAssiduity ? 'Assiduité, voir la page' : undefined}
+                onClick={onOpenAssiduity ?? undefined}
+                onKeyDown={onOpenAssiduity ? (event) => {
+                  if (event.key !== 'Enter' && event.key !== ' ') return
+                  if (event.target !== event.currentTarget) return
+                  event.preventDefault()
+                  onOpenAssiduity()
+                } : undefined}
+              >
+                <WidgetAssiduity payload={grades.payload} releve={grades.releve} config={grades.config} status={grades.status} />
               </div>
             ) : null}
           </div>

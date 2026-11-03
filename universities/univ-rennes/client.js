@@ -165,6 +165,9 @@ export default {
         ],
         gradeWidgets: true,
         nextClassWidget: true,
+        // « Assiduité › Justifier »: « Congé menstruel » and « Manifestation »
+        // among the reasons.
+        absenceReasons: ['menstrual', 'protest'],
         extraServices: [
           // ScoDoc shortcut, opened through the CAS launch relay. Only listed
           // while the grade service is live.
