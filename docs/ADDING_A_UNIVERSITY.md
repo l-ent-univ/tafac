@@ -79,6 +79,7 @@ export const features = {
   grades: false,     // notes ScoDoc — true | false | 'disabled' (pastille visible, données démo)
   mail: false,       // widget « Mails récents » (lecture de la boîte de réception via le webmail)
   moodleDeadlines: false, // widget « Échéances Moodle » (devoirs/tests à rendre) — distinct de `moodle`
+  attendanceQr: false, // « Scanner ma présence » : QR de présence APSOLU (requiert `attendanceQr.origin` et `moodle.wayfEntityId`)
   sidebarLatestGrade: false, // « Dernière note » en bas de la barre latérale, qui ouvre « Mes notes » sur cette note (requiert `grades`)
   weather: { enabled: true, defaultCity: 'Paris' },
   serviceCategories: false, // filtres par catégorie au-dessus de la grille d'applications (voir services.categories)
@@ -134,6 +135,7 @@ Un feature à `false` : le serveur répond `{ disabled: true }` sur les endpoint
 
 - `origins.ade` / `origins.moodle` / `origins.planning` — `null` si absent.
 - `moodle.shibbolethLoginPath` + `moodle.wayfEntityId` — l'entityID Shibboleth de votre université sur la page WAYF de la fédération (visible dans l'URL `user_idp=` lors d'une connexion Moodle manuelle).
+- `attendanceQr.origin` (`client.js` et `server.js`) — origine du site APSOLU quand `features.attendanceQr` est actif. Le bouton de l'accueil scanne le QR ; seule l'URL `<origine>/local/apsolu/attendance/qrcode.php?keycode=…` est acceptée. Le serveur fait la chaîne SAML avec `moodle.wayfEntityId` et le navigateur termine la visite qui enregistre la présence. Le SP doit accepter une URL en `RelayState`.
 - `moodle.signInDomains` — requis quand `features.moodleDeadlines === true` (endpoint `GET /__ent_auth/moodle/deadlines`, contrat dans `src/entApi.js#getMoodleDeadlines`) : domaines que la connexion SSO Moodle côté serveur peut visiter (HTTPS uniquement) en plus de `origins.moodle` et du CAS, typiquement le WAYF et l'IdP Shibboleth (Rennes : `['wayf.univ-rennes.fr', 'ident-shib.univ-rennes1.fr']`). Le serveur rejoue la chaîne du relais Moodle (Shibboleth → WAYF → IdP → CAS → POST SAML) avec une copie du cookie jar de session, récupère le `sesskey` sur `/my/`, puis appelle `lib/ajax/service.php` : `core_calendar_get_action_events_by_timesort` (à faire, retards ≤ 7 jours inclus) et `core_calendar_get_calendar_upcoming_view` (devoirs/tests déjà rendus, et liste de repli). 6 échéances max sur 30 jours, cache 5 min par session ; les liens passent par `/__ent_auth/launch`. Requiert aussi `features.moodle` (relais) pour les liens. Le compte démo renvoie des échéances fictives.
 - `ade.etab`, `ade.passwordKey`, `ade.passwordIv`, `ade.appHeaders` — identité de l'app mobile « Campus » de votre université. **Ces valeurs se rétro-ingénient par campus** (interception du trafic de l'app mobile officielle) ; voir `API_GUIDE.md` et `src/knownEndpoints.js` pour la méthodologie utilisée à Rennes.
 - `planning.gwtClientId` — identifiant client GWT du Planning adesoft (visible dans les requêtes RPC de `myplanning.jsp`).
