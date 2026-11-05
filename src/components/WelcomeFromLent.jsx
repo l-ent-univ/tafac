@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Icon } from '@iconify/react'
 import transitionDoneImage from '../assets/login/transition-done.webp'
+import { r } from '../register.js'
 
 // What a transferred setting looks like to a student. Several keys share a
 // label (favourites and pins are both "Favoris"). The weather city still
@@ -76,7 +77,7 @@ export default function WelcomeFromLent({ visible, importedKeys = [], signedIn =
               </h2>
               <p className="m-0 text-[0.9rem] text-text-muted font-body leading-snug">
                 {labels.length > 0
-                  ? "Tes réglages t'ont suivi depuis l'ent :"
+                  ? r("Tes réglages t'ont suivi depuis l'ent :", "Vos réglages vous ont suivi depuis l'ent :")
                   : "C'est la même appli qu'avant, avec un nouveau nom."}
               </p>
             </div>
@@ -95,7 +96,7 @@ export default function WelcomeFromLent({ visible, importedKeys = [], signedIn =
             ) : null}
             {signedIn ? null : (
               <p className="m-0 text-[0.9rem] text-text-muted font-body leading-snug">
-                Connecte-toi avec les identifiants de ton université, comme avant.
+                {r('Connecte-toi avec les identifiants de ton université, comme avant.', 'Connectez-vous avec les identifiants de votre université, comme avant.')}
               </p>
             )}
             {showInstall ? (
@@ -106,8 +107,8 @@ export default function WelcomeFromLent({ visible, importedKeys = [], signedIn =
               >
                 <Icon icon="ph:device-mobile-speaker" className="h-5 w-5 shrink-0 text-text-muted" aria-hidden="true" />
                 <span className="flex min-w-0 flex-1 flex-col gap-0.5 font-body leading-snug">
-                  <span className="text-[0.9rem] font-semibold">Ajoute Tafac à ton écran d'accueil</span>
-                  <span className="text-[0.8rem] text-text-muted">Puis supprime l'ancienne icône l'ent</span>
+                  <span className="text-[0.9rem] font-semibold">{r("Ajoute Tafac à ton écran d'accueil", "Ajoutez Tafac à votre écran d'accueil")}</span>
+                  <span className="text-[0.8rem] text-text-muted">{r("Puis supprime l'ancienne icône l'ent", "Puis supprimez l'ancienne icône l'ent")}</span>
                 </span>
                 <Icon icon="ph:caret-right" className="h-4 w-4 shrink-0 text-text-muted" aria-hidden="true" />
               </button>

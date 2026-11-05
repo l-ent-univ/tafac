@@ -1,6 +1,7 @@
 import { useId, useState } from 'react'
 import { Icon } from '@iconify/react'
 import { BUCKET_COUNT, countLabel, describeBucket, summarizeDistribution } from '../gradeDetail'
+import { r } from '../register.js'
 
 const BUCKETS = Array.from({ length: BUCKET_COUNT }, (_, index) => index)
 const TICKS = new Set([0, 5, 10, 15, 20])
@@ -64,7 +65,7 @@ function HistogramUnavailable({ status, reason, isPending, onRetry }) {
         <p className="m-0 font-body text-[14px] font-semibold leading-[1.3] text-text">{notYet ? 'Pas encore de répartition' : tooFew ? 'Pas assez de notes' : 'Répartition indisponible'}</p>
         <p className="m-0 font-body text-[13px] font-medium leading-[1.35] text-text-muted">
           {isError
-            ? 'ScoDoc n’a pas répondu. Réessaie dans un instant.'
+            ? r('ScoDoc n’a pas répondu. Réessaie dans un instant.', 'ScoDoc n’a pas répondu. Réessayez dans un instant.')
             : notYet
               ? 'Elle s’affichera une fois les notes saisies.'
               : tooFew
@@ -104,7 +105,7 @@ function GradeHistogram({ state, studentBucket = null, isPending = false, onRetr
 
   const describe = (index) => {
     const range = describeBucket(index)
-    const own = index === studentBucket ? ', dont toi' : ''
+    const own = index === studentBucket ? r(', dont toi', ', dont vous') : ''
     return `${range.long} : ${countLabel(counts[index])}${own}`
   }
 
@@ -126,7 +127,7 @@ function GradeHistogram({ state, studentBucket = null, isPending = false, onRetr
   const spokenSummary = [
     `${countLabel(total)} notés.`,
     `La tranche la plus fréquente : ${describeBucket(summary.mode).spoken}, ${countLabel(counts[summary.mode])}.`,
-    hasStudent ? `Ta note est dans la tranche ${describeBucket(studentBucket).spoken}, avec ${countLabel(summary.same)} toi compris ; ${summary.below} en dessous, ${summary.above} au-dessus.` : null,
+    hasStudent ? `${r('Ta note', 'Votre note')} est dans la tranche ${describeBucket(studentBucket).spoken}, avec ${countLabel(summary.same)} ${r('toi', 'vous')} compris ; ${summary.below} en dessous, ${summary.above} au-dessus.` : null,
   ].filter(Boolean).join(' ')
 
   return (
@@ -174,7 +175,7 @@ function GradeHistogram({ state, studentBucket = null, isPending = false, onRetr
                 }}
                 aria-hidden="true"
               >
-                <span className="font-display text-[14px] font-bold leading-none">{countLabel(counts[active])}{active === studentBucket ? ', dont toi' : ''}</span>
+                <span className="font-display text-[14px] font-bold leading-none">{countLabel(counts[active])}{active === studentBucket ? r(', dont toi', ', dont vous') : ''}</span>
                 <span className="font-body text-[12px] font-medium leading-none opacity-75">{describeBucket(active).long}</span>
               </div>
             ) : null}
@@ -188,7 +189,7 @@ function GradeHistogram({ state, studentBucket = null, isPending = false, onRetr
         <div className="grid grid-cols-3 divide-x divide-border" aria-hidden="true">
           {[
             [summary.below, 'en dessous'],
-            [summary.same, 'dans ta tranche'],
+            [summary.same, r('dans ta tranche', 'dans votre tranche')],
             [summary.above, 'au-dessus'],
           ].map(([count, label]) => (
             <span key={label} className="grid justify-items-center gap-[5px] px-1 text-center">
@@ -210,7 +211,7 @@ function GradeHistogram({ state, studentBucket = null, isPending = false, onRetr
           <tbody>
             {BUCKETS.filter((index) => counts[index] > 0).map((index) => (
               <tr key={index}>
-                <th scope="row">{describeBucket(index).long}{index === studentBucket ? ' (ta note)' : ''}</th>
+                <th scope="row">{describeBucket(index).long}{index === studentBucket ? r(' (ta note)', ' (votre note)') : ''}</th>
                 <td>{counts[index]}</td>
               </tr>
             ))}

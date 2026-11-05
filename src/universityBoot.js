@@ -14,6 +14,7 @@ import {
   writeUniversityChoice,
 } from './universityRuntime'
 import { switchUniversityStorage } from './universityStorage'
+import { resolveRegister, setRegister } from './register.js'
 
 // One chunk per university: a page only downloads its own.
 const clientConfigs = import.meta.glob('../universities/*/client.js', { import: 'default' })
@@ -78,6 +79,8 @@ export async function bootUniversity() {
 
   Object.assign(universityConfig, config ?? neutralConfig)
   setLoadedUniversityId(config ? id : null)
+  // The university's register before App knows the student's establishment.
+  setRegister(resolveRegister(universityConfig))
 
   // The page as the service worker kept it still has its placeholders.
   if (document.title.includes('%LENT_')) {

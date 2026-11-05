@@ -18,6 +18,7 @@ import { NewBadge } from './SubjectsList'
 import CloseButton from './CloseButton'
 import Tooltip from './Tooltip'
 import { useSheetDrag } from '../useSheetDrag'
+import { r } from '../register.js'
 
 const FOCUSABLE_SELECTOR = 'button:not([disabled]), [href], [tabindex]:not([tabindex="-1"])'
 const DATE_FORMAT = new Intl.DateTimeFormat('fr-FR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })
@@ -25,16 +26,16 @@ const CARD = 'gd-card gd-rise grid gap-4 modal-inner-corners border border-borde
 
 // What a grade that isn't a number means for the averages.
 const STATE_NOTES = {
-  absent: { icon: 'ph:prohibit', text: 'Une absence non justifiée compte 0 dans tes moyennes.' },
-  excused: { icon: 'ph:check-circle', text: 'Absence justifiée : cette évaluation est neutralisée, elle ne compte pas dans tes moyennes.' },
+  absent: { icon: 'ph:prohibit', get text() { return r('Une absence non justifiée compte 0 dans tes moyennes.', 'Une absence non justifiée compte 0 dans vos moyennes.') } },
+  excused: { icon: 'ph:check-circle', get text() { return r('Absence justifiée : cette évaluation est neutralisée, elle ne compte pas dans tes moyennes.', 'Absence justifiée : cette évaluation est neutralisée, elle ne compte pas dans vos moyennes.') } },
   pending: { icon: 'ph:hourglass', text: 'La note n’est pas encore saisie sur ScoDoc.' },
 }
 
 // What a rattrapage, a session 2 or a bonus does, in place of a weight share.
 const TYPE_NOTES = {
-  Rattrapage: 'Une note de rattrapage remplace ta moyenne de la matière si elle est meilleure.',
-  'Session 2': 'La note de session 2 remplace ta moyenne de la matière.',
-  Bonus: 'Une évaluation bonus ajoute (ou retire) des points à ta moyenne de la matière.',
+  get Rattrapage() { return r('Une note de rattrapage remplace ta moyenne de la matière si elle est meilleure.', 'Une note de rattrapage remplace votre moyenne de la matière si elle est meilleure.') },
+  get 'Session 2'() { return r('La note de session 2 remplace ta moyenne de la matière.', 'La note de session 2 remplace votre moyenne de la matière.') },
+  get Bonus() { return r('Une évaluation bonus ajoute (ou retire) des points à ta moyenne de la matière.', 'Une évaluation bonus ajoute (ou retire) des points à votre moyenne de la matière.') },
 }
 
 const KIND_LABELS = { resource: 'Ressource', sae: 'SAÉ' }
@@ -66,7 +67,7 @@ function Hero({ evaluation, gap, summaryId }) {
         <p id={summaryId} className="m-0 flex items-end gap-[4px] leading-none">
           <span className="gd-grade font-display text-[64px] font-bold leading-[0.8] tracking-[-0.02em] text-text max-sm:text-[56px]" aria-hidden="true">{formatScore(grade.value)}</span>
           <span className="font-body text-[24px] font-medium leading-[0.8] text-text-muted max-sm:text-[21px]" aria-hidden="true">/20</span>
-          <span className="sr-only">Ta note : {formatScore(grade.value)} sur 20{gap ? `, ${gap.spoken}` : ''}.</span>
+          <span className="sr-only">{r('Ta note', 'Votre note')} : {formatScore(grade.value)} sur 20{gap ? `, ${gap.spoken}` : ''}.</span>
         </p>
         {gap ? (
           <span className="mb-[2px] inline-flex items-center gap-[5px] rounded-full border border-border bg-widget-bg/70 py-[6px] pr-[11px] pl-[8px] text-text-secondary" aria-hidden="true">
@@ -270,7 +271,7 @@ function PromoCard({ evaluation, semesterId, showPromoStats, titleId }) {
           {state.status === 'ok' && value != null ? (
             <span className="inline-flex items-center gap-[6px] font-body text-[12px] font-medium leading-none text-text-muted" aria-hidden="true">
               <span className="h-[10px] w-[8px] rounded-t-[2px] bg-brand" />
-              ta note
+              {r('ta note', 'votre note')}
             </span>
           ) : null}
         </div>

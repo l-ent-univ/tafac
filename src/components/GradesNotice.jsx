@@ -3,9 +3,10 @@ import { Icon } from '@iconify/react'
 import { trackGradesAction } from '../analytics'
 import { shadeHex } from '../colorContrast'
 import { describeJuryDecision, formatJuryDate, hashNoticeText, readDismissedMessageHash, writeDismissedMessageHash } from '../gradesNotices'
+import { r } from '../register.js'
 
-// One notice under the "Mes notes" cards: an icon in a soft disc (or any
-// `media`), a bold line with an optional `badge`, an optional text.
+// One notice under the "Mes notes" cards: an icon on the title's line (or
+// any `media`), a bold line with an optional `badge`, an optional text.
 // `collapsible` folds a long text to three lines behind "Lire la suite";
 // `onDismiss` adds a close button; `tint` washes the card in a colour;
 // `onExpand` hears "Lire la suite" unfold it.
@@ -28,14 +29,12 @@ export function GradesNotice({ icon = null, media = null, tint = null, label, ti
   }, [collapsible, expanded, children])
 
   return (
-    <div role="note" aria-label={label} className="grades-notice widget-card widget-card-visible relative isolate flex items-start gap-3 card-corners-sm border bg-widget-bg p-3 text-text shadow-md max-md:gap-2.5">
+    <div role="note" aria-label={label} className={`grades-notice widget-card widget-card-visible relative isolate flex items-start card-corners-sm border bg-widget-bg p-3 text-text shadow-md ${media ? 'gap-3 max-md:gap-2.5' : 'gap-2'}`}>
       {tint ? <span className="grades-notice-tint" style={{ backgroundColor: tint }} aria-hidden="true" /> : null}
-      {media ?? (
-        <span className="inline-flex size-9 shrink-0 items-center justify-center rounded-full bg-brand-subtle text-text" aria-hidden="true">
-          <Icon icon={icon} className="size-[18px]" />
-        </span>
-      )}
-      <div className={`grid min-w-0 flex-1 justify-items-start gap-0.5 ${media ? 'pt-[3px]' : 'pt-[7px]'}`}>
+      {/* An icon alone, on the title's line (no disc: the notice stays
+          compact); `media` (the jury's coin) keeps its own room. */}
+      {media ?? <Icon icon={icon} className="mt-px size-[18px] shrink-0 text-text-secondary" aria-hidden="true" />}
+      <div className={`grid min-w-0 flex-1 justify-items-start gap-0.5 ${media ? 'pt-[3px]' : ''}`}>
         <p className="m-0 font-body text-[15px] font-semibold leading-[1.3] text-text [overflow-wrap:anywhere]">
           {title}
           {badge ? <span className="ml-2 inline-block rounded-full border border-border px-1.5 align-[1px] text-[11px] font-semibold leading-[16px] tracking-[0.04em] text-text-muted">{badge}</span> : null}
@@ -157,7 +156,7 @@ function JuryCoin({ tone }) {
 
 function JuryDecisionNotice({ decision }) {
   const when = formatJuryDate(decision.date)
-  const scope = decision.scope === 'year' ? 'ton année' : 'ce semestre'
+  const scope = decision.scope === 'year' ? r('ton année', 'votre année') : 'ce semestre'
   const detail = `${decision.label ? 'Décision du jury pour' : 'Pour'} ${scope}${when ? `, le ${when}` : ''}`
 
   return (
@@ -197,7 +196,7 @@ function GradesNotices({ releve, departmentMessage }) {
     <div className="grid gap-3 max-md:gap-2">
       {decision ? <JuryDecisionNotice decision={decision} /> : null}
       {showMessage ? (
-        <GradesNotice icon="ph:megaphone" label="Message de ton département" title="Message de ton département" collapsible onDismiss={dismissMessage} onExpand={() => trackGradesAction('department_message_expanded')}>
+        <GradesNotice icon="ph:megaphone" label={r('Message de ton département', 'Message de votre département')} title={r('Message de ton département', 'Message de votre département')} collapsible onDismiss={dismissMessage} onExpand={() => trackGradesAction('department_message_expanded')}>
           {departmentMessage}
         </GradesNotice>
       ) : null}

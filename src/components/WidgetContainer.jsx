@@ -27,6 +27,7 @@ import {
   getEditableLocationLabel,
   getWeatherForQuery,
 } from '../weatherApi'
+import { r } from '../register.js'
 
 const WEATHER_CITY_KEY = 'l-ent:weather-city'
 const WEATHER_CONFIG = universityConfig.features?.weather ?? {}
@@ -211,7 +212,7 @@ function WidgetContainer({
 
     try {
       if (!trimmedQuery) {
-        setLocationError('Saisis une ville/code postal ou choisis "Ma position".')
+        setLocationError(r('Saisis une ville/code postal ou choisis "Ma position".', 'Saisissez une ville/code postal ou choisissez "Ma position".'))
         return
       }
 

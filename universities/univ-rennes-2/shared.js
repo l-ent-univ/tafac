@@ -21,6 +21,10 @@ export const university = {
   logoShape: 'square',
 }
 
+// How the app addresses the student: 'vous' (the default) or 'tu'. An
+// establishment can have its own (client.js › establishments.byId.<id>.register).
+export const register = 'vous'
+
 // The establishments' names (client.js's establishments.byId, and the sent
 // mail's signature in server.js), by their ids.
 export const establishmentNames = {
@@ -29,19 +33,19 @@ export const establishmentNames = {
 
 export const branding = {
   appName: 'Tafac',
-  defaultTitle: "Tafac | Cours, notes et services de ton université",
+  defaultTitle: "Tafac | Cours, notes et services de votre université",
   seoTitle: "Tafac | Client alternatif ENT Université Rennes 2",
   seoDescription: "Client alternatif non officiel aux services numériques de l'Université Rennes 2. Projet étudiant libre, non affilié à l'université.",
-  pwaDescription: "Tes services de l'Université Rennes 2 dans une seule app. Projet étudiant non affilié à l'université.",
+  pwaDescription: "Vos services de l'Université Rennes 2 dans une seule app. Projet étudiant non affilié à l'université.",
   nameInText: 'l’Université Rennes 2',
   logoAlt: 'Université Rennes 2',
   sidebarLogoAlt: "Tafac - Université Rennes 2",
   loginFooterLine: "Projet étudiant non officiel, non affilié à l'Université Rennes 2",
-  loginPasswordNote: "Ton mot de passe sert uniquement à te connecter au site de l'université et n'est jamais enregistré",
+  loginPasswordNote: "Votre mot de passe sert uniquement à vous connecter au site de l'université et n'est jamais enregistré",
   about: {
     intro: "est un client alternatif aux services numériques de l'Université Rennes 2.",
     disclaimer:
-      "Tafac est un projet étudiant indépendant, non officiel et non affilié à l'Université Rennes 2. Tes identifiants servent uniquement à te connecter et ne sont jamais stockés.",
+      "Tafac est un projet étudiant indépendant, non officiel et non affilié à l'Université Rennes 2. Les identifiants servent uniquement à la connexion et ne sont jamais stockés.",
     repoUrl: 'https://github.com/l-ent-univ/tafac',
     // « Équipe » in À propos: the same Tafac team for every university.
     team: TAFAC_TEAM,

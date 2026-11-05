@@ -32,6 +32,7 @@ import {
   getStoredHiddenWidgets,
   getStoredShowAppDescriptions,
   getStoredShowPlanningWeekend,
+  getStoredAssiduityTab,
   getStoredLogoSource,
   getStoredShowUniversityLogo,
   getStoredShowWallpaper,
@@ -41,6 +42,7 @@ import {
   persistHiddenWidgets,
   persistShowAppDescriptions,
   persistShowPlanningWeekend,
+  persistAssiduityTab,
   persistLogoSource,
   persistShowUniversityLogo,
   persistShowWallpaper,
@@ -51,6 +53,7 @@ import AvailableApplications from './components/AvailableApplications'
 import GradesPage from './components/GradesPage'
 import PlanningPage from './components/PlanningPage'
 import MailPage from './components/MailPage'
+import AssiduityPage from './components/AssiduityPage'
 import HomeDraftPage from './components/HomeDraftPage'
 import LoadingDots from './components/LoadingDots'
 import { resolveHeroImage } from './heroImage'
@@ -89,6 +92,7 @@ import {
   logoutFromEnt,
   preloadSchoolCertificateStatus,
 } from './entApi'
+import { r, resolveRegister, setRegister } from './register.js'
 
 // The planning is the student's own (TEMPO): no group to choose in Mon compte.
 const HAS_PERSONAL_PLANNING = universityConfig.planning?.personal === true
@@ -427,8 +431,8 @@ function getFrenchAuthErrorMessage(error, context = 'login') {
   if (error?.status === 429) {
     const minutes = Math.ceil((error.retryAfterSeconds ?? 0) / 60)
     return minutes > 0
-      ? `Trop de tentatives de connexion, réessaie dans ${minutes} min`
-      : 'Trop de tentatives de connexion. Réessaie dans quelques instants'
+      ? r(`Trop de tentatives de connexion, réessaie dans ${minutes} min`, `Trop de tentatives de connexion, réessayez dans ${minutes} min`)
+      : r('Trop de tentatives de connexion. Réessaie dans quelques instants', 'Trop de tentatives de connexion. Réessayez dans quelques instants')
   }
 
   const rawMessage = getErrorMessage(error).trim()
@@ -447,7 +451,7 @@ function getFrenchAuthErrorMessage(error, context = 'login') {
     || normalizedMessage.includes('missing password')
     || normalizedMessage.includes('mot de passe requis')
   ) {
-    return 'Remplis ton identifiant et ton mot de passe'
+    return r('Remplis ton identifiant et ton mot de passe', 'Remplissez votre identifiant et votre mot de passe')
   }
 
   if (
@@ -468,7 +472,7 @@ function getFrenchAuthErrorMessage(error, context = 'login') {
   }
 
   if (normalizedMessage.includes('status 429') || normalizedMessage.includes('too many requests')) {
-    return 'Trop de tentatives de connexion. Réessaie dans quelques instants'
+    return r('Trop de tentatives de connexion. Réessaie dans quelques instants', 'Trop de tentatives de connexion. Réessayez dans quelques instants')
   }
 
   if (
@@ -479,8 +483,8 @@ function getFrenchAuthErrorMessage(error, context = 'login') {
     || normalizedMessage.includes('fetch')
   ) {
     return context === 'session'
-      ? 'Impossible de vérifier la session, réessaie dans quelques instants'
-      : 'Impossible de joindre le service de connexion, vérifie ta connexion puis réessaie'
+      ? r('Impossible de vérifier la session, réessaie dans quelques instants', 'Impossible de vérifier la session, réessayez dans quelques instants')
+      : r('Impossible de joindre le service de connexion, vérifie ta connexion puis réessaie', 'Impossible de joindre le service de connexion, vérifiez votre connexion puis réessayez')
   }
 
   if (normalizedMessage.includes('status 5') || normalizedMessage.includes('internal server error')) {
@@ -491,13 +495,13 @@ function getFrenchAuthErrorMessage(error, context = 'login') {
 
   return context === 'session'
     ? 'Impossible de vérifier la session pour le moment'
-    : 'La connexion a échoué, vérifie tes identifiants puis réessaie'
+    : r('La connexion a échoué, vérifie tes identifiants puis réessaie', 'La connexion a échoué, vérifiez vos identifiants puis réessayez')
 }
 
 // Signed in without the CAS ticket the other services sign in with (the
 // session's `degraded`): signed out completely rather than left with some
 // services missing, and told why on the login form.
-const DEGRADED_SESSION_MESSAGE = 'Ta session a expiré, reconnecte-toi'
+const degradedSessionMessage = () => r('Ta session a expiré, reconnecte-toi', 'Votre session a expiré, reconnectez-vous')
 
 function buildDebugSnapshot(label, data, error = '') {
   return {
@@ -835,7 +839,7 @@ function getFrenchTpLoadErrorMessage(error) {
     || normalizedMessage.includes('load failed')
     || normalizedMessage.includes('network request failed')
   ) {
-    return "Impossible de récupérer les groupes TP pour le moment, vérifie ta connexion puis réessaie"
+    return r('Impossible de récupérer les groupes TP pour le moment, vérifie ta connexion puis réessaie', 'Impossible de récupérer les groupes TP pour le moment, vérifiez votre connexion puis réessayez')
   }
 
   return 'ADE est indisponible pour le moment'
@@ -901,6 +905,10 @@ function App() {
     password: '',
   })
   const [establishment, setEstablishment] = useState(() => getStoredEstablishment())
+  // « tu » or « vous » for every string built from here on (src/register.js):
+  // set before anything below renders, and again when the establishment
+  // changes (every component re-renders with App).
+  setRegister(resolveRegister(universityConfig, establishment))
   const [selectedTp, setSelectedTp] = useState(() => getStoredTpSelection())
   const [hiddenWidgets, setHiddenWidgets] = useState(() => getStoredHiddenWidgets())
   const [customBackground, setCustomBackground] = useState(() => getStoredCustomBackground())
@@ -908,7 +916,7 @@ function App() {
   const [showUniversityLogo, setShowUniversityLogo] = useState(() => getStoredShowUniversityLogo())
   const [logoSource, setLogoSource] = useState(() => getStoredLogoSource())
   // Page shown next to the sidebar: 'home' (« Accueil »), 'grades',
-  // 'planning' or 'mail'. Each switch is
+  // 'planning', 'mail' or 'assiduity'. Each switch is
   // a history entry (see appHistory.js): back and forward move between
   // pages, and a reload stays on the page.
   const [activePage, setActivePage] = useState(() => readHistoryNav().page)
@@ -920,6 +928,7 @@ function App() {
   const [planningArrivalSource, setPlanningArrivalSource] = useState(() => (readHistoryNav().page === 'planning' ? 'history' : 'other'))
   // And the mail page (src/mailAnalytics.js).
   const [mailArrivalSource, setMailArrivalSource] = useState(() => (readHistoryNav().page === 'mail' ? 'history' : 'other'))
+  const [assiduityArrivalSource, setAssiduityArrivalSource] = useState(() => (readHistoryNav().page === 'assiduity' ? 'history' : 'other'))
   // Page-switch animations only once the user has switched, not on first load.
   const [hasSwitchedPage, setHasSwitchedPage] = useState(false)
   const [theme, setTheme] = useState(() => getStoredTheme())
@@ -930,6 +939,8 @@ function App() {
   const [mailReaderOpen, setMailReaderOpen] = useState(false)
   const [sidebarAutoCompactDismissed, setSidebarAutoCompactDismissed] = useState(false)
   const [showPlanningWeekend, setShowPlanningWeekend] = useState(() => getStoredShowPlanningWeekend())
+  // « Assiduité » in the phone's tab bar instead of Moodle (Réglages › Apparence).
+  const [showAssiduityTab, setShowAssiduityTab] = useState(() => getStoredAssiduityTab())
   const [anonymousAnalytics, setAnonymousAnalytics] = useState(() => getStoredAnonymousAnalytics())
   const isAnalyticsAvailable = useAnalyticsAvailable()
   const [profileUser, setProfileUser] = useState(null)
@@ -1059,11 +1070,11 @@ function App() {
           degradedReason: null,
           sessionSource: null,
           canUseServerLaunch: false,
-          error: DEGRADED_SESSION_MESSAGE,
+          error: degradedSessionMessage(),
         })
         navigate(LOGIN_PATH, { replace: true })
         if (exposeOutput) {
-          commitDebugState('Session', session, DEGRADED_SESSION_MESSAGE)
+          commitDebugState('Session', session, degradedSessionMessage())
         }
         return null
       }
@@ -1257,6 +1268,7 @@ function App() {
     setLogoSource(getStoredLogoSource(sessionState.user))
     setShowAppDescriptions(getStoredShowAppDescriptions(sessionState.user))
     setShowPlanningWeekend(getStoredShowPlanningWeekend(sessionState.user))
+    setShowAssiduityTab(getStoredAssiduityTab(sessionState.user))
     // Applied to the analytics module right away (not in an effect) so the
     // first dashboard events already honour this user's choice.
     const storedAnonymousAnalytics = getStoredAnonymousAnalytics(sessionState.user)
@@ -1282,7 +1294,7 @@ function App() {
     setTpOnboardingState((current) => createEmptyTpOnboardingState({
       ...current,
       loadingStep: 'year',
-      loadingMessage: "Récupération de ton groupe...",
+      loadingMessage: r('Récupération de ton groupe...', 'Récupération de votre groupe...'),
       errorMessage: '',
     }))
 
@@ -1867,16 +1879,21 @@ function App() {
     () => activePage === 'mail' && getMobileTabItems(establishment, { gradesSupported }).some((item) => item.page === 'mail'),
     [activePage, establishment, gradesSupported],
   )
+  // Likewise for « Assiduité » (the ScoDoc relevé's absences, with « Mes notes »).
+  const isAssiduityPage = useMemo(
+    () => activePage === 'assiduity' && getMobileTabItems(establishment, { gradesSupported }).some((item) => item.page === 'assiduity'),
+    [activePage, establishment, gradesSupported],
+  )
   // « Accueil » (HomeDraftPage), every university: the page shown when no
   // other is.
-  const isHomePage = !isGradesPage && !isPlanningPage && !isMailPage
+  const isHomePage = !isGradesPage && !isPlanningPage && !isMailPage && !isAssiduityPage
   // The « Accueil » band's tint (--page-top-band, overrides.css): the
   // wallpaper's main colour when it shows one, else the brand's.
   const homeBandTint = useWallpaperTint(isHomePage && showWallpaper ? heroImage.src : null)
   // Folded for a mail open beside the list (handleMailReaderOpenChange).
   const isSidebarAutoCompact = isMailPage && mailReaderOpen && !sidebarCompact && !sidebarAutoCompactDismissed
   // The page the sidebar and the tab bar show as selected.
-  const shownPage = isGradesPage ? 'grades' : isPlanningPage ? 'planning' : isMailPage ? 'mail' : 'home'
+  const shownPage = isGradesPage ? 'grades' : isPlanningPage ? 'planning' : isMailPage ? 'mail' : isAssiduityPage ? 'assiduity' : 'home'
   // Being on « Mes notes » is having seen its launch, however the student
   // got there (tab, card, "Dernière note", app list, a reload on the page):
   // the dashboard card and the tab's « Nouveau » go. After the audience
@@ -1967,6 +1984,7 @@ function App() {
     if (page === 'grades') setGradesArrivalSource(source)
     if (page === 'planning') setPlanningArrivalSource(source)
     if (page === 'mail') setMailArrivalSource(source)
+    if (page === 'assiduity') setAssiduityArrivalSource(source)
     setActivePage(page)
     setHasSwitchedPage(true)
     window.requestAnimationFrame(() => {
@@ -2021,14 +2039,15 @@ function App() {
     }
     handleNavigatePage('mail', 'dashboard_card')
   }, [showPage, handleNavigatePage])
-  // « Écrire au sujet de cette note » (« Mes notes ») or « … de ce cours »
-  // (the Planning): the mail page, its composer open on that mail
-  // (`request`: the composer's `restore`, see MailComposer; its `kind`
-  // 'course' from the Planning), taken once by the page as it mounts.
+  // « Écrire au sujet de cette note » (« Mes notes »), « … de ce cours »
+  // (the Planning) or « Écrire à l’enseignant » (« Assiduité »): the mail
+  // page, its composer open on that mail (`request`: the composer's
+  // `restore`, see MailComposer; its `kind` 'course' from the Planning,
+  // 'absence' from « Assiduité »), taken once by the page as it mounts.
   const [pendingMailCompose, setPendingMailCompose] = useState(null)
   const handleComposeMail = useCallback((request) => {
     setPendingMailCompose(request)
-    handleNavigatePage('mail', request?.kind === 'course' ? 'planning' : 'grades')
+    handleNavigatePage('mail', request?.kind === 'course' ? 'planning' : request?.kind === 'absence' ? 'assiduity' : 'grades')
   }, [handleNavigatePage])
   const clearPendingMailCompose = useCallback(() => setPendingMailCompose(null), [])
   // The composer's « Un cours… »: the Planning's weeks, where it's in the app.
@@ -2077,6 +2096,18 @@ function App() {
     persistShowPlanningWeekend(show, sessionState.user)
     setShowPlanningWeekend(show)
   }, [sessionState.user])
+  // « Accueil »'s « Assiduité » card: the page, as a dashboard card.
+  const handleOpenAssiduityFromCard = useCallback(() => handleNavigatePage('assiduity', 'dashboard_card'), [handleNavigatePage])
+  const handleAssiduityTabChange = useCallback((show) => {
+    persistAssiduityTab(show, sessionState.user)
+    setShowAssiduityTab(show)
+    track('setting_changed', { setting: 'assiduity_tab', value: show ? 'on' : 'off' })
+  }, [sessionState.user])
+  // Réglages › Apparence offers it where there's an « Assiduité » page;
+  // its words say whether Moodle gives way.
+  const tabBarShortcuts = useMemo(() => getMobileTabItems(establishment, { gradesSupported }), [establishment, gradesSupported])
+  const hasAssiduityPage = tabBarShortcuts.some((item) => item.page === 'assiduity')
+  const hasMoodleTab = tabBarShortcuts.some((item) => item.id === 'moodle')
 
   // `persist` false: live under the pointer, stored on release.
   const handleSidebarCompactChange = useCallback((compact, { persist = true } = {}) => {
@@ -2707,6 +2738,8 @@ function App() {
                   onOpenMail={hasMailPage ? handleOpenMail : null}
                   onOpenCardsSettings={handleOpenCardsSettings}
                   onOpenGradesPage={hasGradesPage ? handleOpenGradesPage : null}
+                  showAssiduity={hasAssiduityPage}
+                  onOpenAssiduity={hasAssiduityPage ? handleOpenAssiduityFromCard : null}
                   onOpenPlanningPage={hasPlanningPage ? handleOpenPlanningPage : null}
                   onOpenMailPage={hasMailPage ? handleOpenMailPage : null}
                   appsSlotRef={setHomeAppsSlotEl}
@@ -2721,6 +2754,11 @@ function App() {
             {isPlanningPage ? (
               <div className="page-enter flex-1 min-h-0 4xl:flex-none 4xl:min-h-0">
                 <PlanningPage selection={selectedTp} user={sessionState.user} showWeekend={showPlanningWeekend} onOpenAccount={handleOpenAccountModal} initialDay={pendingPlanningDay} onInitialDayHandled={clearPendingPlanningDay} arrivalSource={planningArrivalSource} onComposeMail={hasMailPage ? handleComposeMail : null} />
+              </div>
+            ) : null}
+            {isAssiduityPage ? (
+              <div className="page-enter flex-1 min-h-0 4xl:flex-none 4xl:min-h-0">
+                <AssiduityPage arrivalSource={assiduityArrivalSource} onComposeMail={hasMailPage ? handleComposeMail : null} absenceReasons={universityConfig.establishments?.byId?.[establishment]?.absenceReasons} findsClassTeacher={hasPlanningPage} />
               </div>
             ) : null}
             {isMailPage ? (
@@ -2745,6 +2783,7 @@ function App() {
             establishment={establishment}
             gradesSupported={gradesSupported}
             activePage={shownPage}
+            showAssiduity={showAssiduityTab}
             onNavigatePage={handleNavigatePage}
           />
         </div>
@@ -2796,6 +2835,9 @@ function App() {
         onSidebarCompactChange={handleSidebarCompactChange}
         showPlanningWeekend={showPlanningWeekend}
         onShowPlanningWeekendChange={handleShowPlanningWeekendChange}
+        assiduityTab={showAssiduityTab}
+        onAssiduityTabChange={hasAssiduityPage ? handleAssiduityTabChange : null}
+        assiduityTabReplacesMoodle={hasMoodleTab}
         planningSelection={selectedTp}
         anonymousAnalytics={anonymousAnalytics}
         onAnonymousAnalyticsChange={isAnalyticsAvailable ? handleAnonymousAnalyticsChange : null}

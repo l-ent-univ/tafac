@@ -17,6 +17,7 @@ import {
   persistNextClassCache,
   readNextClassCache,
 } from '../upcomingClasses'
+import { r } from '../register.js'
 
 const NEXT_CLASS_TICK_MS = 30 * 1000
 const NEXT_CLASS_REFRESH_MS = 5 * 60 * 1000
@@ -275,7 +276,7 @@ function getStatusCopy(widgetState, lookaheadDays = NEXT_CLASS_LOOKAHEAD_DAYS, {
     case 'unconfigured':
       return {
         title: 'Groupe manquant',
-        body: 'Choisis ton groupe TD ou TP dans « Mon compte »',
+        body: r('Choisis ton groupe TD ou TP dans « Mon compte »', 'Choisissez votre groupe TD ou TP dans « Mon compte »'),
         icon: 'ph:users',
       }
     case 'limited':
@@ -290,7 +291,7 @@ function getStatusCopy(widgetState, lookaheadDays = NEXT_CLASS_LOOKAHEAD_DAYS, {
       if (widgetState.noTimetable) {
         return {
           title: 'Pas d’emploi du temps',
-          body: `${PLANNING_PROVIDER} n’a encore aucun cours pour toi cette année`,
+          body: r(`${PLANNING_PROVIDER} n’a encore aucun cours pour toi cette année`, `${PLANNING_PROVIDER} n’a encore aucun cours pour vous cette année`),
           icon: 'ph:calendar-blank',
           action,
         }
@@ -303,7 +304,7 @@ function getStatusCopy(widgetState, lookaheadDays = NEXT_CLASS_LOOKAHEAD_DAYS, {
     case 'paused':
       return {
         title: 'Synchroniser le planning',
-        body: 'Appuie ici pour mettre à jour le prochain cours',
+        body: r('Appuie ici pour mettre à jour le prochain cours', 'Appuyez ici pour mettre à jour le prochain cours'),
         icon: 'ph:calendar-check',
         action,
       }

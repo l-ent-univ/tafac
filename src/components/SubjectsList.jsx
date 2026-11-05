@@ -13,6 +13,7 @@ import { gradeCopyText } from '../contextMenuItems'
 import { copyToClipboard, useContextMenu } from '../useContextMenu'
 import CardInfoTip from './CardInfoTip'
 import UeLink from './UeLink'
+import { r } from '../register.js'
 
 const DAY_FORMAT = new Intl.DateTimeFormat('fr-FR', { day: 'numeric', month: 'short' })
 
@@ -320,7 +321,7 @@ function SubjectsList({ report, ueColors = {}, subjectIcon = () => null, onOpenU
               <span className="font-body text-[13px] font-medium leading-none text-text-30" aria-hidden="true">{group.modules.length}</span>
               {group.kind === 'sae' ? (
                 <CardInfoTip label="Les SAÉ, c’est quoi ?">
-                  Les situations d’apprentissage et d’évaluation : les projets du semestre, où tu mets en pratique les ressources. Elles comptent souvent beaucoup dans tes UE.
+                  {r('Les situations d’apprentissage et d’évaluation : les projets du semestre, où tu mets en pratique les ressources. Elles comptent souvent beaucoup dans tes UE.', 'Les situations d’apprentissage et d’évaluation : les projets du semestre, où vous mettez en pratique les ressources. Elles comptent souvent beaucoup dans vos UE.')}
                 </CardInfoTip>
               ) : null}
             </div>

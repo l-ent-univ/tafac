@@ -1,4 +1,4 @@
-// "Briefing du jour": the short sentence under "Salut Camille !" on the
+// "Briefing du jour": the short sentence under "Bonjour Camille" on the
 // greeting card. Built from what the dashboard already has on the device
 // (ADE classes, Moodle deadlines) and from the time of day. Pure on purpose: no storage, no fetch, `now` passed in, so every
 // case is unit tested (tests/dailyBriefing.test.js).
