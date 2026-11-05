@@ -13,6 +13,7 @@ import { parseDay } from '../assiduity'
 import CloseButton from './CloseButton'
 import LentButton from './LentButton'
 import { r } from '../register.js'
+import { useSheetDrag } from '../useSheetDrag'
 
 // « Justifier » (« Assiduité »): a short walkthrough, one question a step,
 // as the grade simulator's sheet (GradeSimulatorModal): why the student
@@ -270,6 +271,7 @@ function ReviewStep({ entry, answers, file, toTeacher, onToTeacher, findsClassTe
 function JustifyAbsenceSheet({ entry, extraReasons = [], findsClassTeacher = false, onStep = () => {}, onCompose, onClose }) {
   const titleId = useId()
   const dialogRef = useRef(null)
+  const dismiss = useSheetDrag(dialogRef, onClose)
   const bodyRef = useRef(null)
   const heightFromRef = useRef(null)
   const [step, setStep] = useState('reason')
@@ -355,7 +357,7 @@ function JustifyAbsenceSheet({ entry, extraReasons = [], findsClassTeacher = fal
       if (event.key === 'Escape') {
         event.stopPropagation()
         event.preventDefault()
-        onClose()
+        dismiss()
         return
       }
       if (event.key !== 'Tab' || !dialogRef.current) return
@@ -381,7 +383,7 @@ function JustifyAbsenceSheet({ entry, extraReasons = [], findsClassTeacher = fal
 
   return createPortal(
     <div className="gd-root fixed inset-0 z-50 flex items-center justify-center p-5 max-sm:items-end max-sm:p-0" role="presentation">
-      <div className="weather-modal-backdrop absolute inset-0 bg-backdrop animate-modal-backdrop-in" onClick={onClose} aria-hidden="true" />
+      <div className="weather-modal-backdrop absolute inset-0 bg-backdrop animate-modal-backdrop-in" onClick={dismiss} aria-hidden="true" />
       <section
         ref={dialogRef}
         className="gd-dialog relative isolate flex max-h-[min(860px,calc(100dvh-40px))] w-[min(560px,100%)] flex-col overflow-hidden modal-corners [--modal-inset:24px] [--modal-inner-radius:20px] max-sm:[--modal-inset:16px] max-sm:[--modal-inner-radius:18px] border border-border bg-bg text-text shadow-[0_24px_80px_var(--color-shadow)] outline-none max-sm:max-h-[calc(100dvh-16px)] max-sm:rounded-b-none max-sm:border-b-0"
@@ -412,7 +414,7 @@ function JustifyAbsenceSheet({ entry, extraReasons = [], findsClassTeacher = fal
               <span className="truncate font-body text-[12.5px] font-medium leading-none text-text-muted">{context}</span>
             </span>
             <StepDots index={stepIndex} />
-            <CloseButton onClick={onClose} />
+            <CloseButton onClick={dismiss} />
           </div>
         </header>
         <div ref={bodyRef} className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-6 pt-3 pb-6 max-sm:px-4 max-sm:pb-[max(24px,env(safe-area-inset-bottom))]">
