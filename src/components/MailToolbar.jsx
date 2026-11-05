@@ -41,8 +41,9 @@ function ToolbarButton({ label, icon, iconClassName = '', onClick, disabled = fa
 // for good (`onDeleteForever`, after a confirmation), in red. `onMove(event)`
 // opens the folder picker under its button (« Déplacer »). Three buttons in
 // that group whatever the folder: on a 360 px phone the bar still fits once
-// the buttons narrow to 36 px (max-sm).
-function MailToolbar({ message, multiple = false, folderKind = 'inbox', onReply, onReplyAll, onForward, onTrash, onSpam, onRestore, onDeleteForever, onMove, onToggleUnread, onToggleFlag, className = '' }) {
+// the buttons narrow to 36 px (max-sm). `onClose`: the side panel's own
+// close button, at its far end (desktop only: a phone has its back button).
+function MailToolbar({ message, multiple = false, folderKind = 'inbox', onReply, onReplyAll, onForward, onTrash, onSpam, onRestore, onDeleteForever, onMove, onToggleUnread, onToggleFlag, onClose = null, className = '' }) {
   const ready = Boolean(message)
   const deleteForever = { id: 'delete-forever', label: 'Supprimer définitivement', icon: 'ph:trash', iconClassName: 'text-[#d1342f] dark:text-[#ff6b63]', onClick: onDeleteForever, disabled: !ready }
   const move = { id: 'move', label: 'Déplacer', icon: 'ph:folder-open', onClick: onMove, disabled: !ready }
@@ -104,6 +105,11 @@ function MailToolbar({ message, multiple = false, folderKind = 'inbox', onReply,
           ))}
         </div>
       ))}
+      {onClose ? (
+        <div className="pointer-events-auto mobile-tab-bar ml-auto flex items-center rounded-full p-[3px] max-4xl:hidden">
+          <ToolbarButton label="Fermer" icon="ph:x" onClick={onClose} tooltipSide="bottom-end" />
+        </div>
+      ) : null}
     </div>
   )
 }

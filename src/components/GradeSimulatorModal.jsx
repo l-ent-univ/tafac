@@ -7,6 +7,7 @@ import { describeRevealForAnalytics } from '../gradesAnalytics'
 import { addCustomEvaluations } from '../gradeSimulation'
 import { readSemesterUes } from '../semesterUes'
 import { useUeColor } from '../useUeColor'
+import { useSheetDrag } from '../useSheetDrag'
 import { buildSegmentPath, pointAt } from '../ueRingGeometry'
 import GradeSimulatorReveal from './GradeSimulatorReveal'
 import GradeSimulatorUe from './GradeSimulatorUe'
@@ -236,6 +237,7 @@ function UeDial({ ues, turn, onTurn, leaving = false, hiddenCode = null, onLeft 
 // opening and closing, for the anonymous analytics (GradesPage's).
 function GradeSimulatorModal({ report = null, releve = null, config = null, semester = null, subjectIcon = () => null, onStep = () => {}, onClose }) {
   const dialogRef = useRef(null)
+  const dismiss = useSheetDrag(dialogRef, onClose)
   const titleId = useId()
   const semesterLabel = semester?.number != null ? `Semestre ${semester.number}` : null
   // Their colours as painted (useUeColor): the dial, the UE's step and the
@@ -401,7 +403,7 @@ function GradeSimulatorModal({ report = null, releve = null, config = null, seme
     if (event.key === 'Escape') {
       event.stopPropagation()
       event.preventDefault()
-      onClose()
+      dismiss()
       return
     }
     if (event.key !== 'Tab' || !dialogRef.current) return
@@ -430,7 +432,7 @@ function GradeSimulatorModal({ report = null, releve = null, config = null, seme
 
   return createPortal(
     <div className="gd-root fixed inset-0 z-50 flex items-center justify-center p-5 max-sm:items-end max-sm:p-0" role="presentation">
-      <div className="weather-modal-backdrop absolute inset-0 bg-backdrop animate-modal-backdrop-in" onClick={onClose} aria-hidden="true" />
+      <div className="weather-modal-backdrop absolute inset-0 bg-backdrop animate-modal-backdrop-in" onClick={dismiss} aria-hidden="true" />
       <section
         ref={dialogRef}
         className="gd-dialog relative isolate flex max-h-[min(860px,calc(100dvh-40px))] w-[min(600px,100%)] flex-col modal-corners [--modal-inset:24px] [--modal-inner-radius:20px] max-sm:[--modal-inset:16px] max-sm:[--modal-inner-radius:18px] border border-border bg-bg text-text shadow-[0_24px_80px_var(--color-shadow)] outline-none max-sm:max-h-[calc(100dvh-16px)] max-sm:rounded-b-none max-sm:border-b-0"
@@ -450,7 +452,7 @@ function GradeSimulatorModal({ report = null, releve = null, config = null, seme
                 <span className="truncate font-body text-[12.5px] font-medium leading-none text-text-muted">{semesterLabel}</span>
               ) : null}
             </span>
-            <CloseButton onClick={onClose} />
+            <CloseButton onClick={dismiss} />
           </div>
         </header>
         {picked ? (
@@ -492,7 +494,7 @@ function GradeSimulatorModal({ report = null, releve = null, config = null, seme
             flyFrom={reveal.flyFrom}
             onEdit={hideReveal}
             onShown={reportReveal}
-            onClose={onClose}
+            onClose={dismiss}
           />
         ) : null}
         {picked ? null : (

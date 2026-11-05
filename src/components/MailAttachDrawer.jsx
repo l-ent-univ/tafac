@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react'
 import { Icon } from '@iconify/react'
 import CloseButton from './CloseButton'
 import MailSearchField from './MailSearchField'
+import { useSheetDrag } from '../useSheetDrag'
 
 // The cards a drawer's arrows move through (MailGradePicker's grades,
 // MailCoursePicker's classes).
@@ -58,6 +59,7 @@ function nextCard(cards, current, key) {
 // first (`onSubmit`), Tab goes round it. `scrollRef`: its scroll box.
 function MailAttachDrawer({ titleId, title, subtitle = null, search = null, onSubmit = null, onClose, scrollRef = null, children }) {
   const dialogRef = useRef(null)
+  const dismiss = useSheetDrag(dialogRef, onClose)
   const searchRef = useRef(null)
   const hasSearch = Boolean(search)
 
@@ -77,7 +79,7 @@ function MailAttachDrawer({ titleId, title, subtitle = null, search = null, onSu
     const cards = [...dialogRef.current.querySelectorAll(`.${ATTACH_CARD_CLASS}`)]
     let handled = true
     if (event.key === 'Escape') {
-      if (!event.defaultPrevented) onClose()
+      if (!event.defaultPrevented) dismiss()
     } else if (event.key === 'ArrowDown' || event.key === 'ArrowUp' || ((event.key === 'ArrowRight' || event.key === 'ArrowLeft') && cards.includes(document.activeElement))) {
       const target = nextCard(cards, cards.includes(document.activeElement) ? document.activeElement : null, event.key)
       if (target) target.focus()
@@ -99,7 +101,7 @@ function MailAttachDrawer({ titleId, title, subtitle = null, search = null, onSu
 
   return (
     <div className="absolute inset-0 z-40 flex items-end pl-[env(safe-area-inset-left)] pr-[env(safe-area-inset-right)]" role="presentation">
-      <div className="absolute inset-0 bg-backdrop animate-modal-backdrop-in" onClick={onClose} aria-hidden="true" />
+      <div className="absolute inset-0 bg-backdrop animate-modal-backdrop-in" onClick={dismiss} aria-hidden="true" />
       <section
         ref={dialogRef}
         className="mail-grade-drawer planning-sheet relative flex h-[min(640px,calc(100%-56px))] w-full flex-col overflow-hidden rounded-t-[24px] border-t border-border bg-bg text-text shadow-[0_-12px_48px_var(--color-shadow)] outline-none"
@@ -124,7 +126,7 @@ function MailAttachDrawer({ titleId, title, subtitle = null, search = null, onSu
               className="order-last w-full sm:order-none sm:w-[260px]"
             />
           ) : null}
-          <CloseButton onClick={onClose} />
+          <CloseButton onClick={dismiss} />
         </div>
         {/* Room around the cards for their shadow, inside the scroll box. */}
         <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 pt-1 pb-5 max-sm:px-4 max-sm:pb-[max(16px,env(safe-area-inset-bottom))]">

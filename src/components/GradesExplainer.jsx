@@ -9,6 +9,7 @@ import { useUeColor } from '../useUeColor'
 import CloseButton from './CloseButton'
 import LentButton from './LentButton'
 import { r } from '../register.js'
+import { useSheetDrag } from '../useSheetDrag'
 
 const FOCUSABLE_SELECTOR = 'button:not([disabled]), [href], [tabindex]:not([tabindex="-1"])'
 const PASS_MARK = 10
@@ -498,6 +499,7 @@ function ExplainerDialog({ ues, onClose }) {
   const [replay, setReplay] = useState(0)
   const [announcement, setAnnouncement] = useState('')
   const dialogRef = useRef(null)
+  const dismiss = useSheetDrag(dialogRef, onClose)
   const bodyRef = useRef(null)
   const previousRef = useRef(null)
   const nextRef = useRef(null)
@@ -541,7 +543,7 @@ function ExplainerDialog({ ues, onClose }) {
   const handleKeyDown = (event) => {
     if (event.key === 'Escape') {
       event.stopPropagation()
-      onClose()
+      dismiss()
       return
     }
     if (event.key === 'ArrowRight' || event.key === 'ArrowLeft') {
@@ -575,7 +577,7 @@ function ExplainerDialog({ ues, onClose }) {
 
   return createPortal(
     <div className="gx-root fixed inset-0 z-50 flex items-center justify-center p-5 max-sm:items-end max-sm:p-0" role="presentation">
-      <div className="weather-modal-backdrop absolute inset-0 bg-backdrop animate-modal-backdrop-in" onClick={onClose} aria-hidden="true" />
+      <div className="weather-modal-backdrop absolute inset-0 bg-backdrop animate-modal-backdrop-in" onClick={dismiss} aria-hidden="true" />
       <section
         ref={dialogRef}
         className="gx-dialog relative flex h-[min(700px,calc(100dvh-40px))] w-[min(560px,100%)] flex-col overflow-hidden corners-[22px] border border-border bg-bg text-text shadow-[0_24px_80px_var(--color-shadow)] outline-none animate-modal-card-in max-sm:h-[calc(100dvh-12px)] max-sm:rounded-b-none max-sm:border-b-0"
@@ -589,7 +591,7 @@ function ExplainerDialog({ ues, onClose }) {
             <h2 id={titleId} className="m-0 text-[22px] font-bold leading-[1.1]">{r('Comment lire tes notes', 'Comment lire vos notes')}</h2>
             <p className="m-0 font-body text-[13px] font-medium leading-none text-text-muted">Étape {stepIndex + 1} sur {steps.length}</p>
           </div>
-          <CloseButton onClick={onClose} />
+          <CloseButton onClick={dismiss} />
         </header>
 
         <div ref={bodyRef} className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden overscroll-contain px-6 pb-5 max-sm:px-4">
@@ -646,7 +648,7 @@ function ExplainerDialog({ ues, onClose }) {
               </button>
             ))}
           </div>
-          <LentButton ref={nextRef} className="min-h-[40px]! px-4! text-[14px]!" onClick={() => (isLast ? onClose() : goTo(stepIndex + 1))}>
+          <LentButton ref={nextRef} className="min-h-[40px]! px-4! text-[14px]!" onClick={() => (isLast ? dismiss() : goTo(stepIndex + 1))}>
             {isLast ? 'Compris' : 'Suivant'}
             {!isLast ? <Icon icon="ph:arrow-right" className="size-4" aria-hidden="true" /> : null}
           </LentButton>

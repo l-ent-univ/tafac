@@ -9,6 +9,7 @@ import PlanningEventBlock from './PlanningEventBlock'
 import CloseButton from './CloseButton'
 import Tooltip from './Tooltip'
 import { GROUP_CARD_CLASSES, GroupRow } from './GroupCard'
+import { useSheetDrag } from '../useSheetDrag'
 
 function linkHost(href) {
   try {
@@ -27,6 +28,7 @@ function linkHost(href) {
 // in the Messagerie), null without the in-app mail page.
 function PlanningEventSheet({ event, accent, events, todayKey, searching, onWrite = null, onClose, onPickDay }) {
   const dialogRef = useRef(null)
+  const dismiss = useSheetDrag(dialogRef, onClose)
   const scrollRef = useRef(null)
   // Content under the header: its blur shows.
   const [isStuck, setIsStuck] = useState(false)
@@ -61,18 +63,18 @@ function PlanningEventSheet({ event, accent, events, todayKey, searching, onWrit
     const previous = document.activeElement
     dialogRef.current?.focus({ preventScroll: true })
     const handleKey = (keyEvent) => {
-      if (keyEvent.key === 'Escape') onClose()
+      if (keyEvent.key === 'Escape') dismiss()
     }
     document.addEventListener('keydown', handleKey)
     return () => {
       document.removeEventListener('keydown', handleKey)
       if (previous?.isConnected) previous.focus?.({ preventScroll: true })
     }
-  }, [onClose])
+  }, [dismiss])
 
   return createPortal(
     <div className="gd-root fixed inset-0 z-50 flex items-center justify-center p-5 max-sm:items-end max-sm:p-0" role="presentation">
-      <div className="weather-modal-backdrop absolute inset-0 bg-backdrop animate-modal-backdrop-in" onClick={onClose} aria-hidden="true" />
+      <div className="weather-modal-backdrop absolute inset-0 bg-backdrop animate-modal-backdrop-in" onClick={dismiss} aria-hidden="true" />
       <section
         ref={dialogRef}
         className="gd-dialog planning-sheet relative isolate flex max-h-[min(820px,calc(100dvh-40px))] w-[min(448px,100%)] flex-col modal-corners [--modal-inset:24px] [--modal-inner-radius:20px] max-sm:[--modal-inset:16px] max-sm:[--modal-inner-radius:18px] border border-border bg-bg text-text shadow-[0_24px_80px_var(--color-shadow)] outline-none max-sm:max-h-[calc(100dvh-16px)] max-sm:rounded-b-none max-sm:border-b-0"
@@ -106,7 +108,7 @@ function PlanningEventSheet({ event, accent, events, todayKey, searching, onWrit
                     <Tooltip title="Écrire au sujet de ce cours" side="bottom-end" className="max-4xl:hidden" />
                   </button>
                 ) : null}
-                <CloseButton glass onClick={onClose} />
+                <CloseButton glass onClick={dismiss} />
               </div>
             </header>
 
