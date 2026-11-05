@@ -97,6 +97,7 @@ import {
   pickPartageSignature,
   readZimbraSignatures,
 } from './mailSignature.js'
+import { parseAttendanceQr } from '../src/attendanceQr.js'
 import { CUSTOM_SIGNATURE_MAX_LENGTH, normalizeCustomSignatureText } from '../src/mailSignatureChoice.js'
 import { createPlanningPortalApiClient } from '../planningPortalApi.js'
 import {
@@ -211,6 +212,7 @@ const MOODLE_ORIGIN = universityConfig.origins.moodle ?? null
 const PLANNING_ORIGIN = universityConfig.origins.planning ?? null
 const GRADES_ORIGIN = universityConfig.grades?.origin ?? null
 // Certificat de scolarité (features.schoolCertificate, server/schoolCertificate.js).
+const ATTENDANCE_QR_ORIGIN = universityConfig.attendanceQr?.origin ?? null
 const SCHOOL_CERTIFICATE_ORIGIN = FEATURES.schoolCertificate ? (universityConfig.schoolCertificate?.origin ?? null) : null
 const SCHOOL_CERTIFICATE_MENU_CAPTION = universityConfig.schoolCertificate?.menuCaption ?? 'Inscriptions'
 // Mail (see universities/<id>/server.js → mail, docs/ADDING_A_UNIVERSITY.md).
@@ -1623,11 +1625,16 @@ function parseFormFields(formBody) {
   return Object.fromEntries(new URLSearchParams(formBody))
 }
 
-async function prepareMoodleLaunchRelay(session, targetUrl = null) {
+// `startUrl`, `isHandoff`: another Shibboleth site's way in and its SAML POST
+// target (the attendance QR's APSOLU site).
+async function prepareMoodleLaunchRelay(session, targetUrl = null, {
+  startUrl = buildMoodleShibbolethLoginUrl(targetUrl),
+  isHandoff = isMoodleShibbolethPostTarget,
+} = {}) {
   const acceptHeader = 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8'
   const launchCapabilities = getSessionLaunchCapabilities(session)
   const chain = []
-  let currentUrl = buildMoodleShibbolethLoginUrl(targetUrl)
+  let currentUrl = startUrl
   let currentMethod = 'GET'
   let currentBody = undefined
   let currentHeaders = { Accept: acceptHeader }
@@ -1671,7 +1678,7 @@ async function prepareMoodleLaunchRelay(session, targetUrl = null) {
 
     const autoSubmitForm = extractAutoSubmitForm(html, currentUrl)
     if (autoSubmitForm) {
-      if (isMoodleShibbolethPostTarget(autoSubmitForm.action)) {
+      if (isHandoff(autoSubmitForm.action)) {
         return {
           finalUrl: autoSubmitForm.action,
           actionUrl: autoSubmitForm.action,
@@ -2632,6 +2639,7 @@ const FEATURE_GATED_PREFIXES = [
   ['/__ent_auth/grades', 'grades'],
   ['/__ent_auth/mail', 'mail'],
   ['/__ent_auth/moodle', 'moodleDeadlines'],
+  ['/__ent_auth/attendance', 'attendanceQr'],
 ]
 
 app.use((req, res, next) => {
@@ -3163,6 +3171,47 @@ app.get('/__ent_auth/launch', async (req, res) => {
   } catch (err) {
     if (debug) return res.json({ error: String(err), chain })
     res.redirect(targetUrl)
+  }
+})
+
+// Attendance QR (features.attendanceQr): signs in to the APSOLU site, then
+// lands on the QR's page, where the visit itself records the presence. The
+// browser must make that visit: APSOLU keeps a hash of its IP and User-Agent
+// with each presence, so doing it here would give every student the same one.
+// Any failure opens the QR's page, where the student signs in by hand.
+app.get('/__ent_auth/attendance/open', async (req, res) => {
+  const qrUrl = parseAttendanceQr(req.query.url, ATTENDANCE_QR_ORIGIN)
+  if (!qrUrl) {
+    return res.redirect('/')
+  }
+
+  const session = getSessionFromRequest(req)
+  if (!getSessionLaunchCapabilities(session).canUseServerLaunch || !WAYF_ENTITY_ID) {
+    return res.redirect(qrUrl)
+  }
+
+  const target = `${ATTENDANCE_QR_ORIGIN}/auth/shibboleth/index.php?target=${encodeURIComponent(qrUrl)}`
+  const startUrl = `${ATTENDANCE_QR_ORIGIN}/Shibboleth.sso/DS?providerId=${encodeURIComponent(WAYF_ENTITY_ID)}&target=${encodeURIComponent(target)}`
+
+  try {
+    const relay = await prepareMoodleLaunchRelay(session, null, {
+      startUrl,
+      isHandoff: (url) => url.startsWith(`${ATTENDANCE_QR_ORIGIN}/Shibboleth.sso/`),
+    })
+
+    res.setHeader('Cache-Control', 'no-store')
+    res.setHeader('Content-Type', 'text/html; charset=utf-8')
+    return res.status(200).send(buildAutoSubmitPage({
+      title: 'Présence SIUAPS',
+      heading: 'Enregistrement de ta présence',
+      body: 'Connexion au site du SIUAPS...',
+      actionUrl: relay.actionUrl,
+      // The SP's RelayState names a cookie this server got, not the browser:
+      // given as a URL, the SP sends the browser there instead of its home.
+      fields: { ...relay.fields, RelayState: target },
+    }))
+  } catch {
+    return res.redirect(qrUrl)
   }
 })
 
