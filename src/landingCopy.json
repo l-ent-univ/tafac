@@ -19,7 +19,7 @@
     "intro": "Vérifiez votre salle avant de partir, consultez vos résultats ou répondez à un mail sans passer d’un site à l’autre.",
     "tabsLabel": "Pages de {appName}",
     "previewLabel": "Aperçu avec le compte de démonstration",
-    "note": "Les services disponibles dépendent de votre université. Les notes sont accessibles pour les formations BUT utilisant ScoDoc.",
+    "note": "Les services disponibles dépendent de votre université. Les notes et l’assiduité sont accessibles pour les formations BUT utilisant ScoDoc.",
     "tabs": {
       "home": {
         "label": "Accueil",
@@ -128,6 +128,63 @@
             "body": "Le domaine des adresses extérieures à l’université s’affiche à côté du nom."
           }
         ]
+      },
+      "assiduity": {
+        "label": "Assiduité",
+        "shortLabel": "Assiduité",
+        "title": "Suivez vos absences du semestre",
+        "intro": "Retrouvez les absences et les retards enregistrés sur ScoDoc, justifiés ou non.",
+        "previewLabel": "Assiduité : heures justifiées et non justifiées, le semestre et les dernières absences",
+        "items": [
+          {
+            "title": "Vos heures d’absence",
+            "body": "Consultez les heures justifiées, non justifiées et vos retards."
+          },
+          {
+            "title": "Le semestre jour par jour",
+            "body": "Chaque absence est placée sur une ligne qui va du premier au dernier jour du semestre."
+          },
+          {
+            "title": "Les heures par matière",
+            "body": "Repérez les matières où vous avez manqué le plus d’heures."
+          },
+          {
+            "title": "Le temps restant pour justifier",
+            "body": "Voyez combien de temps il vous reste, selon la règle de votre département."
+          },
+          {
+            "title": "Un justificatif en quelques étapes",
+            "body": "Indiquez le motif, ajoutez le justificatif et relisez le mail avant de l’envoyer."
+          }
+        ]
+      }
+    }
+  },
+  "film": {
+    "title": "Sur votre téléphone, où que vous soyez",
+    "intro": "Le planning, les notes, les mails et l’assiduité, en quelques touches",
+    "videoLabel": "{appName} sur un téléphone : l’accueil, le planning, les notes, la messagerie et l’assiduité",
+    "chaptersLabel": "Pages du film",
+    "chapters": {
+      "home": {
+        "label": "Accueil",
+        "body": "Le prochain cours et la fin de la journée"
+      },
+      "planning": {
+        "label": "Planning",
+        "body": "Les cours de la semaine, jour par jour"
+      },
+      "grades": {
+        "label": "Mes notes",
+        "body": "Les moyennes et le détail de chaque note"
+      },
+      "mail": {
+        "label": "Messagerie",
+        "body": "Les mails de la fac, lus dans l’app"
+      },
+      "assiduity": {
+        "label": "Assiduité",
+        "body": "Les absences, justifiées ou non"
       }
     }
   },

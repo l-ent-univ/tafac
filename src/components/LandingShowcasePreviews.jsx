@@ -2,10 +2,11 @@ import { useMemo } from 'react'
 import { Icon } from '@iconify/react'
 import universityConfig from '@university'
 import { buildUeWash, formatGradeDay } from '../gradesSubjects'
-import { buildGradesPreview, buildMailPreview, buildPlanningPreview } from '../landingShowcasePreview'
+import { buildAssiduityPreview, buildGradesPreview, buildMailPreview, buildPlanningPreview } from '../landingShowcasePreview'
 import { agendaDayText } from '../planningDates'
 import { assignSubjectIcons } from '../subjectIcons'
 import { useUeColor } from '../useUeColor'
+import { AbsenceRow, SemesterLine, TotalsCard } from './AssiduityPage'
 import GreetingCard from './GreetingCard'
 import { CARD_CLASSES as GRADE_CARD_CLASSES, LatestGradeCardBody } from './LatestGradesList'
 import MailRowContent from './MailRowContent'
@@ -27,6 +28,8 @@ import { formatReceivedAt, getSenderLabel, parseDate } from './widgetListUtils'
 // says what they show.
 
 const noop = () => {}
+// A row's right-click menu: none in a picture.
+const noMenu = () => ({})
 
 // What the app's right-click menu looks like (ContextMenu), standing still
 // where a pointer opened it.
@@ -238,13 +241,69 @@ function MailPreview() {
   )
 }
 
-// The preview of the tab `kind` ('home', 'grades', 'planning', 'mail').
+// « Assiduité »: the semester's totals and its line, then the latest
+// absences as the list shows them (by month, the one not justified with its
+// « Justifier », a quiz missed meanwhile under the one it fell in). On
+// phones, without the line.
+function AssiduityPreview() {
+  const assiduity = useMemo(() => buildAssiduityPreview(), [])
+  const subjectIcon = useMemo(() => {
+    const grades = buildGradesPreview()
+    return assignSubjectIcons(
+      [...grades.report.resources, ...grades.report.saes]
+        .sort((left, right) => left.code.localeCompare(right.code))
+        .map((module) => module.title),
+      universityConfig.appIconStyle,
+    )
+  }, [])
+
+  return (
+    <div className="landing-preview-assiduity grid min-w-0 gap-3 max-md:gap-2">
+      <div className="flex flex-wrap items-stretch gap-3 max-md:gap-2">
+        <TotalsCard totals={assiduity.totals} sums={assiduity.sums} counts={assiduity.counts} />
+        {assiduity.timeline ? (
+          <div className="flex flex-[3_1_380px] max-md:hidden">
+            <SemesterLine timeline={assiduity.timeline} entriesById={assiduity.entriesById} onPick={noop} activeId={null} />
+          </div>
+        ) : null}
+      </div>
+      <p className="m-0 mt-2 flex items-center gap-[5px] font-body text-base font-medium leading-none text-brand">
+        <Icon icon="ph:clock-counter-clockwise" className="size-[17px]" aria-hidden="true" />
+        Historique
+      </p>
+      <div className="landing-preview-sheet min-w-0 overflow-hidden corners-[22px] border">
+        {assiduity.months.map((group) => (
+          <div key={group.key}>
+            <p className="m-0 border-b border-border bg-bg-subtle/60 px-3 py-2 font-body text-[13px] font-semibold text-text-secondary">{group.label}</p>
+            <ul className="m-0 list-none p-0">
+              {group.entries.map((entry) => (
+                <AbsenceRow
+                  key={entry.id}
+                  entry={entry}
+                  icon={subjectIcon(entry.subjectTitle)}
+                  evaluations={assiduity.evaluationsByEntry[entry.id]}
+                  highlighted={false}
+                  menuProps={noMenu}
+                  onJustify={entry.status === 'unjustified' ? noop : null}
+                />
+              ))}
+            </ul>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+// The preview of the tab `kind` ('home', 'grades', 'planning', 'mail',
+// 'assiduity').
 // `preview`: buildLandingPreview's (the dashboard's widgets).
 function LandingShowcasePreview({ kind, preview }) {
   if (kind === 'home') return <HomePreview preview={preview} />
   if (kind === 'grades') return <GradesPreview />
   if (kind === 'planning') return <PlanningPreview />
   if (kind === 'mail') return <MailPreview />
+  if (kind === 'assiduity') return <AssiduityPreview />
   return null
 }
 
