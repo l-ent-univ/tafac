@@ -5,6 +5,7 @@ import { MUTED_FILL_CLASSES, ROW_CLASSES } from '../settingsStyles'
 import SettingsGroup, { RowText } from './SettingsGroup'
 import MailSignatureContent from './MailSignatureContent'
 import Switch from './Switch'
+import { r } from '../register.js'
 
 // Réglages › Messagerie: the signature under the student's mails, on or
 // off and which (src/mailSignatureStore.js, shared with the composer's
@@ -18,17 +19,17 @@ const KINDS = [
 ]
 
 const FOOTERS = {
-  auto: 'Faite à partir de ton compte, toujours à jour',
+  get auto() { return r('Faite à partir de ton compte, toujours à jour', 'Faite à partir de votre compte, toujours à jour') },
   partage: 'Celle choisie dans Partage, Préférences › Signatures',
-  custom: 'Enregistrée dans Partage sous le nom « Tafac », sur tous tes appareils',
+  get custom() { return r('Enregistrée dans Partage sous le nom « Tafac », sur tous tes appareils', 'Enregistrée dans Partage sous le nom « Tafac », sur tous vos appareils') },
 }
 
 const SAVE_ERRORS = {
   'too-long': 'Signature trop longue',
-  limit: 'Trop de signatures dans Partage, supprimes-en une',
-  rate: 'Trop d’enregistrements, réessaie dans un moment',
-  expired: 'Session expirée, reconnecte-toi',
-  failed: 'Signature non enregistrée, réessaie',
+  get limit() { return r('Trop de signatures dans Partage, supprimes-en une', 'Trop de signatures dans Partage, supprimez-en une') },
+  get rate() { return r('Trop d’enregistrements, réessaie dans un moment', 'Trop d’enregistrements, réessayez dans un moment') },
+  get expired() { return r('Session expirée, reconnecte-toi', 'Session expirée, reconnectez-vous') },
+  get failed() { return r('Signature non enregistrée, réessaie', 'Signature non enregistrée, réessayez') },
 }
 
 function KindPicker({ value, onChange }) {
@@ -87,7 +88,7 @@ function CustomSignatureEditor({ saved, maxLength, draft, onDraftChange }) {
   return (
     <div className="flex flex-col gap-2">
       <label className="flex flex-col gap-[7px]">
-        <span className="font-body text-[13px] font-semibold leading-none text-text-60">Ta signature</span>
+        <span className="font-body text-[13px] font-semibold leading-none text-text-60">{r('Ta signature', 'Votre signature')}</span>
         <textarea
           value={draft}
           onChange={(event) => {
@@ -142,7 +143,7 @@ function MailSignatureSettings({ autoSignature }) {
   return (
     <SettingsGroup title="Signature" footer={enabled ? FOOTERS[kind] : null}>
       <label className={`${ROW_CLASSES} cursor-pointer`}>
-        <RowText icon="ph:pen" label="Signature des mails" description="Ajoutée sous chaque mail que tu écris" />
+        <RowText icon="ph:pen" label="Signature des mails" description={r('Ajoutée sous chaque mail que tu écris', 'Ajoutée sous chaque mail que vous écrivez')} />
         <Switch checked={enabled} onChange={setMailSignatureEnabled} />
       </label>
       {/* Unfolds with the switch (its grid row from 0fr to 1fr); folded, inert. */}
@@ -165,7 +166,7 @@ function MailSignatureSettings({ autoSignature }) {
                 </div>
               </div>
               {hasImages ? (
-                <p className="m-0 font-body text-[13px] font-medium leading-[1.4] text-text-50">Les images de ta signature Partage ne sont pas reprises</p>
+                <p className="m-0 font-body text-[13px] font-medium leading-[1.4] text-text-50">{r('Les images de ta signature Partage ne sont pas reprises', 'Les images de votre signature Partage ne sont pas reprises')}</p>
               ) : null}
             </div>
           </div>

@@ -16,6 +16,7 @@ import Switch from './Switch'
 import MailSignatureSettings from './MailSignatureSettings'
 import HomeLayoutSetting from './HomeLayoutSetting'
 import PlanningExtraCourses from './PlanningExtraCourses'
+import { r } from '../register.js'
 
 // Also the debug menu's toggles (src/components/debug/).
 export { Switch }
@@ -295,7 +296,7 @@ function LogoSetting({ shown, onShownChange, establishmentLabel, source, onSourc
       <SwitchRow
         icon="ph:buildings"
         label="Logo de l’université"
-        description="Afficher le logo de ton établissement dans la barre latérale"
+        description={r('Afficher le logo de ton établissement dans la barre latérale', 'Afficher le logo de votre établissement dans la barre latérale')}
         checked={shown}
         onChange={onShownChange}
       />
@@ -447,7 +448,7 @@ function WallpaperSetting({ previewSrc, hasCustom, enabled, onEnabledChange, onC
   return (
     <SettingsGroup
       title="Fond d’écran"
-      footer={canPick ? 'Ton image reste sur cet appareil, elle n’est envoyée nulle part.' : null}
+      footer={canPick ? r('Ton image reste sur cet appareil, elle n’est envoyée nulle part.', 'Votre image reste sur cet appareil, elle n’est envoyée nulle part.') : null}
     >
       {previewSrc ? (
         <div className="p-2">
@@ -533,6 +534,11 @@ function AccountModal({
   onSidebarCompactChange = null,
   showPlanningWeekend = false,
   onShowPlanningWeekendChange = null,
+  // « Assiduité » in the phone's tab bar (null: no such page here), in
+  // Moodle's place when the bar has Moodle.
+  assiduityTab = false,
+  onAssiduityTabChange = null,
+  assiduityTabReplacesMoodle = false,
   planningSelection = null,
   onPlanningExtraResourcesChange = null,
   anonymousAnalytics = true,
@@ -679,7 +685,7 @@ function AccountModal({
             {HAS_GROUP_CHOICE ? (
               <SettingsGroup
                 title="Mon groupe"
-                footer="Sert à trouver tes cours. Le changement s’applique quand tu fermes les réglages."
+                footer={r('Sert à trouver tes cours. Le changement s’applique quand tu fermes les réglages.', 'Sert à trouver vos cours. Le changement s’applique quand vous fermez les réglages.')}
               >
                 {shouldShowPlanningLoader ? (
                   <div className="flex h-[162px] w-full items-center justify-center">
@@ -794,6 +800,20 @@ function AccountModal({
                   onChange={onShowAppDescriptionsChange}
                 />
               </SettingsGroup>
+            ) : null}
+            {/* The tab bar only shows below large screens (4xl), the setting too. */}
+            {typeof onAssiduityTabChange === 'function' ? (
+              <div className="4xl:hidden">
+                <SettingsGroup title="Barre d’onglets">
+                  <SwitchRow
+                    icon="ph:user-check"
+                    label="Assiduité"
+                    description={assiduityTabReplacesMoodle ? 'Remplacer Moodle par Assiduité dans la barre d’onglets' : 'Afficher Assiduité dans la barre d’onglets'}
+                    checked={assiduityTab}
+                    onChange={onAssiduityTabChange}
+                  />
+                </SettingsGroup>
+              </div>
             ) : null}
             {/* The sidebar only shows on large screens (4xl), the setting too. */}
             {typeof onSidebarCompactChange === 'function' ? (

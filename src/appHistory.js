@@ -5,7 +5,7 @@
 // transfer link). A reload keeps the entry's state, so it lands where it was.
 // « Accueil » ('home') when the entry has none, or an older one's
 // 'dashboard' (the page « Accueil » replaced).
-const PAGES = new Set(['home', 'grades', 'planning', 'mail'])
+const PAGES = new Set(['home', 'grades', 'planning', 'mail', 'assiduity'])
 
 // A mail entry belongs to the sign-in that wrote it. Logging out doesn't
 // reload the page, so the tab's history still holds the previous student's

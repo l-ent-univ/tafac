@@ -387,6 +387,8 @@ test('mail_action keeps only the properties of its action, never a subject, an a
   const courseLeaks = { course: 'R5.12 Développement back-end', room: 'A08', teacher: 'M. Lemoine', day: '2026-11-03', title: 'R5.12' }
   assert.deepEqual(keep({ action: 'compose_opened', kind: 'course', ...leaks, ...courseLeaks }), { action: 'compose_opened', kind: 'course' })
   assert.deepEqual(keep({ action: 'course_attached', ...leaks, ...courseLeaks }), { action: 'course_attached' })
+  // An absence's mail: never its day, hours, subject or teacher.
+  assert.deepEqual(keep({ action: 'compose_opened', kind: 'absence', ...leaks, ...courseLeaks }), { action: 'compose_opened', kind: 'absence' })
   assert.deepEqual(
     keep({ action: 'sent', result: 'partial', attachments: '2-3', inline_images: true, ...leaks }),
     { action: 'sent', result: 'partial', attachments: '2-3', inline_images: true },
@@ -426,4 +428,28 @@ test('setting_changed takes the mail signature on/off and its kind, nothing else
   assert.equal(keep({ setting: 'mail_signature', value: 'custom' }), null)
   assert.equal(keep({ setting: 'wallpaper', value: 'partage' }), null)
   assert.equal(keep({ setting: 'theme', value: 'custom' }), null)
+})
+
+test('« Assiduité »: its page, its load, its actions and « Justifier », never what the absences are', () => {
+  const opts = { hasSession: true }
+  const keep = (event, properties) => sanitizeAnalyticsEvent({ event, properties }, opts)?.properties ?? null
+  const leaks = { date: '2026-09-25', subject: 'R5.11 Relations presse', teacher: 'thomas.lemoine@univ-rennes.fr', hours: 2, reason: 'menstrual', count: 4 }
+  assert.deepEqual(keep('page_viewed', { page: 'assiduity', source: 'dashboard_card', ...leaks }), { page: 'assiduity', source: 'dashboard_card' })
+  // Each page to its own sources.
+  assert.equal(keep('page_viewed', { page: 'assiduity', source: 'tile' }), null)
+  assert.equal(keep('page_viewed', { page: 'assiduity', source: 'grades' }), null)
+  assert.deepEqual(keep('assiduity_loaded', { status: 'hidden', duration_bucket: '<1s', error_kind: 'timeout', ...leaks }), { status: 'hidden', duration_bucket: '<1s' })
+  assert.deepEqual(keep('assiduity_loaded', { status: 'error', duration_bucket: '<3s', error_kind: 'http_5xx' }), { status: 'error', duration_bucket: '<3s', error_kind: 'http_5xx' })
+  assert.equal(keep('assiduity_loaded', { status: 'absent' }), null)
+  assert.deepEqual(keep('assiduity_action', { action: 'justify_opened', from: 'countdown', ...leaks }), { action: 'justify_opened', from: 'countdown' })
+  assert.deepEqual(keep('assiduity_action', { action: 'mark_picked', from: 'row' }), { action: 'mark_picked' })
+  assert.equal(keep('assiduity_action', { action: 'absence_deleted' }), null)
+  // « Justifier »: the reason never goes, the proof only where it belongs.
+  assert.deepEqual(keep('justify_step', { step: 'reason_picked', reason: 'menstrual', proof: 'attached' }), { step: 'reason_picked' })
+  assert.deepEqual(keep('justify_step', { step: 'composed', proof: 'later', reached: 'review', ...leaks }), { step: 'composed', proof: 'later' })
+  assert.deepEqual(keep('justify_step', { step: 'closed', reached: 'proof', proof: 'none' }), { step: 'closed', reached: 'proof' })
+  assert.deepEqual(keep('justify_step', { step: 'proof_chosen', proof: 'certificat.jpg' }), { step: 'proof_chosen' })
+  // The phone's tab and the Accueil card: on/off, the card by its id.
+  assert.deepEqual(keep('setting_changed', { setting: 'assiduity_tab', value: 'on' }), { setting: 'assiduity_tab', value: 'on' })
+  assert.deepEqual(keep('setting_changed', { setting: 'widget_visibility', value: 'off', widget: 'assiduity' }), { setting: 'widget_visibility', value: 'off', widget: 'assiduity' })
 })

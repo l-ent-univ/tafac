@@ -17,6 +17,7 @@ import {
   readStoredHref,
   storeHref,
 } from './widgetListUtils'
+import { r } from '../register.js'
 
 const MAX_VISIBLE_MESSAGES = 2
 const MAIL_REFRESH_MS = 5 * 60 * 1000
@@ -298,7 +299,7 @@ function WidgetRecentMail({ visible = false, preview = null, onOpenMail = null, 
 
       {state.status === 'ok' && messages.length === 0 ? (
         <div className={`flex flex-1 flex-col ${large ? LARGE_ROOM_CLASSES : ''}`}>
-          <WidgetListStatus icon="ph:check-circle" title="Aucun nouveau mail" body="Ta boîte de réception est à jour" />
+          <WidgetListStatus icon="ph:check-circle" title="Aucun nouveau mail" body={r('Ta boîte de réception est à jour', 'Votre boîte de réception est à jour')} />
         </div>
       ) : null}
 
@@ -307,7 +308,7 @@ function WidgetRecentMail({ visible = false, preview = null, onOpenMail = null, 
           <WidgetListStatus
             icon="ph:warning"
             title="Messagerie indisponible"
-            body="Impossible de charger tes mails"
+            body={r('Impossible de charger tes mails', 'Impossible de charger vos mails')}
             action={{ label: 'Réessayer', onClick: () => void loadMail() }}
           />
         </div>

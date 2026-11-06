@@ -1,6 +1,6 @@
 // « Accueil »'s cards in their order on the page (HomeDraftPage) and in its
 // miniature (Réglages › Accueil, HomeLayoutSetting).
-export const HOME_CARD_ORDER = ['nextClass', 'average', 'mail', 'latestGrade', 'deadlines']
+export const HOME_CARD_ORDER = ['nextClass', 'average', 'mail', 'latestGrade', 'deadlines', 'assiduity']
 
 // Where each card goes on two columns, for the cards drawn (whatever their
 // order in `ids`): { id: 'tall' | 'half' | 'full' }. « Prochains cours »

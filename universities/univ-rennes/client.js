@@ -25,6 +25,7 @@ import {
   mailWebmailUrl,
   planningServiceUrl,
   portalEntryPath,
+  register,
   university,
 } from './shared.js'
 
@@ -34,6 +35,8 @@ export default {
   appIconStyle: appIcons.style,
 
   university,
+  // « vous » or « tu » (src/register.js), from shared.js.
+  register,
 
   branding: {
     ...branding,
@@ -136,6 +139,9 @@ export default {
     byId: {
       iutlan: {
         label: establishmentNames.iutlan,
+        // The IUT's students are addressed as « tu » (the university's
+        // other students as « vous », shared.js's `register`).
+        register: 'tu',
         // Next to Tafac's in the sidebar and header, instead of the
         // university's: a square badge, its letters light in dark mode.
         logo: iutLannionLogo,
@@ -168,6 +174,9 @@ export default {
         ],
         gradeWidgets: true,
         nextClassWidget: true,
+        // « Assiduité › Justifier »: « Congé menstruel » and « Manifestation »
+        // among the reasons.
+        absenceReasons: ['menstrual', 'protest'],
         extraServices: [
           // ScoDoc shortcut, opened through the CAS launch relay. Only listed
           // while the grade service is live.

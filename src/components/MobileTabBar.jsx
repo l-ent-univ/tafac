@@ -28,6 +28,15 @@ function getTabIcon(item) {
 // Full class strings, so Tailwind sees them.
 const WIDE_BAR_MIN_TABS = 4
 
+// « Assiduité » (the ScoDoc absences) on the bar only when the student
+// asked for it (Réglages › Apparence, `showAssiduity`), in Moodle's place:
+// six tabs don't fit a phone. Moodle stays otherwise.
+function pickShortcuts(shortcuts, showAssiduity) {
+  return showAssiduity
+    ? shortcuts.filter((item) => item.id !== 'moodle')
+    : shortcuts.filter((item) => item.id !== 'assiduity')
+}
+
 function getTabSizeClasses(count) {
   return count >= WIDE_BAR_MIN_TABS ? 'flex-1 basis-0 min-w-0 px-1' : 'min-w-[84px] px-3.5'
 }
@@ -36,8 +45,8 @@ function getTabSizeClasses(count) {
 // shown wherever the desktop sidebar isn't. Home first, then the same
 // shortcuts as the sidebar (grades, planning, mail, Moodle); a greyed-out tab
 // explains itself in a bubble instead of a hover tooltip.
-function MobileTabBar({ establishment, gradesSupported = true, activePage = 'home', onNavigatePage }) {
-  const shortcuts = getMobileTabItems(establishment, { gradesSupported })
+function MobileTabBar({ establishment, gradesSupported = true, activePage = 'home', showAssiduity = false, onNavigatePage }) {
+  const shortcuts = pickShortcuts(getMobileTabItems(establishment, { gradesSupported }), showAssiduity)
   const items = [HOME_TAB, ...shortcuts].map((item) => (
     item.page ? { ...item, selected: item.page === activePage } : item
   ))

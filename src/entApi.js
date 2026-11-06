@@ -8,6 +8,7 @@ import { getLoadedUniversityId, getUniversityRequestHeaders } from './university
 import { buildUploadDisposition, normalizeAttachmentType, readAttachmentLimits, sanitizeAttachmentName } from './mailAttachments'
 import { isValidAddress, sanitizeDisplayName } from './mailCompose'
 import { readMailSignatures } from './mailSignatureChoice'
+import { r } from './register.js'
 
 // Null on the neutral page (no university picked yet).
 export const ENT_ORIGIN = universityConfig.origins.ent
@@ -1529,7 +1530,7 @@ function resolveGradesReleve(data) {
   }
 
   if (!data?.authenticated) {
-    return { error: 'Connecte-toi pour accéder aux notes' }
+    return { error: r('Connecte-toi pour accéder aux notes', 'Connectez-vous pour accéder aux notes') }
   }
 
   if (data?.disabled) {

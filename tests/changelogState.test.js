@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import { CHANGELOG } from '../src/changelog.js'
+import { setRegister } from '../src/register.js'
 import {
   CHANGELOG_SEEN_KEY,
   formatEntryDate,
@@ -195,10 +196,14 @@ test('the seed entries follow each university’s features', () => {
   const exemple = { id: 'univ-exemple', features: { ade: true, planning: true, moodle: false, grades: 'disabled', mail: false, moodleDeadlines: false } }
 
   const needAudience = CHANGELOG.filter((entry) => entry.audience).map((entry) => entry.id)
-  assert.deepEqual(needAudience, ['messagerie', 'planning', 'simulateur-fluide', 'mes-notes'])
+  assert.deepEqual(needAudience, ['assiduite', 'messagerie', 'planning', 'simulateur-fluide', 'mes-notes'])
   assert.equal(ids(rennes).length, CHANGELOG.length - needAudience.length, 'all but the ones for « Mes notes » and the Planning, which need their audience')
   assert.ok(!ids(rennes).includes('mes-notes'))
   assert.ok(!ids(rennes).includes('planning'))
+  // « Assiduité » comes with « Mes notes »: its students only.
+  assert.ok(!ids(rennes).includes('assiduite'))
+  assert.ok(getApplicableEntries(CHANGELOG, rennes, ['grades-page']).some((entry) => entry.id === 'assiduite'))
+  assert.ok(!ids(exemple).includes('assiduite'))
   assert.equal(getApplicableEntries(CHANGELOG, rennes, ['grades-page', 'planning-page', 'mail-page']).length, CHANGELOG.length)
   assert.ok(!ids(exemple).includes('mes-notes'))
   assert.ok(!ids(exemple).includes('certificat-de-scolarite'))
@@ -312,4 +317,25 @@ test('only spotlight entries get a card, and only unseen ones', () => {
   assert.equal(getLaunchId(entries, ['launch', 'later'], ['later']), 'launch', 'a held launch is skipped')
   assert.deepEqual(getHeldLaunchIds(entries, ['launch', 'later', 'new-global'], 'later'), ['launch'], 'the pill’s entries are never held')
   assert.deepEqual(getHeldLaunchIds(entries, ['later'], 'later'), [])
+})
+
+test('the entries’ texts follow the register: « vous » by default, « tu » once set', () => {
+  // \b is ASCII-only: « êtes » would match « tes ».
+  const TU = /(?<!\p{L})(tu|te|toi|ton|ta|tes|t’\p{L}+)(?!\p{L})/iu
+  const VOUS = /(?<!\p{L})(vous|votre|vos)(?!\p{L})/iu
+  const texts = () => CHANGELOG.flatMap((entry) => [entry.title, entry.body])
+
+  for (const text of texts()) {
+    assert.equal(typeof text, 'string')
+    assert.ok(!TU.test(text), `vous by default: ${text}`)
+  }
+  assert.ok(texts().some((text) => VOUS.test(text)), 'some entries address the student')
+
+  setRegister('tu')
+  try {
+    for (const text of texts()) assert.ok(!VOUS.test(text), `tu once set: ${text}`)
+    assert.ok(texts().some((text) => TU.test(text)))
+  } finally {
+    setRegister('vous')
+  }
 })

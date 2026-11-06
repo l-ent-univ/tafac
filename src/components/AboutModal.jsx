@@ -16,6 +16,7 @@ import BetaTag from './BetaTag'
 import PrivacyModal from './PrivacyModal'
 import SettingsGroup, { RowText } from './SettingsGroup'
 import CloseButton from './CloseButton'
+import { r } from '../register.js'
 
 /* global __BUILD_HASH__ */
 
@@ -87,7 +88,7 @@ function AboutData({ onPrivacyClick }) {
   const [isPrivacyOpen, setPrivacyOpen] = useState(false)
   if (!about.disclaimer && !isAnalyticsAvailable) return null
   return (
-    <SettingsGroup title="Tes données">
+    <SettingsGroup title={r('Tes données', 'Vos données')}>
       {about.disclaimer ? (
         <div className="flex gap-[10px] px-4 py-[13px]">
           <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full ${MUTED_FILL_CLASSES}`} aria-hidden="true">

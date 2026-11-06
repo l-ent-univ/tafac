@@ -1,5 +1,6 @@
 import universityConfig from '@university'
 import { getRequestErrorKind } from './entApi'
+import { r } from './register.js'
 
 // Shared by the ScoDoc pages ("Mes notes", "Absences").
 
@@ -47,17 +48,17 @@ export function getSecretariatEmail(department, config) {
 
 export function describeLoadError(data, error) {
   if (data && data.authenticated === false && !data.error) {
-    return 'Ta session a expiré. Reconnecte-toi pour retrouver tes données ScoDoc.'
+    return r('Ta session a expiré. Reconnecte-toi pour retrouver tes données ScoDoc.', 'Votre session a expiré. Reconnectez-vous pour retrouver vos données ScoDoc.')
   }
 
   if (data?.unavailable) {
-    return "Aucun relevé ScoDoc n'est associé à ton compte (les notes de ta formation sont peut-être sur Pégase ou l'ENT)."
+    return r("Aucun relevé ScoDoc n'est associé à ton compte (les notes de ta formation sont peut-être sur Pégase ou l'ENT).", "Aucun relevé ScoDoc n'est associé à votre compte (les notes de votre formation sont peut-être sur Pégase ou l'ENT).")
   }
 
   const kind = error ? getRequestErrorKind(error) : data?.errorKind
   if (kind === 'network' || kind === 'timeout') {
-    return 'Impossible de joindre le serveur. Vérifie ta connexion puis réessaie.'
+    return r('Impossible de joindre le serveur. Vérifie ta connexion puis réessaie.', 'Impossible de joindre le serveur. Vérifiez votre connexion puis réessayez.')
   }
 
-  return 'ScoDoc ne répond pas pour le moment. Réessaie dans quelques minutes, ou ouvre-le directement.'
+  return r('ScoDoc ne répond pas pour le moment. Réessaie dans quelques minutes, ou ouvre-le directement.', 'ScoDoc ne répond pas pour le moment. Réessayez dans quelques minutes, ou ouvrez-le directement.')
 }

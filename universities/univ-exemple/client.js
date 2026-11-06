@@ -10,6 +10,7 @@ import {
   gradesCopy,
   planningServiceUrl,
   portalEntryPath,
+  register,
   university,
 } from './shared.js'
 
@@ -19,6 +20,8 @@ export default {
   appIconStyle: appIcons.style,
 
   university,
+  // « vous » or « tu » (src/register.js), from shared.js.
+  register,
 
   branding: {
     ...branding,

@@ -1,13 +1,16 @@
 import { useEffect, useRef, useState } from 'react'
 import { Icon } from '@iconify/react'
 import appsIcon from '../assets/home-icons/apps.png'
+import assiduityIcon from '../assets/home-icons/assiduity.png'
 import averageIcon from '../assets/home-icons/average.png'
 import calendarIcon from '../assets/home-icons/calendar.png'
 import gradesIcon from '../assets/home-icons/grades.png'
 import homeworkIcon from '../assets/home-icons/homework.png'
 import mailIcon from '../assets/home-icons/mail.png'
 import menuIcon from '../assets/home-icons/menu.png'
+import { buildGreeting } from '../greeting'
 import { HOME_CARD_ORDER, layoutHomeCards } from '../homeCardsLayout'
+import { r } from '../register.js'
 
 // « Accueil »'s icons, as its cards and greeting row show them.
 const CARD_ICONS = {
@@ -16,6 +19,7 @@ const CARD_ICONS = {
   mail: mailIcon,
   latestGrade: gradesIcon,
   deadlines: homeworkIcon,
+  assiduity: assiduityIcon,
 }
 
 // A tile's place in the miniature's grid (layoutHomeCards).
@@ -105,7 +109,7 @@ function HomeLayoutSetting({ widgets, onChange, wallpaperSrc = null, firstName =
     onToggle: toggle,
     refusing: refusal?.id === id ? refusal.count : null,
   })
-  const greeting = firstName ? `Salut ${firstName} !` : 'Salut !'
+  const greeting = buildGreeting(firstName)
 
   return (
     <div className="flex flex-col gap-[7px]">
@@ -172,9 +176,9 @@ function HomeLayoutSetting({ widgets, onChange, wallpaperSrc = null, firstName =
         {refusal ? (
           <>
             <Icon icon="ph:info-bold" className="size-[14px] shrink-0" aria-hidden="true" />
-            Garde au moins une carte sur l’accueil
+            {r('Garde au moins une carte sur l’accueil', 'Gardez au moins une carte sur l’accueil')}
           </>
-        ) : 'Touche une carte pour l’afficher ou la masquer'}
+        ) : r('Touche une carte pour l’afficher ou la masquer', 'Touchez une carte pour l’afficher ou la masquer')}
       </p>
     </div>
   )

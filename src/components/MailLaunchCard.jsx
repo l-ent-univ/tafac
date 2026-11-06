@@ -1,6 +1,7 @@
 import { Icon } from '@iconify/react'
 import LaunchCard from './LaunchCard'
 import { accentStyle } from '../eventAccents'
+import { r } from '../register.js'
 
 // The « Nouveautés » entry this card launches (src/changelog.js, a
 // `spotlight` one): see LaunchCard for when it shows.
@@ -64,8 +65,8 @@ function MailLaunchCard({ onOpen }) {
     <LaunchCard
       entryId={ENTRY_ID}
       launch="mail"
-      title="Tes mails dans l’appli"
-      line="Lis, réponds et écris, avec pièces jointes, brouillons et signature"
+      title={r('Tes mails dans l’appli', 'Vos mails dans l’appli')}
+      line={r('Lis, réponds et écris, avec pièces jointes, brouillons et signature', 'Lisez, répondez et écrivez, avec pièces jointes, brouillons et signature')}
       ctaLabel="Ouvrir la messagerie"
       closeLabel="Fermer l’annonce de la messagerie"
       onOpen={onOpen}

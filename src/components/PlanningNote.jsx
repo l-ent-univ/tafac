@@ -4,6 +4,7 @@ import { useRef } from 'react'
 import { trackPlanningAction } from '../analytics'
 import { SECONDARY_BUTTON } from '../scodocPageUtils'
 import LoadingDots from './LoadingDots'
+import { r } from '../register.js'
 
 // The planning service's name (planning.providerName), ADE by default.
 const PROVIDER = universityConfig.planning?.providerName ?? 'ADE'
@@ -18,17 +19,17 @@ const NOTES = {
   unavailable: {
     icon: 'ph:cloud-slash',
     title: 'Planning indisponible',
-    detail: `${PROVIDER} n’a pas répondu. Vérifie ta connexion, puis réessaie.`,
+    get detail() { return r(`${PROVIDER} n’a pas répondu. Vérifie ta connexion, puis réessaie.`, `${PROVIDER} n’a pas répondu. Vérifiez votre connexion, puis réessayez.`) },
   },
   'no-timetable': {
     icon: 'ph:calendar-blank',
     title: 'Pas d’emploi du temps',
-    detail: `${PROVIDER} n’a encore aucun cours pour toi cette année. Ton emploi du temps est peut-être ailleurs`,
+    get detail() { return r(`${PROVIDER} n’a encore aucun cours pour toi cette année. Ton emploi du temps est peut-être ailleurs`, `${PROVIDER} n’a encore aucun cours pour vous cette année. Votre emploi du temps est peut-être ailleurs`) },
   },
   unconfigured: {
     icon: 'ph:users-three',
-    title: 'Choisis ton groupe',
-    detail: 'Indique ton groupe de TD/TP dans Mon compte pour voir ton planning.',
+    get title() { return r('Choisis ton groupe', 'Choisissez votre groupe') },
+    get detail() { return r('Indique ton groupe de TD/TP dans Mon compte pour voir ton planning.', 'Indiquez votre groupe de TD/TP dans Mon compte pour voir votre planning.') },
   },
 }
 

@@ -4,6 +4,7 @@ import LaunchCard from './LaunchCard'
 import { pickInkOn } from '../colorContrast'
 import { buildSegmentPath, pointAt } from '../ueRingGeometry'
 import { useUeColor } from '../useUeColor'
+import { r } from '../register.js'
 
 // The « Nouveautés » entry this card launches (src/changelog.js, a
 // `spotlight` one): see LaunchCard for when it shows.
@@ -151,7 +152,7 @@ function GradesLaunchCard({ onOpen }) {
     <LaunchCard
       entryId={ENTRY_ID}
       launch="grades"
-      title="Tes notes, enfin dans l’appli"
+      title={r('Tes notes, enfin dans l’appli', 'Vos notes, enfin dans l’appli')}
       line="Moyenne, UE, crédits ECTS et un simulateur, semestre par semestre."
       ctaLabel="Voir mes notes"
       closeLabel="Fermer l’annonce de Mes notes"

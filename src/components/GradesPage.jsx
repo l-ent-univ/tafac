@@ -34,6 +34,7 @@ import UeSubjectsList from './UeSubjectsList'
 import WidgetAverageGrade from './WidgetAverageGrade'
 import WidgetEcts from './WidgetEcts'
 import WidgetUes from './WidgetUes'
+import { r } from '../register.js'
 
 // Why the semester has nothing to show, if it doesn't: no relevé, a relevé
 // ScoDoc hasn't published (with its own notice), or no grade yet. Mirrors
@@ -301,13 +302,13 @@ function GradesPage({ user = null, arrivalSource = 'other', initialGradeRequest 
   } else if (empty?.kind === 'unpublished') {
     body = (
       <PageEmptyState key={activeId} icon="ph:file-dashed" title="Relevé pas encore publié">
-        {empty.message || `Ton relevé ${semesterName(activeSemester)} n’est pas encore visible sur ScoDoc.`}
+        {empty.message || `${r('Ton relevé', 'Votre relevé')} ${semesterName(activeSemester)} n’est pas encore visible sur ScoDoc.`}
       </PageEmptyState>
     )
   } else if (empty?.kind === 'noGrades') {
     body = (
       <PageEmptyState key={activeId} icon="ph:chart-line" title="Pas encore de notes">
-        Tes notes {semesterName(activeSemester)} apparaîtront ici dès qu’elles seront saisies sur ScoDoc.
+        {r('Tes notes', 'Vos notes')} {semesterName(activeSemester)} apparaîtront ici dès qu’elles seront saisies sur ScoDoc.
       </PageEmptyState>
     )
   } else if (empty) {

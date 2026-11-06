@@ -26,6 +26,7 @@ export const UNIVERSITY_SETTING_KEYS = [
   'l-ent:grades-dept-message-dismissed',
   'l-ent:moodle-href',
   'l-ent:webmail-href',
+  'l-ent:tabbar-assiduity',
 ]
 
 export const UNIVERSITY_CACHE_KEYS = [

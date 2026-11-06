@@ -11,6 +11,7 @@ import UeBadge from './UeBadge'
 import UeLink from './UeLink'
 import { useUeColor } from '../useUeColor'
 import { useContextMenu } from '../useContextMenu'
+import { r } from '../register.js'
 
 // UE tiles side by side, as many ≥320px as fit a row (one on a phone), in
 // UE order, a row's tiles at one height. Wrapping boxes, not grid columns:
@@ -32,17 +33,17 @@ const VALIDATION_TAGS = {
   capitalization: {
     label: 'Capitalisée',
     spoken: 'Capitalisée : déjà validée lors d’un semestre précédent, elle reste acquise avec ses crédits',
-    tip: 'UE capitalisée : tu l’as déjà validée lors d’un semestre précédent (un semestre redoublé, par ex.). Elle reste acquise avec ses crédits, et ScoDoc garde ta meilleure moyenne.',
+    get tip() { return r('UE capitalisée : tu l’as déjà validée lors d’un semestre précédent (un semestre redoublé, par ex.). Elle reste acquise avec ses crédits, et ScoDoc garde ta meilleure moyenne.', 'UE capitalisée : vous l’avez déjà validée lors d’un semestre précédent (un semestre redoublé, par ex.). Elle reste acquise avec ses crédits, et ScoDoc garde votre meilleure moyenne.') },
   },
   compensation: {
     label: 'Compensée',
     spoken: 'Validée par compensation : moyenne sous 10, mais ses crédits sont acquis',
-    tip: 'Moyenne sous 10, mais l’UE est validée par compensation : en BUT, avec l’UE du même niveau de l’autre semestre de l’année. Ses crédits te sont acquis.',
+    get tip() { return r('Moyenne sous 10, mais l’UE est validée par compensation : en BUT, avec l’UE du même niveau de l’autre semestre de l’année. Ses crédits te sont acquis.', 'Moyenne sous 10, mais l’UE est validée par compensation : en BUT, avec l’UE du même niveau de l’autre semestre de l’année. Ses crédits vous sont acquis.') },
   },
   jury: {
     label: 'Validée par le jury',
     spoken: 'Validée par le jury : moyenne sous 10, mais ses crédits sont acquis',
-    tip: 'Moyenne sous 10, mais le jury a validé cette UE. Ses crédits te sont acquis.',
+    get tip() { return r('Moyenne sous 10, mais le jury a validé cette UE. Ses crédits te sont acquis.', 'Moyenne sous 10, mais le jury a validé cette UE. Ses crédits vous sont acquis.') },
   },
 }
 
@@ -93,11 +94,11 @@ const BELOW_TEN_NOTE = 'Moyenne sous 10 : cette UE n’est pas validée pour l�
 const UE_DECISIONS = {
   AJ: {
     title: 'Ajournée',
-    note: 'Le jury n’a pas validé cette UE : sa moyenne n’atteint pas 10. Ses crédits ne te sont pas acquis ; vois avec ton département pour la suite (rattrapage, redoublement…).',
+    get note() { return r('Le jury n’a pas validé cette UE : sa moyenne n’atteint pas 10. Ses crédits ne te sont pas acquis ; vois avec ton département pour la suite (rattrapage, redoublement…).', 'Le jury n’a pas validé cette UE : sa moyenne n’atteint pas 10. Ses crédits ne vous sont pas acquis ; voyez avec votre département pour la suite (rattrapage, redoublement…).') },
   },
   RAT: {
     title: 'En attente d’un rattrapage',
-    note: 'Tu as une ou plusieurs épreuves de rattrapage à passer. Le jury statuera sur cette UE après le rattrapage ; d’ici là, ses crédits ne te sont pas acquis.',
+    get note() { return r('Tu as une ou plusieurs épreuves de rattrapage à passer. Le jury statuera sur cette UE après le rattrapage ; d’ici là, ses crédits ne te sont pas acquis.', 'Vous avez une ou plusieurs épreuves de rattrapage à passer. Le jury statuera sur cette UE après le rattrapage ; d’ici là, ses crédits ne vous sont pas acquis.') },
   },
   ATT: {
     title: 'Décision en attente',
@@ -105,7 +106,7 @@ const UE_DECISIONS = {
   },
   ATJ: {
     title: 'En attente pour assiduité',
-    note: 'Le jury attend un autre semestre pour statuer, ton assiduité ayant été jugée insuffisante. Vois avec ton département ce qu’il te faut fournir ou rattraper.',
+    get note() { return r('Le jury attend un autre semestre pour statuer, ton assiduité ayant été jugée insuffisante. Vois avec ton département ce qu’il te faut fournir ou rattraper.', 'Le jury attend un autre semestre pour statuer, votre assiduité ayant été jugée insuffisante. Voyez avec votre département ce qu’il vous faut fournir ou rattraper.') },
   },
   ATB: {
     title: 'Décision en attente',
@@ -117,11 +118,11 @@ const UE_DECISIONS = {
   },
   ABAN: {
     title: 'Non évaluée',
-    note: 'Tes notes n’ont pas été présentées au jury, pour manque d’assiduité. L’UE n’est pas validée.',
+    get note() { return r('Tes notes n’ont pas été présentées au jury, pour manque d’assiduité. L’UE n’est pas validée.', 'Vos notes n’ont pas été présentées au jury, pour manque d’assiduité. L’UE n’est pas validée.') },
   },
   DEM: {
     title: 'Démission',
-    note: 'Tu as démissionné : l’UE n’est pas validée.',
+    get note() { return r('Tu as démissionné : l’UE n’est pas validée.', 'Vous avez démissionné : l’UE n’est pas validée.') },
   },
   UEBSL: {
     title: 'UE blanchie',
@@ -132,7 +133,7 @@ const UE_DECISIONS = {
 function describeDecision(code) {
   return UE_DECISIONS[code] ?? {
     title: `Code ${code}`,
-    note: 'Décision du jury pour cette UE : elle n’est pas validée. Vois avec ton département ce que ce code veut dire pour toi.',
+    note: r('Décision du jury pour cette UE : elle n’est pas validée. Vois avec ton département ce que ce code veut dire pour toi.', 'Décision du jury pour cette UE : elle n’est pas validée. Voyez avec votre département ce que ce code veut dire pour vous.'),
   }
 }
 
@@ -206,13 +207,13 @@ const ADJUSTMENTS = [
     key: 'bonus',
     label: 'Bonus',
     sign: 1,
-    tip: (points) => `Bonus de ${points} point, déjà inclus dans la moyenne de l’UE affichée. Ton département l’accorde, par ex. pour une activité sportive ou culturelle.`,
+    tip: (points) => `Bonus de ${points} point, déjà inclus dans la moyenne de l’UE affichée. ${r('Ton département', 'Votre département')} l’accorde, par ex. pour une activité sportive ou culturelle.`,
   },
   {
     key: 'malus',
     label: 'Malus',
     sign: -1,
-    tip: (points) => `Malus de ${points} point, déjà déduit de la moyenne de l’UE affichée. Ton département l’applique, par ex. pour des absences injustifiées.`,
+    tip: (points) => `Malus de ${points} point, déjà déduit de la moyenne de l’UE affichée. ${r('Ton département', 'Votre département')} l’applique, par ex. pour des absences injustifiées.`,
   },
 ]
 

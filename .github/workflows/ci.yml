@@ -168,7 +168,10 @@ jobs:
             # digest"): dropped before the next.
             docker image rm "$IMAGE@$DIGEST" > /dev/null
           done
-          diff -r dist-amd64 dist-arm64
+          # The two platforms' frontends are the same files, the pre-rendered
+          # pages aside: server.js reads .prerender into the pages it sends,
+          # never serves it as a file (left out of the manifest too).
+          diff -r -x .prerender dist-amd64 dist-arm64
           (cd dist-amd64 && find . -type f ! -path './.prerender/*' ! -name robots.txt | sed 's|^\./||' | LC_ALL=C sort | xargs -d '\n' sha256sum) > dist-manifest.sha256
           cp dist-amd64/index.html index.template.html
           wc -l < dist-manifest.sha256

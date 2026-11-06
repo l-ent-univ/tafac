@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import mobileInviteImg from '../assets/mobile-pwa-invite.png'
 import { APP_NAME } from '../seo'
+import { r } from '../register.js'
 
 const VISIT_COUNT_KEY = 'l-ent:visit-count'
 const PROMPT_DISMISSED_KEY = 'l-ent:pwa-prompt-dismissed'
@@ -80,10 +81,10 @@ export default function PwaInstallPrompt({ forceShow = false, forceIos = false, 
           <div className="px-5 pt-4 pb-4 flex flex-col gap-3">
             <div>
               <h2 className="m-0 text-[1.15rem] font-bold text-text leading-tight">
-                Ajoute {APP_NAME} à ton écran d'accueil
+                {r('Ajoute', 'Ajoutez')} {APP_NAME} {r("à ton écran d'accueil", "à votre écran d'accueil")}
               </h2>
               <p className="m-0 mt-1 text-[0.9rem] text-text-muted font-body">
-                Cours et notes de ton université, sur ton téléphone
+                {r('Cours et notes de ton université, sur ton téléphone', 'Cours et notes de votre université, sur votre téléphone')}
               </p>
             </div>
             {showIos ? (
@@ -91,7 +92,7 @@ export default function PwaInstallPrompt({ forceShow = false, forceIos = false, 
                 <div className="flex items-center gap-3">
                   <span className="shrink-0 w-6 h-6 rounded-full bg-brand text-[color:var(--color-bg)] text-[0.75rem] font-bold flex items-center justify-center">1</span>
                   <span>
-                    Appuie sur{' '}
+                    {r('Appuie', 'Appuyez')} sur{' '}
                     <svg className="inline-block w-[1.1em] h-[1.1em] align-[-0.15em]" viewBox="0 0 18.2512 26.8443" fill="currentColor">
                       <path d="M17.8899 11.4937L17.8899 20.9984C17.8899 23.1375 16.7402 24.2804 14.5812 24.2804L3.30863 24.2804C1.14961 24.2804 0 23.1441 0 20.9984L0 11.4937C0 9.34493 1.14961 8.21175 3.30863 8.21175L6.09506 8.21175L6.09506 10.3865L3.48964 10.3865C2.63419 10.3865 2.17471 10.8171 2.17471 11.7147L2.17471 20.7743C2.17471 21.672 2.63419 22.1057 3.48964 22.1057L14.3936 22.1057C15.2423 22.1057 15.7151 21.672 15.7151 20.7743L15.7151 11.7147C15.7151 10.8171 15.2423 10.3865 14.3936 10.3865L11.7881 10.3865L11.7881 8.21175L14.5812 8.21175C16.7402 8.21175 17.8899 9.35159 17.8899 11.4937Z" fillOpacity="0.85"/>
                       <path d="M8.9416 16.2458C9.49505 16.2458 9.94643 15.7953 9.94643 15.2671L9.94643 5.56526L9.863 4.12571L10.3509 4.77952L11.656 6.17347C11.8269 6.36388 12.0693 6.46685 12.3169 6.46685C12.7923 6.46685 13.1975 6.11177 13.1975 5.61867C13.1975 5.35724 13.1038 5.16683 12.9263 4.9924L9.71606 1.90556C9.45864 1.65125 9.21189 1.56471 8.9416 1.56471C8.67796 1.56471 8.43431 1.65125 8.16713 1.90556L4.96355 4.9924C4.78912 5.16683 4.6857 5.35724 4.6857 5.61867C4.6857 6.11177 5.08425 6.46685 5.55962 6.46685C5.80728 6.46685 6.05628 6.36388 6.22716 6.17347L7.53898 4.77952L8.02685 4.12571L7.94342 5.56526L7.94342 15.2671C7.94342 15.7953 8.38814 16.2458 8.9416 16.2458Z" fillOpacity="0.85"/>
@@ -101,16 +102,16 @@ export default function PwaInstallPrompt({ forceShow = false, forceIos = false, 
                 </div>
                 <div className="flex items-center gap-3">
                   <span className="shrink-0 w-6 h-6 rounded-full bg-brand text-[color:var(--color-bg)] text-[0.75rem] font-bold flex items-center justify-center">2</span>
-                  <span>Choisis <strong>Sur l'écran d'accueil</strong></span>
+                  <span>{r('Choisis', 'Choisissez')} <strong>Sur l'écran d'accueil</strong></span>
                 </div>
                 <div className="flex items-center gap-3">
                   <span className="shrink-0 w-6 h-6 rounded-full bg-brand text-[color:var(--color-bg)] text-[0.75rem] font-bold flex items-center justify-center">3</span>
-                  <span>Appuie sur <strong>Ajouter</strong></span>
+                  <span>{r('Appuie', 'Appuyez')} sur <strong>Ajouter</strong></span>
                 </div>
               </div>
             ) : (
               <p className="m-0 text-[0.82rem] text-text-secondary font-body leading-snug">
-                Appuie sur <strong>Installer</strong> dans le menu de ton navigateur.
+                {r('Appuie', 'Appuyez')} sur <strong>Installer</strong> dans le menu de {r('ton', 'votre')} navigateur.
               </p>
             )}
           </div>

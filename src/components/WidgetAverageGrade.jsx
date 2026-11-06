@@ -13,6 +13,8 @@ import {
   positionGradeTooltipFromElement,
   positionGradeTooltipFromPointer,
 } from '../gradeFeatureState'
+import { r } from '../register.js'
+import { describePocRank, isRankPocOn } from '../rankPoc.js'
 
 // Card on the "Mes notes" page: the Figma width (443), at least 20px taller
 // than its 168 so the evolution line keeps a clear gap above the number (the
@@ -31,7 +33,7 @@ function AverageGradeHeader({ estimated = false, final = false, icon = null }) {
       {/* Only when the department hides ScoDoc's average and the card shows the estimate. */}
       {estimated ? (
         <CardInfoTip label="Moyenne approximative : pourquoi ?">
-          Moyenne approximative : ton département masque la moyenne officielle. Elle est recalculée à partir de tes moyennes d’UE, pondérées par leurs ECTS.
+          {r('Moyenne approximative : ton département masque la moyenne officielle. Elle est recalculée à partir de tes moyennes d’UE, pondérées par leurs ECTS.', 'Moyenne approximative : votre département masque la moyenne officielle. Elle est recalculée à partir de vos moyennes d’UE, pondérées par leurs ECTS.')}
         </CardInfoTip>
       ) : null}
       {/* The jury has ruled (ScoDoc's decision on the semester or its year). */}
@@ -54,8 +56,8 @@ function SemesterRank({ rank, groups }) {
       <span className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap">{rank.text}</span>
       {groups.length ? (
         <span className="pointer-events-auto inline-flex">
-          <CardInfoTip label="Ton rang dans tes groupes">
-            <span className="block">Dans tes groupes :</span>
+          <CardInfoTip label={r('Ton rang dans tes groupes', 'Votre rang dans vos groupes')}>
+            <span className="block">{r('Dans tes groupes', 'Dans vos groupes')} :</span>
             {groups.map((group) => (
               <span key={group.name} className="block">{group.name} : {formatRank(group).text.replace(/^Rang /, '')}</span>
             ))}
@@ -66,10 +68,35 @@ function SemesterRank({ rank, groups }) {
   )
 }
 
+// Proof of concept (src/rankPoc.js), where the department hides ranks:
+// the rank ScoDoc sends anyway, a « masqué » tag beside it, or « ≈ 14e »
+// when only the estimate is known; the tip says where each comes from and
+// shows the estimate next to the real rank, to judge it.
+function PocRank({ poc }) {
+  const estimateText = poc.estimate ? `≈ ${poc.estimate.position}e\u202F/\u202F${poc.estimate.total}` : null
+  const text = poc.hidden ? formatRank(poc.hidden).text : estimateText
+  return (
+    <span className="flex min-w-0 items-center gap-[5px] leading-[1.06] text-[14px] font-medium text-text-muted max-md:text-[12px]">
+      <span className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap">{text}</span>
+      <span className="shrink-0 rounded-full border border-dashed border-border-input px-[6px] py-[2px] text-[11px] font-semibold leading-none">{poc.hidden ? 'masqué' : 'estimé'}</span>
+      <span className="pointer-events-auto inline-flex">
+        <CardInfoTip label="D’où vient ce rang ?">
+          {poc.hidden ? (
+            <span className="block">{r('Ton département masque le rang. ScoDoc l’envoie quand même avec le relevé : le voici', 'Votre département masque le rang. ScoDoc l’envoie quand même avec le relevé : le voici')}</span>
+          ) : null}
+          {estimateText ? (
+            <span className="block">Estimation d’après la moyenne, le min et le max de la promo : {estimateText}</span>
+          ) : null}
+        </CardInfoTip>
+      </span>
+    </span>
+  )
+}
+
 // The average sits at the bottom left like the latest grade's value, with the
 // promo average (and the rank, if shown) under it. Pointer events pass through
 // to the evolution line drawn behind (its hover), and on to the card.
-function AverageGradeValues({ avgDisplay, promoDisplay, ranks = null }) {
+function AverageGradeValues({ avgDisplay, promoDisplay, ranks = null, pocRank = null }) {
   return (
     <div className="pointer-events-none relative z-10 flex-1 flex flex-col gap-[5px] justify-end min-w-0">
       <div className="flex items-end gap-[3px] leading-[1.06]">
@@ -81,7 +108,7 @@ function AverageGradeValues({ avgDisplay, promoDisplay, ranks = null }) {
           <span className="max-md:hidden">Moy. </span>Promo : {promoDisplay}
         </span>
       ) : null}
-      {ranks ? <SemesterRank rank={ranks.rank} groups={ranks.groups} /> : null}
+      {ranks ? <SemesterRank rank={ranks.rank} groups={ranks.groups} /> : pocRank ? <PocRank poc={pocRank} /> : null}
     </div>
   )
 }
@@ -126,6 +153,8 @@ function LiveWidgetAverageGrade({ releve, visible, icon }) {
     const rank = report?.status === 'ok' ? formatRank(report.rank) : null
     return rank ? { rank, groups: nameGroupRanks(report.groupRanks, releve.semestre?.groupes) } : null
   }, [releve])
+  // The hidden rank's proof of concept, only where the flag is on.
+  const pocRank = useMemo(() => (releve && !ranks && isRankPocOn() ? describePocRank(releve) : null), [releve, ranks])
 
   if (!data) {
     return null
@@ -144,7 +173,7 @@ function LiveWidgetAverageGrade({ releve, visible, icon }) {
         <AverageSparkline history={data.history} semesterEnd={data.semesterEnd} className="absolute inset-x-0 top-[38px] bottom-0 max-md:top-[32px]" />
       ) : null}
       <AverageGradeHeader estimated={Boolean(data.estimated)} final={data.final} icon={icon} />
-      <AverageGradeValues avgDisplay={avgDisplay} promoDisplay={promoDisplay} ranks={ranks} />
+      <AverageGradeValues avgDisplay={avgDisplay} promoDisplay={promoDisplay} ranks={ranks} pocRank={pocRank} />
     </article>
   )
 }

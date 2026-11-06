@@ -31,6 +31,7 @@ import {
   readStoredHref,
   storeHref,
 } from './widgetListUtils'
+import { r } from '../register.js'
 
 // The composer and its editor (Tiptap) load the first time one opens: most
 // visits only read.
@@ -347,7 +348,7 @@ function MailSessionNotice({ onSignInAgain, className = '' }) {
       <Icon icon="ph:lock" className="size-[18px] shrink-0 text-text-muted" aria-hidden="true" />
       <div className="grid min-w-0 flex-1 gap-0.5">
         <p className="m-0 text-[14px] font-semibold leading-tight text-text">Session expirée</p>
-        <p className="m-0 text-[13px] font-medium leading-snug text-text-muted">Reconnecte-toi pour retrouver tes mails</p>
+        <p className="m-0 text-[13px] font-medium leading-snug text-text-muted">{r('Reconnecte-toi pour retrouver tes mails', 'Reconnectez-vous pour retrouver vos mails')}</p>
       </div>
       {onSignInAgain ? <SignInAgainButton onClick={onSignInAgain} /> : null}
     </div>
@@ -1153,8 +1154,8 @@ function MailPage({ onReaderOpenChange, onSignInAgain, sender = null, composeReq
     else setOpenId(null)
   }, [openId])
 
-  // The open mail's row clicked again closes it (the side panel has no
-  // close button).
+  // The open mail's row clicked again closes it, as the panel's close
+  // button (MailToolbar) does.
   const openMail = useCallback((id) => {
     if (id === openId) {
       closeMail()
@@ -1371,8 +1372,9 @@ function MailPage({ onReaderOpenChange, onSignInAgain, sender = null, composeReq
   useEffect(() => {
     if (!composeRequest || handledComposeRef.current === composeRequest) return
     handledComposeRef.current = composeRequest
-    // About a class (the Planning) or a grade (« Mes notes »).
-    trackMailAction('compose_opened', { kind: composeRequest.kind === 'course' ? 'course' : 'grade' })
+    // About a class (the Planning), an absence (« Assiduité ») or a grade
+    // (« Mes notes »).
+    trackMailAction('compose_opened', { kind: ['course', 'absence'].includes(composeRequest.kind) ? composeRequest.kind : 'grade' })
     showComposer({ key: Date.now(), kind: 'new', message: null, saver: newDraftSaver(), restore: composeRequest })
     onComposeRequestHandled()
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -2005,6 +2007,7 @@ function MailPage({ onReaderOpenChange, onSignInAgain, sender = null, composeReq
             onMove={(event) => openFolderMenu('move', event.currentTarget.getBoundingClientRect(), targetIds, 'toolbar')}
             onToggleUnread={() => setMessagesFlag(targetIds, 'unread', !targetState?.unread, 'toolbar')}
             onToggleFlag={() => setMessagesFlag(targetIds, 'flagged', !targetState?.flagged, 'toolbar')}
+            onClose={isMultiple || isPanelClosing ? null : closeMail}
           />
           {/* On a phone the list (and its notice) is hidden behind the
               reader: the notice over the mail then. Beside the list, the
@@ -2194,7 +2197,7 @@ function MailPage({ onReaderOpenChange, onSignInAgain, sender = null, composeReq
         // Of the folder whose list it stands for, dimmed as that list while
         // another loads.
         <div key={state.folder} className={`mail-list-swap transition-opacity duration-200 ease-out ${isFolderSwitching ? 'opacity-40' : ''}`}>
-          <PageEmptyState icon="ph:check-circle" title="Aucun mail">{listFolderKind === 'inbox' ? 'Ta boîte de réception est vide' : 'Ce dossier est vide'}</PageEmptyState>
+          <PageEmptyState icon="ph:check-circle" title="Aucun mail">{listFolderKind === 'inbox' ? r('Ta boîte de réception est vide', 'Votre boîte de réception est vide') : 'Ce dossier est vide'}</PageEmptyState>
         </div>
       ) : null}
 
@@ -2207,7 +2210,7 @@ function MailPage({ onReaderOpenChange, onSignInAgain, sender = null, composeReq
           title="Session expirée"
           action={onSignInAgain ? <SignInAgainButton onClick={onSignInAgain} /> : null}
         >
-          Reconnecte-toi pour retrouver tes mails
+          {r('Reconnecte-toi pour retrouver tes mails', 'Reconnectez-vous pour retrouver vos mails')}
         </PageEmptyState>
       ) : state.status === 'error' || state.status === 'disabled' ? (
         <PageEmptyState icon="ph:envelope-simple" title="Mails indisponibles">La messagerie ne répond pas, réessaie dans un moment</PageEmptyState>

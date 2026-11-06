@@ -3,6 +3,7 @@ import { shadeHex } from '../colorContrast'
 import { useUeColor } from '../useUeColor'
 import { buildGradesReport, formatGrade } from '../gradesReport'
 import CardInfoTip from './CardInfoTip'
+import { r } from '../register.js'
 
 // Square, as tall as the average card beside it; on phones a card of the
 // overview's strip, last (after "UE validées").
@@ -124,7 +125,7 @@ function WidgetEcts({ releve = null, config = null, visible = false, icon = null
         {icon ? <img src={icon} alt="" width="22" height="22" draggable="false" className="mr-[3px] size-[22px] shrink-0 select-none" aria-hidden="true" /> : null}
         <span className="m-0 min-w-0 leading-[1.06] text-base font-medium text-text-muted overflow-hidden text-ellipsis whitespace-nowrap max-md:text-[14px]">Crédits ECTS</span>
         <CardInfoTip label="Les crédits ECTS, c’est quoi ?">
-          Les crédits ECTS valident ton semestre : chaque UE en apporte un nombre fixe. Le jury les attribue en fin de semestre pour chaque UE validée. En fond, une pile par UE, une pièce par crédit.
+          {r('Les crédits ECTS valident ton semestre', 'Les crédits ECTS valident votre semestre')} : chaque UE en apporte un nombre fixe. Le jury les attribue en fin de semestre pour chaque UE validée. En fond, une pile par UE, une pièce par crédit.
         </CardInfoTip>
       </div>
       <div className="relative z-10 flex-1 min-h-0 flex items-center justify-center">

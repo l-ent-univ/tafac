@@ -1799,16 +1799,31 @@
 
 /* ── Login left panel edge strokes ── */
 
+/* The login panel (LoginPage): the screen's height, its width what lets
+   its photo (login-hands.webp, 1080 × 1070) fit whole and full width under
+   the logo's band (--login-text-h, the least room the logo gets), 529px
+   at most. Its right edge: a hairline drawn over the content (an inset
+   shadow would sit under the photo, which runs to the edge), then a light
+   line outside. The panel stays light in dark mode (its photo). */
 .login-left-panel {
-  box-shadow:
-    inset -1px 0 0 0 rgba(0, 0, 0, 0.08),
-    1px 0 0 0 rgba(255, 255, 255, 0.7);
+  --login-text-h: clamp(160px, 26vh, 300px);
+  flex: 0 0 min(529px, 47vw, calc((100vh - var(--login-text-h)) * 1080 / 1070));
+  box-shadow: 1px 0 0 0 rgba(255, 255, 255, 0.7);
+}
+
+.login-left-panel::after {
+  content: '';
+  position: absolute;
+  inset-block: 0;
+  right: 0;
+  z-index: 20;
+  width: 1px;
+  background: rgba(0, 0, 0, 0.08);
+  pointer-events: none;
 }
 
 :where([data-theme="dark"]) .login-left-panel {
-  box-shadow:
-    inset -1px 0 0 0 rgba(255, 255, 255, 0.06),
-    1px 0 0 0 rgba(255, 255, 255, 0.04);
+  box-shadow: 1px 0 0 0 rgba(255, 255, 255, 0.04);
 }
 
 /* ── Weather gradient inner (uses inline CSS variable) ── */
@@ -7328,5 +7343,177 @@ li:has(> .planning-row.is-link:active) + li > .planning-row .planning-row-text,
 @media (prefers-reduced-motion: reduce) {
   .home-tile-refuse {
     animation: none;
+  }
+}
+
+/* ── « Assiduité » ──
+   The semester line's marks pop onto it one after another; a mark is a
+   10px dot (the line picks the nearest under the pointer): red not justified, soft justified, a
+   ring for a lateness. The one picked keeps a halo. The bars grow from
+   the left, the countdown rings empty in. A row reached from the line or
+   « À justifier » flashes like a grade opened from « Dernières notes ». */
+
+.assiduity-mark {
+  position: relative;
+  display: block;
+  width: 10px;
+  height: 10px;
+  padding: 0;
+  margin: 0;
+  translate: -50% 0;
+  border: 0;
+  border-radius: 999px;
+  background: var(--color-text-muted);
+  box-shadow: 0 0 0 2px var(--color-widget-bg);
+  /* The line picks the nearest mark (SemesterLine). */
+  pointer-events: none;
+  transition: scale 160ms ease, box-shadow 160ms ease;
+  animation: assiduity-mark-in 420ms cubic-bezier(0.34, 1.56, 0.64, 1) backwards;
+  animation-delay: calc(120ms + var(--mark-order, 0) * 45ms);
+}
+
+.assiduity-mark.is-unjustified {
+  background: var(--color-error);
+}
+
+.assiduity-mark.is-late {
+  background: var(--color-widget-bg);
+  box-shadow: inset 0 0 0 2px var(--color-text-muted), 0 0 0 2px var(--color-widget-bg);
+}
+
+.assiduity-mark:focus-visible {
+  outline: 2px solid var(--color-brand);
+  outline-offset: 3px;
+}
+
+.assiduity-mark.is-active {
+  scale: 1.35;
+  box-shadow: 0 0 0 2px var(--color-widget-bg), 0 0 0 5px color-mix(in srgb, var(--color-brand) 22%, transparent);
+}
+
+.assiduity-mark.is-late.is-active {
+  box-shadow: inset 0 0 0 2px var(--color-text-muted), 0 0 0 2px var(--color-widget-bg), 0 0 0 5px color-mix(in srgb, var(--color-brand) 22%, transparent);
+}
+
+@keyframes assiduity-mark-in {
+  from {
+    opacity: 0;
+    scale: 0.2;
+  }
+}
+
+.assiduity-line-tip {
+  animation: assiduity-tip-in 160ms ease-out;
+}
+
+@keyframes assiduity-tip-in {
+  from {
+    opacity: 0;
+    transform: translate(-50%, 3px);
+  }
+}
+
+.assiduity-bar,
+.assiduity-elapsed {
+  transform-origin: left center;
+  animation: assiduity-grow 700ms cubic-bezier(0.16, 1, 0.3, 1) backwards;
+  animation-delay: 80ms;
+}
+
+@keyframes assiduity-grow {
+  from {
+    transform: scaleX(0);
+  }
+}
+
+.assiduity-ring {
+  transition: stroke-dashoffset 600ms ease;
+  animation: assiduity-ring-in 900ms cubic-bezier(0.16, 1, 0.3, 1) backwards;
+}
+
+@keyframes assiduity-ring-in {
+  from {
+    stroke-dashoffset: 0;
+  }
+}
+
+.assiduity-row {
+  transition: background-color 160ms ease;
+}
+
+.assiduity-row.is-highlighted {
+  animation: assiduity-row-flash 2.2s ease-out both;
+}
+
+@keyframes assiduity-row-flash {
+  0%, 40% {
+    background-color: color-mix(in srgb, var(--color-brand) 9%, var(--color-widget-bg));
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .assiduity-mark,
+  .assiduity-line-tip,
+  .assiduity-bar,
+  .assiduity-elapsed,
+  .assiduity-ring {
+    animation: none;
+  }
+
+  .assiduity-mark,
+  .assiduity-ring,
+  .assiduity-row {
+    transition: none;
+  }
+}
+
+/* « Justifier » (JustifyAbsenceSheet): the reasons rise in one after
+   another, the picked tile settles with a small press; the row's button
+   lightens under the pointer. */
+
+.justify-reason {
+  animation: justify-reason-in 360ms cubic-bezier(0.16, 1, 0.3, 1) backwards;
+  animation-delay: calc(var(--reveal-order, 0) * 35ms);
+}
+
+.justify-reason[aria-checked="true"] {
+  animation: justify-reason-pick 260ms cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+@keyframes justify-reason-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+}
+
+@keyframes justify-reason-pick {
+  40% {
+    transform: scale(0.97);
+  }
+}
+
+.justify-button {
+  transition: background-color 160ms ease, scale 120ms ease;
+}
+
+.justify-button:active {
+  scale: 0.96;
+}
+
+@media (hover: hover) {
+  .justify-button:hover {
+    background-color: var(--color-brand-hover);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .justify-reason,
+  .justify-reason[aria-checked="true"] {
+    animation: none;
+  }
+
+  .justify-button {
+    transition: none;
   }
 }

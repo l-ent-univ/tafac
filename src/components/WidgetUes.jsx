@@ -3,6 +3,7 @@ import { readSemesterUes } from '../semesterUes'
 import { useUeColor } from '../useUeColor'
 import { RING_SIZE as SIZE, buildRingSegmentPath, buildRingSegments, readSegmentIndexAt } from '../ueRingGeometry'
 import CardInfoTip from './CardInfoTip'
+import { r } from '../register.js'
 
 // Ring drawn in a 120×120 box (ueRingGeometry.js), shown at the ECTS
 // ring's size (.ue-ring).
@@ -117,7 +118,7 @@ function WidgetUes({ releve = null, config = null, visible = false, icon = null 
         {icon ? <img src={icon} alt="" width="22" height="22" draggable="false" className="mr-[3px] size-[22px] shrink-0 select-none" aria-hidden="true" /> : null}
         <span className="m-0 min-w-0 leading-[1.06] text-base font-medium text-text-muted overflow-hidden text-ellipsis whitespace-nowrap max-md:text-[14px]">UE validées</span>
         <CardInfoTip label="Les UE, c’est quoi ?">
-          Chaque segment est une UE (unité d’enseignement) : plein quand elle est validée, par une moyenne de 10/20 ou plus, par compensation ou parce qu’elle est capitalisée. <span className="max-md:hidden">Survole</span><span className="md:hidden">Touche</span> un segment pour voir sa moyenne.
+          Chaque segment est une UE (unité d’enseignement) : plein quand elle est validée, par une moyenne de 10/20 ou plus, par compensation ou parce qu’elle est capitalisée. <span className="max-md:hidden">{r('Survole', 'Survolez')}</span><span className="md:hidden">{r('Touche', 'Touchez')}</span> un segment pour voir sa moyenne.
         </CardInfoTip>
       </div>
       <div className="relative flex-1 min-h-0 flex items-center justify-center">

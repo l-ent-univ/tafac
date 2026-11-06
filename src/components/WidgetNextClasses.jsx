@@ -15,6 +15,7 @@ import calendarIcon from '../assets/home-icons/calendar.png'
 import PlanningEventBlock from './PlanningEventBlock'
 import WidgetListStatus from './WidgetListStatus'
 import { SHIMMER_CLASSES } from './widgetListUtils'
+import { r } from '../register.js'
 
 // The list follows the clock (a class over leaves it).
 const TICK_MS = 60 * 1000
@@ -163,12 +164,12 @@ function WidgetNextClasses({
       <WidgetListStatus
         icon="ph:warning"
         title="Planning indisponible"
-        body="Impossible de charger tes cours"
+        body={r('Impossible de charger tes cours', 'Impossible de charger vos cours')}
         action={{ label: 'Réessayer', onClick: retry }}
       />
     )
   } else if (classes.status === 'unconfigured') {
-    body = <WidgetListStatus icon="ph:users" title="Groupe manquant" body="Choisis ton groupe TD ou TP dans « Mon compte »" />
+    body = <WidgetListStatus icon="ph:users" title="Groupe manquant" body={r('Choisis ton groupe TD ou TP dans « Mon compte »', 'Choisissez votre groupe TD ou TP dans « Mon compte »')} />
   } else if (!day) {
     body = <WidgetListStatus icon="ph:calendar-blank" title="Aucun cours à venir" body={`Rien de prévu dans les ${lookaheadDays} prochains jours`} />
   } else {

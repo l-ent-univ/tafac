@@ -28,6 +28,7 @@ import {
 import { isValidMailMessageId } from '../server/mailMessage.js'
 import { isValidZimbraUploadId } from '../server/mailUpload.js'
 import { buildComposePayload, composeOrigin, draftStateKey, pickDefaultIdentity, sendFailureText } from '../src/mailSendPayload.js'
+import { setRegister } from '../src/register.js'
 import { createDraftSaver } from '../src/mailDraftSaver.js'
 import { buildDraftFields } from '../src/mailCompose.js'
 import { loadServerConfig } from '../universities/index.js'
@@ -470,7 +471,14 @@ test('the page\'s payload: references, no From, the signature\'s choices only', 
   assert.equal(pickDefaultIdentity(identities, { to: [{ email: 'ALIAS@univ.fr' }] }), 'b')
   assert.equal(pickDefaultIdentity(identities, { to: [{ email: 'x@y.fr' }] }), 'a')
   assert.equal(pickDefaultIdentity([], null), null)
+  // The failure's text follows the register (src/register.js): « vous » by
+  // default, « tu » once set.
+  assert.equal(sendFailureText({ code: 'rate', retryAfter: 42 }), 'Trop d’envois, réessayez dans 42 s')
+  assert.equal(sendFailureText({ code: 'expired' }), 'Session expirée, reconnectez-vous')
+  setRegister('tu')
   assert.equal(sendFailureText({ code: 'rate', retryAfter: 42 }), 'Trop d’envois, réessaie dans 42 s')
+  assert.equal(sendFailureText({ code: 'expired' }), 'Session expirée, reconnecte-toi')
+  setRegister('vous')
   // « Répondre à tous » leaves every one of the student's addresses out.
   const fields = buildDraftFields('reply-all', { from: { email: 'leo@univ.fr' }, to: [{ email: 'me@univ.fr' }, { email: 'alias@univ.fr' }, { email: 'x@univ.fr' }], cc: [] }, ['me@univ.fr', 'alias@univ.fr'])
   assert.deepEqual(fields.to.map((entry) => entry.email), ['leo@univ.fr', 'x@univ.fr'])
