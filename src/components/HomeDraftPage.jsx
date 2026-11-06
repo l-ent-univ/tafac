@@ -8,6 +8,7 @@ import homeworkIcon from '../assets/home-icons/homework.png'
 import mailIcon from '../assets/home-icons/mail.png'
 import menuIcon from '../assets/home-icons/menu.png'
 import { trackDashboardView } from '../analytics'
+import AttendanceScanButton from './AttendanceScanButton'
 import { isWidgetAvailable } from '../dashboardWidgets'
 import { getGrades, peekGrades } from '../entApi'
 import { listGradesSemesters } from '../gradesReport'
@@ -425,6 +426,7 @@ function HomeDraftPage({
         <MailLaunchCard onOpen={onOpenMailPage} />
         <PlanningLaunchCard onOpen={onOpenPlanningPage} />
         <GradesLaunchCard onOpen={onOpenGradesPage} />
+        <AttendanceScanButton />
       </div>
       {/* « Applications »: the favourites as tiles, portalled here by the
           dashboard's app list (AvailableApplications), which launches them. */}

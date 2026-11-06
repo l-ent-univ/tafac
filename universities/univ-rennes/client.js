@@ -11,6 +11,7 @@ import heroRennesBeaulieu1 from './assets/hero/rennes-beaulieu-1.webp'
 import heroRennesBeaulieu2 from './assets/hero/rennes-beaulieu-2.webp'
 import {
   appIcons,
+  attendanceQrOrigin,
   id,
   branding,
   casOrigin,
@@ -75,6 +76,8 @@ export default {
     activateAccount: 'https://sesame.univ-rennes1.fr/motdepasse/public/activate',
     manageAccount: 'https://sesame.univ-rennes.fr/comptes/',
   },
+
+  attendanceQr: { origin: attendanceQrOrigin },
 
   origins: {
     ent: entOrigin,

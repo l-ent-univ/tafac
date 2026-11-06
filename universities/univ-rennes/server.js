@@ -2,7 +2,7 @@
 // Never imported by client code: holds origins, auth-flow parameters and the
 // reverse-engineered ADE mobile-app credentials.
 import { fileURLToPath } from 'node:url'
-import { appIcons, id, casOrigin, entOrigin, establishmentNames, features, gradesCopy, gradesOrigin, mailWebmailUrl, moodleOrigin, planningServiceUrl, portalEntryPath, university } from './shared.js'
+import { appIcons, attendanceQrOrigin, id, casOrigin, entOrigin, establishmentNames, features, gradesCopy, gradesOrigin, mailWebmailUrl, moodleOrigin, planningServiceUrl, portalEntryPath, university } from './shared.js'
 
 export default {
   id,
@@ -33,6 +33,9 @@ export default {
     // (the university WAYF and Shibboleth IdP). HTTPS only.
     signInDomains: ['wayf.univ-rennes.fr', 'ident-shib.univ-rennes1.fr'],
   },
+
+  // Attendance QR (features.attendanceQr): the APSOLU site it points to.
+  attendanceQr: { origin: attendanceQrOrigin },
 
   // Credentials of the official "Campus" mobile app, required by the ADE
   // mobile API. Reverse-engineered per university (see docs/ADDING_A_UNIVERSITY.md).

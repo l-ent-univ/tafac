@@ -88,6 +88,9 @@ export const features = {
   moodleDeadlines: true,
   // « Certificat de scolarité » in Réglages › Compte, from MonDossierWeb.
   schoolCertificate: true,
+  // « Scanner ma présence » on the home page: the SIUAPS attendance QR
+  // (src/attendanceQr.js). Needs attendanceQrOrigin and moodle.wayfEntityId.
+  attendanceQr: true,
   // « Dernière note » at the bottom of the sidebar, opening « Mes notes » on
   // that grade (needs `grades`). Off: the dashboard's card already shows it.
   sidebarLatestGrade: false,
@@ -105,6 +108,9 @@ export const gradesServiceUrl = `${gradesOrigin}/services/doAuth.php?href=${enco
 // Moodle (FOAD). Public: the sidebar and tab bar link to it, the server signs
 // in there for the "Échéances Moodle" widget.
 export const moodleOrigin = 'https://foad.univ-rennes.fr'
+
+// The SIUAPS's APSOLU site, a Moodle of its own behind Shibboleth.
+export const attendanceQrOrigin = 'https://mon-espace.siuaps.univ-rennes.fr'
 
 // Webmail: RENATER Partage (Zimbra), behind Shibboleth → CAS. The app's
 // own Messagerie reads and sends through it (server.js's `mail`), and the
