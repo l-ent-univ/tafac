@@ -1908,88 +1908,6 @@
   transform: none;
 }
 
-/* Landing page: a lighter frost than the dashboard's (the blur behind each
-   card is recomputed while the page scrolls). */
-.landing-widgets .widget-card {
-  -webkit-backdrop-filter: blur(14px) saturate(1.3);
-  backdrop-filter: blur(14px) saturate(1.3);
-}
-
-/* On phones the greeting card is as tall as what it says, and the landing's
-   briefings take one line or two: it keeps two lines' room (1 line: 74 px,
-   2 lines: 92 px) so the title under it doesn't jump as they change. */
-@media (width < 520px) {
-  .landing-widgets .widget-card:has(.greeting-icon) {
-    min-height: 92px;
-  }
-}
-
-/* Landing page: the same intro, slower and further apart, one card after
-   the other in reading order. */
-.landing-widgets .widget-card {
-  transform: translateY(24px) scale(0.94);
-  transition-duration: 700ms, 1000ms, 150ms;
-}
-
-.landing-widgets .widget-card-visible {
-  transform: none;
-}
-
-.landing-widgets .next-class-widget {
-  --widget-delay: 120ms;
-}
-
-.landing-widgets .latest-grade-widget {
-  --widget-delay: 240ms;
-}
-
-.landing-widgets .recent-mail-widget {
-  --widget-delay: 360ms;
-}
-
-.landing-widgets .moodle-deadlines-widget {
-  --widget-delay: 480ms;
-}
-
-/* Landing page: the cards move on to other demo data together
-   (LandingPage); the text that changes scrolls up and out, then the new text
-   comes up from below. */
-.landing-widgets[data-swap="out"] :is(
-  .widget-card:has(.greeting-icon) :is(h2, p),
-  .next-class-widget > div:last-child,
-  .latest-grade-widget > div ~ :is(div, span),
-  .recent-mail-widget li,
-  .moodle-deadlines-widget li
-) {
-  animation: landing-text-out 450ms cubic-bezier(0.7, 0, 0.84, 0) both;
-}
-
-.landing-widgets[data-swap="in"] :is(
-  .widget-card:has(.greeting-icon) :is(h2, p),
-  .next-class-widget > div:last-child,
-  .latest-grade-widget > div ~ :is(div, span),
-  .recent-mail-widget li,
-  .moodle-deadlines-widget li
-) {
-  animation: landing-text-in 600ms cubic-bezier(0.16, 1, 0.3, 1) both;
-}
-
-/* Opacity and transform only: the compositor runs them (a blur here
-   repainted the frosted cards on every frame). */
-@keyframes landing-text-out {
-  to {
-    opacity: 0;
-    transform: translateY(-12px);
-  }
-}
-
-@keyframes landing-text-in {
-  from {
-    opacity: 0;
-    transform: translateY(12px);
-  }
-}
-
 /* "Compatible avec" strip: the logos slide left forever, one half of the
    track (UniversityMarquee) at a time, fading out at both ends under two
    gradients of the page colour (a mask repainted the strip on every
@@ -2010,12 +1928,12 @@
 
 .landing-marquee::before {
   left: 0;
-  background: linear-gradient(to right, var(--color-bg), transparent);
+  background: linear-gradient(to right, var(--landing-marquee-fade, var(--color-bg)), transparent);
 }
 
 .landing-marquee::after {
   right: 0;
-  background: linear-gradient(to left, var(--color-bg), transparent);
+  background: linear-gradient(to left, var(--landing-marquee-fade, var(--color-bg)), transparent);
 }
 
 .landing-marquee-track {
@@ -2058,9 +1976,7 @@
 }
 
 /* Scroll parallax, subtle, driven by the scroll itself (no script, runs
-   off the main thread; without support, nothing moves). At the top, over the
-   first 800px of scroll, the sky falls behind the page by a quarter of it,
-   the clouds by an eighth and the cards by a sixteenth. Around the phone,
+   off the main thread; without support, nothing moves). Around the phone,
    as each comes onto the screen, the flower behind lags and the island in
    front leads, both settling where they're placed (`translate`, as the
    pointer parallax holds `transform`). The laptop takes the same flower
@@ -2069,26 +1985,6 @@
    always allows. */
 @supports (animation-timeline: scroll()) {
   @media (prefers-reduced-motion: no-preference) {
-    .landing-scroll-sky,
-    .landing-scroll-clouds,
-    .landing-scroll-cards {
-      animation: linear both;
-      animation-timeline: scroll(root);
-      animation-range: 0 800px;
-    }
-
-    .landing-scroll-sky {
-      animation-name: landing-scroll-sky;
-    }
-
-    .landing-scroll-clouds {
-      animation-name: landing-scroll-clouds;
-    }
-
-    .landing-scroll-cards {
-      animation-name: landing-scroll-cards;
-    }
-
     .landing-parallax-back,
     .landing-parallax-front {
       animation: linear both;
@@ -2111,25 +2007,6 @@
       animation-timeline: view();
       animation-range: entry 0% entry 100%;
     }
-  }
-}
-
-@keyframes landing-scroll-sky {
-  to {
-    transform: translateY(200px);
-  }
-}
-
-/* `transform`: the clouds' centring is on `translate`. */
-@keyframes landing-scroll-clouds {
-  to {
-    transform: translateY(100px);
-  }
-}
-
-@keyframes landing-scroll-cards {
-  to {
-    translate: 0 50px;
   }
 }
 
@@ -2300,14 +2177,17 @@
   }
 }
 
-/* Each preview on the login page's sky, the app's cards frosted over it as
-   on the dashboard's wallpaper; as tall on every tab, so the page doesn't
-   jump when one is picked (on phones, as tall as its preview). */
+/* Each preview on a plain colour, the hero film's grey (a lifted grey in
+   the dark theme, off the page's near-black); as tall on every tab, so the
+   page doesn't jump when one is picked (on phones, as tall as its
+   preview). */
 .landing-showcase-frame {
+  background-color: #f0f0f0;
   box-shadow: 0 1px 3px rgb(52 18 0 / 0.08), 0 28px 64px -30px rgb(52 18 0 / 0.4);
 }
 
 :where([data-theme="dark"]) .landing-showcase-frame {
+  background-color: #1a1a1a;
   box-shadow: 0 1px 3px rgb(0 0 0 / 0.4), 0 28px 64px -30px rgb(0 0 0 / 0.8);
 }
 
@@ -2330,6 +2210,14 @@
   .landing-showcase-stage {
     padding: 14px;
   }
+}
+
+/* « Assiduité »: the semester's totals and its line one over the other,
+   each across the frame (the page sets them side by side, the totals no
+   wider than 443px: too narrow here for both). */
+.landing-preview-assiduity .widget-card {
+  max-width: none;
+  flex-basis: 100%;
 }
 
 /* The mail list, solid as the mail page is; the composer of « Écrire au
@@ -2532,29 +2420,6 @@
   -webkit-backdrop-filter: none;
 }
 
-/* On phones, on the sky's blue: the wordmark, the Papillon line and the
-   burger white, with a faint shadow for the clouds; back to the text colour
-   in the pill. */
-@media (width < 1024px) {
-  .landing-header:not([data-floating]) .landing-header-wordmark {
-    filter: brightness(0) invert(1) drop-shadow(0 1px 2px rgb(0 0 0 / 0.3));
-  }
-
-  .landing-header:not([data-floating]) .landing-header-burger {
-    color: #fff;
-    filter: drop-shadow(0 1px 2px rgb(0 0 0 / 0.3));
-  }
-
-  .landing-header:not([data-floating]) .landing-header-papillon {
-    color: #fff;
-    text-shadow: 0 1px 3px rgb(0 0 0 / 0.3);
-  }
-
-  .landing-header:not([data-floating]) .landing-header-papillon-logo {
-    filter: brightness(0) invert(1) drop-shadow(0 1px 2px rgb(0 0 0 / 0.3));
-  }
-}
-
 .landing-header-menu {
   border-color: var(--landing-header-edge);
   background-color: var(--landing-header-menu);
@@ -2635,25 +2500,24 @@
 
 /* The landing's app icon comes in with the title: it drops and tilts into
    place with a little bounce. */
-.landing-app-icon {
-  transform-origin: 50% 80%;
-  animation: landing-app-icon-in 900ms cubic-bezier(0.34, 1.56, 0.64, 1) 900ms both;
+/* The landing's first screen, on the hero film's grey (#eee, decoded
+   #f0f0f0 by browsers): the film's edges vanish into it. The dark theme
+   keeps its page colour (its light text on that grey would be unreadable):
+   the film then stands as a grey panel on the right. */
+.landing-first {
+  --landing-first-bg: #f0f0f0;
+  --landing-marquee-fade: var(--landing-first-bg);
+  background-color: var(--landing-first-bg);
 }
 
-@keyframes landing-app-icon-in {
-  from {
-    opacity: 0;
-    transform: translateY(-18px) rotate(-20deg) scale(0.6);
-  }
-
-  40% {
-    opacity: 1;
-  }
+/* The dark theme's film is rendered on its near-black (#0f0f0f on screen). */
+:where([data-theme="dark"]) .landing-first {
+  --landing-first-bg: var(--color-bg);
 }
 
-/* The title fades in once the last card has landed. */
+/* The landing's first words come up as the page opens. */
 .landing-cta {
-  animation: landing-cta-in 700ms cubic-bezier(0.16, 1, 0.3, 1) 900ms both;
+  animation: landing-cta-in 700ms cubic-bezier(0.16, 1, 0.3, 1) 100ms both;
 }
 
 @keyframes landing-cta-in {
@@ -2664,23 +2528,7 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .landing-widgets .widget-card {
-    transform: none;
-    transition-duration: 300ms, 0ms, 150ms;
-  }
-
-  .landing-marquee-track,
-  .landing-app-icon {
-    animation: none;
-  }
-
-  .landing-widgets[data-swap] :is(
-    .widget-card:has(.greeting-icon) :is(h2, p),
-    .next-class-widget > div:last-child,
-    .latest-grade-widget > div ~ :is(div, span),
-    .recent-mail-widget li,
-    .moodle-deadlines-widget li
-  ) {
+  .landing-marquee-track {
     animation: none;
   }
 

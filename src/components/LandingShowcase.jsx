@@ -1,7 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
 import { Icon } from '@iconify/react'
-import loginClouds from '../assets/login/login-clouds.webp'
-import loginSky from '../assets/login/login-sky.webp'
 import { copy, copyText } from '../landingCopy'
 import { useRevealOnce } from '../landingMotion'
 import { showcaseTabId } from '../landingShowcase'
@@ -72,10 +70,6 @@ function ShowcasePanel({ tab, selected, showPreview, preview }) {
         aria-label={`${copyText(text.previewLabel)} (${copyText(copy.showcase.previewLabel).toLowerCase()})`}
         className="landing-showcase-frame relative isolate min-w-0 overflow-hidden corners-[32px] max-md:corners-[26px]"
       >
-        {/* The login page's sky and clouds, as the dashboard's wallpaper
-            behind its frosted cards (the top of the page has them already). */}
-        <img src={loginSky} alt="" aria-hidden="true" draggable="false" loading="lazy" className="absolute inset-0 -z-10 size-full object-cover dark:brightness-[0.55]" />
-        <img src={loginClouds} alt="" aria-hidden="true" draggable="false" loading="lazy" className="pointer-events-none absolute bottom-0 left-1/2 -z-10 w-[max(900px,150%)] max-w-none -translate-x-1/2 translate-y-[38%] dark:brightness-[0.6]" />
         <div inert className="landing-showcase-stage select-none">
           {showPreview ? <LandingShowcasePreview kind={tab.key} preview={preview} /> : null}
         </div>

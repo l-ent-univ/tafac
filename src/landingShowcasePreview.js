@@ -1,15 +1,23 @@
 // The data of the landing showcase's previews (LandingShowcasePreviews):
-// « Mes notes », the Planning and the Messagerie as the app shows them,
+// « Mes notes », the Planning, the Messagerie and « Assiduité » as the app
+// shows them,
 // filled with the demo account's data, built here with the app's own
 // functions (the relevé's report, a class as the Planning reads it, the mail
 // « Écrire au sujet de cette note » writes). Nothing here talks to the
 // server. Pure (no React, no @university), see
 // tests/landingShowcasePreview.test.js.
+import {
+  buildSemesterTimeline,
+  countAbsencesByStatus,
+  findEvaluationsDuringAbsences,
+  groupAbsencesByMonth,
+  sumAbsenceHours,
+} from './assiduity.js'
 import { buildDemoGradesPayload, buildDemoMailPayload, buildDemoUpcomingPayload } from './demoAccount.js'
 import { assignAccent } from './eventAccents.js'
 import { findEvaluation } from './gradeDetail.js'
 import { buildGradeMailSubject, buildGradeSummaryRows, describeGradeMailAbout, findModuleTeacher } from './gradeMail.js'
-import { buildGradesReport } from './gradesReport.js'
+import { buildAbsenceReport, buildGradesReport } from './gradesReport.js'
 import { getMailAddressDomain, isOwnMailDomain } from './mailDomain.js'
 import { toDayKey } from './planningDates.js'
 import { isOngoing, toPlanningEvent } from './planningEvents.js'
@@ -19,6 +27,7 @@ const LATEST_GRADES = 3
 const PLANNING_DAYS = 2
 const PLANNING_CLASSES = 4
 const MAIL_ROWS = 3
+const ABSENCE_ROWS = 3
 // The mail page's domain for the demo's own senders (its addresses are the
 // Université de Rennes'): only a sender from elsewhere shows theirs.
 export const DEMO_OWN_MAIL_DOMAINS = ['univ-rennes.fr']
@@ -105,5 +114,28 @@ export function buildMailPreview(now = new Date()) {
     unreadCount: mail.unreadCount,
     messages: outsider && !shown.includes(outsider) ? [...shown, outsider] : messages.slice(0, MAIL_ROWS),
     composer: buildGradeMailPreview(),
+  }
+}
+
+// « Assiduité »: the semester's totals and its line (every absence a mark),
+// then the latest absences as the list groups them by month, the latest
+// one not justified among them (its « Justifier »), each with the
+// evaluations held meanwhile.
+export function buildAssiduityPreview(now = new Date()) {
+  const payload = buildDemoGradesPayload()
+  const releve = payload['relevé']
+  const absences = buildAbsenceReport(payload, releve, payload.config)
+  const entries = absences.visible ? absences.entries : []
+  const unjustified = entries.find((entry) => entry.status === 'unjustified')
+  const latest = entries.slice(0, ABSENCE_ROWS - (unjustified ? 1 : 0))
+  const shown = unjustified && !latest.includes(unjustified) ? [...latest, unjustified] : entries.slice(0, ABSENCE_ROWS)
+  return {
+    totals: absences.totals,
+    sums: sumAbsenceHours(entries),
+    counts: countAbsencesByStatus(entries),
+    timeline: buildSemesterTimeline({ start: releve.semestre?.date_debut, end: releve.semestre?.date_fin, entries, now }),
+    entriesById: new Map(entries.map((entry) => [entry.id, entry])),
+    months: groupAbsencesByMonth(shown),
+    evaluationsByEntry: findEvaluationsDuringAbsences(buildGradesReport(releve, { config: payload.config }), shown),
   }
 }
