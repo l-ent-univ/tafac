@@ -6953,38 +6953,6 @@ li:has(> .planning-row.is-link:active) + li > .planning-row .planning-row-text,
   display: none;
 }
 
-/* The planning's export button (PlanningExportButton): its word hidden at
-   rest, sliding out beside the icon on hover or keyboard focus. */
-.planning-export-label {
-  display: inline-block;
-  overflow: hidden;
-  max-width: 0;
-  margin-left: 0;
-  white-space: nowrap;
-  opacity: 0;
-  transition: max-width 220ms cubic-bezier(0.2, 0.8, 0.2, 1), margin-left 220ms cubic-bezier(0.2, 0.8, 0.2, 1), opacity 160ms ease-out;
-}
-
-@media (hover: hover) {
-  .group:hover > .planning-export-label {
-    max-width: 6rem;
-    margin-left: 6px;
-    opacity: 1;
-  }
-}
-
-.group:focus-visible > .planning-export-label {
-  max-width: 6rem;
-  margin-left: 6px;
-  opacity: 1;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .planning-export-label {
-    transition: none;
-  }
-}
-
 /* The composer's drop zone (MailDropSheets): three sheets fan out of a pile
    with a little spring, one after the other, then float, each on its own
    beat. The fan moves the individual translate/rotate/scale properties,

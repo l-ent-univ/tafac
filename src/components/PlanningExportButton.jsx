@@ -2,6 +2,7 @@ import { Icon } from '@iconify/react'
 import { SECONDARY_BUTTON } from '../scodocPageUtils'
 import { usePlanningExport } from '../usePlanningExport'
 import LoadingDots from './LoadingDots'
+import Tooltip from './Tooltip'
 
 const NOTICES = {
   empty: { short: 'Aucun cours', long: 'Aucun cours à exporter', role: 'status' },
@@ -9,10 +10,9 @@ const NOTICES = {
 }
 
 // The header's export (usePlanningExport): dots while it's asked; a short
-// notice under it when there's nothing, or it fails. On a phone a round
-// icon button like the view one (its touch area 44px). On a wide screen
-// round too, "Exporter" sliding out on hover or focus. None without a
-// group; `className` places it in the header row; `from`: where it is, for
+// notice under it when there's nothing, or it fails. A round icon button
+// as the app's others, its name in a tooltip on a wide screen (on a phone
+// its touch area 44px). None without a group; `className` places it in the header row; `from`: where it is, for
 // the analytics (usePlanningExport).
 function PlanningExportButton({ selection, from = 'header', className = '' }) {
   const { state, run } = usePlanningExport(selection, { from })
@@ -28,16 +28,13 @@ function PlanningExportButton({ selection, from = 'header', className = '' }) {
         onClick={() => void run()}
         disabled={isLoading}
         aria-busy={isLoading || undefined}
-        aria-label="Exporter le planning (.ics)"
-        title="Exporter vers un agenda (.ics)"
-        className={`${SECONDARY_BUTTON} group relative h-[42px] cursor-pointer justify-center gap-0! px-3! py-0! disabled:cursor-wait max-md:size-10 max-md:p-0 max-md:shadow-xs max-md:after:absolute max-md:after:-inset-[3px]`}
+        aria-label="Exporter vers un agenda (.ics)"
+        className={`${SECONDARY_BUTTON} group relative size-[42px] cursor-pointer justify-center p-0! disabled:cursor-wait max-md:size-10 max-md:shadow-xs max-md:after:absolute max-md:after:-inset-[3px]`}
       >
         {isLoading
           ? <LoadingDots label={null} className="w-4" />
           : <Icon icon="ph:calendar-plus" className="size-4 shrink-0 max-md:size-[18px]" aria-hidden="true" />}
-        {/* Round at rest; its word slides out beside the icon under the
-            pointer or the keyboard's focus (a phone keeps the icon). */}
-        <span className="planning-export-label max-md:hidden" aria-hidden="true">Exporter</span>
+        {notice ? null : <Tooltip title="Exporter vers un agenda (.ics)" side="bottom-end" className="max-4xl:hidden" />}
       </button>
       {/* Under the button, not beside it: nothing in the row moves. */}
       {notice ? (
