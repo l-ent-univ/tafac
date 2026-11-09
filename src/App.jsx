@@ -937,6 +937,7 @@ function App() {
   // Toggled from the sidebar's handle and the settings.
   const [sidebarCompact, setSidebarCompact] = useState(getStoredSidebarCompact)
   const [mailReaderOpen, setMailReaderOpen] = useState(false)
+  const [planningSidePanelOpen, setPlanningSidePanelOpen] = useState(false)
   const [sidebarAutoCompactDismissed, setSidebarAutoCompactDismissed] = useState(false)
   const [showPlanningWeekend, setShowPlanningWeekend] = useState(() => getStoredShowPlanningWeekend())
   // « Assiduité » in the phone's tab bar instead of Moodle (Réglages › Apparence).
@@ -1766,6 +1767,16 @@ function App() {
     setIsAccountModalOpen(true)
   }, [sessionState.authenticated, sessionState.checking])
 
+  // Réglages › Planning (« Mon groupe »), from the planning's « Formations ».
+  const handleOpenPlanningSettings = useCallback(() => {
+    if (!sessionState.authenticated || sessionState.checking) {
+      return
+    }
+
+    setAccountModalSection('planning')
+    setIsAccountModalOpen(true)
+  }, [sessionState.authenticated, sessionState.checking])
+
   // Réglages › Accueil, from « Accueil » without a card.
   const handleOpenCardsSettings = useCallback(() => {
     if (!sessionState.authenticated || sessionState.checking) {
@@ -1890,8 +1901,10 @@ function App() {
   // The « Accueil » band's tint (--page-top-band, overrides.css): the
   // wallpaper's main colour when it shows one, else the brand's.
   const homeBandTint = useWallpaperTint(isHomePage && showWallpaper ? heroImage.src : null)
-  // Folded for a mail open beside the list (handleMailReaderOpenChange).
-  const isSidebarAutoCompact = isMailPage && mailReaderOpen && !sidebarCompact && !sidebarAutoCompactDismissed
+  // Folded for a mail open beside the list (handleMailReaderOpenChange),
+  // or the planning's side panel (handlePlanningSidePanelOpenChange).
+  const isSidePanelOpen = (isMailPage && mailReaderOpen) || (isPlanningPage && planningSidePanelOpen)
+  const isSidebarAutoCompact = isSidePanelOpen && !sidebarCompact && !sidebarAutoCompactDismissed
   // The page the sidebar and the tab bar show as selected.
   const shownPage = isGradesPage ? 'grades' : isPlanningPage ? 'planning' : isMailPage ? 'mail' : isAssiduityPage ? 'assiduity' : 'home'
   // Being on « Mes notes » is having seen its launch, however the student
@@ -2121,6 +2134,11 @@ function App() {
   // (unless already folded by hand); it unfolds over the page on hover.
   const handleMailReaderOpenChange = useCallback((open) => {
     setMailReaderOpen(open)
+    setSidebarAutoCompactDismissed(false)
+  }, [])
+  // Likewise the planning's « Salles et personnels ».
+  const handlePlanningSidePanelOpenChange = useCallback((open) => {
+    setPlanningSidePanelOpen(open)
     setSidebarAutoCompactDismissed(false)
   }, [])
 
@@ -2753,7 +2771,7 @@ function App() {
             ) : null}
             {isPlanningPage ? (
               <div className="page-enter flex-1 min-h-0 4xl:flex-none 4xl:min-h-0">
-                <PlanningPage selection={selectedTp} user={sessionState.user} showWeekend={showPlanningWeekend} onOpenAccount={handleOpenAccountModal} initialDay={pendingPlanningDay} onInitialDayHandled={clearPendingPlanningDay} arrivalSource={planningArrivalSource} onComposeMail={hasMailPage ? handleComposeMail : null} />
+                <PlanningPage selection={selectedTp} user={sessionState.user} showWeekend={showPlanningWeekend} onOpenAccount={handleOpenAccountModal} initialDay={pendingPlanningDay} onInitialDayHandled={clearPendingPlanningDay} arrivalSource={planningArrivalSource} onComposeMail={hasMailPage ? handleComposeMail : null} onSidePanelOpenChange={handlePlanningSidePanelOpenChange} onOpenPlanningSettings={handleOpenPlanningSettings} />
               </div>
             ) : null}
             {isAssiduityPage ? (

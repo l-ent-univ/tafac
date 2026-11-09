@@ -166,6 +166,68 @@ function flattenPortalTree(root, entries = []) {
   return entries
 }
 
+// « Salles et personnels » (the planning's side panel): the tree's rooms
+// (Salles, -3) and staff (Enseignants, -2), each entry under its folders.
+// The folders are listed once (`groups`: kind and names from the branch
+// down, synthetic or empty names left out) and each leaf is
+// [id, name, group index], an array: ~9,600 of them at Rennes. A leaf's
+// own name stays as ADE gives it ("B09B - Amphi TA (009) [142P]",
+// "DUPONT Christophe").
+const DIRECTORY_BRANCHES = [
+  { id: '-3', kind: 'room' },
+  { id: '-2', kind: 'person' },
+  { id: '-1', kind: 'group' },
+]
+
+// Folders left out with all they hold: placeholders, not places
+// (« salle à définir », « Cours annulé »…), matched however spaced or cased.
+const HIDDEN_DIRECTORY_FOLDERS = ['Appariteurs - Salles fictives']
+const foldFolderName = (name) => normalizeLabel(name).toLocaleLowerCase('fr')
+const HIDDEN_DIRECTORY_FOLDER_KEYS = new Set(HIDDEN_DIRECTORY_FOLDERS.map(foldFolderName))
+
+function isDirectoryFolderName(name) {
+  const label = normalizeLabel(name)
+  return Boolean(label) && !label.startsWith('portal-category-')
+}
+
+export function buildPortalDirectory(root) {
+  const groups = []
+  const groupIndex = new Map()
+  const items = []
+  const seen = new Set()
+
+  const groupFor = (kind, names) => {
+    const key = `${kind}::${names.join('\u0000')}`
+    if (!groupIndex.has(key)) {
+      groupIndex.set(key, groups.length)
+      groups.push({ kind, path: names })
+    }
+    return groupIndex.get(key)
+  }
+
+  const walk = (node, kind, names) => {
+    const children = node?.children ?? []
+    if (children.length === 0) {
+      const id = String(node?.id ?? '').trim()
+      const name = normalizeLabel(node?.name)
+      if (!/^\d+$/.test(id) || !name || seen.has(id)) return
+      seen.add(id)
+      items.push([id, name, groupFor(kind, names)])
+      return
+    }
+    if (HIDDEN_DIRECTORY_FOLDER_KEYS.has(foldFolderName(node?.name))) return
+    const nextNames = isDirectoryFolderName(node?.name) ? [...names, normalizeLabel(node.name)] : names
+    for (const child of children) walk(child, kind, nextNames)
+  }
+
+  for (const { id, kind } of DIRECTORY_BRANCHES) {
+    const branch = (root?.children ?? []).find((child) => String(child?.id) === id)
+    for (const child of branch?.children ?? []) walk(child, kind, [])
+  }
+
+  return { groups, items }
+}
+
 function clonePortalTreeNode(node, children = []) {
   return {
     ...node,
@@ -783,6 +845,23 @@ export function createPlanningPortalApiClient({
     }
   }
 
+  // The rooms and staff of the whole tree (buildPortalDirectory), built
+  // once per cached tree.
+  const portalDirectoryCache = new WeakMap()
+  async function fetchPortalDirectory(jar, { cacheScope = null } = {}) {
+    const tree = await fetchPortalTree(jar, { cacheScope })
+    let directory = portalDirectoryCache.get(tree.fullRoot)
+    if (!directory) {
+      directory = buildPortalDirectory(tree.fullRoot)
+      portalDirectoryCache.set(tree.fullRoot, directory)
+    }
+    return {
+      ...directory,
+      projectId: tree.projectId,
+      cache: tree.cache,
+    }
+  }
+
   async function fetchPortalCalendar(jar, { cacheScope = null } = {}) {
     const context = await authenticatePortal(jar, { cacheScope })
     const cached = getFreshCacheEntry(portalCalendarCache, cacheScope, PORTAL_CALENDAR_TTL_MS)
@@ -891,5 +970,6 @@ export function createPlanningPortalApiClient({
     fetchPortalStatus,
     fetchPortalTree: retryOnStaleSession(fetchPortalTree),
     searchPortalTree,
+    fetchPortalDirectory: retryOnStaleSession(fetchPortalDirectory),
   }
 }

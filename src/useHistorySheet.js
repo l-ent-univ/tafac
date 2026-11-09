@@ -36,9 +36,14 @@ export function useHistorySheet(key) {
 
   // The close button, Escape, the backdrop: back off the sheet's entry when
   // it's the current one (popstate then closes it), plainly otherwise.
+  // True when it stepped back (the page's own entry comes with a popstate).
   const close = useCallback(() => {
-    if (isOpenRef.current && window.history.state?.[key]) window.history.back()
-    else setIsOpen(false)
+    if (isOpenRef.current && window.history.state?.[key]) {
+      window.history.back()
+      return true
+    }
+    setIsOpen(false)
+    return false
   }, [key])
 
   useEffect(() => {

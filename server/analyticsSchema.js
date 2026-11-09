@@ -37,12 +37,15 @@ const PLANNING_VIEWS = ['day', 'two_days', 'week', 'list']
 const PLANNING_ACTIONS = [
   'view_changed', 'day_changed', 'week_changed', 'today', 'calendar_picked', 'day_opened',
   'course_opened', 'occurrence_opened', 'retry', 'open_account', 'ics_exported',
+  'share_opened', 'directory_opened', 'directory_picked',
 ]
 // planning_action's own properties, by action (any other is dropped), and
 // those an action can't go without.
 const PLANNING_ACTION_PROPERTIES = {
   view_changed: ['view'],
   course_opened: ['view'],
+  share_opened: ['view'],
+  directory_picked: ['kind'],
   day_changed: ['via', 'steps'],
   week_changed: ['via', 'steps'],
   ics_exported: ['from', 'result'],
@@ -52,6 +55,7 @@ const PLANNING_ACTION_REQUIRED = {
   day_changed: ['via'],
   week_changed: ['via'],
   ics_exported: ['from', 'result'],
+  directory_picked: ['kind'],
 }
 const MAIL_ACTIONS = [
   'mail_opened', 'thread_expanded', 'folder_changed', 'search', 'refresh',
@@ -289,6 +293,7 @@ export const ANALYTICS_EVENTS = {
       steps: oneOf('1', '2-3', '4+'),
       from: oneOf('header', 'settings'),
       result: oneOf('ok', 'empty', 'error'),
+      kind: oneOf('room', 'person', 'group'),
     },
     required: ['action'],
     refine: (props) => {

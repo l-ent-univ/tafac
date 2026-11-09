@@ -10,6 +10,8 @@ import { preloadMailPdf, printMail, saveMailPdf } from '../mailPrint'
 import MailToolbar, { PRIMARY_COMPOSE_CLASSES } from './MailToolbar'
 import ContextMenu from './ContextMenu'
 import ConfirmDialog from './ConfirmDialog'
+import SidePanelResizeHandle from './SidePanelResizeHandle'
+import { createSidePanelSizing, useSidePanelWidth } from '../sidePanelWidth'
 import SwipeableRow from './SwipeableRow'
 import Tooltip from './Tooltip'
 import { getSenderDomainCue } from './mailSender'
@@ -51,16 +53,16 @@ const WEBMAIL_HREF_KEY = 'l-ent:webmail-href'
 const fullDateFormatter = new Intl.DateTimeFormat('fr-FR', { dateStyle: 'full', timeStyle: 'short' })
 
 // The reader beside the list (from 4xl) and its width: dragged from its
-// left edge and stored for the device, else a share of the window.
+// left edge and stored for the device, else a share of the window. The
+// list keeps 440px beside it (its 24px gutters included).
 const READER_BESIDE_QUERY = '(min-width: 1024px)'
-const READER_PANEL_WIDTH = 'clamp(380px, 40vw, 640px)'
-const READER_WIDTH_KEY = 'l-ent:mail-reader-width'
-const MIN_READER_WIDTH = 360
-const MAX_READER_WIDTH = 960
-// Room the list keeps beside a dragged reader (its 24px gutters included).
-const LIST_MIN_WIDTH = 440
-const READER_RIGHT_PX = 12
-const READER_KEYBOARD_STEP_PX = 16
+const READER_SIZING = createSidePanelSizing({
+  storageKey: 'l-ent:mail-reader-width',
+  defaultWidth: 'clamp(380px, 40vw, 640px)',
+  min: 360,
+  max: 960,
+  contentMin: 440,
+})
 
 const noop = () => {}
 // How long the pointer rests on a row before its thread is fetched ahead.
@@ -129,130 +131,6 @@ const TOAST_MS = 6000
 // N seconds, or never; an auto-opened one waits the longer of the two, and
 // « never » holds for both.
 const AUTO_OPENED_READ_DELAY_MS = 2000
-
-function readStoredReaderWidth() {
-  try {
-    const value = Number(JSON.parse(localStorage.getItem(READER_WIDTH_KEY) || 'null')?.value)
-    return Number.isFinite(value) ? value : null
-  } catch {
-    return null
-  }
-}
-
-function storeReaderWidth(width) {
-  try {
-    if (width == null) localStorage.removeItem(READER_WIDTH_KEY)
-    else localStorage.setItem(READER_WIDTH_KEY, JSON.stringify({ value: width }))
-  } catch {
-    // Storage unavailable
-  }
-}
-
-// The widest the reader gets in this window: the list keeps its room.
-function maxReaderWidth() {
-  const sidebarWidth = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--sidebar-width')) || 0
-  return Math.max(MIN_READER_WIDTH, Math.min(MAX_READER_WIDTH, window.innerWidth - sidebarWidth - LIST_MIN_WIDTH))
-}
-
-function clampReaderWidth(width) {
-  return Math.round(Math.min(maxReaderWidth(), Math.max(MIN_READER_WIDTH, width)))
-}
-
-// The CSS width: a dragged one still gives way to the list in a narrower
-// window (as clampReaderWidth does under the pointer).
-function readerWidthCss(width) {
-  if (width == null) return READER_PANEL_WIDTH
-  return `clamp(${MIN_READER_WIDTH}px, min(${width}px, 100vw - var(--sidebar-width, 280px) - ${LIST_MIN_WIDTH}px), ${MAX_READER_WIDTH}px)`
-}
-
-// Thin strip on the reader panel's left edge, as the sidebar's on its right
-// (Sidebar's SidebarResizeHandle): drag to resize, double-click for the
-// default width, or the arrow keys. Stored on release.
-function MailReaderResizeHandle({ width, onWidthChange, onResizingChange }) {
-  const [isDragging, setIsDragging] = useState(false)
-  const widthRef = useRef(width)
-  useEffect(() => {
-    widthRef.current = width
-  }, [width])
-  // Closed mid-drag (Escape): the page's resize cursor goes with it.
-  useEffect(() => {
-    if (!isDragging) return undefined
-    return () => {
-      document.documentElement.classList.remove('sidebar-resizing')
-      onResizingChange(false)
-    }
-  }, [isDragging, onResizingChange])
-
-  const handlePointerDown = (event) => {
-    if (event.button !== 0) return
-    event.preventDefault()
-    event.currentTarget.setPointerCapture?.(event.pointerId)
-    setIsDragging(true)
-    onResizingChange(true)
-    document.documentElement.classList.add('sidebar-resizing')
-  }
-
-  const handlePointerMove = (event) => {
-    if (!isDragging) return
-    const next = clampReaderWidth(window.innerWidth - READER_RIGHT_PX - event.clientX)
-    widthRef.current = next
-    onWidthChange(next)
-  }
-
-  const endDragging = (event) => {
-    if (!isDragging) return
-    event.currentTarget.releasePointerCapture?.(event.pointerId)
-    setIsDragging(false)
-    onResizingChange(false)
-    document.documentElement.classList.remove('sidebar-resizing')
-    onWidthChange(widthRef.current, { persist: true })
-  }
-
-  // The panel's measured width when none is stored (a share of the window).
-  const currentWidth = (target) => widthRef.current ?? target.closest('section')?.querySelector('.mail-reader-panel')?.getBoundingClientRect().width ?? MIN_READER_WIDTH
-
-  const handleKeyDown = (event) => {
-    const step = { ArrowLeft: READER_KEYBOARD_STEP_PX, ArrowRight: -READER_KEYBOARD_STEP_PX }[event.key]
-    if (event.key === 'Home' || event.key === 'End') {
-      event.preventDefault()
-      onWidthChange(event.key === 'Home' ? MIN_READER_WIDTH : maxReaderWidth(), { persist: true })
-      return
-    }
-    if (!step) return
-    event.preventDefault()
-    onWidthChange(clampReaderWidth(currentWidth(event.currentTarget) + step), { persist: true })
-  }
-
-  return (
-    <div
-      className="group hidden 4xl:block fixed top-6 bottom-6 z-30 w-3 translate-x-1/2"
-      style={{ right: `calc(${READER_RIGHT_PX}px + var(--mail-reader-width))` }}
-    >
-      <div
-        role="separator"
-        aria-orientation="vertical"
-        aria-label="Largeur du mail"
-        aria-valuemin={MIN_READER_WIDTH}
-        aria-valuemax={MAX_READER_WIDTH}
-        aria-valuenow={width ?? undefined}
-        tabIndex={0}
-        title="Glisser pour redimensionner, double-clic pour rétablir"
-        onPointerDown={handlePointerDown}
-        onPointerMove={handlePointerMove}
-        onPointerUp={endDragging}
-        onPointerCancel={endDragging}
-        onDoubleClick={() => onWidthChange(null, { persist: true })}
-        onKeyDown={handleKeyDown}
-        className="flex h-full w-full justify-center cursor-col-resize touch-none outline-none"
-      >
-        <span
-          aria-hidden="true"
-          className={`sidebar-handle-tint h-full w-[3px] rounded-full transition-opacity duration-150 ${isDragging ? 'opacity-100' : 'opacity-0 group-hover:opacity-100 group-has-[:focus-visible]:opacity-100'}`}
-        />
-      </div>
-    </div>
-  )
-}
 
 // A plain list: no card, a hairline under each row but the last.
 const ROW_CLASSES = 'min-w-0 border-b border-border last:border-b-0'
@@ -827,12 +705,8 @@ function MailPage({ onReaderOpenChange, onSignInAgain, sender = null, composeReq
   // arriving on the page doesn't.
   const [hasOpenedMail, setHasOpenedMail] = useState(Boolean(openId))
   if (openId && !hasOpenedMail) setHasOpenedMail(true)
-  const [readerWidth, setReaderWidth] = useState(readStoredReaderWidth)
-  const [isResizingReader, setIsResizingReader] = useState(false)
-  const handleReaderWidthChange = useCallback((width, { persist = false } = {}) => {
-    setReaderWidth(width)
-    if (persist) storeReaderWidth(width)
-  }, [])
+  const readerWidth = useSidePanelWidth(READER_SIZING)
+  const isResizingReader = readerWidth.isResizing
   if (openId && openId !== panelId) setPanelId(openId)
   const searchWords = foldMailSearchText(query).split(/\s+/).filter(Boolean)
   const searchText = query.trim()
@@ -1975,7 +1849,7 @@ function MailPage({ onReaderOpenChange, onSignInAgain, sender = null, composeReq
     <section
       ref={sectionRef}
       className={`relative w-full grid gap-4 pt-4 px-6 pb-6 4xl:pt-0 max-md:px-3 max-md:pt-5 max-md:pb-5 ${isResizingReader ? '' : '4xl:transition-[padding-right] 4xl:duration-[340ms] 4xl:ease-[cubic-bezier(0.32,0.72,0,1)]'} ${openId || isMultiple ? '4xl:pr-[calc(var(--mail-reader-width)+24px)]' : ''}`}
-      style={{ '--mail-reader-width': readerWidthCss(readerWidth) }}
+      style={{ '--mail-reader-width': readerWidth.css }}
       aria-labelledby="mail-page-title" aria-busy={state.status === 'loading' || undefined}
       {...pageMenuProps()}>
       {/* Under 1024 px the reader takes the list's place; above, it sits in
@@ -2031,7 +1905,15 @@ function MailPage({ onReaderOpenChange, onSignInAgain, sender = null, composeReq
         </div>
       ) : null}
       {openId || isMultiple ? (
-        <MailReaderResizeHandle width={readerWidth} onWidthChange={handleReaderWidthChange} onResizingChange={setIsResizingReader} />
+        <SidePanelResizeHandle
+          sizing={READER_SIZING}
+          width={readerWidth.width}
+          onWidthChange={readerWidth.onWidthChange}
+          onResizingChange={readerWidth.onResizingChange}
+          cssVar="--mail-reader-width"
+          panelSelector=".mail-reader-panel"
+          label="Largeur du mail"
+        />
       ) : null}
 
       <div className={openId || isMultiple ? 'contents max-4xl:hidden' : 'contents'}>

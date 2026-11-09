@@ -1,5 +1,4 @@
 import { Icon } from '@iconify/react'
-import { SECONDARY_BUTTON } from '../scodocPageUtils'
 import { usePlanningExport } from '../usePlanningExport'
 import LoadingDots from './LoadingDots'
 import Tooltip from './Tooltip'
@@ -10,9 +9,9 @@ const NOTICES = {
 }
 
 // The header's export (usePlanningExport): dots while it's asked; a short
-// notice under it when there's nothing, or it fails. A round icon button
-// as the app's others, its name in a tooltip on a wide screen (on a phone
-// its touch area 44px). None without a group; `className` places it in the header row; `from`: where it is, for
+// notice under it when there's nothing, or it fails. A segment of the
+// header's button group (.button-group, PlanningHeader), its name in a
+// tooltip on a wide screen. None without a group; `className` places it in the header row; `from`: where it is, for
 // the analytics (usePlanningExport).
 function PlanningExportButton({ selection, from = 'header', className = '' }) {
   const { state, run } = usePlanningExport(selection, { from })
@@ -29,11 +28,11 @@ function PlanningExportButton({ selection, from = 'header', className = '' }) {
         disabled={isLoading}
         aria-busy={isLoading || undefined}
         aria-label="Exporter vers un agenda (.ics)"
-        className={`${SECONDARY_BUTTON} group relative size-[42px] cursor-pointer justify-center p-0! disabled:cursor-wait max-md:size-10 max-md:shadow-xs max-md:after:absolute max-md:after:-inset-[3px]`}
+        className={`button-group-item group disabled:cursor-wait`}
       >
         {isLoading
           ? <LoadingDots label={null} className="w-4" />
-          : <Icon icon="ph:calendar-plus" className="size-4 shrink-0 max-md:size-[18px]" aria-hidden="true" />}
+          : <Icon icon="ph:calendar-plus" className="size-[18px] shrink-0" aria-hidden="true" />}
         {notice ? null : <Tooltip title="Exporter vers un agenda (.ics)" side="bottom-end" className="max-4xl:hidden" />}
       </button>
       {/* Under the button, not beside it: nothing in the row moves. */}
