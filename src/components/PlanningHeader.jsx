@@ -4,8 +4,12 @@ import { trackPlanningAction, trackPlanningNavigation } from '../analytics'
 import { WEEKDAY_LETTERS, addDays, dayText, daysBetween, monthLabel, parseDayKey, sameWeekday, shortWeekRangeText, shortWeekdayText, startOfWeek, toDayKey, weekRangeText, weekdayIndex } from '../planningDates'
 import { LABEL_COLUMN } from '../planningGrid'
 import { SECONDARY_BUTTON } from '../scodocPageUtils'
+import { HAS_PLANNING_DIRECTORY } from '../usePlanningDirectory'
 import Dropdown from './Dropdown'
+import PlanningDirectoryButton from './PlanningDirectoryButton'
 import PlanningExportButton from './PlanningExportButton'
+import PlanningShareButton from './PlanningShareButton'
+import SegmentedControl from './SegmentedControl'
 import SwipePager from './SwipePager'
 
 const compareDays = (left, right) => daysBetween(right, left)
@@ -168,29 +172,17 @@ const WIDE_VIEWS = [
   { id: 'list', label: 'Liste', ariaLabel: 'Afficher la liste' },
 ]
 
-// The wide screen's views, side by side in a pill as the account's theme
-// switch: the one shown on a card.
+// The wide screen's views, in the app's segmented control: the one shown
+// under its thumb.
 function WideViewSwitch({ view, onChangeView }) {
   return (
-    <div className="flex gap-0.5 rounded-full border border-border bg-brand-subtle p-[3px]" role="group" aria-label="Affichage">
-      {WIDE_VIEWS.map((choice) => {
-        const isActive = choice.id === view
-        return (
-          <button
-            key={choice.id}
-            type="button"
-            aria-pressed={isActive}
-            aria-label={choice.ariaLabel}
-            onClick={isActive ? undefined : () => onChangeView(choice.id)}
-            className={`inline-flex h-[34px] items-center rounded-full border px-3.5 font-body text-[14px] font-semibold cursor-pointer transition-[background-color,color,box-shadow,border-color] duration-150 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand ${
-              isActive ? 'border-border bg-widget-bg text-text shadow-xs' : 'border-transparent bg-transparent text-text-secondary hover:text-text'
-            }`}
-          >
-            {choice.label}
-          </button>
-        )
-      })}
-    </div>
+    <SegmentedControl
+      options={WIDE_VIEWS.map((choice) => ({ value: choice.id, label: choice.label, ariaLabel: choice.ariaLabel }))}
+      value={view}
+      onChange={onChangeView}
+      label="Affichage"
+      stretch={false}
+    />
   )
 }
 
@@ -202,14 +194,17 @@ const PHONE_VIEWS = [
 
 // The phone's views in the app's menu (Dropdown), from a round button by
 // "Aujourd’hui" showing the view in place (like the PDF button on a phone,
-// its touch area 44px), read out as "Affichage : Jour".
-function PhoneViewMenu({ view, onChangeView }) {
+// its touch area 44px), read out as "Affichage : Jour". Under them,
+// « Salles et personnels » (`onOpenDirectory`, ADE only): always there,
+// where the header's pill goes away from today.
+function PhoneViewMenu({ view, onChangeView, onOpenDirectory = null }) {
   const shown = PHONE_VIEWS.find((choice) => choice.value === view) ?? PHONE_VIEWS[0]
   return (
     <Dropdown
       options={PHONE_VIEWS}
       value={shown.value}
       onChange={onChangeView}
+      actions={HAS_PLANNING_DIRECTORY && onOpenDirectory ? [{ id: 'directory', label: 'Salles et personnels', icon: 'ph:user-list', onSelect: onOpenDirectory }] : []}
       label="Affichage"
       align="end"
       className="shrink-0"
@@ -230,8 +225,12 @@ function PhoneViewMenu({ view, onChangeView }) {
 // ahead by the chip, which says the week (or the day) shown, the view
 // switch is "Jour" / "Semaine" / "Liste", and every view has the week's
 // days' headers in place of the strip (the same ones, so switching moves
-// nothing up there), swiped by weeks too.
-function PlanningHeader({ titleId, selectedDay, todayKey, view, isWide, columnsFor, selection, onSelectDay, onOpenDay, onToday, onStep, onChangeView }) {
+// nothing up there), swiped by weeks too. `onShare`: « Partager », the
+// week of the selected day as an image (PlanningShareSheet).
+// `onOpenDirectory`: « Salles et personnels » (ADE only), its side panel
+// toggled, or a phone's sheet opened (from the pill, or the view menu
+// away from today); `isDirectoryOpen`: shown.
+function PlanningHeader({ titleId, selectedDay, todayKey, view, isWide, columnsFor, selection, onSelectDay, onOpenDay, onToday, onStep, onChangeView, onShare = null, isDirectoryOpen = false, onOpenDirectory = null }) {
   const [isPickerOpen, setIsPickerOpen] = useState(false)
   const monday = startOfWeek(selectedDay)
   const dayCount = view === 'twoDays' ? 2 : 1
@@ -244,6 +243,9 @@ function PlanningHeader({ titleId, selectedDay, todayKey, view, isWide, columnsF
   const byWeek = isWeek || isList
   const wholeWeek = isWeek || (isList && isWide)
   const chipText = byWeek ? weekRangeText(monday) : dayText(selectedDay)
+  // « Partager » and « Salles et personnels » on a phone: only on today
+  // (away, "Aujourd’hui" takes their room).
+  const shareOnPhone = isWeek ? monday === startOfWeek(todayKey) : selectedDay === todayKey
   // The strip's steps, for the analytics (trackPlanningNavigation): a
   // week swiped, a day's pill tapped.
   const swipeStrip = (day) => {
@@ -325,16 +327,22 @@ function PlanningHeader({ titleId, selectedDay, todayKey, view, isWide, columnsF
           ) : null}
           {/* Wide: "Jour" / "Semaine" / "Liste". Otherwise a menu of the
               phone's views. */}
-          {isWide ? <WideViewSwitch view={view} onChangeView={onChangeView} /> : <PhoneViewMenu view={view} onChangeView={onChangeView} />}
-          {/* At the row's end, apart from the views: the .ics export. On a
-              phone it gives its room to "Aujourd’hui" (the row would cut
-              the day short): it exports the weeks ahead, offered from
-              today. */}
-          <PlanningExportButton
-            selection={selection}
-            from="header"
-            className={(isWeek ? monday !== startOfWeek(todayKey) : selectedDay !== todayKey) ? 'max-md:hidden' : ''}
-          />
+          {isWide ? <WideViewSwitch view={view} onChangeView={onChangeView} /> : <PhoneViewMenu view={view} onChangeView={onChangeView} onOpenDirectory={onOpenDirectory} />}
+          {/* At the row's end, apart from the views, joined in one pill
+              (.button-group): « Partager » (the week shown, as an image),
+              the .ics export (a wide screen's; a phone's is in the share
+              sheet) and « Salles et personnels ». On a phone the pill gives
+              its room to "Aujourd’hui" (the row would cut the day short),
+              « Salles et personnels » staying in the view menu. Left out
+              rather than hidden: .button-group's display outranks
+              Tailwind's. */}
+          {isWide || shareOnPhone ? (
+            <div className="button-group" role="group" aria-label="Actions du planning">
+              <PlanningShareButton selection={selection} onShare={onShare} />
+              <PlanningExportButton selection={selection} from="header" className="max-md:hidden" />
+              <PlanningDirectoryButton open={isDirectoryOpen} onOpen={onOpenDirectory} />
+            </div>
+          ) : null}
         </div>
       </div>
       {isWide ? (

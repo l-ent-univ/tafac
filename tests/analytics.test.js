@@ -351,6 +351,13 @@ test('planning_action keeps only the properties of its action, never a class or 
   assert.equal(keep({ action: 'ics_exported', from: 'header' }), null)
   assert.equal(keep({ action: 'ics_exported', from: 'dashboard', result: 'ok' }), null)
   assert.equal(keep({ action: 'Maths B204' }), null)
+  // « Partager », « Salles et personnels »: never the room or the person picked.
+  assert.deepEqual(keep({ action: 'share_opened', view: 'week', group: 'TP 3' }), { action: 'share_opened', view: 'week' })
+  assert.deepEqual(keep({ action: 'directory_opened', kind: 'room' }), { action: 'directory_opened' })
+  assert.deepEqual(keep({ action: 'directory_picked', kind: 'room', name: 'B05 - 107', id: '8101' }), { action: 'directory_picked', kind: 'room' })
+  assert.deepEqual(keep({ action: 'directory_picked', kind: 'group' }), { action: 'directory_picked', kind: 'group' })
+  assert.equal(keep({ action: 'directory_picked' }), null)
+  assert.equal(keep({ action: 'directory_picked', kind: 'DUPONT Christophe' }), null)
 })
 
 test('page_viewed accepts the Messagerie with its own sources', () => {

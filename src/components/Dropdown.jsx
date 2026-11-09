@@ -17,7 +17,10 @@ const VIEWPORT_EDGE = 12
 // Arrows/Home/End move, Enter picks, Escape, a click outside, a scroll or a
 // resize closes. `options`: [{ value, label }]. `triggerLabel` (optional)
 // replaces what the trigger shows (a shorter form); its accessible name and
-// the menu keep the option's label.
+// the menu keep the option's label. `actions` (optional): [{ id, label,
+// icon, onSelect }], buttons under the options past a hairline (the
+// planning's « Salles et personnels », under its views), outside the list
+// of choices but in the arrows' reach.
 function Dropdown({
   options,
   value,
@@ -30,6 +33,7 @@ function Dropdown({
   triggerClassName = '',
   chevronClassName = 'size-3.5',
   triggerLabel = null,
+  actions = [],
 }) {
   const [isOpen, setIsOpen] = useState(false)
   const [position, setPosition] = useState(null)
@@ -104,7 +108,7 @@ function Dropdown({
 
   const handleMenuKeyDown = (event) => {
     const current = optionRefs.current.indexOf(document.activeElement)
-    const last = options.length - 1
+    const last = options.length + actions.length - 1
     const moves = { ArrowDown: Math.min(last, current + 1), ArrowUp: Math.max(0, current - 1), Home: 0, End: last }
     if (event.key in moves) {
       event.preventDefault()
@@ -122,6 +126,27 @@ function Dropdown({
     setPosition(null)
     setIsOpen(true)
   }
+
+  const optionButtons = options.map((option, index) => {
+    const isSelected = index === selectedIndex
+    return (
+      <button
+        key={option.value}
+        ref={(element) => { optionRefs.current[index] = element }}
+        type="button"
+        role="option"
+        aria-selected={isSelected}
+        className={OPTION_CLASSES}
+        onClick={() => pick(option.value)}
+      >
+        <span className="flex-1">{option.label}</span>
+        {isSelected ? <Icon icon="ph:check" className="w-[18px] h-[18px] shrink-0" aria-hidden="true" /> : null}
+      </button>
+    )
+  })
+  // The list of choices: the menu itself, or its first part with actions.
+  const hasActions = actions.length > 0
+  const listProps = { id: listId, role: 'listbox', 'aria-label': label }
 
   return (
     <div ref={rootRef} className={`relative inline-flex min-w-0 ${className}`}>
@@ -153,9 +178,7 @@ function Dropdown({
       {isOpen && typeof document !== 'undefined' ? createPortal(
         <div
           ref={menuRef}
-          id={listId}
-          role="listbox"
-          aria-label={label}
+          {...(hasActions ? {} : listProps)}
           className={MENU_CLASSES}
           style={{
             top: position?.top ?? 0,
@@ -167,23 +190,27 @@ function Dropdown({
           }}
           onKeyDown={handleMenuKeyDown}
         >
-          {options.map((option, index) => {
-            const isSelected = index === selectedIndex
-            return (
-              <button
-                key={option.value}
-                ref={(element) => { optionRefs.current[index] = element }}
-                type="button"
-                role="option"
-                aria-selected={isSelected}
-                className={OPTION_CLASSES}
-                onClick={() => pick(option.value)}
-              >
-                <span className="flex-1">{option.label}</span>
-                {isSelected ? <Icon icon="ph:check" className="w-[18px] h-[18px] shrink-0" aria-hidden="true" /> : null}
-              </button>
-            )
-          })}
+          {hasActions ? <div {...listProps}>{optionButtons}</div> : optionButtons}
+          {hasActions ? (
+            <>
+              <div className="mx-3 my-[5px] h-px bg-border" aria-hidden="true" />
+              {actions.map((action, index) => (
+                <button
+                  key={action.id}
+                  ref={(element) => { optionRefs.current[options.length + index] = element }}
+                  type="button"
+                  className={OPTION_CLASSES}
+                  onClick={() => {
+                    close()
+                    action.onSelect()
+                  }}
+                >
+                  {action.icon ? <Icon icon={action.icon} className="w-[18px] h-[18px] shrink-0" aria-hidden="true" /> : null}
+                  <span className="flex-1">{action.label}</span>
+                </button>
+              ))}
+            </>
+          ) : null}
         </div>,
         document.body,
       ) : null}

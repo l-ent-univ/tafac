@@ -183,9 +183,11 @@
   box-shadow: 0 1px 3px rgb(52 18 0 / 0.06), 0 16px 40px -14px rgb(52 18 0 / 0.24);
 }
 
-/* The mail reader's side panel (MailPage, from 4xl): the sidebar's frame
-   on a solid white, sliding in from the right edge and back out. */
-.mail-reader-panel {
+/* The mail reader's side panel (MailPage, from 4xl), and the planning's
+   (PlanningDirectoryPanel): the sidebar's frame on a solid white, sliding
+   in from the right edge and back out. */
+.mail-reader-panel,
+.side-panel {
   --mail-panel-bg: #ffffff;
   background-color: var(--mail-panel-bg);
   border-color: rgb(52 18 0 / 0.08);
@@ -193,11 +195,13 @@
   animation: mail-reader-panel-in 340ms cubic-bezier(0.32, 0.72, 0, 1) both;
 }
 
-.mail-reader-panel.is-closing {
+.mail-reader-panel.is-closing,
+.side-panel.is-closing {
   animation: mail-reader-panel-out 240ms cubic-bezier(0.32, 0.72, 0, 1) both;
 }
 
-:where([data-theme="dark"]) .mail-reader-panel {
+:where([data-theme="dark"]) .mail-reader-panel,
+:where([data-theme="dark"]) .side-panel {
   --mail-panel-bg: #1c1c1c;
   background-color: var(--mail-panel-bg);
   border-color: rgb(255 255 255 / 0.1);
@@ -607,7 +611,9 @@
 /* Still a (near-instant) animation: its end unmounts the closed panel. */
 @media (prefers-reduced-motion: reduce) {
   .mail-reader-panel,
-  .mail-reader-panel.is-closing {
+  .mail-reader-panel.is-closing,
+  .side-panel,
+  .side-panel.is-closing {
     animation-duration: 1ms;
   }
 }
@@ -1178,14 +1184,6 @@
 
 /* The mail reader's toolbar (MailToolbar): hairlines between the buttons
    of a group. */
-.mail-toolbar-divider {
-  background-color: rgb(52 18 0 / 0.12);
-}
-
-:where([data-theme="dark"]) .mail-toolbar-divider {
-  background-color: rgb(255 255 255 / 0.14);
-}
-
 /* A sheet's close button (a grade's, a class's), of the tab bar's glass. */
 /* ── Close button (CloseButton) ──
    A soft tint of the text colour (plain) or frosted glass (below), the ×
@@ -3884,16 +3882,174 @@
 
 /* In the mail reader's white panel the white edge would vanish: a hairline
    instead, so its chips and buttons still read as lifted. */
-.mail-reader-panel .material {
+.mail-reader-panel .material,
+.side-panel .material {
   border-color: rgb(52 18 0 / 0.1);
 }
 
-:where([data-theme="dark"]) .mail-reader-panel .material {
+:where([data-theme="dark"]) .mail-reader-panel .material,
+:where([data-theme="dark"]) .side-panel .material {
   border-color: rgb(255 255 255 / 0.08);
 }
 
 :where([data-theme="dark"]) .material-wash-frame {
   opacity: 0.34;
+}
+
+/* ── Segmented control (SegmentedControl) ──
+   A recessed track (a warm well, a faint inner shadow) and, over the
+   picked option, a raised thumb of the material above (white, a white edge,
+   a soft warm shadow) that slides and resizes to the new pick on the
+   panels' curve, and gives a little under the press as material does. The
+   options' text over it: the picked one full strength. */
+.segmented {
+  position: relative;
+  isolation: isolate;
+  display: inline-flex;
+  min-width: 0;
+  gap: 2px;
+  padding: 3px;
+  border-radius: 9999px;
+  background-color: rgb(52 18 0 / 0.05);
+  box-shadow:
+    inset 0 1px 2px rgb(52 18 0 / 0.08),
+    inset 0 0 0 1px rgb(52 18 0 / 0.05);
+}
+
+.segmented--stretch {
+  display: grid;
+  grid-auto-columns: minmax(0, 1fr);
+  grid-auto-flow: column;
+}
+
+.segmented-thumb {
+  position: absolute;
+  top: 3px;
+  bottom: 3px;
+  left: 0;
+  z-index: -1;
+  width: var(--segmented-w);
+  transform: translateX(var(--segmented-x));
+  box-sizing: border-box;
+  border: 1px solid #ffffff;
+  border-radius: 9999px;
+  background-color: #ffffff;
+  box-shadow:
+    0 1px 2px rgb(52 18 0 / 0.1),
+    0 4px 12px -4px rgb(52 18 0 / 0.26);
+}
+
+.segmented[data-ready] .segmented-thumb {
+  transition:
+    transform 380ms cubic-bezier(0.32, 0.72, 0, 1),
+    width 380ms cubic-bezier(0.32, 0.72, 0, 1),
+    scale 140ms ease-out;
+}
+
+.segmented:has(.segmented-option[data-active]:active) .segmented-thumb {
+  scale: 0.96;
+}
+
+.segmented-option {
+  position: relative;
+  display: inline-flex;
+  min-width: 0;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 0 14px;
+  border: 0;
+  border-radius: 9999px;
+  background: transparent;
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  transition: color 200ms ease;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.segmented--md .segmented-option {
+  height: 34px;
+}
+
+.segmented--sm .segmented-option {
+  height: 30px;
+  padding: 0 12px;
+}
+
+.segmented-option[data-active] {
+  color: var(--color-text);
+  cursor: default;
+}
+
+@media (hover: hover) {
+  .segmented-option:not([data-active]):hover {
+    color: var(--color-text);
+  }
+}
+
+.segmented-option:focus-visible {
+  outline: 2px solid var(--color-text-30);
+  outline-offset: -2px;
+}
+
+.segmented-label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: var(--font-body);
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1;
+}
+
+.segmented-icon {
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+}
+
+@media (max-width: 599px) {
+  .segmented-label {
+    font-size: 13px;
+  }
+
+  .segmented-option {
+    padding: 0 10px;
+  }
+
+  .segmented-icon {
+    display: none;
+  }
+}
+
+/* On a white panel or sheet the white edge vanishes: a hairline instead. */
+.side-panel .segmented-thumb,
+.mail-reader-panel .segmented-thumb,
+.account-modal-layout-panel .segmented-thumb {
+  border-color: rgb(52 18 0 / 0.08);
+}
+
+:where([data-theme="dark"]) .segmented {
+  background-color: rgb(0 0 0 / 0.3);
+  box-shadow:
+    inset 0 1px 2px rgb(0 0 0 / 0.5),
+    inset 0 0 0 1px rgb(255 255 255 / 0.06);
+}
+
+:where([data-theme="dark"]) .segmented-thumb {
+  border-color: rgb(255 255 255 / 0.1);
+  background-color: #383838;
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.06),
+    0 1px 2px rgb(0 0 0 / 0.5),
+    0 4px 12px -4px rgb(0 0 0 / 0.65);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .segmented[data-ready] .segmented-thumb {
+    transition: none;
+  }
 }
 
 /* ── "Dernières notes" UE wash ──
@@ -5236,6 +5392,302 @@
 .app-icon--auto {
   background-color: var(--app-tile-bg);
   color: var(--app-tile-fg);
+}
+
+/* « Salles et personnels »: someone else's timetable shown
+   (PlanningViewedFrame). A frame of their colour (.room-icon's ink,
+   currentColor) round the page, fixed between the sidebar and the side
+   panel (with it whenever it shows), a faint wash inside its edge; their
+   name on a tab hanging from its top, in that colour. */
+.planning-viewed-frame {
+  position: fixed;
+  top: 12px;
+  bottom: 12px;
+  left: calc(var(--sidebar-width, 280px) + 24px);
+  right: calc(var(--side-panel-width) + 24px);
+  z-index: 25;
+  pointer-events: none;
+  border: 2px solid currentColor;
+  border-radius: 28px;
+  box-shadow: inset 0 0 0 4px color-mix(in srgb, currentColor 10%, transparent);
+  transition: left 340ms cubic-bezier(0.32, 0.72, 0, 1);
+  animation: planning-viewed-in 240ms ease-out both;
+}
+
+.planning-viewed-tab {
+  position: absolute;
+  top: -2px;
+  left: 50%;
+  translate: -50% 0;
+  display: flex;
+  max-width: min(420px, calc(100% - 64px));
+  align-items: center;
+  gap: 6px;
+  padding: 5px 5px 7px 12px;
+  border-radius: 0 0 14px 14px;
+  background-color: currentColor;
+  pointer-events: auto;
+  font-family: var(--font-body);
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1;
+  box-shadow: 0 6px 16px -8px rgb(52 18 0 / 0.4);
+}
+
+/* Its text in the page's colour over the tint (white-ish on the light
+   theme's ink, dark on the dark theme's). */
+.planning-viewed-tab > * {
+  color: var(--color-bg);
+}
+
+.planning-viewed-close {
+  display: inline-flex;
+  width: 22px;
+  height: 22px;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  border-radius: 9999px;
+  background-color: color-mix(in srgb, var(--color-bg) 18%, transparent);
+  cursor: pointer;
+  transition: background-color 150ms ease;
+}
+
+.planning-viewed-close:hover {
+  background-color: color-mix(in srgb, var(--color-bg) 32%, transparent);
+}
+
+.planning-viewed-close:focus-visible {
+  outline: 2px solid var(--color-bg);
+  outline-offset: 1px;
+}
+
+@keyframes planning-viewed-in {
+  from {
+    opacity: 0;
+    scale: 0.985;
+  }
+}
+
+/* On a phone (PlanningViewedBar): a bar of their colour under the week
+   strip, filled as the wide screen's tab, their name (a button: the sheet
+   again) and « × »; the page's top band washed in the colour. */
+.planning-top.is-viewing {
+  --viewed-ink: var(--app-tile-fg, var(--color-brand));
+  --page-top-band: color-mix(in srgb, var(--viewed-ink) 9%, var(--color-bg));
+  --page-top-line: color-mix(in srgb, var(--viewed-ink) 24%, var(--color-bg));
+}
+
+:where([data-theme="dark"]) .planning-top.is-viewing {
+  --viewed-ink: var(--app-tile-fg-dark, var(--color-brand));
+}
+
+.planning-viewed-bar {
+  display: flex;
+  height: 40px;
+  align-items: center;
+  gap: 4px;
+  padding: 4px;
+  border-radius: 9999px;
+  background-color: currentColor;
+  box-shadow: 0 6px 16px -8px rgb(52 18 0 / 0.4);
+  animation: planning-viewed-in 240ms ease-out both;
+}
+
+.planning-viewed-bar > * {
+  color: var(--color-bg);
+}
+
+.planning-viewed-bar-name {
+  display: flex;
+  min-width: 0;
+  height: 100%;
+  flex: 1;
+  align-items: center;
+  gap: 7px;
+  padding: 0 8px 0 10px;
+  border: 0;
+  border-radius: 9999px;
+  background-color: transparent;
+  cursor: pointer;
+  font-family: var(--font-body);
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 1;
+  text-align: left;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.planning-viewed-bar-name:active {
+  background-color: color-mix(in srgb, var(--color-bg) 14%, transparent);
+}
+
+.planning-viewed-bar-name:focus-visible {
+  outline: 2px solid var(--color-bg);
+  outline-offset: -2px;
+}
+
+/* Its « × » a little larger, its touch area 44px. */
+.planning-viewed-close--bar {
+  position: relative;
+  width: 32px;
+  height: 32px;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.planning-viewed-close--bar::after {
+  content: '';
+  position: absolute;
+  inset: -6px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .planning-viewed-frame,
+  .planning-viewed-bar {
+    transition: none;
+    animation: none;
+  }
+}
+
+/* ── Button group (the planning header's actions) ──
+   Icon buttons joined in one pill of the material (white, a white edge, a
+   soft warm shadow; the dark theme's own), hairlines between them. A
+   segment lightens under the pointer, its icon gives under the press, and
+   one whose panel is open (aria-expanded) stays tinted. Gone when empty. */
+.button-group {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  padding: 2px;
+  border: 1px solid #ffffff;
+  border-radius: 9999px;
+  background-color: #ffffff;
+  box-shadow: 0 1px 3px rgb(52 18 0 / 0.08), 0 8px 20px -10px rgb(52 18 0 / 0.28);
+}
+
+.button-group:empty {
+  display: none;
+}
+
+.button-group > * + * {
+  margin-left: 1px;
+}
+
+.button-group > * + *::before {
+  content: '';
+  position: absolute;
+  top: 10px;
+  bottom: 10px;
+  left: -1px;
+  width: 1px;
+  background-color: rgb(52 18 0 / 0.1);
+  pointer-events: none;
+  transition: opacity 150ms ease;
+}
+
+/* No hairline against a selected (or hovered) segment: on either side. A
+   segment may sit in a wrapper (the export's, for its notice). */
+.button-group > :is([aria-expanded="true"], :has(> [aria-expanded="true"]))::before,
+.button-group > :is([aria-expanded="true"], :has(> [aria-expanded="true"])) + *::before {
+  opacity: 0;
+}
+
+@media (hover: hover) {
+  .button-group > :is(.button-group-item:hover:not(:disabled), :has(> .button-group-item:hover:not(:disabled)))::before,
+  .button-group > :is(.button-group-item:hover:not(:disabled), :has(> .button-group-item:hover:not(:disabled))) + *::before {
+    opacity: 0;
+  }
+}
+
+.button-group-item {
+  position: relative;
+  display: inline-flex;
+  width: 40px;
+  height: 36px;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  border-radius: 9999px;
+  background-color: transparent;
+  color: var(--color-text);
+  cursor: pointer;
+  transition: background-color 150ms ease;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.button-group-item > svg {
+  transition: scale 100ms ease-out;
+}
+
+.button-group-item:active:not(:disabled) > svg {
+  scale: 0.86;
+}
+
+@media (hover: hover) {
+  .button-group-item:hover:not(:disabled) {
+    background-color: rgb(52 18 0 / 0.05);
+  }
+}
+
+.button-group-item[aria-expanded="true"] {
+  background-color: rgb(52 18 0 / 0.08);
+}
+
+.button-group-item:focus-visible {
+  outline: 2px solid var(--color-text-30);
+  outline-offset: -2px;
+}
+
+.button-group-item:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+/* On a white panel, sheet or composer the white edge vanishes: a hairline
+   instead (the dark theme's own after). */
+:is(.side-panel, .mail-reader-panel, .mail-composer) .button-group {
+  border-color: rgb(52 18 0 / 0.08);
+}
+
+@media (max-width: 1023px) {
+  .button-group {
+    padding: 1px;
+  }
+}
+
+:where([data-theme="dark"]) .button-group {
+  border-color: rgb(255 255 255 / 0.08);
+  background-color: #1c1c1c;
+  box-shadow: 0 1px 3px rgb(0 0 0 / 0.4), 0 8px 20px -10px rgb(0 0 0 / 0.7);
+}
+
+:where([data-theme="dark"]) :is(.side-panel, .mail-reader-panel, .mail-composer) .button-group {
+  border-color: rgb(255 255 255 / 0.08);
+}
+
+:where([data-theme="dark"]) .button-group > * + *::before {
+  background-color: rgb(255 255 255 / 0.1);
+}
+
+@media (hover: hover) {
+  :where([data-theme="dark"]) .button-group-item:hover:not(:disabled) {
+    background-color: rgb(255 255 255 / 0.07);
+  }
+}
+
+:where([data-theme="dark"]) .button-group-item[aria-expanded="true"] {
+  background-color: rgb(255 255 255 / 0.1);
+}
+
+/* A room's model (RoomIcon): the badge palette's ink alone, no tile. */
+.room-icon {
+  color: var(--app-tile-fg);
+}
+
+:where([data-theme="dark"]) .room-icon {
+  color: var(--app-tile-fg-dark);
 }
 
 :where([data-theme="dark"]) .app-icon--auto {
@@ -6931,7 +7383,8 @@ li:has(> .planning-row.is-link:active) + li > .planning-row .planning-row-text,
    warm hairline (the sheet is lighter than the page) so they stand out.
    The mail reader's panel (its attachments' card) likewise. */
 .planning-sheet .widget-card,
-.mail-reader-panel .widget-card {
+.mail-reader-panel .widget-card,
+.side-panel .widget-card {
   --color-widget-bg: #ffffff;
   --color-bg-subtle: #f8f7f3;
   border-color: rgb(52 18 0 / 0.1);
@@ -6941,7 +7394,8 @@ li:has(> .planning-row.is-link:active) + li > .planning-row .planning-row-text,
 }
 
 :where([data-theme="dark"]) .planning-sheet .widget-card,
-:where([data-theme="dark"]) .mail-reader-panel .widget-card {
+:where([data-theme="dark"]) .mail-reader-panel .widget-card,
+:where([data-theme="dark"]) .side-panel .widget-card {
   --color-widget-bg: #1c1c1c;
   --color-bg-subtle: #242424;
   border-color: rgba(255, 255, 255, 0.08);
@@ -6951,38 +7405,6 @@ li:has(> .planning-row.is-link:active) + li > .planning-row .planning-row-text,
 /* The sheet already wears the course's wash: its block stays plain. */
 .planning-sheet .planning-block > .latest-grade-wash {
   display: none;
-}
-
-/* The planning's export button (PlanningExportButton): its word hidden at
-   rest, sliding out beside the icon on hover or keyboard focus. */
-.planning-export-label {
-  display: inline-block;
-  overflow: hidden;
-  max-width: 0;
-  margin-left: 0;
-  white-space: nowrap;
-  opacity: 0;
-  transition: max-width 220ms cubic-bezier(0.2, 0.8, 0.2, 1), margin-left 220ms cubic-bezier(0.2, 0.8, 0.2, 1), opacity 160ms ease-out;
-}
-
-@media (hover: hover) {
-  .group:hover > .planning-export-label {
-    max-width: 6rem;
-    margin-left: 6px;
-    opacity: 1;
-  }
-}
-
-.group:focus-visible > .planning-export-label {
-  max-width: 6rem;
-  margin-left: 6px;
-  opacity: 1;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .planning-export-label {
-    transition: none;
-  }
 }
 
 /* The composer's drop zone (MailDropSheets): three sheets fan out of a pile

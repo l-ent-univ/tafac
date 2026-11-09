@@ -340,6 +340,62 @@ const DEMO_TREE_ROOT = Object.freeze({
 
 const DEMO_DEFAULT_TREE_PATH = Object.freeze(['-100', '10', '110', '111', '1112', '11121'])
 
+// « Salles et personnels »: the demo's rooms and staff, as the ADE portal's
+// (planningPortalApi.js's buildPortalDirectory), and its groups
+// (« Formations »).
+// Each one's timetable is the demo week's classes there, or theirs
+// (`location`, `teacher`: matched in the week's templates).
+const DEMO_DIRECTORY_GROUPS = Object.freeze([
+  { kind: 'room', path: ['Sites Univ Rennes', 'IUT Lannion', 'Bâtiment B', 'Salle de cours'] },
+  { kind: 'room', path: ['Sites Univ Rennes', 'IUT Lannion', 'Bâtiment C', 'Salle projet'] },
+  { kind: 'room', path: ['Sites Univ Rennes', 'IUT Lannion', 'Amphithéâtre'] },
+  { kind: 'room', path: ['00-Beaulieu - Campus Scientifique et Technologique de Beaulieu', 'Bâtiment 02A', 'Amphithéâtre'] },
+  { kind: 'person', path: ['IUT Lannion', 'Département Info-Com'] },
+  { kind: 'person', path: ['Faculté des Sciences', 'Département Mathématiques'] },
+  { kind: 'group', path: ['IUT Lannion', 'BUT Info-Com', 'Info-Com 3', 'TD A'] },
+  { kind: 'group', path: ['IUT Lannion', 'BUT Info-Com', 'Info-Com 3', 'TD B'] },
+  { kind: 'group', path: ['IUT Lannion', 'BUT Info-Com', 'Info-Com 2', 'TD A'] },
+])
+const DEMO_DIRECTORY_ITEMS = Object.freeze([
+  { id: '9101', name: 'B03 - Salle Atelier [24P]', group: 0, location: 'B03 - Salle Atelier' },
+  { id: '9102', name: 'B04 - TD 1 [32P]', group: 0, location: 'B04 - TD 1' },
+  { id: '9103', name: 'B08 - TD 3 [32P]', group: 0, location: 'B08 - TD 3' },
+  { id: '9104', name: 'B12 - Langues [20P]', group: 0, location: 'B12 - Langues' },
+  { id: '9105', name: 'C12 - Salle projet [28P]', group: 1, location: 'C12 - Salle projet' },
+  { id: '9106', name: 'Amphi 1 [180P]', group: 2, location: 'Amphi 1' },
+  { id: '9107', name: 'Amphi 2 [120P]', group: 2, location: 'Amphi 2' },
+  { id: '9108', name: 'B02A - Amphi A (René Dabard) [350P]', group: 3, location: 'B02A - Amphi A' },
+  { id: '9201', name: 'GUILLOU Yann', group: 4, teacher: 'M. Guillou' },
+  { id: '9202', name: 'KERJEAN Anne', group: 4, teacher: 'Mme Kerjean' },
+  { id: '9203', name: 'LE FUR Claire', group: 4, teacher: 'Mme Le Fur' },
+  { id: '9204', name: 'LE GOFF Pierre', group: 4, teacher: 'M. Le Goff' },
+  { id: '9205', name: 'LEMOINE Thomas', group: 4, teacher: 'M. Lemoine' },
+  { id: '9206', name: 'MARTIN Sophie', group: 4, teacher: 'Mme Martin' },
+  { id: '9207', name: 'RIOU Hélène', group: 4, teacher: 'Mme Riou' },
+  { id: '9208', name: 'DUPONT Christophe', group: 5, teacher: 'M. Dupont' },
+  // The demo tree's own groups (DEMO_TREE_ROOT): the demo week is theirs.
+  { id: '11111', name: 'TP 1', group: 6 },
+  { id: '11112', name: 'TP 2', group: 6 },
+  { id: '11121', name: 'TP 3', group: 7 },
+  { id: '11211', name: 'TP 1', group: 8 },
+])
+const DEMO_DIRECTORY_BY_ID = new Map(DEMO_DIRECTORY_ITEMS.map((item) => [item.id, item]))
+
+export function buildDemoAdeDirectoryPayload() {
+  return {
+    groups: cloneDemoValue(DEMO_DIRECTORY_GROUPS),
+    items: DEMO_DIRECTORY_ITEMS.map(({ id, name, group }) => [id, name, group]),
+  }
+}
+
+// A directory entry's classes among the demo week's (its room, or its
+// teacher among those ADE joins with « - »; a group has the whole week).
+function matchesDemoDirectoryEntry(event, entry) {
+  if (entry.location) return event.location === entry.location
+  if (!entry.teacher) return true
+  return String(event.teacher ?? '').split(' - ').some((name) => name.trim() === entry.teacher)
+}
+
 function cloneDemoValue(value) {
   if (typeof globalThis.structuredClone === 'function') {
     return globalThis.structuredClone(value)
@@ -839,10 +895,13 @@ export function buildDemoCalendarPayload({ date, resourceId } = {}) {
 export function buildDemoUpcomingPayload({ date, lookaheadDays = 14, selection = null } = {}) {
   const requestedDate = parseDateOnly(date || formatDateOnly(new Date()))
   const selectionLabel = getSelectionLabel(selection)
+  // A room or a teacher picked in « Salles et personnels ».
+  const directoryEntry = DEMO_DIRECTORY_BY_ID.get(String(selection?.resourceId ?? '')) ?? null
   const upcomingEvents = [
     ...buildDemoEventsForWeek(requestedDate, selectionLabel),
     ...buildDemoEventsForWeek(addDays(requestedDate, 7), selectionLabel),
   ]
+    .filter((event) => !directoryEntry || matchesDemoDirectoryEntry(event, directoryEntry))
     .filter((event) => {
       const eventStart = new Date(event.start)
       const maxDate = addDays(requestedDate, lookaheadDays)

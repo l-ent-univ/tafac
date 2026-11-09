@@ -115,6 +115,7 @@ import {
   DEMO_GRADES_DEPARTMENT_MESSAGE,
   DEMO_SESSION_MODE,
   applyDemoLayoutMutation,
+  buildDemoAdeDirectoryPayload,
   buildDemoAdeTreePayload,
   buildDemoAlertsPayload,
   buildDemoCalendarPayload,
@@ -2343,6 +2344,7 @@ const {
   fetchPortalStatus = null,
   fetchPortalTree = null,
   searchPortalTree = null,
+  fetchPortalDirectory = null,
 } = portalClient ?? {}
 
 const {
@@ -6350,6 +6352,51 @@ app.get('/__ent_auth/ade/tree', async (req, res) => {
         finalUrl: tree.finalUrl,
         planningIdentifier: tree.planningIdentifier,
         cache: tree.cache,
+      },
+    })
+  } catch (error) {
+    res.status(500).json({ error: error instanceof Error ? error.message : String(error) })
+  }
+})
+
+// « Salles et personnels » (the planning's side panel): the ADE tree's
+// rooms and staff, for the student to pick one and see its timetable
+// through /ade/upcoming. The ADE portal only (its tree has both branches);
+// `supported: false` elsewhere.
+app.get('/__ent_auth/ade/directory', async (req, res) => {
+  try {
+    const entSession = getSessionFromRequest(req)
+    if (!entSession) return res.status(200).json({ authenticated: false, directory: null })
+
+    if (isDemoSession(entSession)) {
+      setSessionCookie(res, entSession)
+      return res.status(200).json({
+        authenticated: true,
+        sessionMode: DEMO_SESSION_MODE,
+        supported: true,
+        directory: buildDemoAdeDirectoryPayload(),
+      })
+    }
+
+    if (PLANNING_API !== 'portal-rest' || !fetchPortalDirectory) {
+      setSessionCookie(res, entSession)
+      return res.status(200).json({ authenticated: true, supported: false, directory: null })
+    }
+
+    const directory = await fetchPortalDirectory(entSession.jar, {
+      cacheScope: getPlanningCacheScope(entSession),
+    })
+
+    setSessionCookie(res, entSession)
+    res.status(200).json({
+      authenticated: true,
+      sessionMode: entSession.mode ?? null,
+      supported: true,
+      directory: { groups: directory.groups, items: directory.items },
+      debug: {
+        source: PLANNING_HOST,
+        projectId: directory.projectId,
+        cache: directory.cache,
       },
     })
   } catch (error) {

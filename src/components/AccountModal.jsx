@@ -15,6 +15,7 @@ import CloseButton from './CloseButton'
 import Switch from './Switch'
 import MailSignatureSettings from './MailSignatureSettings'
 import HomeLayoutSetting from './HomeLayoutSetting'
+import SegmentedControl from './SegmentedControl'
 import { r } from '../register.js'
 
 // Also the debug menu's toggles (src/components/debug/).
@@ -249,32 +250,18 @@ const THEME_CHOICES = [
   { id: 'dark', label: 'Sombre', icon: 'ph:moon' },
 ]
 
-// Three-way pill: follow the device, or force light or dark.
+// Three ways, in the app's segmented control: follow the device, or force
+// light or dark.
 function ThemeSetting({ value, onChange }) {
   return (
     <div className="flex flex-col gap-[7px]">
       <h4 className="m-0 px-1 font-body text-[13px] font-semibold leading-none text-text-60">Thème</h4>
-      <div className={`flex gap-1 rounded-full ${MUTED_FILL_CLASSES} p-1`}>
-        {THEME_CHOICES.map((choice) => {
-          const isActive = choice.id === value
-          return (
-            <button
-              key={choice.id}
-              type="button"
-              aria-pressed={isActive}
-              onClick={() => onChange(choice.id)}
-              className={`inline-flex h-9 min-w-0 flex-auto items-center justify-center gap-[6px] rounded-full border px-3 font-body text-[14px] font-medium text-[var(--color-text)] cursor-pointer transition-[background-color,box-shadow,border-color] duration-150 ease-in-out max-sm:text-[13px] ${
-                isActive
-                  ? 'bg-widget-bg border-white dark:border-[rgba(255,255,255,0.08)] shadow-[0_1px_3px_rgba(0,0,0,0.06)]'
-                  : 'bg-transparent border-transparent hover:bg-brand-subtle'
-              }`}
-            >
-              <Icon icon={choice.icon} className="h-4 w-4 shrink-0 max-sm:hidden" aria-hidden="true" />
-              <span className="truncate">{choice.label}</span>
-            </button>
-          )
-        })}
-      </div>
+      <SegmentedControl
+        options={THEME_CHOICES.map((choice) => ({ value: choice.id, label: choice.label, icon: choice.icon }))}
+        value={value}
+        onChange={onChange}
+        label="Thème"
+      />
     </div>
   )
 }
@@ -286,7 +273,7 @@ const LOGO_SOURCE_CHOICES = [
 
 // The logo next to Tafac's (sidebar, header): shown or not, and, when the
 // student's establishment has its own (`establishmentLabel`), whose: the
-// establishment's or the university's, in a pill like the theme's. That row
+// establishment's or the university's, in a segmented control as the theme's. That row
 // unfolds and folds with the switch (its grid row from 0fr to 1fr, no height
 // to measure); folded, it's inert.
 function LogoSetting({ shown, onShownChange, establishmentLabel, source, onSourceChange }) {
@@ -309,28 +296,19 @@ function LogoSetting({ shown, onShownChange, establishmentLabel, source, onSourc
                 running over it. */}
             <div className={`${ROW_CLASSES} flex-wrap border-t border-[var(--color-border)]`}>
               <span className="shrink-0 font-body text-[16px] font-medium leading-[1.2] tracking-[-0.3125px] text-[var(--color-text)]">Afficher</span>
-              <div className={`ml-auto flex min-w-0 gap-1 rounded-full ${MUTED_FILL_CLASSES} p-1`} role="group" aria-label="Logo affiché">
-                {LOGO_SOURCE_CHOICES.map((choice) => {
-                  const isActive = choice.id === source
-                  return (
-                    <button
-                      key={choice.id}
-                      type="button"
-                      aria-pressed={isActive}
-                      title={choice.id === 'establishment' ? establishmentLabel : undefined}
-                      onClick={() => onSourceChange(choice.id)}
-                      className={`inline-flex h-8 min-w-0 items-center justify-center rounded-full border px-3 text-[var(--color-text)] cursor-pointer transition-[background-color,box-shadow,border-color] duration-150 ease-in-out max-sm:px-[10px] ${
-                        isActive
-                          ? 'bg-widget-bg border-white dark:border-[rgba(255,255,255,0.08)] shadow-[0_1px_3px_rgba(0,0,0,0.06)]'
-                          : 'bg-transparent border-transparent hover:bg-brand-subtle'
-                      }`}
-                    >
-                      {/* The font on a span: index.css gives buttons `font: inherit`, outside Tailwind's layers. */}
-                      <span className="truncate font-body text-[14px] font-medium leading-none max-sm:text-[13px]">{choice.label}</span>
-                    </button>
-                  )
-                })}
-              </div>
+              <SegmentedControl
+                className="ml-auto"
+                size="sm"
+                stretch={false}
+                options={LOGO_SOURCE_CHOICES.map((choice) => ({
+                  value: choice.id,
+                  label: choice.label,
+                  title: choice.id === 'establishment' ? establishmentLabel : undefined,
+                }))}
+                value={source}
+                onChange={onSourceChange}
+                label="Logo affiché"
+              />
             </div>
           </div>
         </div>
