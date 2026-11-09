@@ -7,6 +7,7 @@ import { SECONDARY_BUTTON } from '../scodocPageUtils'
 import Dropdown from './Dropdown'
 import PlanningExportButton from './PlanningExportButton'
 import PlanningShareButton from './PlanningShareButton'
+import SegmentedControl from './SegmentedControl'
 import SwipePager from './SwipePager'
 
 const compareDays = (left, right) => daysBetween(right, left)
@@ -169,29 +170,17 @@ const WIDE_VIEWS = [
   { id: 'list', label: 'Liste', ariaLabel: 'Afficher la liste' },
 ]
 
-// The wide screen's views, side by side in a pill as the account's theme
-// switch: the one shown on a card.
+// The wide screen's views, in the app's segmented control: the one shown
+// under its thumb.
 function WideViewSwitch({ view, onChangeView }) {
   return (
-    <div className="flex gap-0.5 rounded-full border border-border bg-brand-subtle p-[3px]" role="group" aria-label="Affichage">
-      {WIDE_VIEWS.map((choice) => {
-        const isActive = choice.id === view
-        return (
-          <button
-            key={choice.id}
-            type="button"
-            aria-pressed={isActive}
-            aria-label={choice.ariaLabel}
-            onClick={isActive ? undefined : () => onChangeView(choice.id)}
-            className={`inline-flex h-[34px] items-center rounded-full border px-3.5 font-body text-[14px] font-semibold cursor-pointer transition-[background-color,color,box-shadow,border-color] duration-150 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand ${
-              isActive ? 'border-border bg-widget-bg text-text shadow-xs' : 'border-transparent bg-transparent text-text-secondary hover:text-text'
-            }`}
-          >
-            {choice.label}
-          </button>
-        )
-      })}
-    </div>
+    <SegmentedControl
+      options={WIDE_VIEWS.map((choice) => ({ value: choice.id, label: choice.label, ariaLabel: choice.ariaLabel }))}
+      value={view}
+      onChange={onChangeView}
+      label="Affichage"
+      stretch={false}
+    />
   )
 }
 
