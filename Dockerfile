@@ -7,7 +7,7 @@
 # Dependabot (.github/dependabot.yml) proposes the next one.
 
 # --- Build: install everything, build the frontend ---
-FROM node:24.22.2-alpine AS build
+FROM node:26.13.0-alpine AS build
 WORKDIR /app
 COPY package.json package-lock.json ./
 RUN npm ci
@@ -17,7 +17,7 @@ ARG BUILD_HASH
 RUN npm run build
 
 # --- Runtime: production dependencies, sources and built frontend ---
-FROM node:24.22.2-alpine
+FROM node:26.13.0-alpine
 WORKDIR /app
 ENV NODE_ENV=production \
     MULTI_UNIVERSITY=1 \
