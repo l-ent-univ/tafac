@@ -58,7 +58,7 @@ import HomeDraftPage from './components/HomeDraftPage'
 import LoadingDots from './components/LoadingDots'
 import { resolveHeroImage } from './heroImage'
 import { useWallpaperTint } from './useWallpaperTint'
-import { getStoredTheme, persistTheme, watchTheme } from './theme'
+import { getStoredPalette, getStoredTheme, persistPalette, persistTheme, watchTheme } from './theme'
 import MobileTabBar from './components/MobileTabBar'
 import { getMobileTabItems } from './navItems'
 import { getHomeWidgets } from './dashboardWidgets'
@@ -932,6 +932,7 @@ function App() {
   // Page-switch animations only once the user has switched, not on first load.
   const [hasSwitchedPage, setHasSwitchedPage] = useState(false)
   const [theme, setTheme] = useState(() => getStoredTheme())
+  const [palette, setPalette] = useState(() => getStoredPalette())
   const [showAppDescriptions, setShowAppDescriptions] = useState(() => getStoredShowAppDescriptions())
   // Compact sidebar (icons alone): kept for the device, like its width.
   // Toggled from the sidebar's handle and the settings.
@@ -1949,12 +1950,23 @@ function App() {
     track('setting_changed', { setting: 'custom_background', value: 'off' })
   }, [])
 
-  useEffect(() => watchTheme(theme), [theme])
+  useEffect(() => watchTheme(theme, palette), [theme, palette])
 
   const handleThemeChange = useCallback((nextTheme) => {
     persistTheme(nextTheme)
     setTheme(nextTheme)
     track('setting_changed', { setting: 'theme', value: nextTheme })
+  }, [])
+
+  // A preset by its id; a custom pick with its hue and tint too.
+  const handlePaletteChange = useCallback((nextPalette) => {
+    persistPalette(nextPalette)
+    setPalette(nextPalette)
+    track('setting_changed', {
+      setting: 'palette',
+      value: nextPalette.id,
+      ...(nextPalette.id === 'custom' ? { hue: nextPalette.hue, tint: nextPalette.tint } : {}),
+    })
   }, [])
 
   const handleShowWallpaperChange = useCallback((show) => {
@@ -2841,6 +2853,8 @@ function App() {
         onLogoSourceChange={handleLogoSourceChange}
         theme={theme}
         onThemeChange={handleThemeChange}
+        palette={palette}
+        onPaletteChange={handlePaletteChange}
         hasCustomBackground={Boolean(customBackground)}
         onCustomBackgroundChange={handleCustomBackgroundChange}
         onCustomBackgroundReset={handleCustomBackgroundReset}

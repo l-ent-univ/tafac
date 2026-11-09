@@ -4,9 +4,9 @@
    and tinted, with the photo blurred behind. */
 
 .widget-card {
-  --color-widget-bg: rgb(252 251 248 / 0.66);
-  --color-bg-subtle: rgb(252 251 248 / 0.84);
-  border-color: rgb(255 255 255 / 0.65);
+  --color-widget-bg: var(--material-glass);
+  --color-bg-subtle: var(--material-glass-hover);
+  border-color: var(--material-glass-edge);
   -webkit-backdrop-filter: blur(20px) saturate(1.5);
   backdrop-filter: blur(20px) saturate(1.5);
   /* Intro: cards rise and settle from a slightly smaller scale, staggered in
@@ -25,9 +25,9 @@
 }
 
 :where([data-theme="dark"]) .widget-card {
-  --color-widget-bg: rgb(24 24 24 / 0.6);
-  --color-bg-subtle: rgb(38 38 38 / 0.74);
-  border-color: rgba(255, 255, 255, 0.08);
+  --color-widget-bg: var(--material-glass);
+  --color-bg-subtle: var(--material-glass-hover);
+  border-color: var(--material-glass-edge);
 }
 
 /* ── Concentric modal corners ──
@@ -145,8 +145,8 @@
 /* ── Sidebar: floating frosted panel ── */
 
 .sidebar-panel {
-  background-color: rgb(245 243 236 / 0.6);
-  border-color: rgb(255 255 255 / 0.6);
+  background-color: var(--material-sidebar);
+  border-color: var(--material-sidebar-edge);
   -webkit-backdrop-filter: blur(24px) saturate(1.5);
   backdrop-filter: blur(24px) saturate(1.5);
   box-shadow: 0 12px 40px -16px rgb(52 18 0 / 0.22);
@@ -155,8 +155,8 @@
 }
 
 :where([data-theme="dark"]) .sidebar-panel {
-  background-color: rgb(20 20 20 / 0.55);
-  border-color: rgb(255 255 255 / 0.08);
+  background-color: var(--material-sidebar);
+  border-color: var(--material-sidebar-edge);
   box-shadow: 0 12px 40px -16px rgb(0 0 0 / 0.6);
 }
 
@@ -165,9 +165,9 @@
    solid surfaces, with a crisper edge so they still lift off the page. */
 
 .dashboard-no-wallpaper .widget-card {
-  --color-widget-bg: #ffffff;
-  --color-bg-subtle: #f8f7f3;
-  border-color: #ffffff;
+  --color-widget-bg: var(--material-solid);
+  --color-bg-subtle: var(--material-solid-hover);
+  border-color: var(--material-solid-edge);
   -webkit-backdrop-filter: none;
   backdrop-filter: none;
   box-shadow: 0 1px 3px rgb(52 18 0 / 0.06), 0 10px 28px -14px rgb(52 18 0 / 0.16);
@@ -176,8 +176,8 @@
 /* Close to the page colour: a warm hairline and a deeper shadow keep it
    standing apart from the page. */
 .dashboard-no-wallpaper .sidebar-panel {
-  background-color: #f5f3ec;
-  border-color: rgb(52 18 0 / 0.08);
+  background-color: var(--material-sidebar-solid);
+  border-color: color-mix(in srgb, var(--ink) 8%, transparent);
   -webkit-backdrop-filter: none;
   backdrop-filter: none;
   box-shadow: 0 1px 3px rgb(52 18 0 / 0.06), 0 16px 40px -14px rgb(52 18 0 / 0.24);
@@ -188,9 +188,9 @@
    in from the right edge and back out. */
 .mail-reader-panel,
 .side-panel {
-  --mail-panel-bg: #ffffff;
+  --mail-panel-bg: var(--material-solid);
   background-color: var(--mail-panel-bg);
-  border-color: rgb(52 18 0 / 0.08);
+  border-color: color-mix(in srgb, var(--ink) 8%, transparent);
   box-shadow: 0 1px 3px rgb(52 18 0 / 0.06), 0 16px 40px -14px rgb(52 18 0 / 0.24);
   animation: mail-reader-panel-in 340ms cubic-bezier(0.32, 0.72, 0, 1) both;
 }
@@ -202,9 +202,9 @@
 
 :where([data-theme="dark"]) .mail-reader-panel,
 :where([data-theme="dark"]) .side-panel {
-  --mail-panel-bg: #1c1c1c;
+  --mail-panel-bg: var(--material-solid);
   background-color: var(--mail-panel-bg);
-  border-color: rgb(255 255 255 / 0.1);
+  border-color: var(--line);
   box-shadow: 0 1px 3px rgb(0 0 0 / 0.4), 0 16px 40px -14px rgb(0 0 0 / 0.7);
 }
 
@@ -953,15 +953,15 @@
 }
 
 :where([data-theme="dark"]) .dashboard-no-wallpaper .widget-card {
-  --color-widget-bg: #1c1c1c;
-  --color-bg-subtle: #242424;
-  border-color: rgba(255, 255, 255, 0.08);
+  --color-widget-bg: var(--material-solid);
+  --color-bg-subtle: var(--material-solid-hover);
+  border-color: var(--material-solid-edge);
   box-shadow: 0 1px 3px rgb(0 0 0 / 0.3);
 }
 
 :where([data-theme="dark"]) .dashboard-no-wallpaper .sidebar-panel {
-  background-color: #161616;
-  border-color: rgb(255 255 255 / 0.1);
+  background-color: var(--material-sidebar-solid);
+  border-color: var(--line);
   box-shadow: 0 1px 3px rgb(0 0 0 / 0.4), 0 16px 40px -14px rgb(0 0 0 / 0.7);
 }
 
@@ -972,7 +972,7 @@
    (no blur), so the strip under it doesn't show through. */
 .sidebar-panel.sidebar-peek {
   width: var(--sidebar-width);
-  background-color: #f5f3ec;
+  background-color: var(--material-sidebar-solid);
   -webkit-backdrop-filter: none;
   backdrop-filter: none;
   opacity: 0;
@@ -1010,7 +1010,7 @@
 }
 
 :where([data-theme="dark"]) .sidebar-panel.sidebar-peek {
-  background-color: #161616;
+  background-color: var(--material-sidebar-solid);
 }
 
 :where([data-theme="dark"]) .sidebar-panel.sidebar-peek.is-open {
@@ -1034,8 +1034,8 @@
    (#191919) and the page (#0f0f0f) they sit on: in the same grey as the
    band, they didn't stand out from it. */
 :where([data-theme="dark"]) .dashboard-no-wallpaper :is(.dashboard-widgets, .grades-page) .widget-card {
-  --color-widget-bg: #222222;
-  --color-bg-subtle: #2a2a2a;
+  --color-widget-bg: var(--material-banded);
+  --color-bg-subtle: var(--material-banded-hover);
 }
 
 /* A logo with a dark version of its own (logoDark): that one, as is. */
@@ -1075,11 +1075,7 @@
 /* The sidebar's resize line and its fold button: brown in light mode, a
    soft yellow in dark mode. */
 .sidebar-handle-tint {
-  background-color: rgb(74 38 14 / 0.78);
-}
-
-:where([data-theme="dark"]) .sidebar-handle-tint {
-  background-color: rgb(255 250 228 / 0.78);
+  background-color: var(--handle-tint);
 }
 
 /* Translucent, the line would show through the button: it stops where the
@@ -3910,10 +3906,10 @@
   gap: 2px;
   padding: 3px;
   border-radius: 9999px;
-  background-color: rgb(52 18 0 / 0.05);
+  background-color: color-mix(in srgb, var(--ink) 5%, transparent);
   box-shadow:
-    inset 0 1px 2px rgb(52 18 0 / 0.08),
-    inset 0 0 0 1px rgb(52 18 0 / 0.05);
+    inset 0 1px 2px color-mix(in srgb, var(--ink) 8%, transparent),
+    inset 0 0 0 1px color-mix(in srgb, var(--ink) 5%, transparent);
 }
 
 .segmented--stretch {
@@ -3931,12 +3927,12 @@
   width: var(--segmented-w);
   transform: translateX(var(--segmented-x));
   box-sizing: border-box;
-  border: 1px solid #ffffff;
+  border: 1px solid var(--surface-thumb);
   border-radius: 9999px;
-  background-color: #ffffff;
+  background-color: var(--surface-thumb);
   box-shadow:
-    0 1px 2px rgb(52 18 0 / 0.1),
-    0 4px 12px -4px rgb(52 18 0 / 0.26);
+    0 1px 2px color-mix(in srgb, var(--ink) 10%, transparent),
+    0 4px 12px -4px color-mix(in srgb, var(--ink) 26%, transparent);
 }
 
 .segmented[data-ready] .segmented-thumb {
@@ -4023,6 +4019,409 @@
   }
 }
 
+/* ── Palette picker (Réglages › Apparence › Couleurs, PalettePicker) ──
+   The pad: the hues around it, from red at the top clockwise, pale at the
+   centre where the dot means Sable and full at the rim. The pad carries
+   --dot-x and --dot-y (-1..1 of its half-width less --pad-inset, so the dot
+   never crosses the edge) and the dot's colours; the dot and the lens read
+   them. The dot moves by translate alone, in container units, so a drag
+   costs the compositor and nothing else; the page follows it live. */
+/* Laid out as a settings card: the pad 8px in from the card's edges, its
+   corners concentric with the card's (modal-nested-corners, the card's
+   20px less those 8px); beside it the pick's name and the presets, which
+   sit in a track like the segmented control's. On a phone, the pad spans
+   the card and the rest goes under it. */
+.palette-picker {
+  --modal-nested-inset: 8px;
+  display: flex;
+  align-items: stretch;
+  gap: 16px;
+  padding: var(--modal-nested-inset);
+}
+
+.palette-pad {
+  --pad-inset: 18px;
+  --dot-x: 0;
+  --dot-y: 0;
+  --lens-side: -1;
+  /* The dot's way from the centre, along each axis. */
+  --dot-reach: calc(50cqw - var(--pad-inset));
+  /* A spring with a little give at the end, and a soft one for the colour. */
+  --pad-spring: cubic-bezier(0.32, 0.72, 0, 1);
+  --pad-settle: cubic-bezier(0.34, 1.56, 0.64, 1);
+  position: relative;
+  flex-shrink: 0;
+  width: 176px;
+  aspect-ratio: 1;
+  container-type: inline-size;
+  background:
+    radial-gradient(circle closest-side, var(--surface-card) 0 16%, color-mix(in srgb, var(--surface-card) 72%, transparent) 42%, transparent 100%),
+    conic-gradient(in oklch longer hue, oklch(0.74 0.15 0), oklch(0.74 0.15 360));
+  box-shadow:
+    inset 0 0 0 1px color-mix(in srgb, var(--ink) 8%, transparent),
+    inset 0 1px 2px color-mix(in srgb, var(--ink) 6%, transparent);
+  cursor: crosshair;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+@supports (animation-timing-function: linear(0, 1)) {
+  .palette-pad {
+    --pad-spring: linear(0, 0.006, 0.025 2.8%, 0.101 6.1%, 0.539 18.9%, 0.721 25.3%, 0.849 31.5%, 0.937 38.1%, 0.968 41.8%, 0.991 45.7%, 1.006 50.1%, 1.015 55%, 1.017 63.9%, 1.001);
+    --pad-settle: linear(0, 0.011 1.6%, 0.044 3.4%, 0.17 7%, 0.6 15.1%, 0.858 21%, 1.017 26.1%, 1.095 30.3%, 1.122 33.1%, 1.129 35.8%, 1.11 40.9%, 1.016 56.5%, 0.994 64.7%, 0.991 74.5%, 1);
+  }
+}
+
+.palette-pad:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 3px;
+}
+
+.palette-pad[data-dragging] {
+  cursor: grabbing;
+}
+
+/* Sable's share, a hairline ring at the pad's heart. */
+.palette-pad-centre {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: calc((100% - 2 * var(--pad-inset)) * 0.16);
+  aspect-ratio: 1;
+  border-radius: 50%;
+  translate: -50% -50%;
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ink) 14%, transparent);
+  pointer-events: none;
+  transition: scale 260ms var(--pad-settle), box-shadow 200ms ease;
+}
+
+.palette-dot {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 28px;
+  height: 28px;
+  border: 3px solid #ffffff;
+  border-radius: 50%;
+  box-sizing: border-box;
+  background-color: var(--swatch-light);
+  translate:
+    calc(-50% + var(--dot-x) * var(--dot-reach))
+    calc(-50% + var(--dot-y) * var(--dot-reach));
+  box-shadow:
+    0 1px 2px rgb(0 0 0 / 0.2),
+    0 4px 12px -2px rgb(0 0 0 / 0.3);
+  /* A preset or an arrow sends the dot gliding; a release lets it settle
+     back to its size with a little bounce. */
+  transition:
+    translate 360ms var(--pad-spring),
+    scale 420ms var(--pad-settle),
+    background-color 320ms ease;
+  pointer-events: none;
+  will-change: translate;
+}
+
+/* Under the pointer the dot is held: larger, on the finger at once, no
+   glide behind it. */
+.palette-pad[data-dragging] .palette-dot {
+  scale: 1.18;
+  transition: scale 160ms ease-out;
+}
+
+/* The magnetic centre (PalettePicker): the dot clicks onto it with a
+   spring and the ring swells to take it; pulled free, it glides back under
+   the pointer in a blink rather than jumping. */
+.palette-pad[data-dragging][data-magnet="in"] .palette-dot {
+  transition: translate 280ms var(--pad-spring), scale 160ms ease-out, background-color 200ms ease;
+}
+
+.palette-pad[data-dragging][data-magnet="out"] .palette-dot {
+  transition: translate 160ms cubic-bezier(0.2, 0.8, 0.2, 1), scale 160ms ease-out, background-color 200ms ease;
+}
+
+.palette-pad[data-magnet="in"] .palette-pad-centre {
+  scale: 1.3;
+  box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--ink) 34%, transparent);
+}
+
+/* On a finger the dot is covered: a lens above it shows the colour and its
+   name (below the dot near the top rim, --lens-side). Mouse pointers hide
+   nothing, so they get none. */
+.palette-lens {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 4px 11px 4px 5px;
+  border-radius: 999px;
+  background: var(--surface-raised);
+  color: var(--ink);
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1;
+  white-space: nowrap;
+  translate:
+    calc(-50% + var(--dot-x) * var(--dot-reach))
+    calc(-50% + var(--dot-y) * var(--dot-reach) + var(--lens-side) * 46px);
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--ink) 8%, transparent),
+    0 6px 18px -6px rgb(0 0 0 / 0.35);
+  opacity: 0;
+  scale: 0.7;
+  transition:
+    opacity 120ms ease,
+    scale 260ms var(--pad-settle);
+  pointer-events: none;
+}
+
+.palette-lens::before {
+  content: '';
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background-color: var(--swatch-light);
+  box-shadow: inset 0 0 0 1px rgb(0 0 0 / 0.1);
+}
+
+.palette-pad[data-dragging]:is([data-pointer="touch"], [data-pointer="pen"]) .palette-lens {
+  opacity: 1;
+  scale: 1;
+}
+
+.palette-side {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 8px 8px 0 0;
+}
+
+.palette-current {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+/* The row label's and description's type (SettingsGroup's RowText). */
+.palette-name {
+  margin: 0;
+  font-family: var(--font-body);
+  font-size: 16px;
+  font-weight: 500;
+  line-height: 1.2;
+  letter-spacing: -0.3125px;
+  color: var(--ink);
+}
+
+.palette-detail {
+  margin: 0;
+  font-family: var(--font-body);
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 1.35;
+  color: var(--color-text-60);
+  font-variant-numeric: tabular-nums;
+}
+
+.palette-presets {
+  display: flex;
+  align-self: flex-start;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 5px;
+  border-radius: 9999px;
+  background-color: color-mix(in srgb, var(--ink) 5%, transparent);
+  box-shadow:
+    inset 0 1px 2px color-mix(in srgb, var(--ink) 8%, transparent),
+    inset 0 0 0 1px color-mix(in srgb, var(--ink) 5%, transparent);
+}
+
+:where([data-theme="dark"]) .palette-presets {
+  background-color: rgb(0 0 0 / 0.3);
+  box-shadow:
+    inset 0 1px 2px rgb(0 0 0 / 0.5),
+    inset 0 0 0 1px rgb(255 255 255 / 0.06);
+}
+
+.palette-preset {
+  width: 26px;
+  height: 26px;
+  flex-shrink: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background-color: var(--swatch-light);
+  box-shadow: inset 0 0 0 1px rgb(0 0 0 / 0.12);
+  cursor: pointer;
+  transition: scale 260ms var(--pad-settle, ease), box-shadow 200ms ease;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* The pick: ringed in the segmented control's thumb, lifted as it is. */
+.palette-preset[data-current] {
+  box-shadow:
+    0 0 0 3px var(--surface-thumb),
+    0 1px 2px color-mix(in srgb, var(--ink) 10%, transparent),
+    0 4px 12px -4px color-mix(in srgb, var(--ink) 26%, transparent);
+}
+
+:where([data-theme="dark"]) .palette-preset[data-current] {
+  box-shadow:
+    0 0 0 3px var(--surface-thumb),
+    0 1px 2px rgb(0 0 0 / 0.5),
+    0 4px 12px -4px rgb(0 0 0 / 0.65);
+}
+
+.palette-preset:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 4px;
+}
+
+/* Contrast (PaletteContrast): a settings row, the label as RowText's and
+   the slider filling the rest. The track runs from a faint ink to the
+   full one, filled to the thumb; the thumb is the segmented control's. */
+.palette-contrast-label {
+  flex-shrink: 0;
+  font-family: var(--font-body);
+  font-size: 16px;
+  font-weight: 500;
+  line-height: 1.2;
+  letter-spacing: -0.3125px;
+  color: var(--ink);
+}
+
+.palette-contrast {
+  --contrast-fill: 50%;
+  flex: 1;
+  min-width: 0;
+  max-width: 260px;
+  height: 28px;
+  margin: 0 0 0 auto;
+  background: transparent;
+  cursor: pointer;
+  appearance: none;
+  -webkit-appearance: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.palette-contrast::-webkit-slider-runnable-track {
+  height: 6px;
+  border-radius: 9999px;
+  background:
+    linear-gradient(to right, color-mix(in srgb, var(--ink) 30%, transparent), var(--ink)) 0 0 / var(--contrast-fill) 100% no-repeat,
+    color-mix(in srgb, var(--ink) 8%, transparent);
+}
+
+.palette-contrast::-moz-range-track {
+  height: 6px;
+  border-radius: 9999px;
+  background: color-mix(in srgb, var(--ink) 8%, transparent);
+}
+
+.palette-contrast::-moz-range-progress {
+  height: 6px;
+  border-radius: 9999px;
+  background: linear-gradient(to right, color-mix(in srgb, var(--ink) 30%, transparent), var(--ink));
+}
+
+.palette-contrast::-webkit-slider-thumb {
+  width: 22px;
+  height: 22px;
+  margin-top: -8px;
+  border: 1px solid var(--surface-thumb);
+  border-radius: 50%;
+  background-color: var(--surface-thumb);
+  box-shadow:
+    0 1px 2px color-mix(in srgb, var(--ink) 14%, transparent),
+    0 4px 12px -4px color-mix(in srgb, var(--ink) 32%, transparent);
+  transition: scale 200ms var(--pad-settle, ease);
+  appearance: none;
+  -webkit-appearance: none;
+}
+
+.palette-contrast::-moz-range-thumb {
+  width: 22px;
+  height: 22px;
+  border: 1px solid var(--surface-thumb);
+  border-radius: 50%;
+  background-color: var(--surface-thumb);
+  box-shadow:
+    0 1px 2px color-mix(in srgb, var(--ink) 14%, transparent),
+    0 4px 12px -4px color-mix(in srgb, var(--ink) 32%, transparent);
+}
+
+.palette-contrast:active::-webkit-slider-thumb {
+  scale: 1.12;
+}
+
+.palette-contrast:focus-visible {
+  outline: none;
+}
+
+.palette-contrast:focus-visible::-webkit-slider-thumb {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+.palette-contrast:focus-visible::-moz-range-thumb {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+/* The dots show each palette's brand as the theme at hand would. */
+:root[data-theme="dark"] .palette-dot,
+:root[data-theme="dark"] .palette-lens::before,
+:root[data-theme="dark"] .palette-preset {
+  background-color: var(--swatch-dark);
+}
+
+@media (hover: hover) {
+  .palette-preset:hover {
+    scale: 1.1;
+  }
+}
+
+.palette-preset:active {
+  scale: 0.92;
+  transition-duration: 80ms;
+}
+
+
+@media (max-width: 599px) {
+  .palette-picker {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .palette-pad {
+    width: 100%;
+  }
+
+  .palette-side {
+    gap: 12px;
+    padding: 0 4px 6px;
+  }
+}
+
+/* Reduced motion: the dot and the lens move and show without gliding. The
+   page's own glide between picks is off in tokens.css. */
+@media (prefers-reduced-motion: reduce) {
+  .palette-dot,
+  .palette-lens,
+  .palette-preset,
+  .palette-pad-centre,
+  .palette-pad[data-dragging] .palette-dot,
+  .palette-pad[data-dragging][data-magnet] .palette-dot {
+    transition: none;
+  }
+}
+
 /* On a white panel or sheet the white edge vanishes: a hairline instead. */
 .side-panel .segmented-thumb,
 .mail-reader-panel .segmented-thumb,
@@ -4039,7 +4438,7 @@
 
 :where([data-theme="dark"]) .segmented-thumb {
   border-color: rgb(255 255 255 / 0.1);
-  background-color: #383838;
+  background-color: var(--surface-thumb);
   box-shadow:
     inset 0 1px 0 rgb(255 255 255 / 0.06),
     0 1px 2px rgb(0 0 0 / 0.5),
@@ -7385,9 +7784,9 @@ li:has(> .planning-row.is-link:active) + li > .planning-row .planning-row-text,
 .planning-sheet .widget-card,
 .mail-reader-panel .widget-card,
 .side-panel .widget-card {
-  --color-widget-bg: #ffffff;
-  --color-bg-subtle: #f8f7f3;
-  border-color: rgb(52 18 0 / 0.1);
+  --color-widget-bg: var(--material-solid);
+  --color-bg-subtle: var(--material-solid-hover);
+  border-color: var(--line);
   -webkit-backdrop-filter: none;
   backdrop-filter: none;
   box-shadow: 0 1px 3px rgb(52 18 0 / 0.06), 0 10px 28px -14px rgb(52 18 0 / 0.16);
@@ -7396,9 +7795,9 @@ li:has(> .planning-row.is-link:active) + li > .planning-row .planning-row-text,
 :where([data-theme="dark"]) .planning-sheet .widget-card,
 :where([data-theme="dark"]) .mail-reader-panel .widget-card,
 :where([data-theme="dark"]) .side-panel .widget-card {
-  --color-widget-bg: #1c1c1c;
-  --color-bg-subtle: #242424;
-  border-color: rgba(255, 255, 255, 0.08);
+  --color-widget-bg: var(--material-solid);
+  --color-bg-subtle: var(--material-solid-hover);
+  border-color: var(--material-solid-edge);
   box-shadow: 0 1px 3px rgb(0 0 0 / 0.3);
 }
 
