@@ -1184,14 +1184,6 @@
 
 /* The mail reader's toolbar (MailToolbar): hairlines between the buttons
    of a group. */
-.mail-toolbar-divider {
-  background-color: rgb(52 18 0 / 0.12);
-}
-
-:where([data-theme="dark"]) .mail-toolbar-divider {
-  background-color: rgb(255 255 255 / 0.14);
-}
-
 /* A sheet's close button (a grade's, a class's), of the tab bar's glass. */
 /* ── Close button (CloseButton) ──
    A soft tint of the text colour (plain) or frosted glass (below), the ×

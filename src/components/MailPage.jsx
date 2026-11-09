@@ -1952,7 +1952,7 @@ function MailPage({ onReaderOpenChange, onSignInAgain, sender = null, composeReq
         <MailSearchField value={query} onChange={setQuery} label="Rechercher dans les mails" className="flex-1" />
         <button
           type="button"
-          className="mobile-tab-bar group relative ml-2 inline-flex size-11 shrink-0 items-center justify-center rounded-full text-text-muted cursor-pointer transition-[color] duration-150 hover:text-text disabled:cursor-default focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-text/20"
+          className="material group relative ml-2 inline-flex size-11 shrink-0 items-center justify-center rounded-full text-text-muted cursor-pointer transition-[color] duration-150 hover:text-text disabled:cursor-default focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-text/20"
           aria-label="Actualiser"
           aria-busy={isRefreshing || undefined}
           disabled={isRefreshing}

@@ -605,8 +605,8 @@ function MailBodyFrame({ message, showRemoteImages, title, onResumeDraft = null 
 
 // In place of the list only (in the side panel, from 4xl, the list stays
 // beside it, its open row closing it again): back to it, as iOS's back
-// button — a pill of the tab bar's glass (.mobile-tab-bar, as the search
-// and the reader's toolbar), named after the folder left, held at the top
+// button — a pill of the app's material (.material, as the search and the
+// reader's toolbar), named after the folder left, held at the top
 // as a long mail scrolls under it. Its text on a span: a <button> takes its
 // font from index.css's `button { font: inherit }`.
 function ReaderBackRow({ onBack, label = 'Réception' }) {
@@ -614,7 +614,7 @@ function ReaderBackRow({ onBack, label = 'Réception' }) {
     <div className="sticky top-[calc(env(safe-area-inset-top)+12px)] z-20 flex 4xl:hidden">
       <button
         type="button"
-        className="mobile-tab-bar mobile-tab-bar-item inline-flex h-11 items-center gap-[6px] rounded-full pl-3 pr-4 text-text cursor-pointer transition-[background-color,transform] duration-150 ease-out active:scale-[0.96] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-text/30"
+        className="material inline-flex h-11 items-center gap-[6px] rounded-full pl-3 pr-4 text-text cursor-pointer focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-text/30"
         aria-label={`Retour : ${label}`}
         onClick={onBack}
       >
