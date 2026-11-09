@@ -6,6 +6,7 @@ import { LABEL_COLUMN } from '../planningGrid'
 import { SECONDARY_BUTTON } from '../scodocPageUtils'
 import Dropdown from './Dropdown'
 import PlanningExportButton from './PlanningExportButton'
+import PlanningShareButton from './PlanningShareButton'
 import SwipePager from './SwipePager'
 
 const compareDays = (left, right) => daysBetween(right, left)
@@ -230,8 +231,9 @@ function PhoneViewMenu({ view, onChangeView }) {
 // ahead by the chip, which says the week (or the day) shown, the view
 // switch is "Jour" / "Semaine" / "Liste", and every view has the week's
 // days' headers in place of the strip (the same ones, so switching moves
-// nothing up there), swiped by weeks too.
-function PlanningHeader({ titleId, selectedDay, todayKey, view, isWide, columnsFor, selection, onSelectDay, onOpenDay, onToday, onStep, onChangeView }) {
+// nothing up there), swiped by weeks too. `onShare`: « Partager », the
+// week of the selected day as an image (PlanningShareSheet).
+function PlanningHeader({ titleId, selectedDay, todayKey, view, isWide, columnsFor, selection, onSelectDay, onOpenDay, onToday, onStep, onChangeView, onShare = null }) {
   const [isPickerOpen, setIsPickerOpen] = useState(false)
   const monday = startOfWeek(selectedDay)
   const dayCount = view === 'twoDays' ? 2 : 1
@@ -326,15 +328,17 @@ function PlanningHeader({ titleId, selectedDay, todayKey, view, isWide, columnsF
           {/* Wide: "Jour" / "Semaine" / "Liste". Otherwise a menu of the
               phone's views. */}
           {isWide ? <WideViewSwitch view={view} onChangeView={onChangeView} /> : <PhoneViewMenu view={view} onChangeView={onChangeView} />}
-          {/* At the row's end, apart from the views: the .ics export. On a
-              phone it gives its room to "Aujourd’hui" (the row would cut
-              the day short): it exports the weeks ahead, offered from
-              today. */}
-          <PlanningExportButton
+          {/* At the row's end, apart from the views: « Partager » (the
+              week shown, as an image) and, on a wide screen, the .ics
+              export. On a phone the export is in the share sheet, and
+              « Partager » gives its room to "Aujourd’hui" (the row would
+              cut the day short). */}
+          <PlanningShareButton
             selection={selection}
-            from="header"
+            onShare={onShare}
             className={(isWeek ? monday !== startOfWeek(todayKey) : selectedDay !== todayKey) ? 'max-md:hidden' : ''}
           />
+          <PlanningExportButton selection={selection} from="header" className="max-md:hidden" />
         </div>
       </div>
       {isWide ? (

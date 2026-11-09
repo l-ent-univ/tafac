@@ -12,6 +12,7 @@ import PlanningDayPage from './PlanningDayPage'
 import PlanningEventSheet from './PlanningEventSheet'
 import PlanningHeader from './PlanningHeader'
 import PlanningListView from './PlanningListView'
+import PlanningShareSheet from './PlanningShareSheet'
 import SwipePager from './SwipePager'
 
 // The view (one day, two side by side, or the week's list), kept in this
@@ -171,6 +172,15 @@ function PlanningPage({ selection = null, user = null, showWeekend = false, onOp
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [openEvent, load])
 
+  // « Partager »: the selected day's week as an image, in a sheet of its
+  // own (its own history entry, as the class's sheet).
+  const shareSheet = useHistorySheet('tafacPlanningShareSheet')
+  const openShare = useCallback(() => {
+    trackPlanningAction('share_opened', { view: toPlanningView(view) })
+    shareSheet.open()
+  }, [shareSheet, view])
+  const shareMonday = startOfWeek(selectedDay)
+
   const openSheet = useCallback((event) => {
     trackPlanningAction('course_opened', { view: toPlanningView(view) })
     setOpenEvent(event)
@@ -268,6 +278,7 @@ function PlanningPage({ selection = null, user = null, showWeekend = false, onOp
             }}
             onStep={(count) => stepBy(count, 'arrow')}
             onChangeView={changeView}
+            onShare={openShare}
           />
         </div>
       </div>
@@ -340,6 +351,19 @@ function PlanningPage({ selection = null, user = null, showWeekend = false, onOp
             sheet.close()
             setSelectedDay(day)
           }}
+        />
+      ) : null}
+      {shareSheet.isOpen ? (
+        <PlanningShareSheet
+          monday={shareMonday}
+          days={weekColumns(events, shareMonday, { showWeekend })}
+          events={events}
+          status={statusOn(shareMonday)}
+          accentFor={accentFor}
+          group={selection?.label ?? ''}
+          selection={selection}
+          onClose={shareSheet.close}
+          onComposeMail={onComposeMail}
         />
       ) : null}
     </section>

@@ -2047,7 +2047,7 @@ function App() {
   const [pendingMailCompose, setPendingMailCompose] = useState(null)
   const handleComposeMail = useCallback((request) => {
     setPendingMailCompose(request)
-    handleNavigatePage('mail', request?.kind === 'course' ? 'planning' : request?.kind === 'absence' ? 'assiduity' : 'grades')
+    handleNavigatePage('mail', ['course', 'timetable'].includes(request?.kind) ? 'planning' : request?.kind === 'absence' ? 'assiduity' : 'grades')
   }, [handleNavigatePage])
   const clearPendingMailCompose = useCallback(() => setPendingMailCompose(null), [])
   // The composer's « Un cours… »: the Planning's weeks, where it's in the app.
