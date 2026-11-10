@@ -378,7 +378,7 @@ function HomeDraftPage({
           {/* On arrival the icons come into focus one after the other
               (.home-icon-deal), each turning once as it lands (HomeIcon).
               Hovered, an icon grows a little with a springy overshoot,
-              turns again and comes over its neighbours. */}
+              turns under the pointer and comes over its neighbours. */}
           <div className="mb-2 flex items-center gap-1.5" aria-hidden="true">
             {GREETING_ICONS.map(({ src, rotate }, index) => (
               <span
