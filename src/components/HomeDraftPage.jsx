@@ -28,6 +28,7 @@ import WidgetRecentGrades from './WidgetRecentGrades'
 import WidgetRecentMail from './WidgetRecentMail'
 import { SHIMMER_CLASSES } from './widgetListUtils'
 import { r } from '../register.js'
+import HomeIcon from './HomeIcon'
 
 // The row above the greeting, in place of the card's wave: each icon
 // tilted its own way, on one line.
@@ -375,8 +376,9 @@ function HomeDraftPage({
         </div>
         <div className="relative mt-auto grid gap-1 min-w-0">
           {/* On arrival the icons come into focus one after the other
-              (.home-icon-deal). Hovered, an icon grows a little with a
-              springy overshoot and comes over its neighbours. */}
+              (.home-icon-deal), each turning once as it lands (HomeIcon).
+              Hovered, an icon grows a little with a springy overshoot,
+              turns under the pointer and comes over its neighbours. */}
           <div className="mb-2 flex items-center gap-1.5" aria-hidden="true">
             {GREETING_ICONS.map(({ src, rotate }, index) => (
               <span
@@ -384,12 +386,10 @@ function HomeDraftPage({
                 className="home-icon-deal relative shrink-0 hover:z-10"
                 style={{ '--i': index, '--r': `${rotate}deg`, transform: 'rotate(var(--r))' }}
               >
-                <img
+                <HomeIcon
                   src={src}
-                  alt=""
-                  width="36"
-                  height="36"
-                  draggable="false"
+                  size={36}
+                  order={index}
                   className="block size-9 select-none transition-transform duration-[450ms] ease-[cubic-bezier(0.34,1.8,0.5,1)] hover:scale-[1.15] motion-reduce:transition-none max-md:size-[30px]"
                 />
               </span>
