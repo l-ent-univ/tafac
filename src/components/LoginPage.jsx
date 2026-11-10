@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import {useEffect, useMemo, useRef, useState} from 'react'
 import { Icon } from '@iconify/react'
 import universityConfig from '@university'
 import loginHands from '../assets/login/login-hands.webp'
@@ -11,6 +11,7 @@ import ServiceNotice from './ServiceNotice'
 import { APP_NAME } from '../seo'
 import { getListedUniversities, getLoadedUniversityId, writeUniversityChoice } from '../universityRuntime'
 import { r } from '../register.js'
+import {OtpInput} from "./OtpInput.jsx";
 
 const universityLogo = universityConfig.branding.logo
 const universityLogoAlt = universityConfig.branding.logoAlt ?? universityConfig.university?.name ?? ''
@@ -62,7 +63,6 @@ function UniversityPicker() {
     if (!needle) return universities
     return universities.filter((entry) => `${entry.name} ${entry.shortName ?? ''} ${entry.slug}`.toLowerCase().includes(needle))
   }, [query, universities])
-
   return (
     <div className="mt-6 flex w-full flex-col gap-3">
       {universities.length >= PICKER_SEARCH_FROM ? (
@@ -123,18 +123,28 @@ function LoginPage({
   credentials,
   checking,
   errorMessage,
+  requireOTP,
   onCredentialsChange,
   onDemoLogin,
   onSubmit,
 }) {
   const [showPassword, setShowPassword] = useState(false)
   const [aboutOpen, setAboutOpen] = useState(false)
+  const formRef = useRef(null)
 
   function handleDemoLinkClick() {
     setAboutOpen(false)
     onDemoLogin?.()
   }
 
+
+  useEffect(() => {
+    if (credentials.otp.length === 6 && !checking) {
+      formRef.current?.requestSubmit()
+    } else if(credentials.otp.length === 6 && checking) {
+      onCredentialsChange('otp', '')
+    }
+  }, [checking, credentials.otp, onCredentialsChange])
   return (
     <section className="flex w-full min-h-screen bg-bg" aria-label="Page de connexion">
       {/* The photo of the app in hand on its own grey (#EEEEEE), the panel
@@ -240,48 +250,63 @@ function LoginPage({
                 {/* Real form with labelled username/current-password fields and a
                     submit button, so password managers recognize and offer to save
                     the login. */}
-                <form className="mt-6 flex w-full flex-col" onSubmit={onSubmit}>
-                  <div className="flex flex-col gap-4">
-                    <div className="flex flex-col gap-[7px]">
-                      <label htmlFor="login-username" className="pl-[18px] text-left text-[13px] font-semibold leading-none text-text-70 font-body">Identifiant</label>
-                      <input
-                        id="login-username"
-                        name="username"
-                        className={FIELD_CLASS}
-                        autoComplete="username"
-                        autoCapitalize="none"
-                        autoCorrect="off"
-                        spellCheck={false}
-                        type="text"
-                        value={credentials.username}
-                        onChange={(event) => onCredentialsChange('username', event.target.value)}
-                      />
-                    </div>
+                <form ref={formRef} className="mt-6 flex w-full flex-col" onSubmit={onSubmit}>
+                  <div>
+                    {!requireOTP ? (
+                        <div className="flex flex-col gap-4">
+                          <div className="flex flex-col gap-[7px]">
+                            <label htmlFor="login-username" className="pl-[18px] text-left text-[13px] font-semibold leading-none text-text-70 font-body">Identifiant</label>
+                            <input
+                                id="login-username"
+                                name="username"
+                                className={FIELD_CLASS}
+                                autoComplete="username"
+                                autoCapitalize="none"
+                                autoCorrect="off"
+                                spellCheck={false}
+                                type="text"
+                                value={credentials.username}
+                                onChange={(event) => onCredentialsChange('username', event.target.value)}
+                            />
+                          </div>
+                          <div className="flex flex-col gap-[7px]">
+                            <label htmlFor="login-password" className="pl-[18px] text-left text-[13px] font-semibold leading-none text-text-70 font-body">Mot de passe</label>
+                            <div className="relative">
+                              <input
+                                  readOnly={requireOTP}
+                                  id="login-password"
+                                  name="password"
+                                  className={`${FIELD_CLASS} pr-[52px]`}
+                                  autoComplete="current-password"
+                                  type={showPassword ? 'text' : 'password'}
+                                  value={credentials.password}
+                                  onChange={(event) => onCredentialsChange('password', event.target.value)}
+                              />
+                              <button
+                                  type="button"
+                                  className="absolute right-[5px] top-1/2 flex h-[42px] w-[42px] -translate-y-1/2 cursor-pointer items-center justify-center rounded-full border-0 bg-transparent text-text-muted transition-colors duration-120 hover:bg-text/6 hover:text-text"
+                                  onClick={() => setShowPassword((v) => !v)}
+                                  aria-label={showPassword ? 'Masquer le mot de passe' : 'Afficher le mot de passe'}
+                                  aria-controls="login-password"
+                                  tabIndex={-1}
+                              >
+                                <Icon icon={showPassword ? 'ph:eye-slash' : 'ph:eye'} className="h-[18px] w-[18px]" />
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                    ) : null}
+                    { requireOTP && !checking ?
+                        (<OtpInput
+                        autoFocus
+                        value={credentials.otp}
+                        onChange={(event) => onCredentialsChange('otp', event)}
+                        fieldClass={FIELD_CLASS}
+                    />
+                    ): null}
 
-                    <div className="flex flex-col gap-[7px]">
-                      <label htmlFor="login-password" className="pl-[18px] text-left text-[13px] font-semibold leading-none text-text-70 font-body">Mot de passe</label>
-                      <div className="relative">
-                        <input
-                          id="login-password"
-                          name="password"
-                          className={`${FIELD_CLASS} pr-[52px]`}
-                          autoComplete="current-password"
-                          type={showPassword ? 'text' : 'password'}
-                          value={credentials.password}
-                          onChange={(event) => onCredentialsChange('password', event.target.value)}
-                        />
-                        <button
-                          type="button"
-                          className="absolute right-[5px] top-1/2 flex h-[42px] w-[42px] -translate-y-1/2 cursor-pointer items-center justify-center rounded-full border-0 bg-transparent text-text-muted transition-colors duration-120 hover:bg-text/6 hover:text-text"
-                          onClick={() => setShowPassword((v) => !v)}
-                          aria-label={showPassword ? 'Masquer le mot de passe' : 'Afficher le mot de passe'}
-                          aria-controls="login-password"
-                          tabIndex={-1}
-                        >
-                          <Icon icon={showPassword ? 'ph:eye-slash' : 'ph:eye'} className="h-[18px] w-[18px]" />
-                        </button>
-                      </div>
-                    </div>
+
+
                   </div>
 
                   {/* Collapses to nothing when empty: its spacing sits inside
@@ -298,7 +323,7 @@ function LoginPage({
                   </div>
 
                   <LentButton type="submit" className="mt-5 min-h-[52px]! w-full text-[16px]!" loading={checking}>
-                    Se connecter
+                    {requireOTP ? "Se connecter avec 2FA" : "Se connecter"}
                   </LentButton>
                 </form>
 

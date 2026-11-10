@@ -263,7 +263,7 @@ export async function getAuthSession() {
   return payload
 }
 
-export async function loginToEnt({ username, password }) {
+export async function loginToEnt({ username, password,otp }) {
   clearGradesCache()
   localStorage.removeItem(ADE_TIMETABLE_CACHE_KEY)
 
@@ -277,7 +277,7 @@ export async function loginToEnt({ username, password }) {
       'Content-Type': 'application/json',
       ...getUniversityRequestHeaders(),
     },
-    body: JSON.stringify({ username, password, ...(university ? { university } : {}) }),
+    body: JSON.stringify({ username, password, otp,...(university ? { university } : {}) }),
   })
 
   const payload = await parseJsonPayload(response)

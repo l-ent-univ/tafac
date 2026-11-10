@@ -453,6 +453,9 @@ function getFrenchAuthErrorMessage(error, context = 'login') {
   ) {
     return r('Remplis ton identifiant et ton mot de passe', 'Remplissez votre identifiant et votre mot de passe')
   }
+  if(normalizedMessage.includes("invalid otp")){
+    return 'Jeton 2FA incorrecte'
+  }
 
   if (
     normalizedMessage.includes('cas login failed')
@@ -903,6 +906,7 @@ function App() {
   const [credentials, setCredentials] = useState({
     username: '',
     password: '',
+    otp:''
   })
   const [establishment, setEstablishment] = useState(() => getStoredEstablishment())
   // « tu » or « vous » for every string built from here on (src/register.js):
@@ -992,6 +996,7 @@ function App() {
     sessionSource: null,
     canUseServerLaunch: false,
     error: '',
+    requireOTP: false,
   })
   const [hasCheckedInitialSession, setHasCheckedInitialSession] = useState(false)
   const [pathname, setPathname] = useState(() => window.location.pathname)
@@ -2402,12 +2407,15 @@ function App() {
       setCredentials((current) => ({
         ...current,
         password: '',
+        otp:''
       }))
       commitDebugState('Connexion', result)
       if (reloadForOtherUniversity(result)) return
       await refreshSession()
     } catch (error) {
       const message = getFrenchAuthErrorMessage(error, 'login')
+      const requireOTP = getErrorMessage(error).match(/MFA|OTP/)?.length > 0
+      console.log(requireOTP)
       clearLegacySensitiveClientCaches()
       setSessionState({
         checking: false,
@@ -2419,7 +2427,8 @@ function App() {
         degradedReason: null,
         sessionSource: null,
         canUseServerLaunch: false,
-        error: message,
+        error: requireOTP && message !== "Jeton 2FA incorrecte" ? null : message,
+        requireOTP,
       })
       track('login_result', { result: 'failure', demo: false })
       flushAnalytics()
@@ -2447,6 +2456,7 @@ function App() {
       setCredentials((current) => ({
         ...current,
         password: '',
+        otp: ''
       }))
       commitDebugState('Connexion demo', result)
       if (reloadForOtherUniversity(result)) return
@@ -2812,6 +2822,7 @@ function App() {
           credentials={credentials}
           checking={sessionState.checking}
           errorMessage={sessionState.error}
+          requireOTP={sessionState.requireOTP}
           onCredentialsChange={(field, value) => setCredentials((current) => ({ ...current, [field]: value }))}
           onDemoLogin={() => void handleDemoLogin()}
           onSubmit={handleLogin}

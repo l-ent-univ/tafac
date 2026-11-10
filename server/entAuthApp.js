@@ -1210,10 +1210,9 @@ async function fetchEntLayout(jar) {
   }
 }
 
-async function performEntLogin({ username, password }) {
+async function performEntLogin({ username, password , otp}) {
   const jar = new CookieJar()
   const acceptHeader = 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8'
-
   const loginPageResult = await followRedirectChain(PORTAL_ENTRY_URL, jar, {
     headers: {
       Accept: acceptHeader,
@@ -1222,7 +1221,6 @@ async function performEntLogin({ username, password }) {
 
   const loginPageHtml = await loginPageResult.response.text()
   const execution = extractHiddenInputValue(loginPageHtml, 'execution')
-
   if (!execution) {
     throw new Error('Could not extract the CAS login form.')
   }
@@ -1238,7 +1236,7 @@ async function performEntLogin({ username, password }) {
     geolocation,
   }).toString()
 
-  const submitResponse = await fetchWithJar(actionUrl, jar, {
+  let submitResponse = await fetchWithJar(actionUrl, jar, {
     method: 'POST',
     headers: {
       Accept: acceptHeader,
@@ -1249,8 +1247,32 @@ async function performEntLogin({ username, password }) {
     body: formBody,
     redirect: 'manual',
   })
-
+  if(otp && submitResponse.status === 200){
+      const otpFormBody = new URLSearchParams({
+        token: otp,
+        execution: extractHiddenInputValue(await submitResponse.text(), 'execution'),
+        _eventId: eventId,
+        geolocation,
+      })
+    submitResponse = await fetchWithJar(actionUrl, jar, {
+      method: 'POST',
+      headers: {
+        Accept: acceptHeader,
+        'Content-Type': 'application/x-www-form-urlencoded',
+        Origin: CAS_ORIGIN,
+        Referer: loginPageResult.finalUrl,
+      },
+      body: otpFormBody,
+      redirect: 'manual',
+    })
+  }
+  console.log(submitResponse)
   if (!isRedirectStatus(submitResponse.status)) {
+    if(submitResponse.ok && submitResponse.headers.getSetCookie().map(cookie => cookie.startsWith("MFATRUSTED")).length > 0) {
+      throw new Error('MFA required.')
+    } else if (otp){
+      throw new Error('Invalid OTP.')
+    }
     const html = await submitResponse.text()
     const message = extractCasError(html)
     throw new Error(message || 'CAS login failed. Check your username and password.')
@@ -2745,6 +2767,7 @@ app.post('/__ent_auth/login', async (req, res) => {
   try {
     const username = String(req.body.username ?? '').trim()
     const password = String(req.body.password ?? '')
+    const otp = String(req.body.otp)
 
     if (!username || !password) {
       return res.status(400).json({
@@ -2772,8 +2795,7 @@ app.post('/__ent_auth/login', async (req, res) => {
         university: UNIVERSITY_ID,
       })
     }
-
-    const result = await performEntLogin({ username, password })
+    const result = await performEntLogin({ username, password, otp})
     clearLoginRateLimit(req, username)
     // The password lives only in this request: the session keeps the CAS TGC,
     // which signs in to every service (ENT, ADE, Moodle, webmail…) on its own.
