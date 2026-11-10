@@ -2415,7 +2415,6 @@ function App() {
     } catch (error) {
       const message = getFrenchAuthErrorMessage(error, 'login')
       const requireOTP = getErrorMessage(error).match(/MFA|OTP/)?.length > 0
-      console.log(requireOTP)
       clearLegacySensitiveClientCaches()
       setSessionState({
         checking: false,

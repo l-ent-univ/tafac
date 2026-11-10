@@ -1266,7 +1266,6 @@ async function performEntLogin({ username, password , otp}) {
       redirect: 'manual',
     })
   }
-  console.log(submitResponse)
   if (!isRedirectStatus(submitResponse.status)) {
     if(submitResponse.ok && submitResponse.headers.getSetCookie().map(cookie => cookie.startsWith("MFATRUSTED")).length > 0) {
       throw new Error('MFA required.')
