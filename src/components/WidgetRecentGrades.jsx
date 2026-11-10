@@ -10,6 +10,7 @@ import { CARD_CLASSES, LatestGradeCardBody } from './LatestGradesList'
 import WidgetListStatus from './WidgetListStatus'
 import { SHIMMER_CLASSES } from './widgetListUtils'
 import { r } from '../register.js'
+import HomeIcon from './HomeIcon'
 
 const MAX_GRADES = 6
 // « Mes notes »'s grade card, its corners nested in this card's: the card's
@@ -51,7 +52,7 @@ function WidgetRecentGrades({ releve = null, config = null, semesterId = null, s
       aria-label="Dernières notes"
     >
       <div className="flex min-w-0 items-center gap-2">
-        <img src={gradesIcon} alt="" width="22" height="22" draggable="false" className="size-[22px] shrink-0 select-none" aria-hidden="true" />
+        <HomeIcon src={gradesIcon} className="size-[22px] shrink-0 select-none" />
         <h2 className="m-0 min-w-0 truncate font-body text-base font-medium leading-[1.06] text-text-muted max-md:text-[15px]">Dernières notes</h2>
       </div>
       {failed ? (

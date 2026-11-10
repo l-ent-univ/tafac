@@ -10,6 +10,7 @@ import {
   sumAbsenceHours,
 } from '../assiduity'
 import { SHIMMER_CLASSES } from './widgetListUtils'
+import HomeIcon from './HomeIcon'
 
 // « Accueil »'s « Assiduité » card: the newest semester's absences from
 // the relevé (buildAbsenceReport, the passerelle's rules), as the
@@ -25,7 +26,7 @@ const CARD_CLASSES = 'widget-card widget-card-visible @container/assiduity flex 
 function Header() {
   return (
     <div className="flex min-w-0 items-center gap-[5px]">
-      <img src={assiduityIcon} alt="" width="22" height="22" draggable="false" className="mr-[3px] size-[22px] shrink-0 select-none" aria-hidden="true" />
+      <HomeIcon src={assiduityIcon} className="mr-[3px] size-[22px] shrink-0 select-none" />
       <span className="min-w-0 truncate text-base font-medium leading-[1.06] text-text-muted max-md:text-[14px]">Assiduité</span>
     </div>
   )

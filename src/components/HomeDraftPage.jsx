@@ -28,6 +28,7 @@ import WidgetRecentGrades from './WidgetRecentGrades'
 import WidgetRecentMail from './WidgetRecentMail'
 import { SHIMMER_CLASSES } from './widgetListUtils'
 import { r } from '../register.js'
+import HomeIcon from './HomeIcon'
 
 // The row above the greeting, in place of the card's wave: each icon
 // tilted its own way, on one line.
@@ -147,7 +148,7 @@ function AveragePlaceholder() {
       aria-busy="true"
     >
       <div className="flex min-w-0 items-center gap-[5px]">
-        <img src={averageIcon} alt="" width="22" height="22" draggable="false" className="mr-[3px] size-[22px] shrink-0 select-none" aria-hidden="true" />
+        <HomeIcon src={averageIcon} className="mr-[3px] size-[22px] shrink-0 select-none" />
         <span className="min-w-0 truncate text-base font-medium leading-[1.06] text-text-muted max-md:text-[14px]">Moyenne générale</span>
       </div>
       <div className="mt-auto grid gap-2" aria-hidden="true">
