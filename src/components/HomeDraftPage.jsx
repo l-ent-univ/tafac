@@ -148,7 +148,7 @@ function AveragePlaceholder() {
       aria-busy="true"
     >
       <div className="flex min-w-0 items-center gap-[5px]">
-        <HomeIcon src={averageIcon} className="mr-[3px] size-[22px] shrink-0 select-none" />
+        <img src={averageIcon} alt="" width="22" height="22" draggable="false" className="mr-[3px] size-[22px] shrink-0 select-none" aria-hidden="true" />
         <span className="min-w-0 truncate text-base font-medium leading-[1.06] text-text-muted max-md:text-[14px]">Moyenne générale</span>
       </div>
       <div className="mt-auto grid gap-2" aria-hidden="true">
@@ -376,8 +376,9 @@ function HomeDraftPage({
         </div>
         <div className="relative mt-auto grid gap-1 min-w-0">
           {/* On arrival the icons come into focus one after the other
-              (.home-icon-deal). Hovered, an icon grows a little with a
-              springy overshoot and comes over its neighbours. */}
+              (.home-icon-deal), each turning once as it lands (HomeIcon).
+              Hovered, an icon grows a little with a springy overshoot,
+              turns again and comes over its neighbours. */}
           <div className="mb-2 flex items-center gap-1.5" aria-hidden="true">
             {GREETING_ICONS.map(({ src, rotate }, index) => (
               <span
@@ -385,12 +386,10 @@ function HomeDraftPage({
                 className="home-icon-deal relative shrink-0 hover:z-10"
                 style={{ '--i': index, '--r': `${rotate}deg`, transform: 'rotate(var(--r))' }}
               >
-                <img
+                <HomeIcon
                   src={src}
-                  alt=""
-                  width="36"
-                  height="36"
-                  draggable="false"
+                  size={36}
+                  order={index}
                   className="block size-9 select-none transition-transform duration-[450ms] ease-[cubic-bezier(0.34,1.8,0.5,1)] hover:scale-[1.15] motion-reduce:transition-none max-md:size-[30px]"
                 />
               </span>

@@ -16,7 +16,6 @@ import PlanningEventBlock from './PlanningEventBlock'
 import WidgetListStatus from './WidgetListStatus'
 import { SHIMMER_CLASSES } from './widgetListUtils'
 import { r } from '../register.js'
-import HomeIcon from './HomeIcon'
 
 // The list follows the clock (a class over leaves it).
 const TICK_MS = 60 * 1000
@@ -210,7 +209,7 @@ function WidgetNextClasses({
       aria-label="Prochains cours"
     >
       <div className="flex min-w-0 items-center gap-2">
-        <HomeIcon src={calendarIcon} className="size-[22px] shrink-0 select-none" />
+        <img src={calendarIcon} alt="" width="22" height="22" draggable="false" className="size-[22px] shrink-0 select-none" aria-hidden="true" />
         <h2 className="m-0 min-w-0 truncate font-body text-base font-medium leading-[1.06] text-text-muted max-md:text-[15px]">Prochains cours</h2>
         {day ? <span className="ml-auto shrink-0 font-body text-[13px] font-semibold text-text-secondary">{day.label}</span> : null}
       </div>

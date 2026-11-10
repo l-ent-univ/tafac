@@ -18,7 +18,6 @@ import {
   storeHref,
 } from './widgetListUtils'
 import { r } from '../register.js'
-import HomeIcon from './HomeIcon'
 
 const MAX_VISIBLE_MESSAGES = 2
 const MAIL_REFRESH_MS = 5 * 60 * 1000
@@ -58,7 +57,7 @@ function getLoadOutcome(state) {
 function MailHeader({ unreadCount = 0, icon = null }) {
   return (
     <div className="flex items-center gap-[5px] min-w-0 pr-5">
-      {icon ? <HomeIcon src={icon} className="mr-[3px] size-[22px] shrink-0 select-none" /> : null}
+      {icon ? <img src={icon} alt="" width="22" height="22" draggable="false" className="mr-[3px] size-[22px] shrink-0 select-none" aria-hidden="true" /> : null}
       <span className="m-0 min-w-0 leading-[1.06] text-base font-medium text-text-muted overflow-hidden text-ellipsis whitespace-nowrap max-md:text-[15px]">Mails récents</span>
       {unreadCount > 0 ? (
         <span className="mail-unread-pill ml-[3px] inline-flex items-center justify-center min-w-[18px] h-[18px] px-[6px] rounded-full text-[11px] font-semibold leading-none tabular-nums shrink-0" aria-label={`${unreadCount} non lu${unreadCount > 1 ? 's' : ''}`}>

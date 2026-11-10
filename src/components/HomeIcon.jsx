@@ -1,8 +1,8 @@
 import { useEffect, useRef } from 'react'
 
-// The « Accueil » cards' icons as short 3D clips with a transparent
-// background. Each one turns once and stops front-facing, where
-// the flat icon sits; they start one after the other, as a canon.
+// The « Accueil » icon row's icons as short 3D clips with a transparent
+// background. Each one turns once and stops front-facing, where the flat
+// icon sits; they start one after the other, as a canon (`order`).
 //
 // Two encodings of the same clip, as no browser plays both with transparency:
 // HEVC with alpha (.mov) for WebKit, VP9 with alpha (.webm) for the others.
@@ -22,9 +22,8 @@ const CLIP_BY_FLAT_ICON = new Map(Object.entries(flatIcons).flatMap(([path, url]
     : []
 }))
 
-// The canon: who starts when, in the page's reading order.
-const CANON_ORDER = ['apps', 'calendar', 'average', 'mail', 'grades', 'homework', 'assiduity', 'menu', 'ects', 'ue']
-const CANON_FIRST_MS = 250
+// The canon: the first icon's start, then the gap to each next one.
+const CANON_FIRST_MS = 150
 const CANON_STEP_MS = 110
 
 // Every iOS browser is WebKit; on a Mac only Safari is.
@@ -33,7 +32,7 @@ function isWebKit() {
   return /AppleWebKit/.test(agent) && !/Chrome|Chromium|Edg|OPR|Android/.test(agent)
 }
 
-function HomeIcon({ src, className = '' }) {
+function HomeIcon({ src, size = 22, order = 0, className = '' }) {
   const videoRef = useRef(null)
   const clip = CLIP_BY_FLAT_ICON.get(src) ?? null
   const reduceMotion = typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
@@ -41,27 +40,26 @@ function HomeIcon({ src, className = '' }) {
   useEffect(() => {
     const video = videoRef.current
     if (!video || !clip) return undefined
-    const index = Math.max(CANON_ORDER.indexOf(clip.name), 0)
     const timer = window.setTimeout(() => {
       // Refused (a data saver, a background tab): the poster stays, which is the icon.
       video.play().catch(() => {})
-    }, CANON_FIRST_MS + index * CANON_STEP_MS)
+    }, CANON_FIRST_MS + order * CANON_STEP_MS)
     return () => window.clearTimeout(timer)
-  }, [clip])
+  }, [clip, order])
 
   if (!clip) {
-    return <img src={src} alt="" width="22" height="22" draggable="false" className={className} aria-hidden="true" />
+    return <img src={src} alt="" width={size} height={size} draggable="false" className={className} aria-hidden="true" />
   }
   if (reduceMotion) {
-    return <img src={clip.still} alt="" width="22" height="22" draggable="false" className={className} aria-hidden="true" />
+    return <img src={clip.still} alt="" width={size} height={size} draggable="false" className={className} aria-hidden="true" />
   }
   return (
     <video
       ref={videoRef}
       src={isWebKit() ? clip.mov : clip.webm}
       poster={clip.still}
-      width="22"
-      height="22"
+      width={size}
+      height={size}
       muted
       playsInline
       preload="auto"

@@ -26,7 +26,6 @@ import {
   mergePortlets,
   requestEnt,
 } from '../entApi'
-import HomeIcon from './HomeIcon'
 
 const DEFAULT_ERROR_MESSAGE = 'Impossible de charger les applications pour le moment'
 const CLOSED_CONTEXT_MENU = { open: false, x: 0, y: 0, application: null, source: 'favorite' }
@@ -2016,7 +2015,7 @@ function AvailableApplications({
         {home ? (
           // As the « Accueil » page's cards title themselves.
           <div className="flex min-w-0 items-center gap-2">
-            <HomeIcon src={homeAppsIcon} className="size-[22px] shrink-0 select-none" />
+            <img src={homeAppsIcon} alt="" width="22" height="22" draggable="false" className="size-[22px] shrink-0 select-none" aria-hidden="true" />
             <h2 className="m-0 min-w-0 truncate font-body text-base font-medium leading-[1.06] text-text-muted max-md:text-[15px]" id={titleId}>Applications</h2>
           </div>
         ) : (

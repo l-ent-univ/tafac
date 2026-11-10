@@ -15,7 +15,6 @@ import {
 } from '../gradeFeatureState'
 import { r } from '../register.js'
 import { describePocRank, isRankPocOn } from '../rankPoc.js'
-import HomeIcon from './HomeIcon'
 
 // Card on the "Mes notes" page: the Figma width (443), at least 20px taller
 // than its 168 so the evolution line keeps a clear gap above the number (the
@@ -27,7 +26,7 @@ const CARD_CLASSES = 'average-grade-widget widget-card shadow-md w-full max-w-[4
 function AverageGradeHeader({ estimated = false, final = false, icon = null }) {
   return (
     <div className="relative z-10 flex items-center gap-[5px] min-w-0">
-      {icon ? <HomeIcon src={icon} className="mr-[3px] size-[22px] shrink-0 select-none" /> : null}
+      {icon ? <img src={icon} alt="" width="22" height="22" draggable="false" className="mr-[3px] size-[22px] shrink-0 select-none" aria-hidden="true" /> : null}
       <span className="m-0 min-w-0 leading-[1.06] text-base font-medium text-text-muted overflow-hidden text-ellipsis whitespace-nowrap max-md:text-[14px]">
         Moyenne<span className="max-md:hidden"> générale</span>
       </span>
