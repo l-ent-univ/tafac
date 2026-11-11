@@ -46,7 +46,8 @@ function DayNote({ kind, column, stacked, onRetry, onOpenAccount }) {
   )
 }
 
-// Now, on today's column: a "Maint." capsule over the hours and a line. In
+// Now, on today's column: a "Maint." capsule over the hours and a line
+// (only once its week has loaded with classes: PlanningDayPage). In
 // the week, the line is drawn across today's column alone, faint over the
 // days before it.
 function NowLine({ now, todayKey, column, week }) {
@@ -75,6 +76,12 @@ function PlanningDayPage({ days, width, events, statusOn, accentFor, now, todayK
   const perDay = days.map((day) => eventsOnDay(events, day))
   const bare = perDay.every((list) => list.length === 0)
   const todayIndex = days.indexOf(todayKey)
+  // The now line only over a week with classes: none while it loads, none
+  // on an empty week.
+  const todayMonday = startOfWeek(todayKey)
+  const showNow = todayIndex >= 0
+    && statusOn(todayKey) === 'loaded'
+    && events.some((event) => startOfWeek(event.day) === todayMonday)
   // No class on the whole page: one note, in full, in its middle (its
   // "Réessayer" asks every failed week of the page again).
   const pageKind = bare ? pageStatus(days.map(statusOn)) : null
@@ -119,7 +126,7 @@ function PlanningDayPage({ days, width, events, statusOn, accentFor, now, todayK
               />
             )
             : null))}
-          {todayIndex >= 0 ? <NowLine now={now} todayKey={todayKey} column={dayColumn(width, todayIndex, dayCount)} week={week} /> : null}
+          {showNow ? <NowLine now={now} todayKey={todayKey} column={dayColumn(width, todayIndex, dayCount)} week={week} /> : null}
         </>
       ) : null}
     </div>

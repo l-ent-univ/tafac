@@ -1,10 +1,10 @@
-import { Fragment } from 'react'
 import { Icon } from '@iconify/react'
 import Tooltip from './Tooltip'
 
-// A button in one of the glass pills; the composer's toolbar
-// (MailComposer) is built of the same.
-export const TOOLBAR_BUTTON_CLASSES = 'mobile-tab-bar-item group relative inline-flex h-9 w-10 max-sm:w-9 items-center justify-center rounded-full border-0 bg-transparent text-text cursor-pointer transition-[background-color] duration-150 ease-out disabled:cursor-default disabled:opacity-45'
+// A button in one of the toolbar's pills (.button-group, the app's joined
+// buttons, as the Planning's); the composer's toolbar (MailComposer) is
+// built of the same.
+export const TOOLBAR_BUTTON_CLASSES = 'button-group-item group max-sm:w-9'
 
 // The app's primary button (dark fill, as the composer's send): « Nouveau
 // message » over the list (MailPage).
@@ -21,7 +21,7 @@ function ToolbarButton({ label, icon, iconClassName = '', onClick, disabled = fa
       onClick={onClick}
     >
       {/* The icon gives when pressed, not the button: its tooltip would too. */}
-      <Icon icon={icon} className={`size-[18px] shrink-0 transition-transform duration-100 ease-out group-active:scale-[0.86] ${iconClassName}`} aria-hidden="true" />
+      <Icon icon={icon} className={`size-[18px] shrink-0 ${iconClassName}`} aria-hidden="true" />
       {/* Desktop only: on a phone the bar is at the screen's foot. */}
       <Tooltip title={label} side={tooltipSide} className="max-4xl:hidden" />
     </button>
@@ -95,18 +95,15 @@ function MailToolbar({ message, multiple = false, folderKind = 'inbox', onReply,
     <div role="toolbar" aria-label="Actions du mail" className={`flex items-center gap-2 4xl:flex-wrap ${className}`}>
       {/* Keyed by place: a folder's own buttons swap in without a remount. */}
       {groups.map((group, index) => (
-        <div key={index} className="pointer-events-auto mobile-tab-bar flex items-center rounded-full p-[3px]">
-          {group.map((item, itemIndex) => (
-            <Fragment key={item.id}>
-              {itemIndex > 0 ? <span className="mail-toolbar-divider mx-[1px] h-[18px] w-px shrink-0" aria-hidden="true" /> : null}
-              {/* The panel's first and last groups keep their bubble inside it. */}
-              <ToolbarButton {...item} tooltipSide={index === 0 ? 'bottom-start' : index === groups.length - 1 ? 'bottom-end' : 'bottom'} />
-            </Fragment>
+        <div key={index} className="pointer-events-auto button-group">
+          {group.map((item) => (
+            // The panel's first and last groups keep their bubble inside it.
+            <ToolbarButton key={item.id} {...item} tooltipSide={index === 0 ? 'bottom-start' : index === groups.length - 1 ? 'bottom-end' : 'bottom'} />
           ))}
         </div>
       ))}
       {onClose ? (
-        <div className="pointer-events-auto mobile-tab-bar ml-auto flex items-center rounded-full p-[3px] max-4xl:hidden">
+        <div className="pointer-events-auto button-group ml-auto max-4xl:hidden">
           <ToolbarButton label="Fermer" icon="ph:x" onClick={onClose} tooltipSide="bottom-end" />
         </div>
       ) : null}

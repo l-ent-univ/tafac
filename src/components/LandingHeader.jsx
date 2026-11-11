@@ -44,12 +44,11 @@ function useIsScrolled() {
 // to what's below (Confidentialité: the password's part of the security
 // section), the code, and a way to sign in. Below 1024 px, the links move
 // to a menu behind a burger button.
-// Floating: fixed at the top of the window, on the body (the sky band is its
-// own stacking context, the sections below would cover it). On the sky at
-// first, as wide as the page and as if part of it; once the page scrolls (or
-// the menu opens), it narrows into a frosted pill, the Papillon line folded
-// away (.landing-header in overrides.css). In its place in the band, a
-// spacer as tall as it.
+// Floating: fixed at the top of the window, on the body (the sections below
+// would cover it). At first as wide as the page and as if part of it; once
+// the page scrolls (or the menu opens), it narrows into a frosted pill, the
+// Papillon line folded away (.landing-header in overrides.css). In its
+// place on the page, a spacer as tall as it.
 function LandingHeader({ onLogin }) {
   const headerRef = useRef(null)
   const barRef = useRef(null)
@@ -59,7 +58,7 @@ function LandingHeader({ onLogin }) {
   const isScrolled = useIsScrolled()
   const isFloating = isScrolled || isMenuOpen
 
-  // The spacer keeps the bar's height on the sky, not the pill's (without
+  // The spacer keeps the bar's height at the top, not the pill's (without
   // the Papillon line): measured only while the bar is unfolded and still,
   // never mid-fold, so the page doesn't move as it folds and unfolds.
   useEffect(() => {
@@ -117,8 +116,7 @@ function LandingHeader({ onLogin }) {
         >
           <div ref={barRef} className="landing-header-bar pointer-events-auto relative flex items-center justify-between gap-4 rounded-full border px-4 py-2 max-md:gap-2 max-md:pl-3 max-md:pr-2">
             {/* Under the logo, the family it belongs to (branding.papillon). Its logo
-                white in dark mode; on phones while on the sky, the wordmark, this
-                line and the burger white (overrides.css). */}
+                white in dark mode (overrides.css). */}
             <div className="flex min-w-0 flex-1 flex-col items-start">
               <div className="flex items-center gap-2">
                 <LogoBut1 className="h-9 max-md:h-8" wordmarkClassName="landing-header-wordmark" />

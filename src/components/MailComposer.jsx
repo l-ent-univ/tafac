@@ -864,7 +864,7 @@ function ToolButton({ label, icon, iconClassName = '', disabled = false, menu = 
       disabled={disabled}
       onClick={onClick}
     >
-      <Icon icon={icon} className={`size-[18px] shrink-0 transition-transform duration-100 ease-out group-active:scale-[0.86] ${iconClassName}`} aria-hidden="true" />
+      <Icon icon={icon} className={`size-[18px] shrink-0 ${iconClassName}`} aria-hidden="true" />
       {menu ? <Icon icon="ph:caret-down" className="size-3 shrink-0 text-text-muted" aria-hidden="true" /> : null}
       <Tooltip title={label} side={tooltipSide} className="max-4xl:hidden" />
     </button>
@@ -2087,10 +2087,10 @@ function MailComposer({ initialKind = 'new', message = null, sender = null, iden
   )
 
   // The kind of reply (reply, reply all, forward: a menu) and the
-  // attachments, each a glass pill.
+  // attachments, each a pill of the app's joined buttons (.button-group).
   const tools = (
     <div className="flex items-center gap-2">
-      <span className="mobile-tab-bar relative flex shrink-0 items-center rounded-full p-[3px]">
+      <span className="button-group">
         <ToolButton
           label="Type de réponse"
           icon={KIND_ICONS[kind]}
@@ -2100,7 +2100,7 @@ function MailComposer({ initialKind = 'new', message = null, sender = null, iden
           onClick={(event) => openMenu('kind', event)}
         />
       </span>
-      <span className="mobile-tab-bar relative flex shrink-0 items-center rounded-full p-[3px]">
+      <span className="button-group">
         <ToolButton
           label="Joindre un fichier"
           icon="ph:paperclip"

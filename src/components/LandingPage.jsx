@@ -1,16 +1,21 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import universityConfig from '@university'
-import appIcon from '../assets/landing/app-icon.webp'
-import loginClouds from '../assets/login/login-clouds.webp'
-import loginSky from '../assets/login/login-sky.webp'
+import heroVideo from '../assets/landing/landing-hero.mp4'
+import heroPoster from '../assets/landing/landing-hero-poster.webp'
+import heroStill from '../assets/landing/landing-hero-still.webp'
+import heroVideoDark from '../assets/landing/landing-hero-dark.mp4'
+import heroPosterDark from '../assets/landing/landing-hero-dark-poster.webp'
+import heroStillDark from '../assets/landing/landing-hero-dark-still.webp'
 import { buildLandingPreview } from '../landingPreview'
 import { copy, copyText } from '../landingCopy'
-import { listShowcaseTabs } from '../landingShowcase'
+import { useVisiblePlayback } from '../landingMotion'
+import { useIsDarkTheme } from '../useUeColor'
+import { listShowcaseTabs, showsFilm } from '../landingShowcase'
 import { scrollToShowcaseTab } from '../landingShowcaseScroll'
 import { getPapillonUrl, readPapillonDebugOverride } from '../papillon'
 import FeatureShowcase from './FeatureShowcase'
+import FilmShowcase from './FilmShowcase'
 import FloatingWidgets from './FloatingWidgets'
-import GreetingCard from './GreetingCard'
 import LandingBeta from './LandingBeta'
 import LandingContact from './LandingContact'
 import LandingFaq from './LandingFaq'
@@ -21,11 +26,6 @@ import LentButton from './LentButton'
 import PapillonVision from './PapillonVision'
 import UniversityMarquee from './UniversityMarquee'
 import SecurityShowcase from './SecurityShowcase'
-import WidgetDeadlines from './WidgetDeadlines'
-import WidgetLatestGrade from './WidgetLatestGrade'
-import WidgetListStrip from './WidgetListStrip'
-import WidgetNextClass from './WidgetNextClass'
-import WidgetRecentMail from './WidgetRecentMail'
 
 // Papillon's block at the end instead of the free/contact one (the same
 // switch as every other mention, src/papillon.js).
@@ -33,61 +33,53 @@ const IS_PART_OF_PAPILLON = getPapillonUrl(universityConfig.branding, readPapill
 // The app's pages the showcase presents: all of them on the neutral page, a
 // university's own on its page (src/landingShowcase.js).
 const SHOWCASE_TABS = listShowcaseTabs(universityConfig)
+// The film of every page on a phone, where the university has them all
+// (src/landingShowcase.js); the device section otherwise.
+const SHOWS_FILM = showsFilm(universityConfig)
 
-// The widgets move on to their next demo frame together: each frame stays
-// HOLD_MS, then its text leaves upwards (OUT_MS) and the next one comes in
-// from below (IN_MS). The first change waits for the intro.
-const FIRST_HOLD_MS = 2000
-const HOLD_MS = 1500
-const OUT_MS = 450
-const IN_MS = 600
-// Empty but still a preview: the cards never fall back to loading real data.
-const EMPTY_MAIL = { status: 'ok', unreadCount: 0, webmailHref: null, messages: [] }
-const EMPTY_DEADLINES = { status: 'ok', moodleHref: null, items: [] }
+// The phone's film, in the theme's colours (the dark theme's own render, on
+// its near-black). With reduced motion it doesn't play: it shows its last
+// frame (the phone facing the viewer), not its first (the phone's back).
+const HERO_FILMS = {
+  light: { src: heroVideo, poster: heroPoster, still: heroStill },
+  dark: { src: heroVideoDark, poster: heroPosterDark, still: heroStillDark },
+}
 
-// How many times the widgets have moved on (each one shows frame
-// `step % frames`) and the text animation playing: 'out', 'in' or none yet
-// (data-swap below, overrides.css).
-function useFrameCycle() {
-  const [cycle, setCycle] = useState({ step: 0, phase: null })
-
+// LandingPage keys it by theme: a flip mounts the other film, playing as
+// this one did.
+function HeroFilm({ theme }) {
+  const film = HERO_FILMS[theme]
+  const videoRef = useRef(null)
+  useVisiblePlayback(videoRef)
   useEffect(() => {
-    let timeoutId = 0
-    const leave = () => {
-      setCycle((current) => ({ ...current, phase: 'out' }))
-      timeoutId = window.setTimeout(enter, OUT_MS)
-    }
-    const enter = () => {
-      setCycle((current) => ({ step: current.step + 1, phase: 'in' }))
-      timeoutId = window.setTimeout(leave, IN_MS + HOLD_MS)
-    }
-    timeoutId = window.setTimeout(leave, FIRST_HOLD_MS)
+    const video = videoRef.current
+    if (video && window.matchMedia('(prefers-reduced-motion: reduce)').matches) video.poster = film.still
+  }, [film])
 
-    return () => window.clearTimeout(timeoutId)
-  }, [])
-
-  return cycle
+  return (
+    <video
+      ref={videoRef}
+      src={film.src}
+      poster={film.poster}
+      width="1200"
+      height="1500"
+      muted
+      playsInline
+      preload="auto"
+      aria-label="Tafac sur un téléphone : l'accueil, ses applications et les prochains cours"
+      className="absolute inset-0 block size-full object-cover max-md:object-[50%_70%]"
+    />
+  )
 }
 
-function frameAt(frames, step) {
-  return frames.length > 0 ? frames[step % frames.length] : undefined
-}
-
-// The public home page, shown at / while signed out: the dashboard's
-// widgets on demo data, as WidgetContainer lays them out, then the app page
-// by page (LandingShowcase), on a computer and a phone, its privacy, the
-// questions students ask and who makes it.
+// The public home page, shown at / while signed out: what Tafac is beside a
+// film of the app on a phone, then the app page by page (LandingShowcase),
+// on a computer and a phone, its privacy, the questions students ask and who
+// makes it.
 function LandingPage({ onLogin }) {
   const [preview] = useState(() => buildLandingPreview())
-  const [areWidgetsVisible, setAreWidgetsVisible] = useState(false)
   const [selectedShowcaseTab, setShowcaseTabId] = useState(SHOWCASE_TABS[0]?.id ?? null)
-  const { step, phase } = useFrameCycle()
-  const greeting = frameAt(preview.greetings, step)
-
-  useEffect(() => {
-    const timeoutId = window.setTimeout(() => setAreWidgetsVisible(true), 140)
-    return () => window.clearTimeout(timeoutId)
-  }, [])
+  const isDark = useIsDarkTheme()
 
   // An address to a page's panel (/#messagerie): that tab, scrolled to
   // once shown (a hidden panel can't be scrolled to by the browser).
@@ -103,80 +95,42 @@ function LandingPage({ onLogin }) {
     <>
       {/* The first screen: the showcase follows straight on (no longer held
           a window's height: on tall screens that left a band of blank). */}
-      <div className="flex flex-col">
-        {/* The header, then the dashboard's frosted cards (as over its wallpaper),
-            on a band of sky. */}
-        <section
-          className="landing-widgets select-none relative w-full grid gap-10 pt-4 px-6 pb-6 4xl:pt-5 max-md:px-3 max-md:pt-3 max-md:pb-5 max-md:gap-8"
-          aria-label="Widgets"
-          data-swap={phase ?? undefined}
-        >
-          <div className="relative isolate overflow-hidden -mx-6 -mt-4 px-6 pt-4 pb-7 4xl:-mt-5 4xl:pt-5 max-md:-mx-3 max-md:-mt-3 max-md:px-3 max-md:pt-3 max-md:pb-5">
-            {/* The login page's sky and clouds, the clouds along the bottom
-                where the title sits. On narrow phones, where the band is short,
-                lower still: the header stays on the sky's plain blue. */}
-            <img src={loginSky} alt="" aria-hidden="true" draggable="false" className="landing-scroll-sky absolute inset-0 -z-10 size-full object-cover dark:brightness-[0.55]" />
-            <img src={loginClouds} alt="" aria-hidden="true" draggable="false" className="landing-scroll-clouds pointer-events-none absolute bottom-0 left-1/2 -z-10 w-[max(1300px,140%)] max-w-none -translate-x-1/2 translate-y-[45%] dark:brightness-[0.6] max-md:w-[900px] max-xs:translate-y-[62%]" />
-            <LandingHeader onLogin={onLogin} />
-            <div className="landing-scroll-cards widget-row flex flex-wrap gap-3 items-stretch max-md:gap-2 overflow-visible p-2 -m-2">
-              {/* A demo card, not a section of the page: no heading. */}
-              <GreetingCard displayName={greeting?.displayName ?? ''} greeting={greeting?.greeting ?? null} visible={areWidgetsVisible} headingAs="p" />
-              <div className="contents">
-                <WidgetNextClass visible={areWidgetsVisible} preview={frameAt(preview.upcomingEvents, step) ?? []} />
-              </div>
-              <div className="contents">
-                {preview.latestGrades.length > 0 ? (
-                  <WidgetLatestGrade visible={areWidgetsVisible} preview={frameAt(preview.latestGrades, step)} />
-                ) : null}
-                {/* Left out on phones, where they would be under the title. */}
-                <div className="contents max-md:hidden">
-                  <WidgetListStrip labels={['Mails récents', 'Échéances']} visible={areWidgetsVisible}>
-                    <WidgetRecentMail key="mail" visible={areWidgetsVisible} preview={frameAt(preview.mail, step) ?? EMPTY_MAIL} />
-                    <WidgetDeadlines key="deadlines" visible={areWidgetsVisible} preview={frameAt(preview.deadlines, step) ?? EMPTY_DEADLINES} />
-                  </WidgetListStrip>
-                </div>
-              </div>
-            </div>
-            {/* The bottom of the band (the sky and the bottom cards' last lines)
-                fades into the page colour, under the title. */}
-            <div aria-hidden="true" className="pointer-events-none absolute inset-x-0 bottom-0 z-20 h-[140px] bg-linear-to-b from-transparent via-bg/60 via-50% to-bg max-md:h-[40px]" />
+      {/* The first screen, on the film's own grey (#eee, which browsers
+          decode as #f0f0f0) so the film has no edges (.landing-first): the
+          header, then what Tafac is and the way in on the left, the film on
+          the whole right half, from under the header to the window's bottom.
+          The phone comes in and settles close up, played once and held on
+          its last frame. On phones and tablets, the film first across the
+          width, fading at its bottom into the title. */}
+      <div className="landing-first flex flex-col md:min-h-[max(640px,100svh)]">
+        <div className="pt-4 4xl:pt-5 max-md:pt-3">
+          <LandingHeader onLogin={onLogin} />
+        </div>
+        <section className="grid grid-cols-[minmax(0,1fr)] md:flex-1 md:grid-cols-2 md:grid-rows-[1fr_auto_auto_1fr]">
+          <div className="landing-cta relative z-10 flex flex-col items-center px-6 text-center md:col-start-1 md:row-start-2 md:items-start md:pr-12 md:pl-[max(24px,calc((100vw-1240px)/2))] md:text-left max-md:-mt-14 max-sm:px-4">
+            <h1 className="m-0 max-w-[16ch] text-balance text-[clamp(36px,5vw,64px)] font-bold leading-[0.95] text-text">
+              {copyText(universityConfig.neutral ? copy.hero.title : copy.hero.universityTitle)}
+            </h1>
           </div>
-        </section>
-        {/* Pulled up so the title's middle sits on the band's last row of cards
-            (its height: two lines on wide screens). On phones, under the cards
-            instead, the app icon just overlapping the band's edge: the
-            schedule and the grade stay in full view. */}
-        <div className="relative z-20 flex flex-col items-center px-6 pb-12 -mt-[115px] max-md:-mt-[4px] max-md:px-4 max-md:pb-10">
-          <div className="landing-cta flex w-full flex-col items-center">
-            <div className="relative">
-              {/* The app's icon, as on a home screen (the PWA's own). */}
-              <div className="absolute inset-x-0 bottom-full mb-5 flex justify-center max-md:mb-4">
-                <img
-                  src={appIcon}
-                  alt=""
-                  width="240"
-                  height="240"
-                  draggable="false"
-                  className="landing-app-icon block size-20 corners-[22.5%] shadow-[0_2px_6px_rgb(52_18_0/0.12),0_14px_32px_-10px_rgb(52_18_0/0.35)] max-md:size-16"
-                />
-              </div>
-              <h1 className="m-0 max-w-[24ch] text-balance text-center text-[clamp(36px,5vw,64px)] font-bold leading-[0.95] text-text">
-                {copyText(universityConfig.neutral ? copy.hero.title : copy.hero.universityTitle)}
-              </h1>
-            </div>
-            <p className="m-0 mt-5 max-w-[40ch] text-balance text-center text-lg font-medium leading-snug text-text-muted font-body max-md:mt-4 max-md:text-base">
+          <div className="relative select-none overflow-hidden bg-(--landing-first-bg) md:col-start-2 md:row-[1/-1] max-md:order-first max-md:aspect-square max-md:max-h-[64svh] max-md:w-full">
+            <HeroFilm key={isDark ? 'dark' : 'light'} theme={isDark ? 'dark' : 'light'} />
+            {/* On phones and tablets, the phone fades out under the title. */}
+            <div aria-hidden="true" className="pointer-events-none absolute inset-x-0 bottom-0 h-32 bg-linear-to-b from-transparent to-(--landing-first-bg) md:hidden" />
+          </div>
+          <div className="landing-cta flex flex-col items-center px-6 pb-12 text-center md:col-start-1 md:row-start-3 md:items-start md:pb-0 md:pr-12 md:pl-[max(24px,calc((100vw-1240px)/2))] md:text-left max-md:pt-6 max-sm:px-4 max-sm:pb-8">
+            <p className="m-0 max-w-[40ch] text-balance text-lg font-medium leading-snug text-text-muted font-body md:mt-5 max-md:text-base">
               {copyText(copy.hero.subtitle)}
             </p>
             <LentButton className="mt-7 min-h-[60px]! px-9! text-[19px]! max-md:mt-6" onClick={onLogin}>
               {copyText(copy.hero.cta)}
             </LentButton>
             {/* What Tafac is, right where it asks for the ENT password. */}
-            <p className="m-0 mt-3 max-w-[62ch] text-balance text-center text-[13px] font-semibold leading-snug text-text-secondary font-body">
+            <p className="m-0 mt-3 max-w-[44ch] text-balance text-[13px] font-semibold leading-snug text-text-secondary font-body">
               {copyText(copy.hero.disclaimer)}
             </p>
-            <UniversityMarquee className="mt-10 w-[min(640px,90vw)] max-md:mt-8" />
+            <UniversityMarquee className="mt-10 w-[min(560px,100%)] max-md:mt-8" />
           </div>
-        </div>
+        </section>
       </div>
       {/* What the app does, page by page. */}
       <LandingShowcase
@@ -186,8 +140,14 @@ function LandingPage({ onLogin }) {
         preview={preview}
         className="pt-24 pb-8 max-md:pt-16 max-md:pb-4"
       />
-      {/* The app on a computer and a phone at once, what each brings. */}
-      <FeatureShowcase className="pt-24 pb-28 max-md:pt-16 max-md:pb-20" />
+      {/* The app on a phone, page by page in students' days; without every
+          page it shows, the app on a computer and a phone at once, what each
+          brings. */}
+      {SHOWS_FILM ? (
+        <FilmShowcase className="pt-24 pb-28 max-md:pt-16 max-md:pb-20" />
+      ) : (
+        <FeatureShowcase className="pt-24 pb-28 max-md:pt-16 max-md:pb-20" />
+      )}
       {/* What happens to the password and the data, then who makes Tafac:
           Papillon's team and vision while it shows it's part of Papillon,
           otherwise free, the team and how to reach them. */}

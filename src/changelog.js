@@ -45,6 +45,21 @@ import { r } from './register.js'
 
 export const CHANGELOG = [
   {
+    id: 'salles-et-personnels',
+    date: '2026-11-09',
+    title: 'Salles et personnels',
+    get body() {
+      return r(
+        'Le planning d’une salle, d’un enseignant ou de n’importe quel groupe\u202f: ouvre «\u202fSalles et personnels\u202f» en haut du Planning. «\u202f×\u202f» sur son nom ramène au tien.',
+        'Le planning d’une salle, d’un enseignant ou de n’importe quel groupe\u202f: ouvrez «\u202fSalles et personnels\u202f» en haut du Planning. «\u202f×\u202f» sur son nom ramène au vôtre.',
+      )
+    },
+    icon: 'ph:user-list',
+    // The ADE portal's tree (/ade/directory): Rennes only for now.
+    universities: ['univ-rennes'],
+    audience: ['planning-page'],
+  },
+  {
     id: 'assiduite',
     date: '2026-11-03',
     title: 'Assiduité',

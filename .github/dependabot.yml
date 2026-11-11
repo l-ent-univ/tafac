@@ -1,0 +1,27 @@
+# Dependency updates, once a week. The workflow actions and the Docker base
+# image are pinned to exact versions (a commit SHA, a Node patch release):
+# these pull requests are how they move forward.
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    groups:
+      # Minor and patch releases together, one pull request a week.
+      npm-minor:
+        update-types: [minor, patch]
+
+  - package-ecosystem: docker
+    directory: /
+    schedule:
+      interval: weekly
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      actions:
+        patterns: ['*']

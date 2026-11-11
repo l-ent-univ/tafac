@@ -5,6 +5,7 @@ import { MUTED_FILL_CLASSES, ROW_CLASSES } from '../settingsStyles'
 import SettingsGroup, { RowText } from './SettingsGroup'
 import MailSignatureContent from './MailSignatureContent'
 import Switch from './Switch'
+import SegmentedControl from './SegmentedControl'
 import { r } from '../register.js'
 
 // Réglages › Messagerie: the signature under the student's mails, on or
@@ -34,27 +35,13 @@ const SAVE_ERRORS = {
 
 function KindPicker({ value, onChange }) {
   return (
-    <div className={`flex gap-1 rounded-full ${MUTED_FILL_CLASSES} p-1`} role="group" aria-label="Signature utilisée">
-      {KINDS.map((choice) => {
-        const isActive = choice.id === value
-        return (
-          <button
-            key={choice.id}
-            type="button"
-            aria-pressed={isActive}
-            onClick={() => onChange(choice.id)}
-            className={`inline-flex h-8 min-w-0 flex-auto items-center justify-center rounded-full border px-3 text-[var(--color-text)] cursor-pointer transition-[background-color,box-shadow,border-color] duration-150 ease-in-out max-sm:px-2 ${
-              isActive
-                ? 'bg-widget-bg border-white dark:border-[rgba(255,255,255,0.08)] shadow-[0_1px_3px_rgba(0,0,0,0.06)]'
-                : 'bg-transparent border-transparent hover:bg-brand-subtle'
-            }`}
-          >
-            {/* The font on a span: index.css gives buttons `font: inherit`, outside Tailwind's layers. */}
-            <span className="truncate font-body text-[14px] font-medium leading-none max-sm:text-[13px]">{choice.label}</span>
-          </button>
-        )
-      })}
-    </div>
+    <SegmentedControl
+      size="sm"
+      options={KINDS.map((choice) => ({ value: choice.id, label: choice.label }))}
+      value={value}
+      onChange={onChange}
+      label="Signature utilisée"
+    />
   )
 }
 

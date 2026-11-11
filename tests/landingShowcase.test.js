@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import { readFileSync } from 'node:fs'
-import { DEVICE_FEATURES, SHOWCASE_TABS, listDeviceFeatures, listShowcaseTabs, showcaseTabId } from '../src/landingShowcase.js'
+import { DEVICE_FEATURES, FILM_CHAPTERS, SHOWCASE_TABS, filmChapterAt, listDeviceFeatures, listShowcaseTabs, showcaseTabId, showsFilm } from '../src/landingShowcase.js'
 
 const COPY = JSON.parse(readFileSync(new URL('../src/landingCopy.json', import.meta.url), 'utf8'))
 
@@ -16,12 +16,12 @@ const ids = (tabs) => tabs.map((tab) => tab.id)
 
 test('the neutral page shows every page of the app, every item', () => {
   const tabs = listShowcaseTabs(NEUTRAL)
-  assert.deepEqual(ids(tabs), ['accueil', 'mes-notes', 'planning', 'messagerie'])
+  assert.deepEqual(ids(tabs), ['accueil', 'mes-notes', 'planning', 'messagerie', 'assiduite'])
   for (const tab of tabs) assert.deepEqual(tab.items, tab.itemFeatures.map((_, index) => index))
 })
 
 test('a university page shows only what it has', () => {
-  assert.deepEqual(ids(listShowcaseTabs(RENNES)), ['accueil', 'mes-notes', 'planning', 'messagerie'])
+  assert.deepEqual(ids(listShowcaseTabs(RENNES)), ['accueil', 'mes-notes', 'planning', 'messagerie', 'assiduite'])
   const exemple = listShowcaseTabs(EXEMPLE)
   assert.deepEqual(ids(exemple), ['accueil', 'planning'])
   // Neither the mails' nor the deadlines' card on its home, nor a mail
@@ -30,6 +30,15 @@ test('a university page shows only what it has', () => {
   assert.deepEqual(home.items, [0, 1, 4])
   const planning = exemple.find((tab) => tab.id === 'planning')
   assert.deepEqual(planning.items, [0, 2, 3])
+})
+
+test('« Assiduité » comes with the ScoDoc grades, « Justifier » with the mail', () => {
+  // Shaped like univ-rennes-2: no grades yet, so no absences either.
+  const noGrades = { id: 'univ-y', features: { ade: true, planning: true, grades: false, mail: true }, mail: {} }
+  assert.ok(!ids(listShowcaseTabs(noGrades)).includes('assiduite'))
+  const gradesNoMail = { id: 'univ-z', features: { grades: true, mail: false } }
+  const assiduity = listShowcaseTabs(gradesNoMail).find((tab) => tab.id === 'assiduite')
+  assert.deepEqual(assiduity.items, [0, 1, 2, 3])
 })
 
 test('the webmail link alone is no Messagerie page', () => {
@@ -59,4 +68,35 @@ test('the device section claims only what the university has', () => {
 test('tabs and panels have ids of their own', () => {
   const tabIds = SHOWCASE_TABS.map((tab) => showcaseTabId(tab.id))
   assert.equal(new Set([...tabIds, ...ids(SHOWCASE_TABS)]).size, SHOWCASE_TABS.length * 2)
+})
+
+test('the film plays only where every page it shows is there', () => {
+  assert.equal(showsFilm(NEUTRAL), true)
+  assert.equal(showsFilm(RENNES), true)
+  // Grades greyed out, no mail.
+  assert.equal(showsFilm(EXEMPLE), false)
+  // No Messagerie page.
+  assert.equal(showsFilm({ ...RENNES, mail: { page: false } }), false)
+  // Rennes 2: no grades yet.
+  assert.equal(showsFilm({ ...RENNES, features: { ...RENNES.features, grades: false } }), false)
+})
+
+test('the film chapters follow its cuts, back home at the end', () => {
+  assert.equal(filmChapterAt(0), 'home')
+  assert.equal(filmChapterAt(1), 'planning')
+  assert.equal(filmChapterAt(4), 'grades')
+  assert.equal(filmChapterAt(8), 'mail')
+  assert.equal(filmChapterAt(9.5), 'assiduity')
+  assert.equal(filmChapterAt(10.6), 'grades')
+  assert.equal(filmChapterAt(11.7), 'home')
+  // Each starts where it's on screen.
+  for (const chapter of FILM_CHAPTERS) assert.equal(filmChapterAt(chapter.start), chapter.key)
+})
+
+test('every film chapter has its copy', () => {
+  for (const chapter of FILM_CHAPTERS) {
+    const text = COPY.film.chapters[chapter.key]
+    assert.ok(text?.label && text?.body, chapter.key)
+  }
+  assert.equal(Object.keys(COPY.film.chapters).length, FILM_CHAPTERS.length)
 })

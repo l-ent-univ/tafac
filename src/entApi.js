@@ -1682,6 +1682,16 @@ export async function getAdeTree(etabsVets = '', { fallback = '' } = {}) {
   return parseJsonPayload(response)
 }
 
+// « Salles et personnels »: the ADE tree's rooms and staff
+// ({ groups, items }, planningPortalApi.js's buildPortalDirectory).
+export async function getAdeDirectory() {
+  const response = await fetch(`${ENT_AUTH_PREFIX}/ade/directory`, {
+    credentials: 'same-origin',
+  })
+
+  return parseJsonPayload(response)
+}
+
 export async function searchAde(query) {
   if (!query?.trim()) {
     return { results: [] }

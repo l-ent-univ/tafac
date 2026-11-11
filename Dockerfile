@@ -2,9 +2,12 @@
 # plus the Express server, serving every university (MULTI_UNIVERSITY=1, as on tafac.fr).
 # A self-hosted instance for one university sets MULTI_UNIVERSITY=0 and UNIVERSITY.
 # See docs/SELF_HOSTING.md.
+#
+# Node is pinned to an exact patch release (security fixes land there);
+# Dependabot (.github/dependabot.yml) proposes the next one.
 
 # --- Build: install everything, build the frontend ---
-FROM node:24-alpine AS build
+FROM node:24.22.2-alpine AS build
 WORKDIR /app
 COPY package.json package-lock.json ./
 RUN npm ci
@@ -14,7 +17,7 @@ ARG BUILD_HASH
 RUN npm run build
 
 # --- Runtime: production dependencies, sources and built frontend ---
-FROM node:24-alpine
+FROM node:24.22.2-alpine
 WORKDIR /app
 ENV NODE_ENV=production \
     MULTI_UNIVERSITY=1 \

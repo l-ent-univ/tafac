@@ -718,4 +718,8 @@ function AssiduityPage({ arrivalSource = 'other', onComposeMail = null, absenceR
   )
 }
 
+// The landing showcase's preview of the page (LandingShowcasePreviews)
+// draws its cards and rows with these.
+export { AbsenceRow, SemesterLine, TotalsCard }
+
 export default AssiduityPage

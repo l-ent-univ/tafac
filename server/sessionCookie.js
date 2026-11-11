@@ -153,7 +153,7 @@ export function createSessionCookieCodec({ secret, previousSecrets = [] } = {}) 
 
   function encode(data) {
     const iv = randomBytes(IV_BYTES)
-    const cipher = createCipheriv('aes-256-gcm', keys[0], iv)
+    const cipher = createCipheriv('aes-256-gcm', keys[0], iv, { authTagLength: AUTH_TAG_BYTES })
     cipher.setAAD(ADDITIONAL_DATA)
     const ciphertext = Buffer.concat([cipher.update(JSON.stringify(data), 'utf8'), cipher.final()])
 
@@ -189,7 +189,7 @@ export function createSessionCookieCodec({ secret, previousSecrets = [] } = {}) 
 
     for (let index = 0; index < keys.length; index += 1) {
       try {
-        const decipher = createDecipheriv('aes-256-gcm', keys[index], iv)
+        const decipher = createDecipheriv('aes-256-gcm', keys[index], iv, { authTagLength: AUTH_TAG_BYTES })
         decipher.setAAD(ADDITIONAL_DATA)
         decipher.setAuthTag(authTag)
         const plaintext = Buffer.concat([decipher.update(ciphertext), decipher.final()])

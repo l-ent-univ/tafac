@@ -3,16 +3,26 @@ import { flushPlanningNavigation, trackPlanningAction, trackPlanningNavigation, 
 import { describePlanningLoad, toPlanningPageSource, toPlanningView } from '../planningAnalytics'
 import { addDays, daysBetween, startOfWeek, toDayKey } from '../planningDates'
 import { weekColumns } from '../planningEvents'
+import { siteLabelFromSelection } from '../planningDirectory'
+import { directoryTintStyle } from '../directoryTint'
 import { usePlanningWeeks, useEventAccents } from '../usePlanningWeeks'
 import { useHistorySheet } from '../useHistorySheet'
+import { useHistoryValue } from '../useHistoryValue'
+import { NEW_MARK_DIRECTORY, useNewMark } from '../useNewMark'
 import { classCopyText } from '../contextMenuItems'
 import { prepareCourseMail } from '../courseMail'
 import { copyToClipboard, useContextMenu } from '../useContextMenu'
 import PlanningDayPage from './PlanningDayPage'
+import PlanningDirectoryPanel from './PlanningDirectoryPanel'
+import PlanningDirectorySheet from './PlanningDirectorySheet'
+import PlanningViewedFrame, { PlanningViewedBar } from './PlanningViewedFrame'
 import PlanningEventSheet from './PlanningEventSheet'
 import PlanningHeader from './PlanningHeader'
 import PlanningListView from './PlanningListView'
+import PlanningShareSheet from './PlanningShareSheet'
+import SidePanelResizeHandle from './SidePanelResizeHandle'
 import SwipePager from './SwipePager'
+import { createSidePanelSizing, useSidePanelWidth } from '../sidePanelWidth'
 
 // The view (one day, two side by side, or the week's list), kept in this
 // browser.
@@ -23,6 +33,16 @@ const PHONE_VIEWS = ['day', 'twoDays', 'list']
 const WIDE_VIEW_KEY = 'l-ent:planning-wide-view'
 const WIDE_VIEWS = ['day', 'week', 'list']
 const WIDE_QUERY = '(min-width: 1024px)'
+// « Salles et personnels »' side panel (PlanningDirectoryPanel): narrower
+// than the mail reader by default, a list; dragged from its left edge and
+// stored for the device, the week keeping 560px beside it.
+const DIRECTORY_SIZING = createSidePanelSizing({
+  storageKey: 'l-ent:planning-side-panel-width',
+  defaultWidth: 'clamp(360px, 32vw, 480px)',
+  min: 320,
+  max: 720,
+  contentMin: 560,
+})
 // The days a page spans, by view (the week shows five or seven of its
 // seven, see weekColumns; the list, the week's days with classes).
 const VIEW_DAYS = { day: 1, twoDays: 2, week: 7, list: 7 }
@@ -110,7 +130,13 @@ function useFontsReady() {
 // once per arrival. `onComposeMail(request)`: App's, the mail page opened
 // on a prefilled composer (« Écrire au sujet de ce cours »); null without
 // the in-app mail page, and the action isn't offered.
-function PlanningPage({ selection = null, user = null, showWeekend = false, onOpenAccount = null, initialDay = null, onInitialDayHandled = () => {}, arrivalSource = 'other', onComposeMail = null }) {
+// `onSidePanelOpenChange(open)`: « Salles et personnels »' side panel shown
+// or not (App folds the sidebar for it, as for the mail reader; a phone has
+// a sheet instead). A room or a person picked there shows its timetable in
+// place of the student's.
+// `onOpenPlanningSettings`: Réglages › Planning, where the student changes
+// their group (offered on the panel's « Formations »).
+function PlanningPage({ selection = null, user = null, showWeekend = false, onOpenAccount = null, initialDay = null, onInitialDayHandled = () => {}, arrivalSource = 'other', onComposeMail = null, onSidePanelOpenChange = null, onOpenPlanningSettings = null }) {
   const now = useNow()
   const todayKey = toDayKey(now)
   const isWide = useWideLayout()
@@ -129,7 +155,27 @@ function PlanningPage({ selection = null, user = null, showWeekend = false, onOp
     onInitialDayHandled()
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [initialDay])
-  const { events, statusOn, errorKindOn, load, retry } = usePlanningWeeks({ selection, user })
+  // « Salles et personnels »: a side panel on a wide screen, its button
+  // toggling it. Gone with the wide layout (a phone has its sheet).
+  const [isDirectoryWanted, setIsDirectoryWanted] = useState(false)
+  const isDirectoryOpen = isDirectoryWanted && isWide
+  // A room or a person picked there: its timetable in place of the
+  // student's, as a group of its own (its ADE id), framed in its colour
+  // with its name on top (PlanningViewedFrame), until « × » there or the
+  // panel closes (the student's own back with it).
+  const [viewedEntry, setViewedEntry] = useState(null)
+  // On a phone, a sheet (PlanningDirectorySheet, its own history entry);
+  // the one picked there stays shown once it closes, under a bar of its
+  // colour (PlanningViewedBar), on a history entry of its own: « × » there
+  // or Back brings the student's own back.
+  const directorySheet = useHistorySheet('tafacPlanningDirectorySheet')
+  const phoneViewed = useHistoryValue('tafacPlanningViewed')
+  const viewed = isWide ? (isDirectoryOpen ? viewedEntry : null) : phoneViewed.value
+  const shownSelection = useMemo(
+    () => (viewed ? { resourceId: viewed.id, label: viewed.name } : selection),
+    [viewed, selection],
+  )
+  const { events, statusOn, errorKindOn, load, retry } = usePlanningWeeks({ selection: shownSelection, user })
   const accentFor = useEventAccents(events)
   // Anonymous analytics: page_viewed, then how the week it opens on loaded
   // (categories only, never its classes or which week it is).
@@ -170,6 +216,84 @@ function PlanningPage({ selection = null, user = null, showWeekend = false, onOp
     for (const monday of occurrenceWeeks) load(monday)
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [openEvent, load])
+
+  // « Partager »: the selected day's week as an image, in a sheet of its
+  // own (its own history entry, as the class's sheet).
+  const shareSheet = useHistorySheet('tafacPlanningShareSheet')
+  const openShare = useCallback(() => {
+    trackPlanningAction('share_opened', { view: toPlanningView(view) })
+    shareSheet.open()
+  }, [shareSheet, view])
+  const shareMonday = startOfWeek(selectedDay)
+
+  const toggleDirectory = useCallback(() => {
+    setIsDirectoryWanted((open) => {
+      if (!open) trackPlanningAction('directory_opened')
+      return !open
+    })
+    setViewedEntry(null)
+  }, [])
+  const closeDirectory = useCallback(() => {
+    setIsDirectoryWanted(false)
+    setViewedEntry(null)
+  }, [])
+  // The student's own group picked: their own planning, no frame.
+  const ownGroupId = selection?.resourceId ? String(selection.resourceId) : null
+  const pickDirectoryEntry = useCallback((entry) => {
+    trackPlanningAction('directory_picked', { kind: entry.kind })
+    setViewedEntry(entry.id === ownGroupId ? null : { id: entry.id, name: entry.name, kind: entry.kind })
+  }, [ownGroupId])
+  const stopViewing = useCallback(() => setViewedEntry(null), [])
+  const [, markDirectorySeen] = useNewMark(NEW_MARK_DIRECTORY)
+  const { open: openDirectorySheetEntry, close: closeDirectorySheet } = directorySheet
+  const openDirectorySheet = useCallback(() => {
+    trackPlanningAction('directory_opened')
+    markDirectorySeen()
+    openDirectorySheetEntry()
+  }, [markDirectorySeen, openDirectorySheetEntry])
+  // A phone's pick: the sheet closes onto the planning, then the one picked
+  // is shown on its own entry (none for the student's own group).
+  const { show: showOnPhone, showAfterBack: showOnPhoneAfterBack } = phoneViewed
+  const pickOnPhone = useCallback((entry) => {
+    trackPlanningAction('directory_picked', { kind: entry.kind })
+    const next = entry.id === ownGroupId ? null : { id: entry.id, name: entry.name, kind: entry.kind }
+    if (closeDirectorySheet()) showOnPhoneAfterBack(next)
+    else showOnPhone(next)
+  }, [ownGroupId, closeDirectorySheet, showOnPhone, showOnPhoneAfterBack])
+  // Réglages over the sheet: the sheet goes first.
+  const openSettingsFromSheet = useMemo(() => (onOpenPlanningSettings ? () => {
+    closeDirectorySheet()
+    onOpenPlanningSettings()
+  } : null), [onOpenPlanningSettings, closeDirectorySheet])
+  // From a phone to a wide screen (an iPad turned), the phone's sheet and
+  // what it showed go: the wide screen has its panel. Back the other way,
+  // the panel's state waits for the wide layout.
+  useEffect(() => {
+    if (!isWide) return
+    if (phoneViewed.value) showOnPhone(null)
+    if (directorySheet.isOpen) closeDirectorySheet()
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isWide])
+  // The directory's tab and search, kept between openings (and from the
+  // panel to the sheet).
+  const [directoryTab, setDirectoryTab] = useState('room')
+  const [directoryQuery, setDirectoryQuery] = useState('')
+  const directoryWidth = useSidePanelWidth(DIRECTORY_SIZING)
+  // What the panel and the sheet are both handed.
+  const directoryProps = {
+    user,
+    siteLabel: siteLabelFromSelection(selection),
+    formationLabel: selection?.programLabel ?? null,
+    shownId: viewed?.id ?? null,
+    tab: directoryTab,
+    onTabChange: setDirectoryTab,
+    query: directoryQuery,
+    onQueryChange: setDirectoryQuery,
+  }
+  useEffect(() => {
+    onSidePanelOpenChange?.(isDirectoryOpen)
+  }, [isDirectoryOpen, onSidePanelOpenChange])
+  useEffect(() => () => onSidePanelOpenChange?.(false), [onSidePanelOpenChange])
 
   const openSheet = useCallback((event) => {
     trackPlanningAction('course_opened', { view: toPlanningView(view) })
@@ -243,13 +367,21 @@ function PlanningPage({ selection = null, user = null, showWeekend = false, onOp
   }
 
   return (
-    <section className="planning-page w-full px-6 pt-4 pb-6 4xl:pt-5 max-md:px-3 max-md:pt-3 max-md:pb-5" aria-labelledby="planning-page-title">
+    <section
+      className={`planning-page w-full px-6 pt-4 pb-6 4xl:pt-5 ${directoryWidth.isResizing ? '' : '4xl:transition-[padding-right] 4xl:duration-[340ms] 4xl:ease-[cubic-bezier(0.32,0.72,0,1)]'} max-md:px-3 max-md:pt-3 max-md:pb-5 ${isDirectoryOpen ? '4xl:pr-[calc(var(--side-panel-width)+24px)]' : ''}`}
+      style={{ '--side-panel-width': directoryWidth.css }}
+      aria-labelledby="planning-page-title"
+    >
       {/* The page's top, tinted apart from the hours as Mes notes' is (the
           band itself behind, so the month's calendar can hang out of it):
           the title row and the week strip, staying on top as the hours
           scroll under. On a phone it tops the screen (no app top bar
-          here), a little more room above. */}
-      <div className="planning-top -mt-4 pt-4 pb-4 4xl:-mt-5 4xl:pt-5 max-md:-mt-3 max-md:pt-5 max-md:pb-3">
+          here), a little more room above, washed in the colour of the
+          room or person shown (PlanningViewedBar). */}
+      <div
+        className={`planning-top -mt-4 pt-4 pb-4 4xl:-mt-5 4xl:pt-5 max-md:-mt-3 max-md:pt-5 max-md:pb-3 ${!isWide && viewed ? 'is-viewing' : ''}`}
+        style={!isWide && viewed ? directoryTintStyle(viewed) ?? undefined : undefined}
+      >
         <span className="page-top-band" aria-hidden="true" />
         <div className="planning-column relative">
           <PlanningHeader
@@ -259,7 +391,7 @@ function PlanningPage({ selection = null, user = null, showWeekend = false, onOp
             view={view}
             isWide={isWide}
             columnsFor={columnsFor}
-            selection={selection}
+            selection={shownSelection}
             onSelectDay={setSelectedDay}
             onOpenDay={openDay}
             onToday={() => {
@@ -268,7 +400,11 @@ function PlanningPage({ selection = null, user = null, showWeekend = false, onOp
             }}
             onStep={(count) => stepBy(count, 'arrow')}
             onChangeView={changeView}
+            onShare={openShare}
+            isDirectoryOpen={isWide ? isDirectoryOpen : directorySheet.isOpen}
+            onOpenDirectory={isWide ? toggleDirectory : openDirectorySheet}
           />
+          {!isWide && viewed ? <PlanningViewedBar viewed={viewed} onChange={openDirectorySheet} onStop={() => showOnPhone(null)} /> : null}
         </div>
       </div>
       <div
@@ -340,6 +476,46 @@ function PlanningPage({ selection = null, user = null, showWeekend = false, onOp
             sheet.close()
             setSelectedDay(day)
           }}
+        />
+      ) : null}
+      {shareSheet.isOpen ? (
+        <PlanningShareSheet
+          monday={shareMonday}
+          days={weekColumns(events, shareMonday, { showWeekend })}
+          events={events}
+          status={statusOn(shareMonday)}
+          accentFor={accentFor}
+          group={shownSelection?.label ?? ''}
+          selection={shownSelection}
+          onClose={shareSheet.close}
+          onComposeMail={onComposeMail}
+        />
+      ) : null}
+      {isWide && viewed ? <PlanningViewedFrame viewed={viewed} onStop={stopViewing} /> : null}
+      <PlanningDirectoryPanel
+        open={isDirectoryOpen}
+        onClose={closeDirectory}
+        {...directoryProps}
+        onOpenGroupSettings={onOpenPlanningSettings}
+        onPick={pickDirectoryEntry}
+      />
+      {directorySheet.isOpen && !isWide ? (
+        <PlanningDirectorySheet
+          onClose={closeDirectorySheet}
+          {...directoryProps}
+          onOpenGroupSettings={openSettingsFromSheet}
+          onPick={pickOnPhone}
+        />
+      ) : null}
+      {isDirectoryOpen ? (
+        <SidePanelResizeHandle
+          sizing={DIRECTORY_SIZING}
+          width={directoryWidth.width}
+          onWidthChange={directoryWidth.onWidthChange}
+          onResizingChange={directoryWidth.onResizingChange}
+          cssVar="--side-panel-width"
+          panelSelector=".side-panel"
+          label="Largeur du panneau"
         />
       ) : null}
     </section>

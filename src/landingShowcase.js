@@ -43,6 +43,17 @@ export const SHOWCASE_TABS = Object.freeze([
     itemIcons: ['ph:chat-circle', 'ph:pencil-simple', 'ph:arrow-u-up-left', 'ph:files', 'ph:warning'],
     itemFeatures: [[], [], [], [], []],
   },
+  // The absences of the ScoDoc relevé: on the same terms as « Mes notes »
+  // (the app's nav item comes with its live page). « Justifier » writes the
+  // mail in the Messagerie.
+  {
+    id: 'assiduite',
+    key: 'assiduity',
+    icon: 'ph:user-check',
+    features: ['grades'],
+    itemIcons: ['ph:timer', 'ph:calendar-dots', 'ph:books', 'ph:hourglass-medium', 'ph:seal-check'],
+    itemFeatures: [[], [], [], [], ['mail']],
+  },
 ])
 
 // A tab's own id; its panel's is the tab's `id` (the page's anchor,
@@ -97,4 +108,30 @@ export function listShowcaseTabs(config) {
         .map((features, index) => (hasFeatures(config, features) ? index : null))
         .filter((index) => index !== null),
     }))
+}
+
+// The film of the app on a phone (FilmShowcase; landingCopy.json, `film`):
+// students on Accueil, Planning, Mes notes, Messagerie and Assiduité, in a
+// cut every page or so (tap_cuts, 11.8 s, looping on the home screen; the
+// render's fade back home, 10.9 to 11.5 s, cut out for a hard cut).
+// Each chapter: its icon, where it starts (a click on it seeks there) and
+// the stretches of the film it's on screen, in seconds.
+export const FILM_CHAPTERS = Object.freeze([
+  { key: 'home', icon: 'ph:house', start: 0, ranges: [[0, 0.8], [10.87, Infinity]] },
+  { key: 'planning', icon: 'ph:calendar-blank', start: 0.8, ranges: [[0.8, 3.33]] },
+  { key: 'grades', icon: 'ph:chart-pie-slice', start: 3.33, ranges: [[3.33, 7.27], [10.47, 10.87]] },
+  { key: 'mail', icon: 'ph:envelope-simple', start: 7.27, ranges: [[7.27, 8.77]] },
+  { key: 'assiduity', icon: 'ph:user-check', start: 8.77, ranges: [[8.77, 10.47]] },
+])
+
+// The chapter on screen at `time` (seconds into the film).
+export function filmChapterAt(time) {
+  return (FILM_CHAPTERS.find((chapter) => chapter.ranges.some(([from, to]) => time >= from && time < to)) ?? FILM_CHAPTERS[0]).key
+}
+
+// Whether a landing shows the film: it plays every page, so only where the
+// university has them all (Assiduité comes with the grades' relevé), the
+// in-app Messagerie included. Elsewhere the device section stays.
+export function showsFilm(config) {
+  return hasFeatures(config, ['planning', 'grades', 'mail']) && hasMailPage(config)
 }

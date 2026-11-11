@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import {
+  buildAssiduityPreview,
   DEMO_OWN_MAIL_DOMAINS,
   buildGradeMailPreview,
   buildGradesPreview,
@@ -60,4 +61,17 @@ test('the Messagerie: a few mails, the one from outside the university with its 
   assert.ok(mail.composer?.subject)
   // Demo data only: no link anywhere.
   assert.ok(mail.messages.every((message) => message.href === null))
+})
+
+test('« Assiduité »: the totals, the line, the latest absences with the one not justified', () => {
+  const assiduity = buildAssiduityPreview(new Date(2026, 10, 6))
+  assert.deepEqual(assiduity.totals, { justified: '4h', unjustified: '2h', late: '1' })
+  assert.equal(assiduity.timeline.marks.length, assiduity.entriesById.size)
+  const shown = assiduity.months.flatMap((group) => group.entries)
+  assert.equal(shown.length, 3)
+  assert.ok(shown.some((entry) => entry.status === 'unjustified'))
+  // Newest first, grouped by month.
+  assert.deepEqual(assiduity.months.map((group) => group.label), ['Octobre 2026', 'Septembre 2026'])
+  // A quiz held during an absence, under it.
+  assert.ok(Object.values(assiduity.evaluationsByEntry).flat().length > 0)
 })

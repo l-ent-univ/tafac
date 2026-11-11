@@ -46,7 +46,7 @@ export function toFolderKind(kind) {
 }
 
 // The composer's kinds as the analytics name them.
-const COMPOSE_KINDS = { new: 'new', reply: 'reply', 'reply-all': 'reply_all', forward: 'forward', draft: 'draft', grade: 'grade', course: 'course', absence: 'absence' }
+const COMPOSE_KINDS = { new: 'new', reply: 'reply', 'reply-all': 'reply_all', forward: 'forward', draft: 'draft', grade: 'grade', course: 'course', timetable: 'timetable', absence: 'absence' }
 
 export function toComposeKind(kind) {
   return Object.hasOwn(COMPOSE_KINDS, kind) ? COMPOSE_KINDS[kind] : 'new'
