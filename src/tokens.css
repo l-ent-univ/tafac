@@ -243,7 +243,8 @@
   --p-tint: 1;
   --p-brand-l: 0.5;
   --p-brand-c: 0.15;
-  /* Contrast (the picker's slider), 0 to 1, 0.5 the recipe as drawn below.
+  /* Contrast, 0 to 1, 0.5 the recipe as drawn below. Nothing sets it for
+     now (the settings have no control for it): it stays at the middle.
      Lower, the ink softens, the surfaces draw nearer the page and the lines
      fade; higher, the ink deepens and the lines firm up (the surfaces keep
      their steps, the brand is checked against them). Muted ink keeps
@@ -253,8 +254,8 @@
   --p-contrast: 0.5;
   --p-depth: min(1, calc(0.5 + var(--p-contrast)));
   --p-soften: max(0, calc(0.5 - var(--p-contrast)));
-  /* The glide between two picks. Off while the picker's dot is dragged
-     (data-palette-live, src/theme.js): the page then sits on the dot. */
+  /* The glide between two picks. Off for the first one after Sable
+     (data-palette-live, src/theme.js): there is nothing to glide from. */
   transition:
     --p-hue 320ms cubic-bezier(0.4, 0, 0.2, 1),
     --p-tint 320ms cubic-bezier(0.4, 0, 0.2, 1),

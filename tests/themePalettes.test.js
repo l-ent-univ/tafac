@@ -4,8 +4,8 @@ import test from 'node:test'
 import { contrastRatio } from '../src/colorContrast.js'
 import { oklchToHex } from '../src/oklch.js'
 import {
-  PALETTES, PALETTE_KEY, TINT_MAX, TINT_MIN, brandFor, contrastOf, getStoredPalette, hueName, paletteAt, paletteColors, persistPalette,
-  withContrast,
+  INTENSITY_DEFAULT, INTENSITY_ELEVEN, INTENSITY_MAX, INTENSITY_MIN, INTENSITY_TINTS, PALETTES, PALETTE_KEY, TINT_MAX, TINT_MIN,
+  brandFor, getStoredPalette, hueName, intensityOf, paletteAt, paletteColors, persistPalette, tintOfIntensity,
 } from '../src/theme.js'
 
 const read = (path) => readFileSync(new URL(path, import.meta.url), 'utf8')
@@ -38,9 +38,10 @@ const LIGHT_INK = [0.27, 0.06]
 const DARK_INK = [0.93, 0.02]
 const LIGHT_MUTED = 0.7
 const DARK_MUTED = 0.64
-// Contrast (--p-contrast, 0 to 1): the ink's lightness moves by INK_SWING
-// per unit away from the middle, and under the middle muted ink takes
-// MUTED_SOFTEN more of it per unit.
+// Contrast (--p-contrast, 0 to 1, fixed at the middle: nothing sets it for
+// now): the ink's lightness moves by INK_SWING per unit away from the
+// middle, and under the middle muted ink takes MUTED_SOFTEN more of it per
+// unit.
 const LIGHT_INK_SWING = -0.24
 const DARK_INK_SWING = 0.12
 const MUTED_SOFTEN = 0.24
@@ -67,7 +68,8 @@ function mix(ink, over, share) {
 }
 
 const hues = Array.from({ length: 360 }, (_, hue) => hue)
-const tints = [TINT_MIN, 0.7, 1, TINT_MAX]
+// Every tint the dial reaches, 11 included.
+const tints = INTENSITY_TINTS
 
 test('the recipe in tokens.css is the one the checks stand on', () => {
   const [light, dark] = tokens.split(':root[data-palette][data-theme="dark"]')
@@ -114,8 +116,8 @@ test('index.html applies the stored numbers before first paint', () => {
   assert.ok(html.includes("root.setAttribute('data-palette', palette.value)"))
 })
 
-// Whatever the dot lands on: the brand reads under white and as text on the
-// page and the subtle surface, in both themes.
+// Whatever the swatch and the notch: the brand reads under white and as
+// text on the page and the subtle surface, in both themes.
 test('the brand keeps 4.5:1 for any hue and tint', () => {
   for (const hue of hues) {
     for (const tint of tints) {
@@ -131,8 +133,9 @@ test('the brand keeps 4.5:1 for any hue and tint', () => {
   }
 })
 
-// At every contrast the slider reaches, the brand being checked above
-// against the middle's surfaces (the deepest: higher contrast keeps them).
+// At every contrast the recipe allows, should one be set again; the brand
+// is checked above against the middle's surfaces (the deepest: higher
+// contrast keeps them).
 test('the ink and the muted ink keep 4.5:1 on every surface, for any hue, tint and contrast', () => {
   for (const contrast of contrasts) {
     const light = Math.max(0, Math.min(1, LIGHT_MUTED + MUTED_SOFTEN * softenOf(contrast)))
@@ -154,7 +157,7 @@ test('the ink and the muted ink keep 4.5:1 on every surface, for any hue, tint a
   }
 })
 
-test('the presets are points on the pad, and their dots read on the page', () => {
+test('the presets are palettes of their own, and their swatches read on the page', () => {
   for (const preset of presets) {
     assert.equal(paletteAt(preset.hue, preset.tint), preset)
     const { swatch, swatchDark, page } = paletteColors(preset)
@@ -167,18 +170,44 @@ test('the presets are points on the pad, and their dots read on the page', () =>
   assert.equal(paletteAt(-10, 5).tint, TINT_MAX)
 })
 
-// A custom pick is named for its hue's family; the presets' hues fall in
-// the family they are named for.
-test('a custom pick carries the name of its hue', () => {
+// A preset keeps its name at any intensity; a hue none of them has is named
+// for its family, and the presets' hues fall in the family they are named
+// for.
+test('a pick off the presets carries the name of its hue', () => {
   for (const hue of hues) assert.ok(hueName(hue).length > 0, `${hue}°`)
   assert.equal(hueName(360), hueName(0))
   assert.equal(hueName(-5), 'Rose')
   assert.deepEqual([245, 150, 295, 355, 35].map(hueName), ['Bleu', 'Vert', 'Violet', 'Rose', 'Corail'])
-  assert.equal(paletteAt(245, 0.9).label, 'Bleu')
+  assert.equal(paletteAt(245, 0.9).label, 'Océan')
+  assert.equal(paletteAt(200, 0.9).label, 'Turquoise')
+})
+
+// The dial: ten notches and 11, each a tint of its own that survives the
+// rounding of paletteAt (so of storage); the presets sit on the middle one,
+// and 11's tint is one index.html accepts.
+test('the dial\'s notches are tints, the presets at the middle', () => {
+  assert.equal(INTENSITY_TINTS.length, INTENSITY_ELEVEN)
+  assert.deepEqual([TINT_MIN, TINT_MAX], [tintOfIntensity(INTENSITY_MIN), tintOfIntensity(INTENSITY_ELEVEN)])
+  assert.ok(tintOfIntensity(INTENSITY_ELEVEN) > tintOfIntensity(INTENSITY_MAX))
+  assert.ok(TINT_MAX <= 2, 'within index.html\'s range')
+  for (let step = INTENSITY_MIN; step <= INTENSITY_ELEVEN; step += 1) {
+    const tint = tintOfIntensity(step)
+    if (step > INTENSITY_MIN) assert.ok(tint > tintOfIntensity(step - 1), `${step} deepens`)
+    const palette = paletteAt(245, tint)
+    assert.equal(palette.tint, tint, `${step} survives rounding`)
+    assert.equal(intensityOf(palette), step)
+    assert.equal(palette.id, step === INTENSITY_DEFAULT ? 'ocean' : 'custom')
+  }
+  for (const preset of presets) assert.equal(intensityOf(preset), INTENSITY_DEFAULT, preset.id)
+  assert.equal(intensityOf(PALETTES[0]), INTENSITY_DEFAULT)
+  // Out of range, the nearest end; between two notches, the nearest.
+  assert.equal(tintOfIntensity(0), TINT_MIN)
+  assert.equal(tintOfIntensity(40), TINT_MAX)
+  assert.equal(intensityOf(paletteAt(200, 0.55)), 2)
 })
 
 // The glide between two picks: the numbers are registered so they ease,
-// eased on <html> with a palette, and not while the dot is dragged nor
+// eased on <html> with a palette, and not while the contrast is dragged nor
 // under reduced motion.
 test('tokens.css eases the palette numbers between picks', () => {
   for (const name of ['--p-hue', '--p-tint', '--p-brand-l', '--p-brand-c']) {
@@ -214,43 +243,13 @@ test('a palette round-trips through storage', () => {
 
     store.set(PALETTE_KEY, JSON.stringify({ value: 'custom', hue: 720, tint: 1 }))
     assert.equal(getStoredPalette().id, 'sand')
+    // A contrast kept from when the settings had a slider for it is dropped.
+    store.set(PALETTE_KEY, JSON.stringify({ value: 'ocean', hue: 245, tint: 1, contrast: 1 }))
+    assert.deepEqual(getStoredPalette(), PALETTES[1])
+    store.set(PALETTE_KEY, JSON.stringify({ value: 'sand', contrast: 0.2 }))
+    assert.deepEqual(getStoredPalette(), PALETTES[0])
     store.set(PALETTE_KEY, 'not json')
     assert.equal(getStoredPalette().id, 'sand')
-  } finally {
-    delete globalThis.localStorage
-  }
-})
-
-// The contrast rides on the palette: stored with it, painted before the
-// app loads, kept by Sable for the next one, left off at the middle.
-test('the contrast is stored with the palette and painted before load', () => {
-  const html = read('../index.html')
-  assert.ok(html.includes("root.style.setProperty('--p-contrast'"))
-  assert.match(tokens, /--p-contrast 320ms/)
-  assert.deepEqual(withContrast(PALETTES[1], 0.5), PALETTES[1])
-
-  const store = new Map()
-  globalThis.localStorage = {
-    getItem: (key) => store.get(key) ?? null,
-    setItem: (key, value) => store.set(key, value),
-    removeItem: (key) => store.delete(key),
-  }
-  try {
-    persistPalette(withContrast(paletteAt(245, 1), 0.8))
-    assert.equal(JSON.parse(store.get(PALETTE_KEY)).contrast, 0.8)
-    assert.equal(getStoredPalette().id, 'ocean')
-    assert.equal(contrastOf(getStoredPalette()), 0.8)
-
-    persistPalette(withContrast(PALETTES[0], 0.2))
-    assert.deepEqual(JSON.parse(store.get(PALETTE_KEY)), { value: 'sand', contrast: 0.2 })
-    assert.equal(getStoredPalette().id, 'sand')
-    assert.equal(contrastOf(getStoredPalette()), 0.2)
-
-    persistPalette(PALETTES[0])
-    assert.equal(store.has(PALETTE_KEY), false)
-
-    store.set(PALETTE_KEY, JSON.stringify({ value: 'ocean', hue: 245, tint: 1, contrast: 7 }))
-    assert.equal(contrastOf(getStoredPalette()), 0.5)
   } finally {
     delete globalThis.localStorage
   }

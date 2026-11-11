@@ -12,9 +12,10 @@ export const THEME_OPTIONS = ['auto', 'light', 'dark']
 // data-palette>). A palette is a hue (OKLCH, 0–360) and a tint (how coloured
 // the surfaces are, 1 = the presets'); tokens.css' recipe makes every role
 // from them, in both themes. Sable, the original warm one, sets no
-// attribute. The presets below are points on the picker's pad; anything
-// else is `custom`. Keep the stored shape in sync with the inline script in
-// index.html, which applies it before first paint.
+// attribute. The presets below are the picker's swatches, at the dial's
+// middle; a preset at another intensity is `custom`. Keep the stored shape
+// in sync with the inline script in index.html, which applies it before
+// first paint.
 export const PALETTE_KEY = 'l-ent:palette'
 export const PALETTES = [
   { id: 'sand', label: 'Sable' },
@@ -25,24 +26,34 @@ export const PALETTES = [
   { id: 'coral', label: 'Corail', hue: 35, tint: 1 },
   { id: 'sun', label: 'Soleil', hue: 75, tint: 1 },
 ]
-// The pad's reach: its inner edge to its rim. Under TINT_MIN the surfaces
-// are nearly grey, over TINT_MAX they leave the sRGB gamut on most hues.
-export const TINT_MIN = 0.3
-export const TINT_MAX = 1.5
-// Contrast (the picker's slider): 0 soft to 1 firm, the recipe as drawn at
-// the middle. It rides on whichever palette is picked; Sable ignores it.
-export const CONTRAST_DEFAULT = 0.5
+// Intensity, the picker's dial: 1 to 10, the presets' tint at 5 (the top of
+// the dial), and one notch past the scale, 11. The tint of each, in order:
+// under the first the surfaces are nearly grey; at 10 the lightest ones
+// have reached the edge of sRGB on most hues, so 11 deepens the others and
+// the dark theme. index.html takes a tint up to 2.
+export const INTENSITY_TINTS = [0.3, 0.48, 0.65, 0.83, 1, 1.1, 1.2, 1.3, 1.4, 1.5, 2]
+export const INTENSITY_MIN = 1
+export const INTENSITY_DEFAULT = 5
+export const INTENSITY_MAX = 10
+export const INTENSITY_ELEVEN = 11
+export const TINT_MIN = INTENSITY_TINTS[0]
+export const TINT_MAX = INTENSITY_TINTS[INTENSITY_ELEVEN - 1]
 
-export function contrastOf(palette) {
-  return isValidNumber(palette?.contrast, 0, 1) ? palette.contrast : CONTRAST_DEFAULT
+export function tintOfIntensity(intensity) {
+  const step = Math.min(INTENSITY_ELEVEN, Math.max(INTENSITY_MIN, Math.round(intensity)))
+  return INTENSITY_TINTS[step - 1]
 }
 
-// `palette` with `contrast`, the default left off so a preset stays itself.
-export function withContrast(palette, contrast) {
-  const { contrast: _previous, ...rest } = palette
-  return contrast === CONTRAST_DEFAULT ? rest : { ...rest, contrast }
+// The dial's notch for a palette: the one whose tint is nearest (a tint
+// stored before the dial falls between two). Sable has none: the middle.
+export function intensityOf(palette) {
+  if (!Number.isFinite(palette?.tint)) return INTENSITY_DEFAULT
+  let nearest = 0
+  for (let index = 1; index < INTENSITY_TINTS.length; index += 1) {
+    if (Math.abs(INTENSITY_TINTS[index] - palette.tint) < Math.abs(INTENSITY_TINTS[nearest] - palette.tint)) nearest = index
+  }
+  return nearest + 1
 }
-
 // Sable's colours, the light and dark themes of tokens.css as they are.
 const SAND = { swatch: '#341200', swatchDark: '#e4e4e4', page: { light: '#FCFBF8', dark: '#0f0f0f' } }
 
@@ -74,8 +85,8 @@ function contrast(a, b) {
 
 // The brand colour of a hue, in light theme: as light as keeps 4.5:1 under
 // white text and as text on the subtle surface, with as much chroma as the
-// tint asks for and sRGB allows (a vivid dot at the pad's rim, a muted one
-// near its centre). tokens.css derives the dark brand from it.
+// tint asks for and sRGB allows (vivid at the top of the dial, muted at its
+// start). tokens.css derives the dark brand from it.
 export function brandFor(hue, tint) {
   const cap = Math.min(0.19, 0.07 + 0.1 * tint)
   const subtle = oklchToHex(LIGHT_SUBTLE[0], LIGHT_SUBTLE[1] * tint, hue)
@@ -89,7 +100,7 @@ export function brandFor(hue, tint) {
   return { l: 0.4, c: 0, hex: oklchToHex(0.4, 0, hue) }
 }
 
-// What the picker and the browser chrome need of a palette: the dot's
+// What the picker and the browser chrome need of a palette: the swatch's
 // colour in each theme (the brand, as tokens.css derives it) and the page
 // colour of each theme.
 export function paletteColors(palette) {
@@ -108,8 +119,9 @@ export function paletteColors(palette) {
 const clampTint = (tint) => Math.min(TINT_MAX, Math.max(TINT_MIN, tint))
 const wrapHue = (hue) => ((hue % 360) + 360) % 360
 
-// The name of a custom pick, from its OKLCH hue: the colour's family, where
-// each sector starts. A pick reads "Turquoise" rather than "Personnalisée".
+// The name of a hue no preset has (a pick stored before the swatches), from
+// its OKLCH hue: the colour's family, where each sector starts. It reads
+// "Turquoise" rather than "Personnalisée".
 const HUE_NAMES = [
   [0, 'Rose'], [8, 'Rouge'], [28, 'Corail'], [50, 'Orange'], [68, 'Ambre'], [92, 'Jaune'], [112, 'Citron'],
   [132, 'Vert'], [162, 'Émeraude'], [182, 'Turquoise'], [208, 'Cyan'], [228, 'Bleu'], [268, 'Indigo'],
@@ -123,13 +135,15 @@ export function hueName(hue) {
   return name
 }
 
-// A palette from a hue and a tint: the preset there when there is one
-// (the picker's dots snap to them), otherwise `custom`, named for its hue.
+// A palette from a hue and a tint: the preset there when there is one,
+// otherwise `custom`. A preset's hue keeps its name at any intensity; any
+// other hue is named for its family.
 export function paletteAt(hue, tint) {
   const h = Math.round(wrapHue(hue))
   const t = Number(clampTint(tint).toFixed(2))
-  const preset = PALETTES.find((entry) => entry.hue === h && entry.tint === t)
-  return preset ?? { id: 'custom', label: hueName(h), hue: h, tint: t }
+  const preset = PALETTES.find((entry) => entry.hue === h)
+  if (preset?.tint === t) return preset
+  return { id: 'custom', label: preset?.label ?? hueName(h), hue: h, tint: t }
 }
 
 function isValidNumber(value, min, max) {
@@ -167,11 +181,10 @@ export function persistTheme(theme) {
 export function getStoredPalette() {
   try {
     const stored = JSON.parse(localStorage.getItem(PALETTE_KEY) || 'null')
-    const contrast = contrastOf(stored)
     const preset = PALETTES.find((entry) => entry.id === stored?.value)
-    if (preset) return withContrast(preset, contrast)
+    if (preset) return preset
     if (stored?.value === 'custom' && isValidNumber(stored.hue, 0, 360) && isValidNumber(stored.tint, TINT_MIN, TINT_MAX)) {
-      return withContrast(paletteAt(stored.hue, stored.tint), contrast)
+      return paletteAt(stored.hue, stored.tint)
     }
     return PALETTES[0]
   } catch {
@@ -181,19 +194,15 @@ export function getStoredPalette() {
 
 // Stored with the numbers index.html paints before the app loads: the hue,
 // the tint and the brand's lightness and chroma (brandFor needs the gamut
-// search; the inline script only reads), and the contrast. Sable keeps its
-// contrast for the next palette, nothing else.
+// search; the inline script only reads). Sable stores nothing.
 export function persistPalette(palette) {
   try {
-    const contrast = contrastOf(palette)
-    if (palette.id === 'sand' && contrast === CONTRAST_DEFAULT) {
+    if (palette.id === 'sand') {
       localStorage.removeItem(PALETTE_KEY)
-    } else if (palette.id === 'sand') {
-      localStorage.setItem(PALETTE_KEY, JSON.stringify({ value: 'sand', contrast }))
     } else {
       const brand = brandFor(palette.hue, palette.tint)
       localStorage.setItem(PALETTE_KEY, JSON.stringify({
-        value: palette.id, hue: palette.hue, tint: palette.tint, brandL: brand.l, brandC: brand.c, contrast,
+        value: palette.id, hue: palette.hue, tint: palette.tint, brandL: brand.l, brandC: brand.c,
       }))
     }
   } catch {
@@ -210,16 +219,15 @@ function nearestTurn(hue, current) {
   return hue + turns * 360
 }
 
-const PALETTE_NUMBERS = ['--p-hue', '--p-tint', '--p-brand-l', '--p-brand-c', '--p-contrast']
+const PALETTE_NUMBERS = ['--p-hue', '--p-tint', '--p-brand-l', '--p-brand-c']
 let settleFrame = 0
 
 // Paints `palette` on <html>: the attribute tokens.css' recipe hooks on and
 // the numbers it reads. Sable clears both. tokens.css eases the numbers
-// from one pick to the next; `live` (the picker's drag, which paints every
-// frame without going through React) turns that off so the page sits on
-// the dot. Leaving Sable, the first numbers are set without easing too: the
-// recipe has nothing to ease from.
-export function applyPalette(palette, { live = false } = {}) {
+// from one pick to the next, a notch of the dial included. Leaving Sable,
+// the first numbers are set without easing (data-palette-live): the recipe
+// has nothing to ease from.
+export function applyPalette(palette) {
   const root = document.documentElement
   cancelAnimationFrame(settleFrame)
   if (palette.id === 'sand') {
@@ -232,13 +240,12 @@ export function applyPalette(palette, { live = false } = {}) {
   const fromSand = !('palette' in root.dataset)
   const hue = nearestTurn(palette.hue, parseFloat(root.style.getPropertyValue('--p-hue')))
   root.dataset.palette = palette.id
-  root.toggleAttribute('data-palette-live', live || fromSand)
+  root.toggleAttribute('data-palette-live', fromSand)
   root.style.setProperty('--p-hue', String(hue))
   root.style.setProperty('--p-tint', String(palette.tint))
   root.style.setProperty('--p-brand-l', String(brand.l))
   root.style.setProperty('--p-brand-c', String(brand.c))
-  root.style.setProperty('--p-contrast', String(contrastOf(palette)))
-  if (fromSand && !live) {
+  if (fromSand) {
     // Two frames on: the first paints the numbers, the second eases again.
     settleFrame = requestAnimationFrame(() => {
       settleFrame = requestAnimationFrame(() => root.removeAttribute('data-palette-live'))

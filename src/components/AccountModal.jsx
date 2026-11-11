@@ -17,8 +17,8 @@ import MailSignatureSettings from './MailSignatureSettings'
 import HomeLayoutSetting from './HomeLayoutSetting'
 import SegmentedControl from './SegmentedControl'
 import { r } from '../register.js'
-import { PALETTES, contrastOf, withContrast } from '../theme'
-import PalettePicker, { PaletteContrast } from './PalettePicker'
+import { PALETTES } from '../theme'
+import PalettePicker from './PalettePicker'
 
 // Also the debug menu's toggles (src/components/debug/).
 export { Switch }
@@ -268,34 +268,15 @@ function ThemeSetting({ value, onChange }) {
   )
 }
 
-// The colour palettes (src/theme.js, tokens.css): the pad and the presets
-// of PalettePicker, in a card.
-// Couleurs: the pad and the presets in one card, laid out as the other
-// settings cards (the pad inset 8px, its corners concentric with the
-// card's). Under them, once a palette other than Sable is on, two rows
-// unfold as the logo's source row does: the contrast, and the way back.
+// Couleurs, the colour palettes (src/theme.js, tokens.css): PalettePicker's
+// row of swatches in a card, the pick's intensity on a dial that opens
+// under it.
 function PaletteSetting({ value, onChange }) {
-  const coloured = value.id !== 'sand'
   return (
     <div className="flex flex-col gap-[7px]">
       <h4 className="m-0 px-1 font-body text-[13px] font-semibold leading-none text-text-60">Couleurs</h4>
       <div className={CARD_CLASSES}>
         <PalettePicker value={value} onChange={onChange} />
-        <div
-          className={`grid transition-[grid-template-rows] duration-300 ease-[cubic-bezier(0.2,0.8,0.2,1)] motion-reduce:transition-none ${coloured ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]'}`}
-          inert={!coloured}
-        >
-          <div className="min-h-0 overflow-hidden">
-            <PaletteContrast value={value} onChange={onChange} className={`${ROW_CLASSES} border-t border-[var(--color-border)]`} />
-            <button
-              type="button"
-              className={`${PRESSABLE_ROW_CLASSES} border-t border-[var(--color-border)]`}
-              onClick={() => onChange(withContrast(PALETTES[0], contrastOf(value)))}
-            >
-              <RowText icon="ph:arrow-counter-clockwise" label="Revenir à Sable" />
-            </button>
-          </div>
-        </div>
       </div>
     </div>
   )
