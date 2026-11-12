@@ -1210,9 +1210,26 @@ async function fetchEntLayout(jar) {
   }
 }
 
-async function performEntLogin({ username, password , otp}) {
+// A CAS answer about the second factor, for the login route to pass on as
+// `code`: 'mfa_required' (the password was accepted, the CAS now asks for a
+// one-time code) or 'mfa_invalid' (it refused the code).
+class CasMfaError extends Error {
+  constructor(message, code) {
+    super(message)
+    this.code = code
+  }
+}
+
+// The CAS login form, by its password field. The step after it (Esup OTP's
+// code page) carries the flow's `execution` too, but no password field.
+function isCasPasswordForm(html) {
+  return /<input[^>]*\bname=["']password["']/i.test(html)
+}
+
+async function performEntLogin({ username, password, otp = '' }) {
   const jar = new CookieJar()
   const acceptHeader = 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8'
+
   const loginPageResult = await followRedirectChain(PORTAL_ENTRY_URL, jar, {
     headers: {
       Accept: acceptHeader,
@@ -1221,6 +1238,7 @@ async function performEntLogin({ username, password , otp}) {
 
   const loginPageHtml = await loginPageResult.response.text()
   const execution = extractHiddenInputValue(loginPageHtml, 'execution')
+
   if (!execution) {
     throw new Error('Could not extract the CAS login form.')
   }
@@ -1228,15 +1246,7 @@ async function performEntLogin({ username, password , otp}) {
   const actionUrl = extractFormAction(loginPageHtml, loginPageResult.finalUrl)
   const eventId = extractHiddenInputValue(loginPageHtml, '_eventId') || 'submit'
   const geolocation = extractHiddenInputValue(loginPageHtml, 'geolocation')
-  const formBody = new URLSearchParams({
-    username,
-    password,
-    execution,
-    _eventId: eventId,
-    geolocation,
-  }).toString()
-
-  let submitResponse = await fetchWithJar(actionUrl, jar, {
+  const submitCasForm = (fields) => fetchWithJar(actionUrl, jar, {
     method: 'POST',
     headers: {
       Accept: acceptHeader,
@@ -1244,34 +1254,50 @@ async function performEntLogin({ username, password , otp}) {
       Origin: CAS_ORIGIN,
       Referer: loginPageResult.finalUrl,
     },
-    body: formBody,
+    body: new URLSearchParams(fields).toString(),
     redirect: 'manual',
   })
-  if(otp && submitResponse.status === 200){
-      const otpFormBody = new URLSearchParams({
-        token: otp,
-        execution: extractHiddenInputValue(await submitResponse.text(), 'execution'),
-        _eventId: eventId,
-        geolocation,
-      })
-    submitResponse = await fetchWithJar(actionUrl, jar, {
-      method: 'POST',
-      headers: {
-        Accept: acceptHeader,
-        'Content-Type': 'application/x-www-form-urlencoded',
-        Origin: CAS_ORIGIN,
-        Referer: loginPageResult.finalUrl,
-      },
-      body: otpFormBody,
-      redirect: 'manual',
-    })
-  }
-  if (!isRedirectStatus(submitResponse.status)) {
-    if(submitResponse.ok && submitResponse.headers.getSetCookie().map(cookie => cookie.startsWith("MFATRUSTED")).length > 0) {
-      throw new Error('MFA required.')
-    } else if (otp){
-      throw new Error('Invalid OTP.')
+
+  let submitResponse = await submitCasForm({
+    username,
+    password,
+    execution,
+    _eventId: eventId,
+    geolocation,
+  })
+
+  // Two-factor (Esup OTP): the CAS answers a right password with one more
+  // page of the same flow, which takes the one-time code as `token`.
+  if (submitResponse.status === 200) {
+    const stepHtml = await submitResponse.text()
+    const stepExecution = isCasPasswordForm(stepHtml) ? '' : extractHiddenInputValue(stepHtml, 'execution')
+
+    if (!stepExecution) {
+      throw new Error(extractCasError(stepHtml) || 'CAS login failed. Check your username and password.')
     }
+
+    if (!otp) {
+      throw new CasMfaError('MFA required.', 'mfa_required')
+    }
+
+    submitResponse = await submitCasForm({
+      token: otp,
+      execution: stepExecution,
+      _eventId: eventId,
+      geolocation,
+    })
+
+    if (!isRedirectStatus(submitResponse.status)) {
+      const answerHtml = await submitResponse.text()
+      // Back on the password form: the CAS started the flow over.
+      if (isCasPasswordForm(answerHtml)) {
+        throw new Error(extractCasError(answerHtml) || 'CAS login failed. Check your username and password.')
+      }
+      throw new CasMfaError('Invalid OTP.', 'mfa_invalid')
+    }
+  }
+
+  if (!isRedirectStatus(submitResponse.status)) {
     const html = await submitResponse.text()
     const message = extractCasError(html)
     throw new Error(message || 'CAS login failed. Check your username and password.')
@@ -2766,7 +2792,8 @@ app.post('/__ent_auth/login', async (req, res) => {
   try {
     const username = String(req.body.username ?? '').trim()
     const password = String(req.body.password ?? '')
-    const otp = String(req.body.otp)
+    // The one-time code of a two-factor login, on the second request.
+    const otp = String(req.body.otp ?? '').replace(/\s/g, '')
 
     if (!username || !password) {
       return res.status(400).json({
@@ -2794,7 +2821,12 @@ app.post('/__ent_auth/login', async (req, res) => {
         university: UNIVERSITY_ID,
       })
     }
-    const result = await performEntLogin({ username, password, otp})
+
+    if (otp && !/^\d{4,10}$/.test(otp)) {
+      throw new CasMfaError('Invalid OTP.', 'mfa_invalid')
+    }
+
+    const result = await performEntLogin({ username, password, otp })
     clearLoginRateLimit(req, username)
     // The password lives only in this request: the session keeps the CAS TGC,
     // which signs in to every service (ENT, ADE, Moodle, webmail…) on its own.
@@ -2827,16 +2859,22 @@ app.post('/__ent_auth/login', async (req, res) => {
       university: UNIVERSITY_ID,
     })
   } catch (error) {
-    const rateLimit = recordLoginFailure(req, req.body?.username)
-    if (rateLimit) {
-      res.setHeader('Retry-After', String(rateLimit.retryAfterSeconds))
-      return res.status(429).json({
-        error: 'Too many login attempts. Please try again later.',
-      })
+    const code = error instanceof CasMfaError ? error.code : null
+
+    // A right password waiting for its code is not a failed attempt.
+    if (code !== 'mfa_required') {
+      const rateLimit = recordLoginFailure(req, req.body?.username)
+      if (rateLimit) {
+        res.setHeader('Retry-After', String(rateLimit.retryAfterSeconds))
+        return res.status(429).json({
+          error: 'Too many login attempts. Please try again later.',
+        })
+      }
     }
 
     res.status(401).json({
       error: error instanceof Error ? error.message : String(error),
+      ...(code ? { code } : {}),
     })
   }
 })

@@ -201,6 +201,11 @@ async function parseJsonPayload(response) {
         : `Request failed with status ${response.status}.`
 
     const error = createHttpError(errorMessage, response.status)
+    // What the server says the failure is, when it names it (the login's
+    // 'mfa_required' and 'mfa_invalid').
+    if (typeof data === 'object' && typeof data?.code === 'string') {
+      error.code = data.code
+    }
     // Seconds until the login rate limit lifts (429), for the message.
     const retryAfterSeconds = Number(response.headers.get('Retry-After'))
     if (retryAfterSeconds > 0) {
@@ -263,7 +268,8 @@ export async function getAuthSession() {
   return payload
 }
 
-export async function loginToEnt({ username, password,otp }) {
+// `otp`: the one-time code, once the server asked for it ('mfa_required').
+export async function loginToEnt({ username, password, otp }) {
   clearGradesCache()
   localStorage.removeItem(ADE_TIMETABLE_CACHE_KEY)
 
@@ -277,7 +283,7 @@ export async function loginToEnt({ username, password,otp }) {
       'Content-Type': 'application/json',
       ...getUniversityRequestHeaders(),
     },
-    body: JSON.stringify({ username, password, otp,...(university ? { university } : {}) }),
+    body: JSON.stringify({ username, password, ...(otp ? { otp } : {}), ...(university ? { university } : {}) }),
   })
 
   const payload = await parseJsonPayload(response)

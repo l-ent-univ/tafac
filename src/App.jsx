@@ -435,6 +435,11 @@ function getFrenchAuthErrorMessage(error, context = 'login') {
       : r('Trop de tentatives de connexion. Réessaie dans quelques instants', 'Trop de tentatives de connexion. Réessayez dans quelques instants')
   }
 
+  // A two-factor login whose one-time code the CAS refused.
+  if (error?.code === 'mfa_invalid') {
+    return 'Code incorrect ou expiré'
+  }
+
   const rawMessage = getErrorMessage(error).trim()
   const normalizedMessage = rawMessage.toLowerCase()
   const mentionsUsername = normalizedMessage.includes('username') || normalizedMessage.includes('identifiant')
@@ -452,9 +457,6 @@ function getFrenchAuthErrorMessage(error, context = 'login') {
     || normalizedMessage.includes('mot de passe requis')
   ) {
     return r('Remplis ton identifiant et ton mot de passe', 'Remplissez votre identifiant et votre mot de passe')
-  }
-  if(normalizedMessage.includes("invalid otp")){
-    return 'Jeton 2FA incorrecte'
   }
 
   if (
@@ -906,7 +908,8 @@ function App() {
   const [credentials, setCredentials] = useState({
     username: '',
     password: '',
-    otp:''
+    // The one-time code of a two-factor login (LoginPage's second step).
+    otp: '',
   })
   const [establishment, setEstablishment] = useState(() => getStoredEstablishment())
   // « tu » or « vous » for every string built from here on (src/register.js):
@@ -997,6 +1000,8 @@ function App() {
     sessionSource: null,
     canUseServerLaunch: false,
     error: '',
+    // The CAS accepted the password and asks for a one-time code: the
+    // login form is on its second step.
     requireOTP: false,
   })
   const [hasCheckedInitialSession, setHasCheckedInitialSession] = useState(false)
@@ -2419,16 +2424,34 @@ function App() {
       setCredentials((current) => ({
         ...current,
         password: '',
-        otp:''
       }))
       commitDebugState('Connexion', result)
       if (reloadForOtherUniversity(result)) return
       await refreshSession()
     } catch (error) {
+      // Two-factor: the password is right, the code is still to come. Not a
+      // failure: the form moves on to its second step.
+      if (error?.code === 'mfa_required') {
+        setCredentials((current) => ({ ...current, otp: '' }))
+        setSessionState((current) => ({
+          ...current,
+          checking: false,
+          error: '',
+          requireOTP: true,
+        }))
+        commitDebugState('Connexion', null, 'Code à usage unique demandé')
+        return
+      }
+
       const message = getFrenchAuthErrorMessage(error, 'login')
-      const requireOTP = getErrorMessage(error).match(/MFA|OTP/)?.length > 0
+      // On the code step, only an answer about the identifiers (a 401 that
+      // isn't the code's) sends back to them: a refused code, the rate limit
+      // or a network error leave the student there, to type a code again.
+      const codeRefused = error?.code === 'mfa_invalid'
+      const leavesCodeStep = error?.status === 401 && !codeRefused
       clearLegacySensitiveClientCaches()
-      setSessionState({
+      setCredentials((current) => ({ ...current, otp: '' }))
+      setSessionState((current) => ({
         checking: false,
         authenticated: false,
         user: null,
@@ -2438,19 +2461,30 @@ function App() {
         degradedReason: null,
         sessionSource: null,
         canUseServerLaunch: false,
-        error: requireOTP && message !== "Jeton 2FA incorrecte" ? null : message,
-        requireOTP,
-      })
+        error: message,
+        requireOTP: codeRefused || (Boolean(current.requireOTP) && !leavesCodeStep),
+      }))
       track('login_result', { result: 'failure', demo: false })
       flushAnalytics()
       commitDebugState('Connexion', null, message)
     }
   }
 
+  // From the code step back to the identifiers (another account, a typo).
+  function handleCancelOtp() {
+    setCredentials((current) => ({ ...current, otp: '' }))
+    setSessionState((current) => ({
+      ...current,
+      error: '',
+      requireOTP: false,
+    }))
+  }
+
   async function handleDemoLogin() {
     setCredentials({
       username: DEMO_CREDENTIALS.username,
       password: DEMO_CREDENTIALS.password,
+      otp: '',
     })
 
     setSessionState((current) => ({
@@ -2467,7 +2501,6 @@ function App() {
       setCredentials((current) => ({
         ...current,
         password: '',
-        otp: ''
       }))
       commitDebugState('Connexion demo', result)
       if (reloadForOtherUniversity(result)) return
@@ -2833,7 +2866,8 @@ function App() {
           credentials={credentials}
           checking={sessionState.checking}
           errorMessage={sessionState.error}
-          requireOTP={sessionState.requireOTP}
+          requireOTP={Boolean(sessionState.requireOTP)}
+          onCancelOtp={handleCancelOtp}
           onCredentialsChange={(field, value) => setCredentials((current) => ({ ...current, [field]: value }))}
           onDemoLogin={() => void handleDemoLogin()}
           onSubmit={handleLogin}
