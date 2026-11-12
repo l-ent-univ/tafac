@@ -1,0 +1,389 @@
+/* ── Colour system ──
+   Three layers, each reading only the one above it:
+
+   1. Palette (--sand-*, --night-*, --red-*, …): the raw colours, named for
+      what they are. Read only in this file.
+   2. Roles (--surface-*, --ink-*, --line-*, --brand-*, --danger-*, …): what a
+      colour is for. Components and overrides.css use these and never a hex.
+      Tailwind gets them as bg-card, text-ink-muted, border-line… (@theme
+      inline in index.css, so a role redefined on a container reaches every
+      class inside it).
+   3. Themes: [data-theme] maps the roles onto the palette. A new theme is a
+      new block at the bottom of this file and nothing else.
+
+   A material (the home's frosted glass, the solid cards without wallpaper)
+   is a set of surface roles redefined on a container: .widget-card in
+   overrides.css.
+
+   The old names (--color-bg, --color-text-muted, …) are aliases of the roles,
+   value for value, until nothing reads them (docs/THEMES.md). */
+
+/* ── 1. Palette ── */
+
+:root {
+  /* Sand: the light theme's warm whites. */
+  --sand-0: #ffffff;
+  --sand-1: #fcfbf8;
+  --sand-2: #f8f7f3;
+  --sand-3: #f3f1eb;
+  --sand-4: #efede7;
+  --sand-5: #edebe5;
+  --sand-6: #e5e3dd;
+
+  /* Cocoa: the light theme's ink, and the brand. */
+  --cocoa-900: #341200;
+  --cocoa-800: #4a1a00;
+
+  /* Night: the dark theme's greys, page to raised. */
+  --night-0: #0f0f0f;
+  --night-1: #191919;
+  --night-2: #1a1a1a;
+  --night-3: #1c1c1c;
+  --night-4: #1e1e1e;
+  --night-5: #222222;
+  --night-6: #242424;
+  --night-7: #2a2a2a;
+
+  /* Fog: the dark theme's ink. */
+  --fog-100: #e4e4e4;
+  --fog-200: #cfcfcf;
+
+  /* Status hues, a step for text on each theme and a fill. */
+  --red-700: #b91c1c;
+  --red-600: #d1342f;
+  --red-300: #ff6b63;
+  --red-200: #fee2e2;
+
+  --amber-700: #9a5b00;
+  --amber-500: #f0932b;
+  --amber-300: #f2b14a;
+  --amber-100: #fdf0d9;
+
+  --green-800: #166534;
+  --green-400: #4ade80;
+  --green-100: #dcfce7;
+
+  --blue-700: #0067bd;
+  --blue-600: #2563eb;
+  --blue-300: #5cb2ff;
+  --blue-100: #dbeafe;
+
+  --yellow-500: #eab308;
+  --yellow-400: #facc15;
+}
+
+/* ── 2–3. Roles, light theme (the default) ── */
+
+:root {
+  /* Surfaces, back to front. */
+  --surface-page: var(--sand-1);
+  --surface-sunken: var(--sand-4);
+  --surface-subtle: var(--sand-5);
+  --surface-strong: var(--sand-6);
+  --surface-field: var(--sand-3);
+  --surface-card: var(--sand-0);
+  --surface-raised: rgb(255 255 255 / 0.98);
+  --surface-raised-hover: #f4f6f4;
+  /* The sliding pick of a segmented control, a step above its track. */
+  --surface-thumb: var(--sand-0);
+
+  /* Ink, strongest to faintest. */
+  --ink: var(--cocoa-900);
+  --ink-secondary: color-mix(in srgb, var(--ink) 70%, transparent);
+  --ink-muted: color-mix(in srgb, var(--ink) 50%, transparent);
+  --ink-faint: color-mix(in srgb, var(--ink) 30%, transparent);
+
+  --line: color-mix(in srgb, var(--ink) 10%, transparent);
+  --line-strong: color-mix(in srgb, var(--ink) 16%, transparent);
+
+  /* Hover and press as a veil of ink: right over any surface, glass included. */
+  --state-hover: color-mix(in srgb, var(--ink) 4%, transparent);
+  --state-press: color-mix(in srgb, var(--ink) 8%, transparent);
+  --focus-ring: var(--ink);
+
+  --brand: var(--cocoa-900);
+  --brand-hover: var(--cocoa-800);
+  --brand-soft: color-mix(in srgb, var(--brand) 8%, transparent);
+  --on-brand: var(--surface-page);
+
+  --danger: var(--red-700);
+  --danger-soft: var(--red-200);
+  --warning: var(--amber-700);
+  --warning-soft: var(--amber-100);
+  --success: var(--green-800);
+  --success-soft: var(--green-100);
+  --info: var(--blue-700);
+  --info-soft: var(--blue-100);
+  --favorite: var(--yellow-500);
+  --flag: var(--amber-500);
+  --notify: var(--blue-600);
+
+  --scrim: color-mix(in srgb, var(--ink) 18%, transparent);
+  --shadow-tint: color-mix(in srgb, var(--ink) 10%, transparent);
+
+  /* Text over the wallpaper or a photo, whatever the theme. */
+  --on-photo: #ffffff;
+
+  /* Materials (.widget-card in overrides.css): frosted glass over the
+     wallpaper, solid cards without it, and solid cards on the home's band. */
+  --material-glass: rgb(252 251 248 / 0.66);
+  --material-glass-hover: rgb(252 251 248 / 0.84);
+  --material-glass-edge: rgb(255 255 255 / 0.65);
+  --material-solid: var(--sand-0);
+  --material-solid-hover: var(--sand-2);
+  --material-solid-edge: var(--sand-0);
+  --material-banded: var(--material-solid);
+  --material-banded-hover: var(--material-solid-hover);
+  /* The sidebar: frosted over the wallpaper, solid without it. */
+  --material-sidebar: rgb(245 243 236 / 0.6);
+  --material-sidebar-edge: rgb(255 255 255 / 0.6);
+  --material-sidebar-solid: #f5f3ec;
+  /* The sidebar's resize line and fold button. */
+  --handle-tint: rgb(74 38 14 / 0.78);
+}
+
+/* ── Dark theme ── */
+
+:root:where([data-theme="dark"]) {
+  --surface-page: var(--night-0);
+  --surface-sunken: var(--night-2);
+  --surface-subtle: var(--night-4);
+  --surface-strong: var(--night-7);
+  --surface-field: var(--night-2);
+  --surface-card: var(--night-3);
+  --surface-raised: rgb(26 26 26 / 0.98);
+  --surface-raised-hover: #262626;
+  --surface-thumb: #383838;
+
+  --ink: var(--fog-100);
+  /* Muted is white rather than ink at half: a touch brighter. */
+  --ink-muted: rgb(255 255 255 / 0.5);
+
+  --line: rgb(255 255 255 / 0.1);
+  --line-strong: rgb(255 255 255 / 0.14);
+
+  --brand: var(--fog-100);
+  --brand-hover: var(--fog-200);
+  --brand-soft: rgb(255 255 255 / 0.08);
+
+  --danger: #f87171;
+  --danger-soft: rgb(248 113 113 / 0.15);
+  --warning: var(--amber-300);
+  --warning-soft: rgb(242 177 74 / 0.15);
+  --success: var(--green-400);
+  --success-soft: rgb(74 222 128 / 0.15);
+  --info: var(--blue-300);
+  --info-soft: rgb(92 178 255 / 0.15);
+  --favorite: var(--yellow-400);
+
+  --scrim: rgb(0 0 0 / 0.5);
+  --shadow-tint: rgb(0 0 0 / 0.3);
+
+  --material-glass: rgb(24 24 24 / 0.6);
+  --material-glass-hover: rgb(38 38 38 / 0.74);
+  --material-glass-edge: rgb(255 255 255 / 0.08);
+  --material-solid: var(--night-3);
+  --material-solid-hover: var(--night-6);
+  --material-solid-edge: rgb(255 255 255 / 0.08);
+  /* A step lighter than the band (#191919) they sit on. */
+  --material-banded: var(--night-5);
+  --material-banded-hover: var(--night-7);
+  --material-sidebar: rgb(20 20 20 / 0.55);
+  --material-sidebar-edge: rgb(255 255 255 / 0.08);
+  /* The solid sidebar: #161616 rather than a card, it sits behind them. */
+  --material-sidebar-solid: #161616;
+  --handle-tint: rgb(255 250 228 / 0.78);
+}
+
+/* ── Colour palettes (Réglages › Apparence) ──
+   A second axis beside light/dark: <html data-palette> tints the whole
+   interface from one hue, in both themes. Sable (no attribute) is the theme
+   above. src/theme.js (and index.html before first paint) sets the numbers
+   on <html>: --p-hue (OKLCH), --p-tint (how coloured the surfaces are, 1 =
+   the presets'), and --p-brand-l and --p-brand-c, the light brand's
+   lightness and chroma, searched there so the brand keeps 4.5:1 under white
+   and on the subtle surface for any hue. The recipe below is the same for
+   every palette; tests/themePalettes.test.js checks its figures hold AA for
+   any hue and tint the picker allows. */
+
+/* Registered so they ease: from one pick to the next, the whole interface
+   glides to its new colours rather than jumping. */
+@property --p-hue {
+  syntax: '<number>';
+  inherits: true;
+  initial-value: 245;
+}
+
+@property --p-tint {
+  syntax: '<number>';
+  inherits: true;
+  initial-value: 1;
+}
+
+@property --p-brand-l {
+  syntax: '<number>';
+  inherits: true;
+  initial-value: 0.5;
+}
+
+@property --p-brand-c {
+  syntax: '<number>';
+  inherits: true;
+  initial-value: 0.15;
+}
+
+@property --p-contrast {
+  syntax: '<number>';
+  inherits: true;
+  initial-value: 0.5;
+}
+
+:root[data-palette] {
+  --p-hue: 245;
+  --p-tint: 1;
+  --p-brand-l: 0.5;
+  --p-brand-c: 0.15;
+  /* Contrast, 0 to 1, 0.5 the recipe as drawn below. Nothing sets it for
+     now (the settings have no control for it): it stays at the middle.
+     Lower, the ink softens, the surfaces draw nearer the page and the lines
+     fade; higher, the ink deepens and the lines firm up (the surfaces keep
+     their steps, the brand is checked against them). Muted ink keeps
+     4.5:1 throughout: softer contrast gives it a larger share of the ink.
+     --p-depth: the surfaces' share of their steps from the page.
+     --p-soften: how far under the middle, for muted ink. */
+  --p-contrast: 0.5;
+  --p-depth: min(1, calc(0.5 + var(--p-contrast)));
+  --p-soften: max(0, calc(0.5 - var(--p-contrast)));
+  /* The glide between two picks. Off for the first one after Sable
+     (data-palette-live, src/theme.js): there is nothing to glide from. */
+  transition:
+    --p-hue 320ms cubic-bezier(0.4, 0, 0.2, 1),
+    --p-tint 320ms cubic-bezier(0.4, 0, 0.2, 1),
+    --p-brand-l 320ms cubic-bezier(0.4, 0, 0.2, 1),
+    --p-brand-c 320ms cubic-bezier(0.4, 0, 0.2, 1),
+    --p-contrast 320ms cubic-bezier(0.4, 0, 0.2, 1);
+
+  --surface-page: oklch(0.982 calc(0.016 * var(--p-tint)) var(--p-hue));
+  --surface-sunken: oklch(calc(0.982 - 0.034 * var(--p-depth)) calc(0.028 * var(--p-tint)) var(--p-hue));
+  --surface-subtle: oklch(calc(0.982 - 0.042 * var(--p-depth)) calc(0.03 * var(--p-tint)) var(--p-hue));
+  --surface-strong: oklch(calc(0.982 - 0.077 * var(--p-depth)) calc(0.04 * var(--p-tint)) var(--p-hue));
+  --surface-field: oklch(calc(0.982 - 0.02 * var(--p-depth)) calc(0.02 * var(--p-tint)) var(--p-hue));
+  --surface-card: oklch(0.997 calc(0.005 * var(--p-tint)) var(--p-hue));
+  --surface-raised: oklch(0.995 calc(0.006 * var(--p-tint)) var(--p-hue) / 0.98);
+  --surface-raised-hover: oklch(0.955 calc(0.022 * var(--p-tint)) var(--p-hue));
+
+  --ink: oklch(calc(0.27 - 0.24 * (var(--p-contrast) - 0.5)) 0.06 var(--p-hue));
+  /* 70 %, not the 50 % of Sable: 4.5:1 or more on every tinted surface,
+     the strong one under a green ink included. */
+  --ink-muted: color-mix(in srgb, var(--ink) calc(70% + 24% * var(--p-soften)), transparent);
+  --line: color-mix(in srgb, var(--ink) calc(10% + 12% * (var(--p-contrast) - 0.5)), transparent);
+  --line-strong: color-mix(in srgb, var(--ink) calc(16% + 16% * (var(--p-contrast) - 0.5)), transparent);
+
+  --brand: oklch(var(--p-brand-l) var(--p-brand-c) var(--p-hue));
+  --brand-hover: oklch(calc(var(--p-brand-l) - 0.06) var(--p-brand-c) var(--p-hue));
+  --brand-soft: color-mix(in srgb, var(--brand) 12%, transparent);
+  --on-brand: #ffffff;
+  --focus-ring: var(--brand);
+
+  --scrim: oklch(0.27 0.06 var(--p-hue) / 0.22);
+
+  --material-glass: color-mix(in srgb, var(--surface-page) 66%, transparent);
+  --material-glass-hover: color-mix(in srgb, var(--surface-page) 84%, transparent);
+  --material-solid: var(--surface-card);
+  --material-solid-hover: oklch(0.975 calc(0.014 * var(--p-tint)) var(--p-hue));
+  --material-solid-edge: var(--surface-card);
+  --material-sidebar: oklch(0.965 calc(0.02 * var(--p-tint)) var(--p-hue) / 0.6);
+  --material-sidebar-solid: oklch(0.962 calc(0.02 * var(--p-tint)) var(--p-hue));
+  --handle-tint: color-mix(in srgb, var(--brand) 78%, transparent);
+}
+
+:root[data-palette-live] {
+  transition: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root[data-palette] {
+    transition: none;
+  }
+}
+
+/* index.html's pre-load style gives body Sable's ink; the palettes' own. */
+:root[data-palette] body {
+  color: var(--ink);
+}
+
+:root[data-palette][data-theme="dark"] {
+  --surface-page: oklch(0.17 calc(0.024 * var(--p-tint)) var(--p-hue));
+  --surface-sunken: oklch(calc(0.17 + 0.035 * var(--p-depth)) calc(0.028 * var(--p-tint)) var(--p-hue));
+  --surface-subtle: oklch(calc(0.17 + 0.055 * var(--p-depth)) calc(0.03 * var(--p-tint)) var(--p-hue));
+  --surface-strong: oklch(calc(0.17 + 0.12 * var(--p-depth)) calc(0.034 * var(--p-tint)) var(--p-hue));
+  --surface-field: oklch(calc(0.17 + 0.035 * var(--p-depth)) calc(0.028 * var(--p-tint)) var(--p-hue));
+  --surface-card: oklch(calc(0.17 + 0.05 * var(--p-depth)) calc(0.03 * var(--p-tint)) var(--p-hue));
+  --surface-raised: oklch(calc(0.17 + 0.06 * var(--p-depth)) calc(0.03 * var(--p-tint)) var(--p-hue) / 0.98);
+  --surface-raised-hover: oklch(calc(0.17 + 0.1 * var(--p-depth)) calc(0.034 * var(--p-tint)) var(--p-hue));
+  --surface-thumb: oklch(calc(0.17 + 0.17 * var(--p-depth)) calc(0.04 * var(--p-tint)) var(--p-hue));
+
+  --ink: oklch(min(0.99, calc(0.93 + 0.12 * (var(--p-contrast) - 0.5))) 0.02 var(--p-hue));
+  /* 64 %: 4.5:1 or more on every surface, the thumb included. */
+  --ink-muted: color-mix(in srgb, var(--ink) calc(64% + 24% * var(--p-soften)), transparent);
+
+  --line: color-mix(in srgb, var(--ink) calc(12% + 12% * (var(--p-contrast) - 0.5)), transparent);
+  --line-strong: color-mix(in srgb, var(--ink) calc(18% + 16% * (var(--p-contrast) - 0.5)), transparent);
+
+  /* The light brand's chroma, four fifths: lighter colours carry less. */
+  --brand: oklch(0.78 calc(var(--p-brand-c) * 0.8) var(--p-hue));
+  --brand-hover: oklch(0.84 calc(var(--p-brand-c) * 0.68) var(--p-hue));
+  --brand-soft: color-mix(in srgb, var(--brand) 16%, transparent);
+  --on-brand: oklch(0.2 0.04 var(--p-hue));
+
+  --scrim: oklch(0.08 0.02 var(--p-hue) / 0.6);
+  --shadow-tint: rgb(0 0 0 / 0.35);
+
+  --material-glass: oklch(0.2 calc(0.03 * var(--p-tint)) var(--p-hue) / 0.6);
+  --material-glass-hover: oklch(0.25 calc(0.034 * var(--p-tint)) var(--p-hue) / 0.74);
+  --material-solid: var(--surface-card);
+  --material-solid-hover: oklch(0.25 calc(0.032 * var(--p-tint)) var(--p-hue));
+  --material-solid-edge: color-mix(in srgb, var(--ink) 8%, transparent);
+  --material-banded: oklch(0.24 calc(0.032 * var(--p-tint)) var(--p-hue));
+  --material-banded-hover: oklch(0.28 calc(0.034 * var(--p-tint)) var(--p-hue));
+  --material-sidebar: oklch(0.19 calc(0.028 * var(--p-tint)) var(--p-hue) / 0.55);
+  --material-sidebar-solid: oklch(0.19 calc(0.026 * var(--p-tint)) var(--p-hue));
+}
+
+/* ── Aliases: the old names, value for value ── */
+
+:root {
+  --color-bg: var(--surface-page);
+  --color-bg-surface: var(--surface-sunken);
+  --color-bg-subtle: var(--surface-subtle);
+  --color-bg-muted: var(--surface-strong);
+  --color-bg-input: var(--surface-field);
+  --color-widget-bg: var(--surface-card);
+
+  --color-text: var(--ink);
+  --color-text-30: color-mix(in srgb, var(--ink) 30%, transparent);
+  --color-text-50: color-mix(in srgb, var(--ink) 50%, transparent);
+  --color-text-60: color-mix(in srgb, var(--ink) 60%, transparent);
+  --color-text-70: color-mix(in srgb, var(--ink) 70%, transparent);
+  --color-text-secondary: var(--ink-secondary);
+  --color-text-muted: var(--ink-muted);
+
+  --color-brand: var(--brand);
+  --color-brand-hover: var(--brand-hover);
+  --color-brand-subtle: var(--brand-soft);
+
+  --color-border: var(--line);
+  --color-border-input: var(--line-strong);
+
+  --color-error: var(--danger);
+  --color-error-bg: var(--danger-soft);
+  --color-success-bg: var(--success-soft);
+  --color-success-text: var(--success);
+  --color-favorite: var(--favorite);
+
+  --color-shadow: var(--shadow-tint);
+  --color-backdrop: var(--scrim);
+
+  --color-context-bg: var(--surface-raised);
+  --color-context-hover: var(--surface-raised-hover);
+}

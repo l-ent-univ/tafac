@@ -34,9 +34,9 @@ export function usePointerParallax(ref) {
   }, [ref])
 }
 
-// Plays the video only while it's on screen; with reduced motion it stays
-// on its first frame (the poster).
-export function useVisiblePlayback(ref) {
+// Plays the video only while it's on screen (`threshold`: how much of it
+// has to be); with reduced motion it stays on its first frame (the poster).
+export function useVisiblePlayback(ref, threshold = 0.2) {
   useEffect(() => {
     const video = ref.current
     if (!video || window.matchMedia('(prefers-reduced-motion: reduce)').matches) return undefined
@@ -44,10 +44,10 @@ export function useVisiblePlayback(ref) {
     const observer = new IntersectionObserver(([entry]) => {
       if (entry.isIntersecting) void video.play().catch(() => {})
       else video.pause()
-    }, { threshold: 0.2 })
+    }, { threshold })
     observer.observe(video)
     return () => observer.disconnect()
-  }, [ref])
+  }, [ref, threshold])
 }
 
 // True once the element has come on screen, and from then on (for a

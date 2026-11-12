@@ -21,12 +21,13 @@ const logoClasses = (entry) => `block w-auto max-w-[160px] object-contain opacit
 // "Compatible avec :" and the universities' logos scrolling sideways. The
 // track holds the logos twice and slides by one half, so the loop is seamless
 // (.landing-marquee-track in overrides.css). A single university: its logo,
-// still.
+// still. Aligned as the hero's text: left beside the film on wide screens,
+// centred on phones and tablets.
 function UniversityMarquee({ className = '' }) {
   if (universities.length === 0) return null
 
   return (
-    <div className={`flex flex-col items-center gap-3 ${className}`}>
+    <div className={`flex flex-col items-center gap-3 md:items-start ${className}`}>
       <p className="m-0 text-sm font-medium text-text-muted font-body">{copyText(copy.hero.compatible)}</p>
       {universities.length === 1 ? (
         <a href={universities[0].href} className="corners-[6px]">

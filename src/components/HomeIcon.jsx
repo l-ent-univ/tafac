@@ -1,11 +1,12 @@
 import { useEffect, useRef, useState } from 'react'
+import { isWebKit } from '../alphaVideo'
 
 // The « Accueil » icon row's icons as short 3D clips with a transparent
 // background. Each one turns once and stops front-facing, where the flat
 // icon sits; they start one after the other, as a canon (`order`).
 //
-// Two encodings of the same clip, as no browser plays both with transparency:
-// HEVC with alpha (.mov) for WebKit, VP9 with alpha (.webm) for the others.
+// Two encodings of the same clip (alphaVideo.js): .mov for WebKit, .webm for
+// the others.
 // `still` is the clip's last frame: the poster, and the whole icon for whoever
 // asked for less motion.
 const flatIcons = import.meta.glob('../assets/home-icons/*.png', { eager: true, import: 'default' })
@@ -33,12 +34,6 @@ const CANON_STEP_MS = 110
 // turns the icon evenly.
 const turnAt = (progress) => (progress < 0.5 ? 4 * progress ** 3 : 1 - ((-2 * progress + 2) ** 3) / 2)
 const progressAt = (turn) => (turn < 0.5 ? Math.cbrt(turn / 4) : 1 - Math.cbrt(2 * (1 - turn)) / 2)
-
-// Every iOS browser is WebKit; on a Mac only Safari is.
-function isWebKit() {
-  const agent = navigator.userAgent
-  return /AppleWebKit/.test(agent) && !/Chrome|Chromium|Edg|OPR|Android/.test(agent)
-}
 
 function HomeIcon({ src, size = 22, order = 0, className = '' }) {
   const videoRef = useRef(null)

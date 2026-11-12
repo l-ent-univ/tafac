@@ -45,6 +45,18 @@ import { r } from './register.js'
 
 export const CHANGELOG = [
   {
+    id: 'couleurs',
+    date: '2026-11-12',
+    title: 'Couleurs de l’interface',
+    get body() {
+      return r(
+        'Dans Réglages › Apparence, choisis une couleur : Océan, Forêt, Lavande, Rose, Corail ou Soleil. Touche-la une seconde fois pour régler son intensité.',
+        'Dans Réglages › Apparence, choisissez une couleur : Océan, Forêt, Lavande, Rose, Corail ou Soleil. Touchez-la une seconde fois pour régler son intensité.',
+      )
+    },
+    icon: 'ph:palette',
+  },
+  {
     id: 'salles-et-personnels',
     date: '2026-11-09',
     title: 'Salles et personnels',
