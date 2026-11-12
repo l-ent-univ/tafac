@@ -4,7 +4,6 @@ import { Icon } from '@iconify/react'
 import universityConfig from '@university'
 import { copy, copyText } from '../landingCopy'
 import { scrollToSection } from '../landingMotion'
-import BetaTag from './BetaTag'
 import LogoBut1 from './LogoBut1'
 import PapillonBadge from './PapillonBadge'
 
@@ -115,18 +114,20 @@ function LandingHeader({ onLogin }) {
           className="landing-header pointer-events-none fixed inset-x-0 top-0 z-40 flex justify-center px-2 pt-3 max-md:px-1.5 max-md:pt-2"
         >
           <div ref={barRef} className="landing-header-bar pointer-events-auto relative flex items-center justify-between gap-4 rounded-full border px-4 py-2 max-md:gap-2 max-md:pl-3 max-md:pr-2">
-            {/* Under the logo, the family it belongs to (branding.papillon). Its logo
-                white in dark mode (overrides.css). */}
+            {/* The logo, « Bêta » quiet beside it (a word at its top, not a
+                pill), and under them, smaller and greyed until hovered, the
+                family it belongs to (branding.papillon; its logo white in dark
+                mode): one thing to read first. */}
             <div className="flex min-w-0 flex-1 flex-col items-start">
-              <div className="flex items-center gap-2">
+              <div className="flex items-start gap-1.5">
                 <LogoBut1 className="h-9 max-md:h-8" wordmarkClassName="landing-header-wordmark" />
-                <BetaTag />
+                <span className="font-body text-[11px] font-semibold uppercase leading-none tracking-[0.08em] text-text-muted">Bêta</span>
               </div>
               <div ref={foldRef} className="landing-header-papillon-fold">
                 <div className="min-h-0 overflow-hidden">
                   <PapillonBadge
-                    className="landing-header-papillon mt-1.5 text-text/75 hover:text-text"
-                    logoClassName="landing-header-papillon-logo dark:[filter:brightness(0)_invert(1)]"
+                    className="landing-header-papillon group mt-1 text-text-muted hover:text-text"
+                    logoClassName="landing-header-papillon-logo h-3! opacity-60 transition-opacity group-hover:opacity-100 dark:[filter:brightness(0)_invert(1)]"
                   />
                 </div>
               </div>

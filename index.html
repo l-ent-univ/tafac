@@ -90,6 +90,25 @@
         var dark = theme === 'dark'
           || (theme === 'auto' && window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches)
         document.documentElement.setAttribute('data-theme', dark ? 'dark' : 'light')
+        // The colour palette likewise: src/theme.js stores its numbers (hue,
+        // tint, the brand's lightness and chroma) so this only reads them;
+        // Sable stores none. Out-of-range numbers are ignored, and theme.js
+        // repaints from the hue and tint once the app loads.
+        try {
+          var palette = JSON.parse(localStorage.getItem('l-ent:palette') || 'null')
+          var within = function (value, min, max) {
+            return typeof value === 'number' && value >= min && value <= max
+          }
+          if (palette && /^[a-z]+$/.test(palette.value) && within(palette.hue, 0, 360)
+            && within(palette.tint, 0, 2) && within(palette.brandL, 0.4, 0.6) && within(palette.brandC, 0, 0.2)) {
+            var root = document.documentElement
+            root.setAttribute('data-palette', palette.value)
+            root.style.setProperty('--p-hue', palette.hue)
+            root.style.setProperty('--p-tint', palette.tint)
+            root.style.setProperty('--p-brand-l', palette.brandL)
+            root.style.setProperty('--p-brand-c', palette.brandC)
+          }
+        } catch (error) {}
       })()
     </script>
 

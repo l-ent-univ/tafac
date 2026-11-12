@@ -2010,8 +2010,9 @@ function AvailableApplications({
         : 'min-w-0 text-[14px] font-semibold leading-[1.2] whitespace-nowrap overflow-hidden text-ellipsis max-md:w-full max-md:text-[12px] max-md:text-center max-md:whitespace-normal max-md:line-clamp-2'
 
     if (shouldHideFavoritesSection) return null
+    // The names are ink, not the brand: a colour palette leaves them be.
     return (
-      <section className="favorites-bar grid gap-2 relative text-brand" aria-labelledby={titleId}>
+      <section className="favorites-bar grid gap-2 relative text-ink" aria-labelledby={titleId}>
         {home ? (
           // As the « Accueil » page's cards title themselves.
           <div className="flex min-w-0 items-center gap-2">

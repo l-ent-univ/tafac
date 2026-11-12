@@ -214,6 +214,9 @@ test('the seed entries follow each university’s features', () => {
   assert.ok(!ids(exemple).includes('raccourcis-messagerie-moodle'))
   assert.ok(!ids(exemple).includes('accueil-compact-telephone'))
   assert.ok(ids(exemple).includes('applications'))
+  // « Couleurs »: in everyone's Réglages, whatever the university.
+  assert.ok(ids(rennes).includes('couleurs'))
+  assert.ok(ids(exemple).includes('couleurs'))
 })
 
 test('an entry with an audience only reaches students who have all of it', () => {

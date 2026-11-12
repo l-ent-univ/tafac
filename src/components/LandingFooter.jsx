@@ -3,6 +3,7 @@ import { copy, copyText } from '../landingCopy'
 import { scrollToSection } from '../landingMotion'
 import { getPapillonUrl, readPapillonDebugOverride } from '../papillon'
 import BetaTag from './BetaTag'
+import FooterHills from './FooterHills'
 import LogoBut1 from './LogoBut1'
 import PapillonBadge from './PapillonBadge'
 
@@ -23,10 +24,12 @@ function FooterLink({ href, children }) {
 // The landing page's footer: Tafac (in beta, part of Papillon, an
 // independent student project) on the left, links in two columns on the
 // right (one under the other on phones), then the year and the licence.
+// Under them, across the whole width, the meadow the page ends on
+// (FooterHills): its empty sky sits behind the last line.
 function LandingFooter({ onLogin }) {
   return (
-    <footer className="border-t border-border/60 px-6 pt-12 pb-10 max-md:px-4 max-md:pt-10 max-md:pb-8">
-      <div className="mx-auto flex w-full max-w-[1080px] flex-col gap-10">
+    <footer className="border-t border-border/60">
+      <div className="relative z-10 mx-auto flex w-full max-w-[1128px] flex-col gap-10 px-6 pt-12 pb-10 max-md:px-4 max-md:pt-10 max-md:pb-8">
         <div className="flex justify-between gap-10 max-md:flex-col">
           <div className="flex max-w-[34ch] flex-col items-start gap-3">
             <div className="flex items-center gap-2">
@@ -66,6 +69,7 @@ function LandingFooter({ onLogin }) {
           {copyText(copy.footer.legal)}
         </p>
       </div>
+      <FooterHills className="-mt-[13vw]" />
     </footer>
   )
 }

@@ -17,6 +17,8 @@ import MailSignatureSettings from './MailSignatureSettings'
 import HomeLayoutSetting from './HomeLayoutSetting'
 import SegmentedControl from './SegmentedControl'
 import { r } from '../register.js'
+import { PALETTES } from '../theme'
+import PalettePicker from './PalettePicker'
 
 // Also the debug menu's toggles (src/components/debug/).
 export { Switch }
@@ -266,6 +268,20 @@ function ThemeSetting({ value, onChange }) {
   )
 }
 
+// Couleurs, the colour palettes (src/theme.js, tokens.css): PalettePicker's
+// row of swatches in a card, the pick's intensity on a dial that opens
+// under it.
+function PaletteSetting({ value, onChange }) {
+  return (
+    <div className="flex flex-col gap-[7px]">
+      <h4 className="m-0 px-1 font-body text-[13px] font-semibold leading-none text-text-60">Couleurs</h4>
+      <div className={CARD_CLASSES}>
+        <PalettePicker value={value} onChange={onChange} />
+      </div>
+    </div>
+  )
+}
+
 const LOGO_SOURCE_CHOICES = [
   { id: 'establishment', label: 'Composante' },
   { id: 'university', label: 'Université' },
@@ -499,6 +515,8 @@ function AccountModal({
   onLogoSourceChange = null,
   theme = 'auto',
   onThemeChange,
+  palette = PALETTES[0],
+  onPaletteChange,
   hasCustomBackground = false,
   onCustomBackgroundChange,
   onCustomBackgroundReset,
@@ -739,6 +757,9 @@ function AccountModal({
           <>
             {typeof onThemeChange === 'function' ? (
               <ThemeSetting value={theme} onChange={onThemeChange} />
+            ) : null}
+            {typeof onPaletteChange === 'function' ? (
+              <PaletteSetting value={palette} onChange={onPaletteChange} />
             ) : null}
             {typeof onCustomBackgroundChange === 'function' || typeof onShowWallpaperChange === 'function' ? (
               <WallpaperSetting

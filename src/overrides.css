@@ -4,9 +4,9 @@
    and tinted, with the photo blurred behind. */
 
 .widget-card {
-  --color-widget-bg: rgb(252 251 248 / 0.66);
-  --color-bg-subtle: rgb(252 251 248 / 0.84);
-  border-color: rgb(255 255 255 / 0.65);
+  --color-widget-bg: var(--material-glass);
+  --color-bg-subtle: var(--material-glass-hover);
+  border-color: var(--material-glass-edge);
   -webkit-backdrop-filter: blur(20px) saturate(1.5);
   backdrop-filter: blur(20px) saturate(1.5);
   /* Intro: cards rise and settle from a slightly smaller scale, staggered in
@@ -25,9 +25,9 @@
 }
 
 :where([data-theme="dark"]) .widget-card {
-  --color-widget-bg: rgb(24 24 24 / 0.6);
-  --color-bg-subtle: rgb(38 38 38 / 0.74);
-  border-color: rgba(255, 255, 255, 0.08);
+  --color-widget-bg: var(--material-glass);
+  --color-bg-subtle: var(--material-glass-hover);
+  border-color: var(--material-glass-edge);
 }
 
 /* ── Concentric modal corners ──
@@ -145,8 +145,8 @@
 /* ── Sidebar: floating frosted panel ── */
 
 .sidebar-panel {
-  background-color: rgb(245 243 236 / 0.6);
-  border-color: rgb(255 255 255 / 0.6);
+  background-color: var(--material-sidebar);
+  border-color: var(--material-sidebar-edge);
   -webkit-backdrop-filter: blur(24px) saturate(1.5);
   backdrop-filter: blur(24px) saturate(1.5);
   box-shadow: 0 12px 40px -16px rgb(52 18 0 / 0.22);
@@ -155,8 +155,8 @@
 }
 
 :where([data-theme="dark"]) .sidebar-panel {
-  background-color: rgb(20 20 20 / 0.55);
-  border-color: rgb(255 255 255 / 0.08);
+  background-color: var(--material-sidebar);
+  border-color: var(--material-sidebar-edge);
   box-shadow: 0 12px 40px -16px rgb(0 0 0 / 0.6);
 }
 
@@ -165,9 +165,9 @@
    solid surfaces, with a crisper edge so they still lift off the page. */
 
 .dashboard-no-wallpaper .widget-card {
-  --color-widget-bg: #ffffff;
-  --color-bg-subtle: #f8f7f3;
-  border-color: #ffffff;
+  --color-widget-bg: var(--material-solid);
+  --color-bg-subtle: var(--material-solid-hover);
+  border-color: var(--material-solid-edge);
   -webkit-backdrop-filter: none;
   backdrop-filter: none;
   box-shadow: 0 1px 3px rgb(52 18 0 / 0.06), 0 10px 28px -14px rgb(52 18 0 / 0.16);
@@ -176,8 +176,8 @@
 /* Close to the page colour: a warm hairline and a deeper shadow keep it
    standing apart from the page. */
 .dashboard-no-wallpaper .sidebar-panel {
-  background-color: #f5f3ec;
-  border-color: rgb(52 18 0 / 0.08);
+  background-color: var(--material-sidebar-solid);
+  border-color: color-mix(in srgb, var(--ink) 8%, transparent);
   -webkit-backdrop-filter: none;
   backdrop-filter: none;
   box-shadow: 0 1px 3px rgb(52 18 0 / 0.06), 0 16px 40px -14px rgb(52 18 0 / 0.24);
@@ -188,9 +188,9 @@
    in from the right edge and back out. */
 .mail-reader-panel,
 .side-panel {
-  --mail-panel-bg: #ffffff;
+  --mail-panel-bg: var(--material-solid);
   background-color: var(--mail-panel-bg);
-  border-color: rgb(52 18 0 / 0.08);
+  border-color: color-mix(in srgb, var(--ink) 8%, transparent);
   box-shadow: 0 1px 3px rgb(52 18 0 / 0.06), 0 16px 40px -14px rgb(52 18 0 / 0.24);
   animation: mail-reader-panel-in 340ms cubic-bezier(0.32, 0.72, 0, 1) both;
 }
@@ -202,9 +202,9 @@
 
 :where([data-theme="dark"]) .mail-reader-panel,
 :where([data-theme="dark"]) .side-panel {
-  --mail-panel-bg: #1c1c1c;
+  --mail-panel-bg: var(--material-solid);
   background-color: var(--mail-panel-bg);
-  border-color: rgb(255 255 255 / 0.1);
+  border-color: var(--line);
   box-shadow: 0 1px 3px rgb(0 0 0 / 0.4), 0 16px 40px -14px rgb(0 0 0 / 0.7);
 }
 
@@ -953,15 +953,15 @@
 }
 
 :where([data-theme="dark"]) .dashboard-no-wallpaper .widget-card {
-  --color-widget-bg: #1c1c1c;
-  --color-bg-subtle: #242424;
-  border-color: rgba(255, 255, 255, 0.08);
+  --color-widget-bg: var(--material-solid);
+  --color-bg-subtle: var(--material-solid-hover);
+  border-color: var(--material-solid-edge);
   box-shadow: 0 1px 3px rgb(0 0 0 / 0.3);
 }
 
 :where([data-theme="dark"]) .dashboard-no-wallpaper .sidebar-panel {
-  background-color: #161616;
-  border-color: rgb(255 255 255 / 0.1);
+  background-color: var(--material-sidebar-solid);
+  border-color: var(--line);
   box-shadow: 0 1px 3px rgb(0 0 0 / 0.4), 0 16px 40px -14px rgb(0 0 0 / 0.7);
 }
 
@@ -972,7 +972,7 @@
    (no blur), so the strip under it doesn't show through. */
 .sidebar-panel.sidebar-peek {
   width: var(--sidebar-width);
-  background-color: #f5f3ec;
+  background-color: var(--material-sidebar-solid);
   -webkit-backdrop-filter: none;
   backdrop-filter: none;
   opacity: 0;
@@ -1010,7 +1010,7 @@
 }
 
 :where([data-theme="dark"]) .sidebar-panel.sidebar-peek {
-  background-color: #161616;
+  background-color: var(--material-sidebar-solid);
 }
 
 :where([data-theme="dark"]) .sidebar-panel.sidebar-peek.is-open {
@@ -1034,8 +1034,8 @@
    (#191919) and the page (#0f0f0f) they sit on: in the same grey as the
    band, they didn't stand out from it. */
 :where([data-theme="dark"]) .dashboard-no-wallpaper :is(.dashboard-widgets, .grades-page) .widget-card {
-  --color-widget-bg: #222222;
-  --color-bg-subtle: #2a2a2a;
+  --color-widget-bg: var(--material-banded);
+  --color-bg-subtle: var(--material-banded-hover);
 }
 
 /* A logo with a dark version of its own (logoDark): that one, as is. */
@@ -1075,11 +1075,7 @@
 /* The sidebar's resize line and its fold button: brown in light mode, a
    soft yellow in dark mode. */
 .sidebar-handle-tint {
-  background-color: rgb(74 38 14 / 0.78);
-}
-
-:where([data-theme="dark"]) .sidebar-handle-tint {
-  background-color: rgb(255 250 228 / 0.78);
+  background-color: var(--handle-tint);
 }
 
 /* Translucent, the line would show through the button: it stops where the
@@ -2371,8 +2367,11 @@
   opacity: 0;
 }
 
+/* At rest, as wide as the hero's content (1240px, LandingPage) plus the
+   bar's own 16px each side: the logo lines up with the title and the text
+   below it, wherever the screen is wider. */
 .landing-header-bar {
-  width: 100%;
+  width: min(100%, 1272px);
   border-color: transparent;
   background-color: transparent;
   transition:
@@ -3910,10 +3909,10 @@
   gap: 2px;
   padding: 3px;
   border-radius: 9999px;
-  background-color: rgb(52 18 0 / 0.05);
+  background-color: color-mix(in srgb, var(--ink) 5%, transparent);
   box-shadow:
-    inset 0 1px 2px rgb(52 18 0 / 0.08),
-    inset 0 0 0 1px rgb(52 18 0 / 0.05);
+    inset 0 1px 2px color-mix(in srgb, var(--ink) 8%, transparent),
+    inset 0 0 0 1px color-mix(in srgb, var(--ink) 5%, transparent);
 }
 
 .segmented--stretch {
@@ -3931,12 +3930,12 @@
   width: var(--segmented-w);
   transform: translateX(var(--segmented-x));
   box-sizing: border-box;
-  border: 1px solid #ffffff;
+  border: 1px solid var(--surface-thumb);
   border-radius: 9999px;
-  background-color: #ffffff;
+  background-color: var(--surface-thumb);
   box-shadow:
-    0 1px 2px rgb(52 18 0 / 0.1),
-    0 4px 12px -4px rgb(52 18 0 / 0.26);
+    0 1px 2px color-mix(in srgb, var(--ink) 10%, transparent),
+    0 4px 12px -4px color-mix(in srgb, var(--ink) 26%, transparent);
 }
 
 .segmented[data-ready] .segmented-thumb {
@@ -4023,6 +4022,589 @@
   }
 }
 
+/* ── Palette picker (Réglages › Apparence › Couleurs, PalettePicker) ──
+   A settings row: the pick's name, then the swatches, one per palette,
+   each in its brand as the theme at hand draws it
+   (--swatch-light, --swatch-dark). The pick wears a ring a hair off the
+   disc and, when it has an intensity to set, a pencil: a tap on it opens
+   the dial below. On a phone the swatches go under the name. */
+.palette-picker,
+.palette-dial {
+  /* A spring with a little give at the end, and one that overshoots. */
+  --palette-spring: cubic-bezier(0.32, 0.72, 0, 1);
+  --palette-settle: cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+@supports (animation-timing-function: linear(0, 1)) {
+  .palette-picker,
+  .palette-dial {
+    --palette-spring: linear(0, 0.006, 0.025 2.8%, 0.101 6.1%, 0.539 18.9%, 0.721 25.3%, 0.849 31.5%, 0.937 38.1%, 0.968 41.8%, 0.991 45.7%, 1.006 50.1%, 1.015 55%, 1.017 63.9%, 1.001);
+    --palette-settle: linear(0, 0.011 1.6%, 0.044 3.4%, 0.17 7%, 0.6 15.1%, 0.858 21%, 1.017 26.1%, 1.095 30.3%, 1.122 33.1%, 1.129 35.8%, 1.11 40.9%, 1.016 56.5%, 0.994 64.7%, 0.991 74.5%, 1);
+  }
+}
+
+.palette-picker {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px 16px;
+  min-height: 54px;
+  padding: 11px 16px;
+}
+
+/* The row label's type (SettingsGroup's RowText). */
+.palette-name {
+  margin: 0;
+  font-family: var(--font-body);
+  font-size: 16px;
+  font-weight: 500;
+  line-height: 1.2;
+  letter-spacing: -0.3125px;
+  color: var(--ink);
+}
+
+/* Padded by the ring's reach and pulled back by as much: the discs line up
+   with the row's edges, the pick's ring reaching past them. */
+.palette-swatches {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin: 0 -4px;
+  padding: 4px;
+}
+
+.palette-swatch {
+  --swatch: var(--swatch-light);
+  --swatch-ink: #ffffff;
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  flex-shrink: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: linear-gradient(rgb(255 255 255 / 0.16), rgb(255 255 255 / 0) 70%) var(--swatch);
+  box-shadow: inset 0 0 0 1px rgb(0 0 0 / 0.1);
+  color: var(--swatch-ink);
+  cursor: pointer;
+  transition: scale 260ms var(--palette-settle);
+  -webkit-tap-highlight-color: transparent;
+}
+
+:root[data-theme="dark"] .palette-swatch {
+  --swatch: var(--swatch-dark);
+  --swatch-ink: rgb(0 0 0 / 0.78);
+}
+
+/* A finger's worth around the disc. */
+.palette-swatch::before {
+  content: '';
+  position: absolute;
+  inset: -6px;
+  border-radius: 50%;
+}
+
+/* The pick's ring: the swatch's colour, the card showing between the two. */
+.palette-swatch::after {
+  content: '';
+  position: absolute;
+  inset: -4px;
+  border: 2px solid var(--swatch);
+  border-radius: 50%;
+  opacity: 0;
+  scale: 0.78;
+  transition: opacity 140ms ease, scale 320ms var(--palette-settle);
+  pointer-events: none;
+}
+
+.palette-swatch[data-current]::after {
+  opacity: 1;
+  scale: 1;
+}
+
+.palette-swatch-edit {
+  width: 14px;
+  height: 14px;
+  animation: palette-swatch-edit-in 320ms var(--palette-settle) backwards;
+}
+
+@keyframes palette-swatch-edit-in {
+  from {
+    opacity: 0;
+    scale: 0.4;
+  }
+}
+
+.palette-swatch:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 6px;
+}
+
+@media (hover: hover) {
+  .palette-swatch:not([data-current]):hover {
+    scale: 1.12;
+  }
+}
+
+.palette-swatch:active {
+  scale: 0.92;
+  transition-duration: 80ms;
+}
+
+/* ── The intensity dial (PalettePicker's IntensityDial) ──
+   A small instrument under the pick's swatch: a knob in a ring, eleven
+   marks around it from 7 o'clock to 4 (a notch each, 5 at the top), a star
+   past the last, an LCD under it. The dial carries its hue (--dial-hue),
+   how far up the scale it is (--dial-level, 0 at 1 to 1 at 10) and the
+   knob's angle (--dial-turn); everything it draws comes from those. Its
+   colours are its own, like a course's: the colour being set is the data.
+   Fixed, in a portal (z-index over the settings). */
+@property --dial-level {
+  syntax: '<number>';
+  inherits: true;
+  initial-value: 0;
+}
+
+.palette-dial {
+  --dial-hue: 0;
+  --dial-level: 0;
+  --dial-turn: 0deg;
+  /* The panel pales to the card at 1 and fills with the hue at 10. */
+  --dial-top: oklch(calc(0.95 - 0.21 * var(--dial-level)) calc(0.01 + 0.12 * var(--dial-level)) var(--dial-hue));
+  --dial-bottom: oklch(calc(0.985 - 0.135 * var(--dial-level)) calc(0.004 + 0.066 * var(--dial-level)) var(--dial-hue));
+  --dial-ring: oklch(calc(0.84 - 0.21 * var(--dial-level)) calc(0.06 + 0.15 * var(--dial-level)) var(--dial-hue));
+  --dial-dot: oklch(calc(0.7 - 0.13 * var(--dial-level)) calc(0.13 + 0.09 * var(--dial-level)) var(--dial-hue));
+  /* A lit mark: a white tube, its halo the hue on the pale panel and white
+     once the panel is the hue. */
+  --dial-glow: color-mix(in oklch, #ffffff calc(var(--dial-level) * 100%), oklch(0.7 0.2 var(--dial-hue)));
+  --dial-mark: oklch(0.4 0.03 var(--dial-hue) / 0.24);
+  --dial-halo: oklch(0.76 0.15 var(--dial-hue) / calc(0.55 * var(--dial-level)));
+  --dial-knob: linear-gradient(#ffffff, #e8e8ea);
+  --dial-knob-edge: rgb(255 255 255 / 0.95);
+  --dial-knurl: rgb(0 0 0 / 0.17);
+  --dial-eleven: linear-gradient(oklch(0.72 0.15 var(--dial-hue)), oklch(0.82 0.09 calc(var(--dial-hue) - 45)));
+  --dial-haze: rgb(255 255 255 / 0.5);
+  position: fixed;
+  z-index: 80;
+  width: 208px;
+  height: 208px;
+  overflow: hidden;
+  border-radius: 20px;
+  background: linear-gradient(var(--dial-top), var(--dial-bottom));
+  box-shadow:
+    0 0 0 1px rgb(0 0 0 / 0.06),
+    0 2px 6px rgb(0 0 0 / 0.1),
+    0 18px 44px -12px rgb(0 0 0 / 0.36),
+    0 0 calc(36px * var(--dial-level)) var(--dial-halo);
+  transform-origin: var(--dial-origin, 50% 0);
+  animation: palette-dial-in 180ms cubic-bezier(0.16, 1, 0.3, 1);
+  transition: --dial-level 240ms ease, box-shadow 320ms ease;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+@supports (corner-shape: superellipse(1.3)) {
+  .palette-dial {
+    border-radius: calc(20px / 0.853);
+    corner-shape: superellipse(1.3);
+  }
+}
+
+:root[data-theme="dark"] .palette-dial {
+  --dial-top: oklch(calc(0.3 + 0.2 * var(--dial-level)) calc(0.025 + 0.125 * var(--dial-level)) var(--dial-hue));
+  --dial-bottom: oklch(calc(0.24 + 0.12 * var(--dial-level)) calc(0.02 + 0.09 * var(--dial-level)) var(--dial-hue));
+  --dial-ring: oklch(calc(0.42 + 0.22 * var(--dial-level)) calc(0.07 + 0.15 * var(--dial-level)) var(--dial-hue));
+  --dial-dot: oklch(calc(0.74 + 0.06 * var(--dial-level)) calc(0.14 + 0.06 * var(--dial-level)) var(--dial-hue));
+  --dial-glow: color-mix(in oklch, #ffffff calc(var(--dial-level) * 70%), oklch(0.74 0.2 var(--dial-hue)));
+  --dial-mark: rgb(255 255 255 / 0.2);
+  --dial-halo: oklch(0.7 0.17 var(--dial-hue) / calc(0.5 * var(--dial-level)));
+  --dial-knob: linear-gradient(#5b5b61, #38383d);
+  --dial-knob-edge: rgb(255 255 255 / 0.24);
+  --dial-knurl: rgb(0 0 0 / 0.4);
+  --dial-eleven: linear-gradient(oklch(0.58 0.17 var(--dial-hue)), oklch(0.68 0.12 calc(var(--dial-hue) - 45)));
+  --dial-haze: rgb(255 255 255 / 0.26);
+  box-shadow:
+    0 0 0 1px rgb(255 255 255 / 0.08),
+    0 2px 6px rgb(0 0 0 / 0.4),
+    0 18px 44px -12px rgb(0 0 0 / 0.7),
+    0 0 calc(36px * var(--dial-level)) var(--dial-halo);
+}
+
+.palette-dial[data-state="closing"] {
+  animation: palette-dial-out 140ms ease-in forwards;
+  pointer-events: none;
+}
+
+@keyframes palette-dial-in {
+  from {
+    opacity: 0;
+    transform: translateY(-6px) scale(0.9);
+    filter: blur(6px);
+  }
+}
+
+@keyframes palette-dial-out {
+  to {
+    opacity: 0;
+    transform: translateY(-4px) scale(0.96);
+  }
+}
+
+/* At 11 the panel runs from the hue to its neighbour and glows outward. */
+.palette-dial::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: var(--dial-eleven);
+  opacity: 0;
+  transition: opacity 420ms ease;
+}
+
+.palette-dial[data-eleven]::before {
+  opacity: 1;
+}
+
+.palette-dial[data-eleven] {
+  box-shadow:
+    0 0 0 1px rgb(0 0 0 / 0.06),
+    0 2px 6px rgb(0 0 0 / 0.1),
+    0 18px 44px -12px rgb(0 0 0 / 0.36),
+    0 0 46px 4px oklch(0.78 0.16 var(--dial-hue) / 0.62);
+}
+
+/* The whole panel turns the knob: the pointer's angle around its centre. */
+.palette-dial-face {
+  position: absolute;
+  inset: 0;
+  outline: none;
+  cursor: grab;
+  touch-action: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.palette-dial[data-dragging] .palette-dial-face {
+  cursor: grabbing;
+}
+
+.palette-dial-ring,
+.palette-dial-knob,
+.palette-dial-haze,
+.palette-dial-cloud {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  border-radius: 50%;
+  translate: -50% -50%;
+  pointer-events: none;
+}
+
+.palette-dial-ring {
+  width: 110px;
+  height: 110px;
+  background: var(--dial-ring);
+  box-shadow:
+    inset 0 1px 2px rgb(0 0 0 / 0.2),
+    0 1px 0 rgb(255 255 255 / 0.3);
+}
+
+.palette-dial-face:focus-visible .palette-dial-ring {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 3px;
+}
+
+/* The knob's body keeps its light from above; only its rim and its dot
+   turn (palette-dial-turn). */
+.palette-dial-knob {
+  width: 98px;
+  height: 98px;
+  background: var(--dial-knob);
+  box-shadow:
+    0 0 0 1px rgb(0 0 0 / 0.07),
+    0 2px 2px rgb(0 0 0 / 0.16),
+    0 9px 12px -3px rgb(0 0 0 / 0.34),
+    inset 0 1px 0 var(--dial-knob-edge),
+    inset 0 -3px 6px rgb(0 0 0 / 0.07);
+}
+
+.palette-dial-turn {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  rotate: var(--dial-turn);
+  transition: rotate 420ms var(--palette-settle);
+}
+
+/* The knurled rim: eighty ridges. */
+.palette-dial-turn::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: repeating-conic-gradient(var(--dial-knurl) 0 1.5deg, transparent 1.5deg 4.5deg);
+  -webkit-mask: radial-gradient(circle closest-side, transparent 0 85%, #000 87% 97%, transparent 99%);
+  mask: radial-gradient(circle closest-side, transparent 0 85%, #000 87% 97%, transparent 99%);
+}
+
+.palette-dial-turn::after {
+  content: '';
+  position: absolute;
+  top: 10px;
+  left: 50%;
+  width: 10px;
+  height: 10px;
+  margin-left: -5px;
+  border-radius: 50%;
+  background: var(--dial-dot);
+  box-shadow: inset 0 1px 1px rgb(0 0 0 / 0.22);
+}
+
+/* A mark: centred on the knob, turned to its notch, then out to the scale.
+   Its size changes about its own centre, so 11 fattens it in place. */
+.palette-dial-mark {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 2.5px;
+  height: 9px;
+  border-radius: 999px;
+  background: var(--dial-mark);
+  translate: -50% -50%;
+  transform: rotate(var(--mark-turn)) translateY(-70px);
+  transition:
+    background-color 160ms ease,
+    box-shadow 200ms ease,
+    width 520ms var(--palette-settle),
+    height 520ms var(--palette-settle);
+  pointer-events: none;
+}
+
+.palette-dial-mark[data-top] {
+  height: 13px;
+  transform: rotate(var(--mark-turn)) translateY(-72px);
+}
+
+.palette-dial-mark[data-lit] {
+  background: #ffffff;
+  box-shadow:
+    0 0 0 0.75px var(--dial-glow),
+    0 0 5px 1px var(--dial-glow),
+    0 0 11px 1px color-mix(in srgb, var(--dial-glow) 55%, transparent);
+}
+
+.palette-dial[data-eleven] .palette-dial-mark {
+  width: 11px;
+  height: 19px;
+  box-shadow:
+    0 0 8px 2px rgb(255 255 255 / 0.85),
+    0 0 18px 4px oklch(0.9 0.1 var(--dial-hue) / 0.7);
+  transition-delay: 0ms, 0ms, calc(var(--mark-index) * 16ms), calc(var(--mark-index) * 16ms);
+}
+
+.palette-dial[data-eleven] .palette-dial-mark[data-top] {
+  height: 23px;
+}
+
+/* The star, a notch past 10: where 11 is. */
+.palette-dial-star {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 13px;
+  height: 13px;
+  color: var(--dial-mark);
+  translate: -50% -50%;
+  transform: rotate(135deg) translateY(-73px) rotate(-120deg);
+  transition: color 200ms ease, transform 560ms var(--palette-settle), filter 320ms ease;
+  pointer-events: none;
+}
+
+.palette-dial[data-eleven] .palette-dial-star {
+  color: #ffffff;
+  transform: rotate(135deg) translateY(-73px) rotate(-120deg) scale(1.75);
+  filter: drop-shadow(0 0 3px #ffffff) drop-shadow(0 0 9px #ffffff);
+}
+
+/* 11's light: a haze that stays behind the marks, a cloud that swells out
+   of the knob once, and the specks (a burst, then a few that keep
+   drifting off the ring). */
+.palette-dial-haze {
+  width: 196px;
+  height: 196px;
+  background: radial-gradient(circle closest-side, var(--dial-haze) 50%, transparent 100%);
+  opacity: 0;
+  transition: opacity 520ms ease;
+}
+
+.palette-dial[data-eleven] .palette-dial-haze {
+  opacity: 1;
+}
+
+.palette-dial-cloud {
+  width: 200px;
+  height: 200px;
+  background: radial-gradient(circle closest-side, rgb(255 255 255 / 0.95) 40%, rgb(255 255 255 / 0) 100%);
+  animation: palette-dial-cloud 1300ms cubic-bezier(0.2, 0.7, 0.2, 1) both;
+}
+
+@keyframes palette-dial-cloud {
+  from {
+    opacity: 0;
+    transform: scale(0.4);
+  }
+
+  18% {
+    opacity: 0.9;
+  }
+
+  to {
+    opacity: 0;
+    transform: scale(1.5);
+  }
+}
+
+.palette-dial-specks {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.palette-dial-speck {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: var(--speck-size);
+  height: var(--speck-size);
+  border-radius: 50%;
+  background: #ffffff;
+  opacity: 0;
+  translate: -50% -50%;
+  animation: palette-dial-burst var(--speck-time) var(--speck-delay) cubic-bezier(0.12, 0.7, 0.2, 1) both;
+}
+
+.palette-dial-speck[data-tone="0"] {
+  background: oklch(0.6 0.22 var(--dial-hue));
+}
+
+.palette-dial-speck[data-tone="1"] {
+  background: oklch(0.86 0.07 calc(var(--dial-hue) - 50));
+}
+
+.palette-dial-speck[data-drift] {
+  animation: palette-dial-drift var(--speck-time) var(--speck-delay) ease-out infinite both;
+}
+
+@keyframes palette-dial-burst {
+  from {
+    opacity: 0;
+    transform: rotate(var(--speck-turn)) translateY(-50px) scale(0.3);
+  }
+
+  12% {
+    opacity: 1;
+  }
+
+  60% {
+    opacity: 0.9;
+  }
+
+  to {
+    opacity: 0;
+    transform: rotate(var(--speck-turn)) translateY(calc(-56px - var(--speck-reach))) scale(1);
+  }
+}
+
+@keyframes palette-dial-drift {
+  from {
+    opacity: 0;
+    transform: rotate(var(--speck-turn)) translateY(-58px) scale(0.4);
+  }
+
+  25% {
+    opacity: 0.95;
+  }
+
+  to {
+    opacity: 0;
+    transform: rotate(var(--speck-turn)) translateY(calc(-58px - var(--speck-reach))) scale(1);
+  }
+}
+
+/* The LCD: two seven-segment digits, every segment faintly there. Its
+   backlight comes on at 11. */
+.palette-dial-lcd {
+  position: absolute;
+  bottom: 12px;
+  left: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 2.5px;
+  box-sizing: border-box;
+  width: 40px;
+  height: 22px;
+  padding: 0 7px;
+  border-radius: 6px;
+  background: #d5dac7;
+  box-shadow:
+    inset 0 0 0 1px rgb(40 50 30 / 0.22),
+    inset 0 1px 2px rgb(40 50 30 / 0.26),
+    0 1px 0 rgb(255 255 255 / 0.35);
+  translate: -50% 0;
+  transition: background-color 320ms ease, box-shadow 320ms ease;
+  pointer-events: none;
+}
+
+.palette-dial[data-eleven] .palette-dial-lcd {
+  background: #c6f6e8;
+  box-shadow:
+    inset 0 0 0 1px rgb(40 90 80 / 0.26),
+    0 0 10px 1px rgb(190 255 238 / 0.85);
+}
+
+.palette-dial-digit {
+  width: 8px;
+  height: 14px;
+  flex-shrink: 0;
+  overflow: visible;
+  transform: skewX(-6deg);
+}
+
+.palette-dial-digit polygon {
+  fill: rgb(20 28 14 / 0.08);
+}
+
+.palette-dial-digit polygon[data-on] {
+  fill: #141a10;
+}
+
+/* Reduced motion: the dial shows and the knob turns without springing, and
+   11 keeps its light without the burst. The page's own glide between
+   notches is off in tokens.css. */
+@media (prefers-reduced-motion: reduce) {
+  .palette-swatch,
+  .palette-swatch::after,
+  .palette-dial,
+  .palette-dial-turn,
+  .palette-dial-mark,
+  .palette-dial-star {
+    transition: none;
+  }
+
+  .palette-swatch-edit,
+  .palette-dial,
+  .palette-dial[data-state="closing"] {
+    animation: none;
+  }
+
+  .palette-dial-cloud,
+  .palette-dial-specks {
+    display: none;
+  }
+}
+
 /* On a white panel or sheet the white edge vanishes: a hairline instead. */
 .side-panel .segmented-thumb,
 .mail-reader-panel .segmented-thumb,
@@ -4039,7 +4621,7 @@
 
 :where([data-theme="dark"]) .segmented-thumb {
   border-color: rgb(255 255 255 / 0.1);
-  background-color: #383838;
+  background-color: var(--surface-thumb);
   box-shadow:
     inset 0 1px 0 rgb(255 255 255 / 0.06),
     0 1px 2px rgb(0 0 0 / 0.5),
@@ -7385,9 +7967,9 @@ li:has(> .planning-row.is-link:active) + li > .planning-row .planning-row-text,
 .planning-sheet .widget-card,
 .mail-reader-panel .widget-card,
 .side-panel .widget-card {
-  --color-widget-bg: #ffffff;
-  --color-bg-subtle: #f8f7f3;
-  border-color: rgb(52 18 0 / 0.1);
+  --color-widget-bg: var(--material-solid);
+  --color-bg-subtle: var(--material-solid-hover);
+  border-color: var(--line);
   -webkit-backdrop-filter: none;
   backdrop-filter: none;
   box-shadow: 0 1px 3px rgb(52 18 0 / 0.06), 0 10px 28px -14px rgb(52 18 0 / 0.16);
@@ -7396,9 +7978,9 @@ li:has(> .planning-row.is-link:active) + li > .planning-row .planning-row-text,
 :where([data-theme="dark"]) .planning-sheet .widget-card,
 :where([data-theme="dark"]) .mail-reader-panel .widget-card,
 :where([data-theme="dark"]) .side-panel .widget-card {
-  --color-widget-bg: #1c1c1c;
-  --color-bg-subtle: #242424;
-  border-color: rgba(255, 255, 255, 0.08);
+  --color-widget-bg: var(--material-solid);
+  --color-bg-subtle: var(--material-solid-hover);
+  border-color: var(--material-solid-edge);
   box-shadow: 0 1px 3px rgb(0 0 0 / 0.3);
 }
 
