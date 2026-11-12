@@ -2367,8 +2367,11 @@
   opacity: 0;
 }
 
+/* At rest, as wide as the hero's content (1240px, LandingPage) plus the
+   bar's own 16px each side: the logo lines up with the title and the text
+   below it, wherever the screen is wider. */
 .landing-header-bar {
-  width: 100%;
+  width: min(100%, 1272px);
   border-color: transparent;
   background-color: transparent;
   transition:
