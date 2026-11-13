@@ -8873,7 +8873,8 @@ button.planning-block:active {
 /* An event's bar: its colour vivid at the top (deepened, more saturated),
    lightening the further down it runs. */
 .planning-bar.planning-accent-fill,
-.planning-list-bar.planning-accent-fill {
+.planning-list-bar.planning-accent-fill,
+.sidebar-next-class-bar.planning-accent-fill {
   background: linear-gradient(
     to bottom,
     color-mix(in oklch, var(--accent), black 6%) 0%,
@@ -8882,7 +8883,7 @@ button.planning-block:active {
   );
 }
 
-:where([data-theme="dark"]) :is(.planning-bar, .planning-list-bar).planning-accent-fill {
+:where([data-theme="dark"]) :is(.planning-bar, .planning-list-bar, .sidebar-next-class-bar).planning-accent-fill {
   background: linear-gradient(
     to bottom,
     var(--accent-dark) 0%,
@@ -10154,8 +10155,12 @@ div:has(> .justify-ticket) {
   }
 }
 
-/* An engraved slot to press (Réglages' « add a wallpaper »): darker under
-   the pointer. */
+/* An engraved slot to press (Réglages' « add a wallpaper »): its dashed
+   edge a little further in than a tag's, darker under the pointer. */
+.engraved-slot.status-tag--dashed {
+  outline-offset: -5px;
+}
+
 @media (hover: hover) {
   .engraved-slot.engraved:hover:not(:disabled) {
     background-color: color-mix(in srgb, var(--ink) 7%, transparent);
@@ -10207,3 +10212,56 @@ div:has(> .justify-ticket) {
   --skullet-highlight: var(--color-bg-subtle);
   --skullet-radius: 999px;
 }
+
+/* The sidebar's « Prochain cours » (SidebarNextClass): tinted all over
+   with its course's colour, as the events, deeper under the pointer. */
+.sidebar-next-class.glass-solid {
+  background-color: color-mix(in srgb, var(--accent) 8%, var(--glass-solid-fill));
+}
+
+:where([data-theme="dark"]) .sidebar-next-class.glass-solid {
+  background-color: color-mix(in srgb, var(--accent-dark) 10%, var(--glass-solid-fill));
+}
+
+@media (hover: hover) {
+  .sidebar-next-class.glass-solid:hover:not(:disabled) {
+    background-color: color-mix(in srgb, var(--accent) 13%, var(--glass-solid-fill));
+  }
+
+  :where([data-theme="dark"]) .sidebar-next-class.glass-solid:hover:not(:disabled) {
+    background-color: color-mix(in srgb, var(--accent-dark) 16%, var(--glass-solid-fill));
+  }
+}
+
+/* It comes in (leaving « Accueil », or room found): a fade, a short rise. */
+.sidebar-next-class-in {
+  animation: sidebar-next-class-in 360ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+@keyframes sidebar-next-class-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.98);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sidebar-next-class-in {
+    animation: none;
+  }
+}
+
+/* The favourites' tiles (the sidebar's, « Accueil »'s « Applications »):
+   each rises in, a beat after the one before (--i), over the skeleton
+   they replace. Still for reduced motion (the rule above). */
+.favorites-strip-item {
+  animation: app-card-enter 360ms cubic-bezier(0.16, 1, 0.3, 1) backwards;
+  animation-delay: calc(min(var(--i, 0), 8) * 35ms);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .favorites-strip-item {
+    animation: none;
+  }
+}
+

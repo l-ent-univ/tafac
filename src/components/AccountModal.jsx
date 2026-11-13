@@ -19,6 +19,7 @@ import SegmentedControl from './SegmentedControl'
 import { r } from '../register.js'
 import { PALETTES } from '../theme'
 import PalettePicker from './PalettePicker'
+import { SIDEBAR_NEXT_CLASS_ENABLED, setSidebarNextClassShown, useSidebarNextClassShown } from '../sidebarNextClassPref'
 
 // Also the debug menu's toggles (src/components/debug/).
 export { Switch }
@@ -59,6 +60,21 @@ function SwitchRow({ icon, label, description, checked, onChange }) {
       <RowText icon={icon} label={label} description={description} />
       <Switch checked={checked} onChange={onChange} />
     </label>
+  )
+}
+
+// « Prochain cours » in the sidebar (SidebarNextClass), on or off: the same
+// choice as its right-click « Masquer ».
+function SidebarNextClassRow() {
+  const shown = useSidebarNextClassShown()
+  return (
+    <SwitchRow
+      icon="ph:calendar-blank"
+      label="Prochain cours"
+      description="Dans la barre latérale, quand elle a la place"
+      checked={shown}
+      onChange={setSidebarNextClassShown}
+    />
   )
 }
 
@@ -536,8 +552,10 @@ function WallpaperSetting({
               style={{ backgroundImage: `url("${previewSrc}")`, ...(previewPosition ? { backgroundPosition: previewPosition } : null) }}
               aria-hidden="true"
             >
+              {/* On the photo: the glass material, darkened for its white
+                  text, the same padding all round. */}
               {enabled && caption ? (
-                <span className="absolute bottom-2 left-2 inline-flex max-w-[calc(100%-16px)] items-center gap-[5px] rounded-full bg-black/50 px-[9px] py-[5px] font-body text-[12px] font-semibold leading-none text-white backdrop-blur-sm">
+                <span className="glass absolute bottom-2 left-2 inline-flex max-w-[calc(100%-16px)] items-center gap-[5px] rounded-full p-[6px] font-body text-[12px] font-semibold leading-none text-white [--glass-fill:rgb(20_20_20/0.32)]">
                   <Icon icon={caption.icon} className="h-[12px] w-[12px] shrink-0" />
                   <span className="truncate">{caption.text}</span>
                 </span>
@@ -622,10 +640,11 @@ function WallpaperSetting({
                     type="button"
                     onClick={() => inputRef.current?.click()}
                     disabled={busy}
-                    className="flex aspect-[16/10] w-full cursor-pointer flex-col items-center justify-center gap-[5px] corners-[10px] engraved status-tag--dashed engraved-slot border-0 p-0 font-body text-[12px] font-semibold leading-none text-text-60 transition-colors hover:text-[var(--color-text)] disabled:cursor-wait disabled:opacity-60"
+                    className="flex aspect-[16/10] w-full cursor-pointer flex-col items-center justify-center gap-1 corners-[10px] engraved status-tag--dashed engraved-slot border-0 p-0 font-body text-[12px] font-semibold leading-none text-text-60 transition-colors hover:text-[var(--color-text)] disabled:cursor-wait disabled:opacity-60"
                   >
-                    <Icon icon={busy ? 'ph:circle-notch-bold' : 'ph:plus-bold'} className={`h-[16px] w-[16px] ${busy ? 'animate-spin' : ''}`} aria-hidden="true" />
-                    {customSrc ? 'Remplacer' : 'Ajouter'}
+                    <Icon icon={busy ? 'ph:circle-notch-bold' : 'ph:plus-bold'} className={`h-[14px] w-[14px] ${busy ? 'animate-spin' : ''}`} aria-hidden="true" />
+                    {/* The font on a span: index.css gives buttons `font: inherit`, outside Tailwind's layers. */}
+                    <span className="font-body text-[12px] font-semibold leading-none">{customSrc ? 'Remplacer' : 'Ajouter'}</span>
                   </button>
                   <input ref={inputRef} type="file" accept="image/*" className="hidden" onChange={handleFile} />
                 </WallpaperCollection>
@@ -980,6 +999,7 @@ function AccountModal({
                     checked={sidebarCompact}
                     onChange={(compact) => onSidebarCompactChange(compact)}
                   />
+                  {SIDEBAR_NEXT_CLASS_ENABLED ? <SidebarNextClassRow /> : null}
                 </SettingsGroup>
               </div>
             ) : null}

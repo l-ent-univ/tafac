@@ -15,6 +15,7 @@ import LoadingDots from './LoadingDots'
 import MailAttachDrawer, { ATTACH_CARD_CLASS, AttachDrawerNote } from './MailAttachDrawer'
 import SmoothSurface from './SmoothSurface'
 import { Skeleton } from 'skullet/react'
+import { useSkeletonsForced } from '../skeletonSamples'
 import {
   ENT_AUTH_PREFIX,
   ENT_ORIGIN,
@@ -33,7 +34,7 @@ const DEFAULT_ERROR_MESSAGE = 'Impossible de charger les applications pour le mo
 const CLOSED_CONTEXT_MENU = { open: false, x: 0, y: 0, application: null, source: 'favorite' }
 const FAVORITE_REMOVAL_ANIMATION_MS = 220
 // The sidebar only fits a few favorites; the rest stay starred in the full list.
-const SIDEBAR_FAVORITES_LIMIT = 4
+const SIDEBAR_FAVORITES_LIMIT = 3
 // The « Accueil » page's « Applications »: after the favourites, up to this
 // many other apps of the list, as many of them as fit on the row.
 const HOME_EXTRA_APPS = 12
@@ -978,6 +979,7 @@ function AvailableApplications({
   onOpenPlanningPage = null,
   onOpenMailPage = null,
 }) {
+  const skeletonsForced = useSkeletonsForced()
   const [viewState, setViewState] = useState({
     status: 'loading',
     source: 'none',
@@ -1970,6 +1972,8 @@ function AvailableApplications({
   // row of tiles (the dashboard without the sidebar, and the « Accueil »
   // page's « Applications », `home`: its own title, no reordering by drag,
   // which follows the dashboard's row).
+  // Loading, or held so from the debug panel (« Simuler le chargement »).
+  const appsLoading = viewState.status === 'loading' || skeletonsForced
   const renderFavoritesSection = ({ sidebar = false, home = false } = {}) => {
     const isSidebarFavorites = sidebar
     const displayedFavorites = isSidebarFavorites
@@ -2034,20 +2038,6 @@ function AvailableApplications({
           </div>
         )}
 
-        {viewState.status === 'loading' ? (
-          // Measured from sample tiles laid out as real ones (skullet): the
-          // icon a block, the name a bar.
-          <Skeleton loading label="Chargement des favoris">
-            <div className={favoriteListClassName}>
-              {['Application', 'Annuaire', 'Documentation', 'Assistance'].map((name) => (
-                <div key={name} className={favoriteItemClassName}>
-                  <span skullet-block="" className={`shrink-0 ${favoriteIconClassName}`} />
-                  <span className={favoriteTitleClassName}>{name}</span>
-                </div>
-              ))}
-            </div>
-          </Skeleton>
-        ) : null}
 
         {viewState.status === 'error' ? (
           <div className="flex items-center gap-3 flex-wrap">
@@ -2063,7 +2053,21 @@ function AvailableApplications({
           </div>
         ) : null}
 
-        {showRow ? (
+        {/* Loading, sample tiles measured into a skeleton (skullet); once
+            the apps are in, the same <Skeleton> reveals the row over it
+            (and each tile rises in, .favorites-strip-item). */}
+        {appsLoading || showRow ? (
+          <Skeleton loading={appsLoading} label="Chargement des favoris">
+            {appsLoading ? (
+              <div className={favoriteListClassName}>
+                {['Application', 'Annuaire', 'Documentation', 'Assistance'].slice(0, isSidebarFavorites ? SIDEBAR_FAVORITES_LIMIT : 4).map((name) => (
+                  <div key={name} className={favoriteItemClassName}>
+                    <span skullet-block="" className={`shrink-0 ${favoriteIconClassName}`} />
+                    <span className={favoriteTitleClassName}>{name}</span>
+                  </div>
+                ))}
+              </div>
+            ) : (
           <div className={home ? 'flex min-w-0 items-start gap-1.5 max-md:gap-1' : 'contents'}>
             <div className={`${favoriteListClassName} ${isDragging && !home ? 'is-dragging' : ''}`} ref={home ? homeAppsRowRef : favoritesRowRef}>
               {displayedFavorites.map((application, index) => {
@@ -2086,6 +2090,7 @@ function AvailableApplications({
                   <a
                     key={application.id}
                     data-app-id={application.id}
+                    style={{ '--i': index }}
                     className={`favorites-strip-item app-card group relative border text-inherit no-underline min-w-0 cursor-pointer focus-visible:outline-none ${favoriteItemClassName} ${isLaunching ? 'pointer-events-none cursor-progress' : ''} ${(isRemovingFavorite || isExitingFavorite) ? 'pointer-events-none opacity-70' : ''} ${isExitingFavorite ? 'animate-favorite-remove' : ''} ${isContextOpen ? 'app-card--active' : ''} ${isSearchHighlighted ? 'favorite-search-highlight' : ''}`}
                     href={href}
                     target={target || undefined}
@@ -2169,6 +2174,8 @@ function AvailableApplications({
               </button>
             ) : null}
           </div>
+            )}
+          </Skeleton>
         ) : null}
 
         {favoriteActionState.error ? (

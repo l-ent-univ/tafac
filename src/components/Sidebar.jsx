@@ -8,6 +8,8 @@ import SidebarGradePocket from './SidebarGradePocket'
 import { track } from '../analytics'
 import { useChangelog } from '../changelogStore'
 import UpdateNotice from './UpdateNotice'
+import SidebarNextClass from './SidebarNextClass'
+import { SIDEBAR_NEXT_CLASS_ENABLED, useSidebarNextClassShown } from '../sidebarNextClassPref'
 import Tooltip from './Tooltip'
 import { buildNavItems, openNavItemLink } from '../navItems'
 import {
@@ -20,6 +22,11 @@ import {
   getStoredSidebarWidth,
   persistSidebarWidth,
 } from '../sidebarWidth'
+
+// « Favoris » (the student's starred apps, portalled in by
+// AvailableApplications, three at most): kept while students' feedback
+// decides; false hides it.
+const SHOW_SIDEBAR_FAVORITES = true
 
 // The sidebar floats 12px (left-3) from the window edge.
 const SIDEBAR_LEFT_PX = 12
@@ -243,6 +250,11 @@ function Sidebar({
   activePage = 'home',
   onNavigatePage,
   onOpenLatestGrade = null,
+  // « Prochain cours » (SidebarNextClass): the student's group and the
+  // day's opening in the Planning; null without a planning.
+  nextClassSelection = null,
+  sessionUser = null,
+  onOpenPlanningDay = null,
   // Compact: the icons alone (App keeps it, the settings toggle it too).
   compact = false,
   // Folded for the page (a mail open beside the list), not by hand: hovering
@@ -253,6 +265,8 @@ function Sidebar({
   // The unfolded sidebar over the folded one (.sidebar-peek): always there
   // while it can peek, so its transitions turn around mid-way.
   const [isPeekOpen, setIsPeekOpen] = useState(false)
+  // « Prochain cours »: off from its menu or Réglages (sidebarNextClassPref).
+  const nextClassShown = useSidebarNextClassShown()
   const peekTimerRef = useRef(null)
   if (!canPeek && isPeekOpen) setIsPeekOpen(false)
   useEffect(() => () => window.clearTimeout(peekTimerRef.current), [])
@@ -428,7 +442,13 @@ function Sidebar({
             <SidebarGradePocket onOpen={onOpenLatestGrade} />
           </div>
         ) : null}
-        <div ref={favoritesSlotRef} className="sidebar-favorites-slot empty:hidden w-full" />
+        {/* No slot, no portal: the favourites aren't rendered at all. */}
+        {SHOW_SIDEBAR_FAVORITES ? <div ref={favoritesSlotRef} className="sidebar-favorites-slot empty:hidden w-full" /> : null}
+        {/* In their place, the next class (not on « Accueil », which has
+            its own card; only with room for it). */}
+        {SIDEBAR_NEXT_CLASS_ENABLED && authenticated && nextClassSelection && activePage !== 'home' && nextClassShown ? (
+          <SidebarNextClass selection={nextClassSelection} sessionUser={sessionUser} onOpenPlanningDay={onOpenPlanningDay} />
+        ) : null}
         {hasPendingUpdate ? <UpdateNotice onUpdateClick={onUpdateClick} /> : null}
         {showChangelogPill ? <ChangelogPill className="flex" /> : null}
         {authenticated ? (

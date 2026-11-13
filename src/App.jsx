@@ -2910,6 +2910,9 @@ function App() {
             gradesSupported={gradesSupported}
             activePage={shownPage}
             onNavigatePage={handleNavigatePage}
+            nextClassSelection={hasPlanningPage ? selectedTp : null}
+            sessionUser={sessionState.user}
+            onOpenPlanningDay={hasPlanningPage ? handleOpenPlanningDay : null}
             onOpenLatestGrade={universityConfig.features?.sidebarLatestGrade === true && sessionState.authenticated && hasGradesPage ? handleOpenSidebarGrade : null}
             compact={sidebarCompact || isSidebarAutoCompact}
             canPeek={isSidebarAutoCompact}
