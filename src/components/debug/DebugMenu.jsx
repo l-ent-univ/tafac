@@ -53,6 +53,7 @@ const ENT_CALLS = [
 ]
 const SECTIONS = [
   ['debug-session', 'Session'],
+  ['debug-login-code', 'Code'],
   ['debug-university', 'Université'],
   ['debug-appearance', 'Apparence'],
   ['debug-display', 'Affichage'],
@@ -103,6 +104,8 @@ export default function DebugMenu({
   onShowIosPrompt,
   onShowUpdatePrompt,
   onShowWelcomeFromLent,
+  loginCodePreview,
+  onLoginCodePreviewChange,
   selectedTp,
 }) {
   const [outputTab, setOutputTab] = useState('api')
@@ -414,6 +417,38 @@ export default function DebugMenu({
               >
                 Forcer le choix du TP
               </DebugButton>
+            </DebugRow>
+          </DebugSection>
+
+          {/* The login's code step (two-factor), shown in place of the
+              page for one way of getting the code and one state of the
+              form. Nothing is requested: sending a code and typing one
+              play out on timers (App.jsx). */}
+          <DebugSection id="debug-login-code" title="Code de vérification">
+            <DebugRow label="Méthode" hint="Affiche l’étape du code de la connexion, sans requête">
+              <DebugSegmented
+                label="Méthode"
+                options={[['app', 'Application'], ['sms', 'SMS'], ['mail', 'Mail']]}
+                value={loginCodePreview?.method ?? null}
+                onChange={(method) => onLoginCodePreviewChange({
+                  method,
+                  state: method === 'app' && ['sending', 'sent'].includes(loginCodePreview?.state) ? 'idle' : loginCodePreview?.state ?? 'idle',
+                })}
+              />
+            </DebugRow>
+            <DebugRow label="État" hint="Envoi et envoyé : SMS et mail seulement">
+              <DebugSegmented
+                label="État"
+                options={[['idle', 'Repos'], ['sending', 'Envoi'], ['sent', 'Envoyé'], ['checking', 'Vérification'], ['refused', 'Refusé']]}
+                value={loginCodePreview?.state ?? null}
+                onChange={(state) => onLoginCodePreviewChange({
+                  method: ['sending', 'sent'].includes(state) && (loginCodePreview?.method ?? 'app') === 'app' ? 'sms' : loginCodePreview?.method ?? 'app',
+                  state,
+                })}
+              />
+            </DebugRow>
+            <DebugRow label="Aperçu" hint="« Retour » sur la page le quitte aussi">
+              <DebugButton onClick={() => onLoginCodePreviewChange(null)} disabled={!loginCodePreview}>Quitter</DebugButton>
             </DebugRow>
           </DebugSection>
 

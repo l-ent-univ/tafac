@@ -1850,6 +1850,90 @@
   }
 }
 
+/* …and its box pops, a ring and a few sparks leaving it, in the box's own
+   colour (--otp-pop). The sparks go up and down, not sideways: the step's
+   clip is close on both sides. */
+.otp-box--filled {
+  animation: otp-box-pop 320ms cubic-bezier(0.3, 1.6, 0.5, 1);
+}
+
+@keyframes otp-box-pop {
+  40% {
+    transform: scale(1.1);
+  }
+}
+
+.otp-box--filled::after {
+  content: '';
+  position: absolute;
+  inset: -1px;
+  border: 2px solid var(--otp-pop);
+  border-radius: inherit;
+  opacity: 0;
+  pointer-events: none;
+  animation: otp-box-ring 440ms ease-out;
+}
+
+@keyframes otp-box-ring {
+  from {
+    opacity: 0.9;
+    transform: scale(1);
+  }
+
+  to {
+    opacity: 0;
+    transform: scale(1.3);
+  }
+}
+
+.otp-box--filled::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 5px;
+  height: 5px;
+  margin: -2.5px;
+  border-radius: 50%;
+  color: var(--otp-pop);
+  box-shadow:
+    -15px -42px 0 0 currentColor,
+    0 -49px 0 -0.5px currentColor,
+    15px -42px 0 0 currentColor,
+    -13px 43px 0 -0.5px currentColor,
+    13px 43px 0 0 currentColor;
+  opacity: 0;
+  pointer-events: none;
+  animation: otp-box-sparks 540ms cubic-bezier(0.2, 0.8, 0.3, 1);
+}
+
+@keyframes otp-box-sparks {
+  from {
+    opacity: 1;
+    transform: scale(0.35);
+  }
+
+  65% {
+    opacity: 1;
+  }
+
+  to {
+    opacity: 0;
+    transform: scale(1.05);
+  }
+}
+
+/* The whole code, on its way to be checked: a wave along the row. */
+.otp-wave .otp-box {
+  animation: otp-box-wave 520ms cubic-bezier(0.3, 1.4, 0.5, 1) calc(var(--i) * 50ms);
+}
+
+@keyframes otp-box-wave {
+  35% {
+    transform: translateY(-7px);
+  }
+}
+
 /* A refused code: the boxes, emptied, shake once. */
 .otp-shake {
   animation: otp-shake 360ms cubic-bezier(0.36, 0.07, 0.19, 0.97);
@@ -1876,8 +1960,302 @@
 @media (prefers-reduced-motion: reduce) {
   .otp-caret,
   .otp-digit,
-  .otp-shake {
+  .otp-shake,
+  .otp-box,
+  .otp-box::before,
+  .otp-box::after {
     animation: none;
+  }
+}
+
+/* The picture over the code field (OtpMethodIcon): an SVG whose parts move
+   on their own. It lands and then floats over its shadow; the group around
+   it carries what the form is doing (data-state), so the two add up. */
+.otp-icon {
+  width: 76px;
+  height: 76px;
+  margin-inline: auto;
+  color: var(--color-text-muted);
+  /* The ring round the tick: the page's colour behind the form. */
+  --otp-icon-ground: #f5f3ed;
+}
+
+:where([data-theme="dark"]) .otp-icon {
+  --otp-icon-ground: var(--color-bg);
+}
+
+.otp-icon svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+
+.otp-icon__state,
+.otp-icon__art,
+.otp-icon__shadow,
+.otp-icon__speed,
+.otp-icon__badge,
+.otp-icon__no,
+.otp-app__dot,
+.otp-sms__dot,
+.otp-mail__flap,
+.otp-mail__seal {
+  transform-box: fill-box;
+  transform-origin: center;
+}
+
+.otp-icon__art {
+  animation:
+    otp-icon-in 560ms cubic-bezier(0.2, 0.9, 0.3, 1.2) both,
+    otp-icon-float 3.2s ease-in-out 700ms infinite alternate;
+}
+
+/* The bubble grows from its tail. */
+.otp-icon[data-method="sms"] .otp-icon__art {
+  transform-origin: 18% 88%;
+}
+
+@keyframes otp-icon-in {
+  from {
+    opacity: 0;
+    transform: translateY(12px) scale(0.55) rotate(-10deg);
+  }
+}
+
+@keyframes otp-icon-float {
+  to {
+    transform: translateY(-3.5px);
+  }
+}
+
+.otp-icon__shadow {
+  animation:
+    otp-icon-shadow-in 560ms ease-out both,
+    otp-icon-shadow 3.2s ease-in-out 700ms infinite alternate;
+}
+
+@keyframes otp-icon-shadow-in {
+  from {
+    opacity: 0;
+    transform: scaleX(0.4);
+  }
+}
+
+@keyframes otp-icon-shadow {
+  to {
+    opacity: 0.6;
+    transform: scaleX(0.88);
+  }
+}
+
+/* Application: the timer runs down in six seconds, the code comes anew. */
+.otp-app__ring {
+  animation: otp-app-ring 6s linear 500ms infinite;
+}
+
+@keyframes otp-app-ring {
+  to {
+    stroke-dashoffset: 72.26;
+  }
+}
+
+.otp-app__dot {
+  animation: otp-app-dot 6s cubic-bezier(0.3, 1.4, 0.5, 1) calc(500ms + var(--i) * 70ms) infinite backwards;
+}
+
+@keyframes otp-app-dot {
+  0% {
+    transform: scale(0);
+  }
+
+  7% {
+    transform: scale(1.3);
+  }
+
+  12%, 94% {
+    transform: scale(1);
+  }
+
+  100% {
+    transform: scale(0);
+  }
+}
+
+/* SMS: the three dots of someone typing. */
+.otp-sms__dot {
+  animation: otp-sms-dot 1.5s ease-in-out calc(700ms + var(--i) * 150ms) infinite;
+}
+
+@keyframes otp-sms-dot {
+  0%, 46%, 100% {
+    transform: none;
+  }
+
+  20% {
+    transform: translateY(-5px);
+  }
+}
+
+/* Mail: the flap closes, the seal is pressed on it. */
+.otp-mail__flap {
+  transform-origin: 50% 0%;
+  animation: otp-mail-flap 380ms cubic-bezier(0.3, 1.3, 0.5, 1) 260ms both;
+}
+
+@keyframes otp-mail-flap {
+  from {
+    transform: scaleY(-0.55);
+  }
+}
+
+.otp-mail__seal {
+  animation: otp-mail-seal 420ms cubic-bezier(0.3, 1.5, 0.5, 1) 520ms both;
+}
+
+@keyframes otp-mail-seal {
+  from {
+    opacity: 0;
+    transform: scale(2.3);
+  }
+}
+
+/* A digit typed: the icon hops, leaning one way then the other (two
+   names for one hop, so each digit starts it over). What the form is doing
+   (below) comes first. */
+.otp-icon[data-beat="a"] .otp-icon__state {
+  animation: otp-icon-hop-a 320ms cubic-bezier(0.3, 1.5, 0.5, 1);
+}
+
+.otp-icon[data-beat="b"] .otp-icon__state {
+  animation: otp-icon-hop-b 320ms cubic-bezier(0.3, 1.5, 0.5, 1);
+}
+
+@keyframes otp-icon-hop-a {
+  40% {
+    transform: translateY(-5px) rotate(-5deg) scale(1.06);
+  }
+}
+
+@keyframes otp-icon-hop-b {
+  40% {
+    transform: translateY(-5px) rotate(5deg) scale(1.06);
+  }
+}
+
+/* A code being sent: the icon leans into it, lines trail behind; the
+   bubble's dots hurry. */
+.otp-icon[data-state="sending"] .otp-icon__state {
+  animation: otp-icon-send 620ms ease-in-out infinite alternate;
+}
+
+@keyframes otp-icon-send {
+  from {
+    transform: translateX(-2px) rotate(-3deg);
+  }
+
+  to {
+    transform: translate(7px, -2px) rotate(6deg);
+  }
+}
+
+.otp-icon__speed {
+  opacity: 0;
+}
+
+.otp-icon[data-state="sending"] .otp-icon__speed {
+  animation: otp-icon-speed 520ms linear infinite;
+}
+
+@keyframes otp-icon-speed {
+  0% {
+    opacity: 0;
+    transform: translateX(6px);
+  }
+
+  30% {
+    opacity: 0.7;
+  }
+
+  100% {
+    opacity: 0;
+    transform: translateX(-8px);
+  }
+}
+
+.otp-icon[data-state="sending"] .otp-sms__dot {
+  animation-duration: 0.7s;
+  animation-delay: calc(var(--i) * 90ms);
+}
+
+/* The code being checked: it holds its breath. */
+.otp-icon[data-state="checking"] .otp-icon__state {
+  animation: otp-icon-check 800ms ease-in-out infinite alternate;
+}
+
+@keyframes otp-icon-check {
+  to {
+    transform: scale(0.93);
+  }
+}
+
+/* A refused code: it shakes its head, once. */
+.otp-icon[data-state="refused"] .otp-icon__state {
+  animation: otp-icon-no 440ms cubic-bezier(0.36, 0.07, 0.19, 0.97);
+}
+
+@keyframes otp-icon-no {
+  20%, 60% {
+    transform: rotate(-9deg);
+  }
+
+  40%, 80% {
+    transform: rotate(9deg);
+  }
+}
+
+/* …and its cross lands where the icon's detail was. The seal it sits on
+   (mail) has landed long before: no stamp again. */
+.otp-icon__no {
+  animation: otp-icon-cross 380ms cubic-bezier(0.3, 1.6, 0.5, 1) both;
+}
+
+@keyframes otp-icon-cross {
+  from {
+    opacity: 0;
+    transform: scale(0.2) rotate(-60deg);
+  }
+}
+
+.otp-icon[data-state="refused"] .otp-mail__seal {
+  animation: otp-icon-cross 380ms cubic-bezier(0.3, 1.6, 0.5, 1) both;
+}
+
+.otp-icon[data-state="refused"] .otp-mail__seal .otp-icon__no {
+  animation: none;
+}
+
+/* The tick of a code on its way. */
+.otp-icon__badge {
+  animation: otp-icon-badge 420ms cubic-bezier(0.3, 1.6, 0.5, 1) 80ms both;
+}
+
+@keyframes otp-icon-badge {
+  from {
+    opacity: 0;
+    transform: scale(0.2);
+  }
+}
+
+/* Still while its step is folded away, and for whoever asked for less
+   motion: the icon as drawn, timer full. */
+[inert] .otp-icon * {
+  animation: none !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .otp-icon * {
+    animation: none !important;
   }
 }
 
