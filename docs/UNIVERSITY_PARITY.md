@@ -10,6 +10,7 @@ Universités à vérifier : **toutes celles du dépôt au moment du commit**, pa
 2. **Clé de config sans défaut** : une nouvelle clé lue sans repli (`config.x.y` qui casse si `x` manque) alors que d'autres universités ne la définissent pas.
 3. **Chemin d'un autre fournisseur cassé** : un changement touche une branche choisie par la config sans vérifier les autres valeurs. Toute clé de config qui sert à choisir un comportement en est une, y compris celles ajoutées après l'écriture de cette liste. Pour la trouver, chercher dans le code modifié les lectures de `universityConfig.*`, `FEATURES.*` et `features?.*`, puis comparer les valeurs de chaque université. Exemples connus :
    - portail : `auth.portal` (`'uportal'` par défaut, `'drupal'`) ;
+   - second facteur à la connexion : `auth.mfa` (absent = aucune étape de code, `'esup-otp'`) ;
    - planning : `planning.api` (`'portal-rest'`, `'tempo'`, absent = Planning GWT), `planning.personal` ;
    - Moodle : `moodle.casLoginPath` (CAS) ou Shibboleth par défaut ;
    - mail : `mail.provider`, `mail.page` ;

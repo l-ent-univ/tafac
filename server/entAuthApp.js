@@ -43,6 +43,7 @@ import {
   unpackJarCookies,
 } from './sessionCookie.js'
 import { createLaunchTargetPolicy } from './launchTargets.js'
+import { fetchEsupOtpChannels, pickEsupOtpAutoTransport, readEsupOtpPage, sendEsupOtpCode } from './esupOtp.js'
 import {
   buildMailMessage,
   buildMailPartHref,
@@ -326,6 +327,9 @@ const PORTAL_ENTRY_URL = `${ENT_ORIGIN}${universityConfig.auth.portalEntryPath}`
 // Portal software behind ENT_ORIGIN (server/portalSession.js): only uPortal
 // has the layout and userinfo APIs.
 const PORTAL_KIND = resolvePortalKind(universityConfig.auth)
+// Second factor of the CAS login (`auth.mfa`): 'esup-otp', or none. Without
+// it a CAS that asks for a code is a failed login, as it always was.
+const MFA_PROVIDER = universityConfig.auth.mfa ?? null
 // Drupal portal: page listing the tools, read for the applications grid.
 const PORTAL_CATALOG_URL = universityConfig.catalog?.path ? `${ENT_ORIGIN}${universityConfig.catalog.path}` : null
 // Moodle signs in either through its own CAS login (moodle.casLoginPath,
@@ -417,6 +421,8 @@ const LOGIN_RATE_LIMIT_WINDOW_MS = 15 * 60 * 1000
 const LOGIN_RATE_LIMIT_BLOCK_MS = 5 * 60 * 1000
 const LOGIN_RATE_LIMIT_MAX_ATTEMPTS_PER_IP = 30
 const LOGIN_RATE_LIMIT_MAX_ATTEMPTS_PER_USERNAME = 8
+// Codes (SMS, mail) one student can have sent within the window.
+const LOGIN_CODE_SEND_MAX_PER_USERNAME = 5
 const runtimeSessions = new Map()
 const runtimeGradesCache = new Map()
 // sessionId → Map(semesterId → { cachedAt, data }): relevés of the other
@@ -441,6 +447,7 @@ const runtimeMoodleDeadlinesCache = new Map()
 const runtimeMoodleContexts = new Map()
 const loginRateLimitByIp = new Map()
 const loginRateLimitByUsername = new Map()
+const loginCodeSendsByUsername = new Map()
 // sessionId → { tokens, updatedAt }: the mail routes' token buckets
 // (takeMailRateLimitToken).
 const mailRateLimitBuckets = new Map()
@@ -1212,11 +1219,14 @@ async function fetchEntLayout(jar) {
 
 // A CAS answer about the second factor, for the login route to pass on as
 // `code`: 'mfa_required' (the password was accepted, the CAS now asks for a
-// one-time code) or 'mfa_invalid' (it refused the code).
+// one-time code), 'mfa_invalid' (it refused the code) or 'mfa_send_failed'
+// (the code asked by SMS or mail could not be sent). `mfa`, with the first
+// and the last: { methods, sent } (describeEsupOtpStep).
 class CasMfaError extends Error {
-  constructor(message, code) {
+  constructor(message, code, mfa = null) {
     super(message)
     this.code = code
+    this.mfa = mfa
   }
 }
 
@@ -1226,7 +1236,58 @@ function isCasPasswordForm(html) {
   return /<input[^>]*\bname=["']password["']/i.test(html)
 }
 
-async function performEntLogin({ username, password, otp = '' }) {
+// The code step of Esup OTP, for the login form: `methods`, what the student
+// can type a code from ({ app, sms, mail }: an authenticator application,
+// the masked number and address a code can be sent to), null when the API
+// doesn't say; `sent`, the transport ('sms', 'mail') a code was just sent
+// by: the one `sendCode` asked for, or, with `autoSend`, the student's only
+// way to a code (as the university's own page sends it unasked). The API
+// is the one the CAS's page names, on the university's own hosts only.
+async function describeEsupOtpStep(stepHtml, sendCode, autoSend) {
+  const page = readEsupOtpPage(stepHtml)
+  const sendFailed = (methods) => new CasMfaError('Could not send the code.', 'mfa_send_failed', { methods, sent: null })
+
+  if (!page || !/^https:\/\//i.test(page.apiUrl) || !launchTargets.isAllowed(page.apiUrl)) {
+    console.warn(page ? 'Esup OTP: the API of the code page is not on an allowed host.' : 'Esup OTP: the code page could not be read.')
+    if (sendCode) throw sendFailed(null)
+    return { methods: null, sent: null }
+  }
+
+  let channels = null
+  try {
+    channels = await fetchEsupOtpChannels(page)
+  } catch (error) {
+    console.warn('Esup OTP: methods unavailable:', error instanceof Error ? error.message : error)
+  }
+
+  const methods = channels
+    ? { app: channels.app, sms: channels.sms?.to ?? null, mail: channels.mail?.to ?? null }
+    : null
+
+  const transport = sendCode || (autoSend ? pickEsupOtpAutoTransport(channels) : '')
+  if (!transport) {
+    return { methods, sent: null }
+  }
+
+  const channel = channels?.[transport]
+  if (!channel) throw sendFailed(methods)
+
+  try {
+    await sendEsupOtpCode(page, channel, transport, { auto: !sendCode })
+  } catch (error) {
+    console.warn('Esup OTP: code not sent:', error instanceof Error ? error.message : error)
+    // Unasked, a code that didn't leave is no error: the form offers it.
+    if (!sendCode) return { methods, sent: null }
+    throw sendFailed(methods)
+  }
+
+  return { methods, sent: transport }
+}
+
+// `otp`: the one-time code of a two-factor login; `sendCode` ('sms',
+// 'mail'): have one sent instead, the login then stops at 'mfa_required'.
+// `autoSend`: whether a code may leave unasked (describeEsupOtpStep).
+async function performEntLogin({ username, password, otp = '', sendCode = '', autoSend = false }) {
   const jar = new CookieJar()
   const acceptHeader = 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8'
 
@@ -1268,7 +1329,7 @@ async function performEntLogin({ username, password, otp = '' }) {
 
   // Two-factor (Esup OTP): the CAS answers a right password with one more
   // page of the same flow, which takes the one-time code as `token`.
-  if (submitResponse.status === 200) {
+  if (MFA_PROVIDER === 'esup-otp' && submitResponse.status === 200) {
     const stepHtml = await submitResponse.text()
     const stepExecution = isCasPasswordForm(stepHtml) ? '' : extractHiddenInputValue(stepHtml, 'execution')
 
@@ -1277,7 +1338,7 @@ async function performEntLogin({ username, password, otp = '' }) {
     }
 
     if (!otp) {
-      throw new CasMfaError('MFA required.', 'mfa_required')
+      throw new CasMfaError('MFA required.', 'mfa_required', await describeEsupOtpStep(stepHtml, sendCode, autoSend))
     }
 
     submitResponse = await submitCasForm({
@@ -2792,8 +2853,10 @@ app.post('/__ent_auth/login', async (req, res) => {
   try {
     const username = String(req.body.username ?? '').trim()
     const password = String(req.body.password ?? '')
-    // The one-time code of a two-factor login, on the second request.
+    // The one-time code of a two-factor login, on the second request; or
+    // `sendCode`, to have one sent by SMS or by mail first.
     const otp = String(req.body.otp ?? '').replace(/\s/g, '')
+    const sendCode = !otp && ['sms', 'mail'].includes(req.body.sendCode) ? req.body.sendCode : ''
 
     if (!username || !password) {
       return res.status(400).json({
@@ -2826,7 +2889,18 @@ app.post('/__ent_auth/login', async (req, res) => {
       throw new CasMfaError('Invalid OTP.', 'mfa_invalid')
     }
 
-    const result = await performEntLogin({ username, password, otp })
+    // Codes sent to this student lately, asked for or not: past the limit
+    // none is sent unasked, and asking for one waits.
+    const sendLimit = getRateLimitStatus(loginCodeSendsByUsername, normalizeLoginIdentifier(username))
+    if (sendCode && sendLimit) {
+      res.setHeader('Retry-After', String(sendLimit.retryAfterSeconds))
+      return res.status(429).json({
+        error: 'Too many codes requested. Please try again later.',
+        code: 'mfa_send_limit',
+      })
+    }
+
+    const result = await performEntLogin({ username, password, otp, sendCode, autoSend: !sendLimit })
     clearLoginRateLimit(req, username)
     // The password lives only in this request: the session keeps the CAS TGC,
     // which signs in to every service (ENT, ADE, Moodle, webmail…) on its own.
@@ -2860,9 +2934,14 @@ app.post('/__ent_auth/login', async (req, res) => {
     })
   } catch (error) {
     const code = error instanceof CasMfaError ? error.code : null
+    const mfa = error instanceof CasMfaError ? error.mfa : null
+
+    if (mfa?.sent) {
+      recordRateLimitFailure(loginCodeSendsByUsername, normalizeLoginIdentifier(req.body?.username), LOGIN_CODE_SEND_MAX_PER_USERNAME)
+    }
 
     // A right password waiting for its code is not a failed attempt.
-    if (code !== 'mfa_required') {
+    if (code !== 'mfa_required' && code !== 'mfa_send_failed') {
       const rateLimit = recordLoginFailure(req, req.body?.username)
       if (rateLimit) {
         res.setHeader('Retry-After', String(rateLimit.retryAfterSeconds))
@@ -2875,6 +2954,7 @@ app.post('/__ent_auth/login', async (req, res) => {
     res.status(401).json({
       error: error instanceof Error ? error.message : String(error),
       ...(code ? { code } : {}),
+      ...(mfa ? { mfa } : {}),
     })
   }
 })
