@@ -1,8 +1,10 @@
-import { useMemo, useState } from 'react'
+import { Fragment, useEffect, useMemo, useRef, useState } from 'react'
 import { Icon } from '@iconify/react'
 import universityConfig from '@university'
 import loginHands from '../assets/login/login-hands.webp'
 import LentButton from './LentButton'
+import OtpInput, { OTP_LENGTH } from './OtpInput'
+import OtpMethodIcon from './OtpMethodIcon'
 import BetaTag from './BetaTag'
 import LogoBut1 from './LogoBut1'
 import AboutModal from './AboutModal'
@@ -11,6 +13,7 @@ import ServiceNotice from './ServiceNotice'
 import { APP_NAME } from '../seo'
 import { getListedUniversities, getLoadedUniversityId, writeUniversityChoice } from '../universityRuntime'
 import { r } from '../register.js'
+import { playOtpChange, playOtpSound, primeOtpSound } from '../otpSound'
 
 const universityLogo = universityConfig.branding.logo
 const universityLogoAlt = universityConfig.branding.logoAlt ?? universityConfig.university?.name ?? ''
@@ -119,21 +122,143 @@ function UniversityPicker() {
   )
 }
 
+// What belongs to one of the login's two steps: the identifiers, then the
+// one-time code of a two-factor login (their fields, their title). Both
+// stay in the page; what isn't shown is inert, collapsed to no height and
+// faded, so the swap glides instead of jumping. The clip runs a little
+// wider than its content, for the fields' focus ring.
+function FormStep({ open, children }) {
+  return (
+    <div
+      className="grid grid-rows-[1fr] transition-[grid-template-rows,opacity] duration-300 ease-out inert:grid-rows-[0fr] inert:opacity-0 motion-reduce:transition-none"
+      inert={!open}
+    >
+      <div className="-mx-1.5 min-h-0 overflow-hidden px-1.5">{children}</div>
+    </div>
+  )
+}
+
 function LoginPage({
   credentials,
   checking,
   errorMessage,
+  requireOTP = false,
+  otpMethods = null,
+  otpSent = null,
+  otpSending = null,
   onCredentialsChange,
+  onSendOtp,
+  onCancelOtp,
   onDemoLogin,
   onSubmit,
 }) {
   const [showPassword, setShowPassword] = useState(false)
   const [aboutOpen, setAboutOpen] = useState(false)
+  const formRef = useRef(null)
+  const usernameRef = useRef(null)
+  const otpRef = useRef(null)
+  const otp = credentials.otp ?? ''
+  const otpComplete = otp.length === OTP_LENGTH
+  // The digits typed so far, one more at each (not at those taken back):
+  // the step's picture hops along.
+  const [otpBeat, setOtpBeat] = useState(0)
+  const [otpLength, setOtpLength] = useState(otp.length)
+  if (otpLength !== otp.length) {
+    setOtpLength(otp.length)
+    if (otp.length > otpLength) setOtpBeat((beat) => beat + 1)
+  }
+  // On the code step an error is said by the field's own line and picture,
+  // until a new code is being typed. Each new error is unseen.
+  const [otpErrorSeen, setOtpErrorSeen] = useState(false)
+  const [lastError, setLastError] = useState(errorMessage)
+  if (lastError !== errorMessage) {
+    setLastError(errorMessage)
+    setOtpErrorSeen(false)
+  }
+  const otpError = requireOTP && errorMessage && !otpErrorSeen && !checking && !otpSending ? errorMessage : ''
+  // The code step, from what the university says the student has
+  // (`otpMethods`: { app, sms, mail }, null when it doesn't say): a code
+  // can be asked by SMS or by mail where a number or an address is set.
+  const otpSendChoices = [
+    otpMethods?.sms ? { transport: 'sms', label: 'par SMS' } : null,
+    otpMethods?.mail ? { transport: 'mail', label: 'par mail' } : null,
+  ].filter(Boolean)
+  const stepError = requireOTP ? '' : errorMessage
+  // One line over the field says where the code comes from, and follows
+  // what happens to it; one under it, the way to get one (or another).
+  const otpLabel = otpError
+    || (otpSending
+    ? 'Envoi du code…'
+    : otpSent === 'sms'
+      ? `Code envoyé par SMS au ${otpMethods?.sms ?? ''}`.trim()
+      : otpSent === 'mail'
+        ? `Code envoyé par mail à ${otpMethods?.mail ?? ''}`.trim()
+        : otpMethods && !otpMethods.app
+          ? 'Code de vérification'
+          : r("Code de ton application d'authentification", "Code de votre application d'authentification"))
 
   function handleDemoLinkClick() {
     setAboutOpen(false)
     onDemoLogin?.()
   }
+
+  // The step's picture: the way the code comes (the one being asked for,
+  // the one it was sent by, else the student's own: the application unless
+  // they have none), and what the form is doing with it.
+  const otpIconMethod = otpSending
+    ?? otpSent
+    ?? (otpMethods && !otpMethods.app ? otpSendChoices[0]?.transport ?? 'app' : 'app')
+  const otpIconState = otpSending
+    ? 'sending'
+    : checking
+      ? 'checking'
+      : otpError ? 'refused' : 'idle'
+
+  // The code step only sends a whole code (Enter on a partial one).
+  function handleSubmit(event) {
+    if (requireOTP && !otpComplete) {
+      event.preventDefault()
+      return
+    }
+    // The step's sounds come after the answer: woken now, from the gesture.
+    primeOtpSound()
+    onSubmit(event)
+  }
+
+  // The step shown takes the focus, its fields were inert until now: the
+  // code's on the way in and after a refused code, the username on the way
+  // back.
+  const wasOnCodeStep = useRef(false)
+  useEffect(() => {
+    // `otpSending`: back to the code once the one asked for is on its way.
+    if (requireOTP && !checking && !otpSending) {
+      otpRef.current?.focus({ preventScroll: true })
+    } else if (!requireOTP && wasOnCodeStep.current) {
+      usernameRef.current?.focus({ preventScroll: true })
+    }
+    wasOnCodeStep.current = requireOTP
+  }, [requireOTP, checking, otpSending])
+
+  // The step's sounds for what comes back: a code on its way, a refusal
+  // (the digits play theirs as they are typed).
+  useEffect(() => {
+    if (requireOTP && otpSent && !otpSending) playOtpSound('sent')
+  }, [requireOTP, otpSent, otpSending])
+  useEffect(() => {
+    if (otpIconState === 'refused') playOtpSound('refused')
+  }, [otpIconState])
+
+  // A whole code is sent as it is, once: no button to reach for.
+  const sentOtp = useRef('')
+  useEffect(() => {
+    if (!otpComplete) {
+      sentOtp.current = ''
+      return
+    }
+    if (!requireOTP || checking || sentOtp.current === otp) return
+    sentOtp.current = otp
+    formRef.current?.requestSubmit()
+  }, [requireOTP, checking, otp, otpComplete])
 
   return (
     <section className="flex w-full min-h-screen bg-bg" aria-label="Page de connexion">
@@ -219,13 +344,23 @@ function LoginPage({
                   </div>
                 ) : null}
 
-                <div className="flex flex-col items-center gap-2 text-text">
-                  <h2 className="m-0 text-[32px] leading-none max-md:text-[28px]">Connexion</h2>
-                  <p className="m-0 text-[15px] font-medium leading-[1.35] text-text-70 font-body">
-                    {isPicker
-                      ? r('Choisis ton université', 'Choisissez votre université')
-                      : r("Utilise tes codes fournis par ton établissement d'enseignement supérieur", "Utilisez vos codes fournis par votre établissement d'enseignement supérieur")}
-                  </p>
+                {/* The title of the step shown; what the identifiers are
+                    goes with them only. Folded like the form's steps, so
+                    the page glides from one to the other. */}
+                <div className="flex flex-col items-center text-text">
+                  <FormStep open={!requireOTP}>
+                    <h2 className="m-0 text-[32px] leading-none max-md:text-[28px]">Connexion</h2>
+                  </FormStep>
+                  <FormStep open={requireOTP}>
+                    <h2 className="m-0 text-balance text-[32px] leading-[1.05] max-md:text-[28px]">Vérification à double facteur</h2>
+                  </FormStep>
+                  <FormStep open={!requireOTP}>
+                    <p className="m-0 pt-2 text-[15px] font-medium leading-[1.35] text-text-70 font-body">
+                      {isPicker
+                        ? r('Choisis ton université', 'Choisissez votre université')
+                        : r("Utilise tes codes fournis par ton établissement d'enseignement supérieur", "Utilisez vos codes fournis par votre établissement d'enseignement supérieur")}
+                    </p>
+                  </FormStep>
                 </div>
               </header>
 
@@ -240,11 +375,13 @@ function LoginPage({
                 {/* Real form with labelled username/current-password fields and a
                     submit button, so password managers recognize and offer to save
                     the login. */}
-                <form className="mt-6 flex w-full flex-col" onSubmit={onSubmit}>
-                  <div className="flex flex-col gap-4">
+                <form ref={formRef} className="mt-6 flex w-full flex-col" onSubmit={handleSubmit}>
+                  <FormStep open={!requireOTP}>
+                  <div className="flex flex-col gap-4 pb-1.5">
                     <div className="flex flex-col gap-[7px]">
                       <label htmlFor="login-username" className="pl-[18px] text-left text-[13px] font-semibold leading-none text-text-70 font-body">Identifiant</label>
                       <input
+                        ref={usernameRef}
                         id="login-username"
                         name="username"
                         className={FIELD_CLASS}
@@ -283,23 +420,89 @@ function LoginPage({
                       </div>
                     </div>
                   </div>
+                  </FormStep>
+
+                  {/* Two-factor: the CAS accepted the password and asks for
+                      a one-time code. Typed whole, it is sent as it is. */}
+                  <FormStep open={requireOTP}>
+                    <div className="pb-1.5">
+                      {/* Keyed by the step too: it lands anew each time the
+                          step opens, not only when the method changes. */}
+                      <OtpMethodIcon
+                        key={`${requireOTP ? 'shown' : 'folded'}-${otpIconMethod}`}
+                        method={otpIconMethod}
+                        state={otpIconState}
+                        sent={otpSent === otpIconMethod && !otpSending}
+                        beat={otpBeat}
+                        className="mb-2.5"
+                      />
+                      <OtpInput
+                        inputRef={otpRef}
+                        label={otpLabel}
+                        value={otp}
+                        busy={checking}
+                        invalid={Boolean(otpError)}
+                        onChange={(value) => {
+                          if (value) setOtpErrorSeen(true)
+                          playOtpChange(otp, value)
+                          onCredentialsChange('otp', value)
+                        }}
+                      />
+                      {otpSendChoices.length > 0 ? (
+                        <p className="m-0 mt-3 text-center text-[13px] font-medium leading-[1.35] text-text-muted font-body">
+                          {otpSent ? 'Renvoyer' : 'Recevoir un code'}{' '}
+                          {otpSendChoices.map((choice, index) => (
+                            <Fragment key={choice.transport}>
+                              {index > 0 ? ' ou ' : null}
+                              <button
+                                type="button"
+                                className={`${LINK_CLASS} cursor-pointer border-0 bg-transparent p-0 text-[13px]! disabled:cursor-default disabled:opacity-50`}
+                                onClick={() => {
+                                  primeOtpSound()
+                                  onSendOtp?.(choice.transport)
+                                }}
+                                disabled={checking || Boolean(otpSending)}
+                              >
+                                {choice.label}
+                              </button>
+                            </Fragment>
+                          ))}
+                        </p>
+                      ) : null}
+                    </div>
+                  </FormStep>
 
                   {/* Collapses to nothing when empty: its spacing sits inside
-                      the clipped row, so the button doesn't jump. */}
-                  <div className={`grid transition-[grid-template-rows] duration-200 ease-out ${errorMessage ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]'}`}>
+                      the clipped row, so the button doesn't jump. The code
+                      step says its errors on the field's own line. */}
+                  <div className={`grid transition-[grid-template-rows] duration-200 ease-out ${stepError ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]'}`}>
                     <div className="overflow-hidden">
-                      <div className="pt-4" role="alert">
-                        <div className={`flex items-start gap-[10px] corners-[14px] border border-error/20 bg-error-bg px-4 py-3 text-error transition-opacity duration-200 ${errorMessage ? 'opacity-100' : 'opacity-0'}`}>
+                      <div className="pt-2.5 pb-1.5" role="alert">
+                        <div className={`flex items-start gap-[10px] corners-[14px] border border-error/20 bg-error-bg px-4 py-3 text-error transition-opacity duration-200 ${stepError ? 'opacity-100' : 'opacity-0'}`}>
                           <Icon icon="ph:warning-circle-fill" className="mt-px h-4 w-4 shrink-0" aria-hidden="true" />
-                          <p className="m-0 text-sm font-semibold leading-[1.3] font-body">{errorMessage}</p>
+                          <p className="m-0 text-sm font-semibold leading-[1.3] font-body">{stepError}</p>
                         </div>
                       </div>
                     </div>
                   </div>
 
-                  <LentButton type="submit" className="mt-5 min-h-[52px]! w-full text-[16px]!" loading={checking}>
+                  <LentButton type="submit" className="mt-3.5 min-h-[52px]! w-full text-[16px]!" loading={checking} disabled={requireOTP && !otpComplete}>
                     Se connecter
                   </LentButton>
+
+                  {/* Back to the identifiers: another account, a typo. */}
+                  <FormStep open={requireOTP}>
+                    <div className="flex justify-center pt-4 pb-1">
+                      <button
+                        type="button"
+                        className={`${LINK_CLASS} cursor-pointer border-0 bg-transparent p-0 disabled:cursor-default disabled:opacity-50`}
+                        onClick={onCancelOtp}
+                        disabled={checking}
+                      >
+                        Retour
+                      </button>
+                    </div>
+                  </FormStep>
                 </form>
 
                 {SHOW_ACCOUNT_LINKS && (loginLinks.forgotPassword || loginLinks.activateAccount) ? (

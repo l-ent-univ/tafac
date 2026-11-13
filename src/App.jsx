@@ -11,6 +11,7 @@ import { markChangelogEntrySeen, setChangelogAudience } from './changelogStore'
 import ChangelogSheet from './components/ChangelogSheet'
 import LandingPage from './components/LandingPage'
 import LoginPage from './components/LoginPage'
+import { playOtpSound } from './otpSound'
 import OnboardingCompletionPage from './components/OnboardingCompletionPage'
 import PwaInstallPrompt from './components/PwaInstallPrompt'
 import OnboardingPage from './components/OnboardingPage'
@@ -430,9 +431,25 @@ function getFrenchAuthErrorMessage(error, context = 'login') {
   // the checks below and showed as wrong credentials.
   if (error?.status === 429) {
     const minutes = Math.ceil((error.retryAfterSeconds ?? 0) / 60)
+    // Too many codes asked by SMS or mail (two-factor login).
+    if (error.code === 'mfa_send_limit') {
+      return minutes > 0
+        ? r(`Trop de codes demandés, réessaie dans ${minutes} min`, `Trop de codes demandés, réessayez dans ${minutes} min`)
+        : r('Trop de codes demandés. Réessaie dans quelques instants', 'Trop de codes demandés. Réessayez dans quelques instants')
+    }
     return minutes > 0
       ? r(`Trop de tentatives de connexion, réessaie dans ${minutes} min`, `Trop de tentatives de connexion, réessayez dans ${minutes} min`)
       : r('Trop de tentatives de connexion. Réessaie dans quelques instants', 'Trop de tentatives de connexion. Réessayez dans quelques instants')
+  }
+
+  // A two-factor login whose one-time code the CAS refused.
+  if (error?.code === 'mfa_invalid') {
+    return 'Code incorrect ou expiré'
+  }
+
+  // The code asked by SMS or mail was not sent.
+  if (error?.code === 'mfa_send_failed') {
+    return 'Envoi du code impossible'
   }
 
   const rawMessage = getErrorMessage(error).trim()
@@ -903,6 +920,8 @@ function App() {
   const [credentials, setCredentials] = useState({
     username: '',
     password: '',
+    // The one-time code of a two-factor login (LoginPage's second step).
+    otp: '',
   })
   const [establishment, setEstablishment] = useState(() => getStoredEstablishment())
   // « tu » or « vous » for every string built from here on (src/register.js):
@@ -993,7 +1012,20 @@ function App() {
     sessionSource: null,
     canUseServerLaunch: false,
     error: '',
+    // The CAS accepted the password and asks for a one-time code: the
+    // login form is on its second step.
+    requireOTP: false,
   })
+  // The code step of a two-factor login: what the student can type a code
+  // from (`methods`: { app, sms, mail }, null when the server doesn't know),
+  // the transport a code was sent by, the one being asked.
+  const [loginMfa, setLoginMfa] = useState({ methods: null, sent: null, sending: null })
+  // Dev only (debug menu): the login's code step shown for one way of
+  // getting the code and one state of the form, without a request:
+  // { method: 'app' | 'sms' | 'mail', state: 'idle' | 'sending' | 'sent' |
+  // 'checking' | 'refused' }, null when off.
+  const [loginCodePreview, setLoginCodePreview] = useState(null)
+  const loginCodePreviewTimer = useRef(0)
   const [hasCheckedInitialSession, setHasCheckedInitialSession] = useState(false)
   const [pathname, setPathname] = useState(() => window.location.pathname)
   const [opensOnLogin] = useState(shouldOpenOnLogin)
@@ -2404,6 +2436,8 @@ function App() {
     try {
       const result = await loginToEnt(credentials)
       const isDemo = result?.sessionMode === DEMO_SESSION_MODE
+      // The code went through: the code step's last sound.
+      if (sessionState.requireOTP) playOtpSound('success')
       track('login_result', { result: 'success', demo: isDemo })
       flushAnalytics()
       // Offer the accepted login to the browser's password manager (Chrome's
@@ -2419,9 +2453,31 @@ function App() {
       if (reloadForOtherUniversity(result)) return
       await refreshSession()
     } catch (error) {
+      // Two-factor: the password is right, the code is still to come. Not a
+      // failure: the form moves on to its second step.
+      if (error?.code === 'mfa_required') {
+        // `sent`: the student's only way to a code, sent without asking.
+        setLoginMfa({ methods: error.mfa?.methods ?? null, sent: error.mfa?.sent ?? null, sending: null })
+        setCredentials((current) => ({ ...current, otp: '' }))
+        setSessionState((current) => ({
+          ...current,
+          checking: false,
+          error: '',
+          requireOTP: true,
+        }))
+        commitDebugState('Connexion', null, 'Code à usage unique demandé')
+        return
+      }
+
       const message = getFrenchAuthErrorMessage(error, 'login')
+      // On the code step, only an answer about the identifiers (a 401 that
+      // isn't the code's) sends back to them: a refused code, the rate limit
+      // or a network error leave the student there, to type a code again.
+      const codeRefused = error?.code === 'mfa_invalid'
+      const leavesCodeStep = error?.status === 401 && !codeRefused
       clearLegacySensitiveClientCaches()
-      setSessionState({
+      setCredentials((current) => ({ ...current, otp: '' }))
+      setSessionState((current) => ({
         checking: false,
         authenticated: false,
         user: null,
@@ -2432,17 +2488,85 @@ function App() {
         sessionSource: null,
         canUseServerLaunch: false,
         error: message,
-      })
+        requireOTP: codeRefused || (Boolean(current.requireOTP) && !leavesCodeStep),
+      }))
       track('login_result', { result: 'failure', demo: false })
       flushAnalytics()
       commitDebugState('Connexion', null, message)
     }
   }
 
+  // Two-factor: has the university send a code by SMS or by mail. The
+  // server signs in again up to the code step to ask for it, so the answer
+  // is 'mfa_required' once more, with the transport in `mfa.sent`.
+  async function handleSendLoginCode(transport) {
+    setLoginMfa((current) => ({ ...current, sending: transport }))
+    setSessionState((current) => ({ ...current, error: '' }))
+
+    try {
+      await loginToEnt({ username: credentials.username, password: credentials.password, sendCode: transport })
+      // No code asked this time: signed in.
+      setCredentials((current) => ({ ...current, password: '' }))
+      await refreshSession()
+    } catch (error) {
+      const sent = error?.code === 'mfa_required' && error.mfa?.sent === transport
+      setLoginMfa((current) => ({
+        methods: error?.mfa?.methods ?? current.methods,
+        sent: sent ? transport : current.sent,
+        sending: null,
+      }))
+      if (sent) return
+
+      setSessionState((current) => ({
+        ...current,
+        error: error?.code === 'mfa_required' ? 'Envoi du code impossible' : getFrenchAuthErrorMessage(error, 'login'),
+        // An answer about the identifiers sends back to them.
+        requireOTP: !(error?.status === 401 && !error?.code),
+      }))
+    }
+  }
+
+  // The debug preview of the code step: `next` now, then `thenState` a
+  // moment later, as a request would (a code sent, a code refused). `sent`
+  // (a code is on its way) follows the states: set by 'sent', kept through
+  // a check and a refusal, dropped at rest.
+  function previewLoginCode(next, thenState = null) {
+    const withSent = (preview, previous) => ({
+      ...preview,
+      sent: preview.method !== 'app' && (
+        preview.state === 'sent'
+        || (['checking', 'refused'].includes(preview.state) && previous?.method === preview.method && Boolean(previous?.sent))
+      ),
+    })
+
+    window.clearTimeout(loginCodePreviewTimer.current)
+    setLoginCodePreview((current) => (next ? withSent(next, current) : null))
+    if (!next || !thenState) return
+
+    loginCodePreviewTimer.current = window.setTimeout(() => {
+      setLoginCodePreview((current) => (current ? withSent({ ...current, state: thenState }, current) : current))
+      if (thenState === 'refused') {
+        setCredentials((current) => ({ ...current, otp: '' }))
+      }
+    }, 1100)
+  }
+
+  // From the code step back to the identifiers (another account, a typo).
+  function handleCancelOtp() {
+    setLoginMfa({ methods: null, sent: null, sending: null })
+    setCredentials((current) => ({ ...current, otp: '' }))
+    setSessionState((current) => ({
+      ...current,
+      error: '',
+      requireOTP: false,
+    }))
+  }
+
   async function handleDemoLogin() {
     setCredentials({
       username: DEMO_CREDENTIALS.username,
       password: DEMO_CREDENTIALS.password,
+      otp: '',
     })
 
     setSessionState((current) => ({
@@ -2634,6 +2758,48 @@ function App() {
     },
   }
 
+  // The login page, on its real state or on the debug preview's.
+  const loginCode = loginCodePreview
+    ? {
+        checking: loginCodePreview.state === 'checking',
+        errorMessage: loginCodePreview.state === 'refused' ? 'Code incorrect ou expiré' : '',
+        requireOTP: true,
+        // The method's own, and with the application the two others, to
+        // go from one to the next by the page's links.
+        otpMethods: {
+          app: loginCodePreview.method === 'app',
+          sms: loginCodePreview.method === 'mail' ? null : '06******12',
+          mail: loginCodePreview.method === 'sms' ? null : 'pr***@exemple.fr',
+        },
+        otpSent: loginCodePreview.sent ? loginCodePreview.method : null,
+        otpSending: loginCodePreview.method !== 'app' && loginCodePreview.state === 'sending' ? loginCodePreview.method : null,
+        onSendOtp: (transport) => previewLoginCode({ method: transport, state: 'sending' }, 'sent'),
+        onCancelOtp: () => previewLoginCode(null),
+        onSubmit: (event) => {
+          event.preventDefault()
+          previewLoginCode({ ...loginCodePreview, state: 'checking' }, 'refused')
+        },
+      }
+    : {
+        checking: sessionState.checking,
+        errorMessage: sessionState.error,
+        requireOTP: Boolean(sessionState.requireOTP),
+        otpMethods: loginMfa.methods,
+        otpSent: loginMfa.sent,
+        otpSending: loginMfa.sending,
+        onSendOtp: (transport) => void handleSendLoginCode(transport),
+        onCancelOtp: handleCancelOtp,
+        onSubmit: handleLogin,
+      }
+  const loginPage = (
+    <LoginPage
+      credentials={credentials}
+      {...loginCode}
+      onCredentialsChange={(field, value) => setCredentials((current) => ({ ...current, [field]: value }))}
+      onDemoLogin={() => void handleDemoLogin()}
+    />
+  )
+
   return (
     // viewport-fit=cover (index.html): the page runs under the notch and the
     // rounded corners, its background filling the screen instead of iOS's
@@ -2642,7 +2808,9 @@ function App() {
     // so the bands' tint and photo still reach the edges. Bars fixed to
     // the screen carry their own insets.
     <main className="relative min-h-screen flex flex-col bg-bg overflow-x-clip pl-[env(safe-area-inset-left)] pr-[env(safe-area-inset-right)]">
-      {shouldHoldInitialRender ? (
+      {loginCodePreview ? (
+        loginPage
+      ) : shouldHoldInitialRender ? (
         <div className="flex-1 min-h-0 bg-bg" aria-hidden="true" />
       ) : isProfileSwitching ? (
         <div className="flex-1 min-h-0 bg-bg flex items-center justify-center p-8">
@@ -2820,14 +2988,7 @@ function App() {
       ) : !showLoginPage ? (
         <LandingPage onLogin={() => navigate(LOGIN_PATH)} />
       ) : (
-        <LoginPage
-          credentials={credentials}
-          checking={sessionState.checking}
-          errorMessage={sessionState.error}
-          onCredentialsChange={(field, value) => setCredentials((current) => ({ ...current, [field]: value }))}
-          onDemoLogin={() => void handleDemoLogin()}
-          onSubmit={handleLogin}
-        />
+        loginPage
       )}
       <AccountModal
         open={isAccountModalOpen}
@@ -2926,6 +3087,11 @@ function App() {
             onShowIosPrompt={() => { setForceIosPrompt(true); setTimeout(() => setForceIosPrompt(false), 100) }}
             onShowUpdatePrompt={() => setForceUpdatePrompt(true)}
             onShowWelcomeFromLent={() => setWelcomeFromLentOpen(true)}
+            loginCodePreview={loginCodePreview}
+            onLoginCodePreviewChange={(next) => {
+              setCredentials((current) => ({ ...current, otp: '' }))
+              previewLoginCode(next)
+            }}
             selectedTp={selectedTp}
           />
         </Suspense>
