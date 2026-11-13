@@ -11,8 +11,15 @@ import { bootUniversity } from './universityBoot'
 // university config when they load: imported once bootUniversity() has
 // filled it.
 // ContextMenuHost: the app's right-click menu, wherever a place offers one.
+// Dev only: /dev/design, every token and shared component on one page
+// (src/dev/DesignGallery.jsx). The build drops the branch and the chunk.
+const DESIGN_GALLERY_PATH = '/dev/design'
+const showDesignGallery = import.meta.env.DEV && window.location.pathname.replace(/\/+$/, '') === DESIGN_GALLERY_PATH
+
 bootUniversity()
-  .then(() => Promise.all([import('./App.jsx'), import('./components/ContextMenuHost.jsx')]))
+  .then(() => (showDesignGallery
+    ? import('./dev/DesignGallery.jsx').then((module) => [{ default: module.default }, { default: () => null }])
+    : Promise.all([import('./App.jsx'), import('./components/ContextMenuHost.jsx')])))
   .then(([appModule, hostModule]) => {
     const App = appModule.default
     const ContextMenuHost = hostModule.default

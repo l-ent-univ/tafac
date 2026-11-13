@@ -48,10 +48,10 @@ function MiniLine({ timeline }) {
   return (
     <div className="relative px-[5px]" aria-hidden="true">
       <div className="relative h-[30px]">
-        <span className="absolute inset-x-0 bottom-[9px] h-[4px] rounded-full border border-dashed border-border-input" />
-        <span className="assiduity-elapsed absolute left-0 bottom-[9px] h-[4px] rounded-full bg-brand-subtle" style={{ width: `${timeline.elapsed}%` }} />
+        <span className="assiduity-track absolute inset-x-0 bottom-[8px] h-[6px] rounded-full" />
+        <span className="assiduity-elapsed assiduity-fill absolute left-0 bottom-[8px] h-[6px] rounded-full" style={{ width: `${timeline.elapsed}%` }} />
         {timeline.today != null ? (
-          <span className="absolute bottom-[3px] h-[16px] w-[2px] -translate-x-1/2 rounded-full bg-brand" style={{ left: `${timeline.today}%` }} />
+          <span className="assiduity-today absolute bottom-[2px] h-[18px] w-[4px] -translate-x-1/2 rounded-full" style={{ left: `${timeline.today}%` }} />
         ) : null}
         {timeline.marks.map((mark, index) => (
           <span key={mark.id} className="absolute" style={{ left: `${mark.position}%`, bottom: `${8 + mark.stack * 11}px` }}>
@@ -120,7 +120,7 @@ function WidgetAssiduity({ payload, releve, config, status }) {
         {timeline ? <div className="min-w-0 flex-1"><MiniLine timeline={timeline} /></div> : null}
       </div>
       {soonest ? (
-        <span className="inline-flex min-w-0 items-center gap-1.5 self-start rounded-full bg-error-bg px-2.5 py-[6px] font-body text-[13px] font-semibold leading-none text-error">
+        <span className="status-tag status-tag--error inline-flex min-w-0 items-center gap-1.5 self-start rounded-full px-2.5 py-[6px] font-body text-[13px] font-semibold leading-none text-error">
           <span className="whitespace-nowrap">{formatTimeLeft(soonest.hoursLeft)} pour justifier</span>
           {soonest.entry.subjectTitle ? <span className="min-w-0 truncate font-medium opacity-80">· {soonest.entry.subjectTitle}</span> : null}
         </span>

@@ -135,7 +135,7 @@ function DeadlinesHeader({ urgentCount = 0, hasOverdue = false, icon = null }) {
       <span className="m-0 min-w-0 leading-[1.06] text-base font-medium text-text-muted overflow-hidden text-ellipsis whitespace-nowrap max-md:text-[15px]">Échéances</span>
       {urgentCount > 0 ? (
         <span
-          className={`deadline-pill ${hasOverdue ? 'deadline-pill-overdue' : ''} ml-[3px] inline-flex items-center justify-center min-w-[18px] h-[18px] px-[6px] rounded-full text-[11px] font-semibold leading-none tabular-nums shrink-0`}
+          className={`lent-button lent-button--tag deadline-pill ${hasOverdue ? 'deadline-pill-overdue' : ''} ml-[3px] inline-flex items-center justify-center min-w-[18px] h-[18px] px-[6px] rounded-full text-[11px] font-semibold leading-none tabular-nums shrink-0`}
           aria-label={`${urgentCount} à rendre sous 48 h`}
           title={hasOverdue ? 'En retard ou à rendre sous 48 h' : 'À rendre sous 48 h'}
         >

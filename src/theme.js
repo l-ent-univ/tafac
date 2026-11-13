@@ -55,7 +55,7 @@ export function intensityOf(palette) {
   return nearest + 1
 }
 // Sable's colours, the light and dark themes of tokens.css as they are.
-const SAND = { swatch: '#341200', swatchDark: '#e4e4e4', page: { light: '#FCFBF8', dark: '#0f0f0f' } }
+const SAND = { swatch: '#491d11', swatchDark: '#e4e4e4', page: { light: '#FCFBF8', dark: '#0f0f0f' } }
 
 // Surfaces of the recipe (tokens.css) the brand must read on: the lightest
 // page the tint allows and the subtle surface, where a brand text can sit.

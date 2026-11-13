@@ -6,9 +6,10 @@ import { copy, copyText } from '../landingCopy'
 import { scrollToSection } from '../landingMotion'
 import LogoBut1 from './LogoBut1'
 import PapillonBadge from './PapillonBadge'
+import SmoothSurface from './SmoothSurface'
 
 const repoUrl = universityConfig.branding.about?.repoUrl
-const LINK_CLASSES = 'inline-flex items-center gap-1.5 rounded-full px-3.5 py-2 border-0 bg-transparent text-[15px] font-semibold text-text no-underline transition-colors hover:bg-white/60 dark:hover:bg-white/10'
+const LINK_CLASSES = 'inline-flex items-center gap-1.5 rounded-full px-3.5 py-2 border-0 bg-transparent text-[15px] font-semibold text-text no-underline transition-[background-color,box-shadow] duration-150 hover:bg-card hover:shadow-[0_0_0_1px_color-mix(in_srgb,var(--color-text)_9%,transparent),0_1px_2px_rgb(0_0_0/0.06)] dark:hover:bg-white/8 dark:hover:shadow-[0_0_0_1px_rgb(255_255_255/0.06)]'
 const MENU_LINK_CLASSES = 'flex min-h-12 items-center gap-2 corners-[16px] px-4 text-[17px] font-semibold text-text no-underline transition-colors hover:bg-bg-subtle dark:hover:bg-white/10'
 
 // The page's sections, in the bar on wide screens and in the menu otherwise.
@@ -149,8 +150,9 @@ function LandingHeader({ onLogin }) {
               <button
                 type="button"
                 onClick={onLogin}
-                className="min-h-10 whitespace-nowrap rounded-full border-0 bg-brand px-5 text-[15px] font-semibold text-bg transition-transform duration-150 hover:scale-[1.03] active:scale-[0.98] cursor-pointer max-md:px-4"
+                className="lent-button min-h-10 whitespace-nowrap rounded-full px-5 text-[15px] font-medium cursor-pointer max-md:px-4"
               >
+                <SmoothSurface />
                 {copyText(copy.header.login)}
               </button>
               <button

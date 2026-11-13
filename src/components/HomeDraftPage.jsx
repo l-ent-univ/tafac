@@ -29,6 +29,7 @@ import WidgetRecentMail from './WidgetRecentMail'
 import { SHIMMER_CLASSES } from './widgetListUtils'
 import { r } from '../register.js'
 import HomeIcon from './HomeIcon'
+import SmoothSurface from './SmoothSurface'
 
 // The row above the greeting, in place of the card's wave: each icon
 // tilted its own way, on one line.
@@ -527,7 +528,7 @@ function HomeDraftPage({
         // Every card hidden (Réglages › Accueil): where to bring
         // them back, in place of the grid.
         <div className={`pt-6 max-md:pt-4 ${CONTENT_MAX_CLASSES}`}>
-          <div className="flex flex-col items-start gap-1 corners-[24px] border border-dashed border-text-30 px-5 py-6 max-md:px-4 max-md:py-5">
+          <div className="engraved flex flex-col items-start gap-1 corners-[24px] px-5 py-6 max-md:px-4 max-md:py-5">
             <span className="flex items-center gap-[7px] font-body text-base font-semibold leading-[1.1] text-text">
               <Icon icon="ph:squares-four" className="size-[18px] shrink-0 opacity-70" aria-hidden="true" />
               Aucune carte sur l’accueil
@@ -537,8 +538,9 @@ function HomeDraftPage({
               <button
                 type="button"
                 onClick={onOpenCardsSettings}
-                className="mt-2 inline-flex cursor-pointer items-center gap-1.5 rounded-full border border-white bg-widget-bg px-3.5 py-2 font-body text-[14px] font-semibold leading-none text-text shadow-[0_1px_3px_rgba(0,0,0,0.08)] transition-shadow duration-150 hover:shadow-[0_3px_10px_rgba(0,0,0,0.1)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-text dark:border-[var(--color-border)]"
+                className="material mt-2 inline-flex cursor-pointer items-center gap-1.5 rounded-full px-3.5 py-2 font-body text-[14px] font-semibold leading-none text-text focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-text"
               >
+                <SmoothSurface />
                 <Icon icon="ph:layout" className="size-4 shrink-0" aria-hidden="true" />
                 Choisir les cartes
               </button>

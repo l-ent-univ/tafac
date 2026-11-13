@@ -70,6 +70,7 @@ import {
 } from '../mailCompose'
 import { composeOrigin, pickDefaultIdentity, sendFailureText } from '../mailSendPayload'
 import { r } from '../register.js'
+import SmoothSurface from './SmoothSurface'
 
 // The window a new mail is written in, in the spirit of Apple Mail's: a
 // toolbar of glass pills (the kind of reply, attachments, then the round
@@ -103,7 +104,7 @@ const RECIPIENT_FIELDS = ['to', 'cc', 'bcc']
 const MOD_KEY = typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.platform) ? '⌘' : 'Ctrl'
 
 // The format bar's choices. Sizes in pixels, the text's own being 16 (no
-// mark then); « Inter » is the text's own font (none set either).
+// mark then); « Collab Sans » is the text's own font (none set either).
 const BLOCK_OPTIONS = [
   { value: 'p', label: 'Corps' },
   { value: 'h2', label: 'Titre' },
@@ -111,7 +112,7 @@ const BLOCK_OPTIONS = [
   { value: 'blockquote', label: 'Citation' },
 ]
 const FONT_OPTIONS = [
-  { value: 'inter', label: 'Inter', family: 'Inter Variable, system-ui, sans-serif' },
+  { value: 'inter', label: 'Collab Sans', family: 'Collab Sans, system-ui, sans-serif' },
   { value: 'georgia', label: 'Georgia', family: 'Georgia, serif' },
   { value: 'mono', label: 'Menlo', family: 'ui-monospace, Menlo, monospace' },
 ]
@@ -627,7 +628,7 @@ function RecipientInput({ id, field, label, tokens, onTokensChange, value, onVal
   return (
     <div
       ref={rootRef}
-      className={`flex min-w-0 flex-1 flex-wrap items-center gap-x-3 gap-y-0.5 rounded-[10px] py-[6px] transition-[background-color] duration-120 ${dragOver ? 'bg-bg-subtle' : ''}`}
+      className={`flex min-w-0 flex-1 flex-wrap items-center gap-x-3 gap-y-0.5 rounded-[10px] py-[6px] transition-[background-color,box-shadow] duration-120 ${dragOver ? 'engraved' : ''}`}
       onClick={() => inputRef.current?.focus()}
       onDragOver={(event) => {
         if (!isRecipientDrag(event)) return
@@ -726,7 +727,7 @@ function RecipientInput({ id, field, label, tokens, onTokensChange, value, onVal
       {open ? (
         <div
           ref={listRef}
-          className="mail-recipient-list absolute top-[calc(100%-2px)] left-3 right-3 z-20 overflow-y-auto overscroll-contain border border-border corners-[16px] bg-context-bg p-[5px] shadow-[0_1px_3px_rgb(52_18_0/0.08),0_18px_44px_-12px_var(--color-shadow)] backdrop-blur-[16px] 4xl:right-auto 4xl:w-[400px] 4xl:max-w-[calc(100%-24px)]"
+          className="mail-recipient-list glass glass--menu absolute top-[calc(100%-2px)] left-3 right-3 z-20 overflow-y-auto overscroll-contain border corners-[16px] p-[5px] 4xl:right-auto 4xl:w-[400px] 4xl:max-w-[calc(100%-24px)]"
           // The field keeps the focus (and the keyboard stays up on a phone).
           onMouseDown={(event) => event.preventDefault()}
         >
@@ -740,7 +741,7 @@ function RecipientInput({ id, field, label, tokens, onTokensChange, value, onVal
                   id={optionId(index)}
                   role="option"
                   aria-selected={isActive}
-                  className={`flex min-h-[44px] cursor-pointer items-center gap-[10px] corners-[11px] px-[10px] py-[6px] max-4xl:min-h-[52px] ${isActive ? 'bg-context-hover' : ''}`}
+                  className={`flex min-h-[44px] cursor-pointer items-center gap-[10px] corners-[11px] px-[10px] py-[6px] max-4xl:min-h-[52px] ${isActive ? 'bg-context-hover shadow-[0_0_0_1px_color-mix(in_srgb,var(--color-text)_9%,transparent),0_1px_2px_rgb(0_0_0/0.06)] dark:shadow-[0_0_0_1px_rgb(255_255_255/0.06)]' : ''}`}
                   onMouseMove={() => {
                     if (!isActive) setActiveEmail(item.email)
                   }}
@@ -807,7 +808,7 @@ function TeacherSuggestions({ groups, canAddAll, onAdd, onDismiss }) {
                 <button
                   key={match.email}
                   type="button"
-                  className="group relative inline-flex h-7 min-w-0 max-w-full items-center gap-[7px] rounded-full border-0 bg-bg-subtle py-0 pl-[4px] pr-[8px] text-text cursor-pointer transition-colors duration-100 hover:bg-bg-muted focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-text max-4xl:h-8"
+                  className="glass-solid group relative inline-flex h-7 min-w-0 max-w-full items-center gap-[7px] rounded-full py-0 pl-[4px] pr-[8px] text-text cursor-pointer transition-colors duration-100 hover:bg-bg-muted focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-text max-4xl:h-8"
                   aria-label={`Ajouter ${match.name || match.email}, ${match.email}, pour ${group.name}`}
                   onClick={() => onAdd([match])}
                 >
@@ -880,7 +881,7 @@ function FormatSelect({ label, value, options, onOpen, className = '' }) {
   return (
     <button
       type="button"
-      className={`inline-flex h-8 shrink-0 items-center gap-1.5 rounded-[9px] border-0 bg-bg-subtle pl-2.5 pr-2 text-text cursor-pointer transition-[background-color] duration-120 hover:bg-bg-muted aria-expanded:bg-bg-muted focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-text ${className}`}
+      className={`glass-solid inline-flex h-8 shrink-0 items-center gap-1.5 rounded-[9px] pl-2.5 pr-2 text-text cursor-pointer aria-expanded:bg-bg-muted focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-text ${className}`}
       aria-label={`${label} : ${current?.label ?? ''}`}
       aria-haspopup="menu"
       onMouseDown={(event) => event.preventDefault()}
@@ -895,7 +896,7 @@ function FormatSelect({ label, value, options, onOpen, className = '' }) {
 
 // A segmented group of the format bar (B I U S…), its buttons lit when on.
 function FormatSegment({ children }) {
-  return <span className="inline-flex shrink-0 items-center gap-px rounded-[9px] bg-bg-subtle p-[2px]">{children}</span>
+  return <span className="format-well inline-flex shrink-0 items-center gap-px rounded-[9px] p-[2px]">{children}</span>
 }
 
 // Pressed down, a button would take the focus from the text and with it the
@@ -1008,7 +1009,7 @@ function AttachmentChip({ item, onRemove, onRetry = null }) {
   const percent = Math.round((item.progress ?? 0) * 100)
   return (
     <li
-      className={`group relative flex h-[46px] w-[248px] min-w-0 items-center gap-[9px] rounded-[14px] pl-[9px] pr-[3px] max-sm:w-full ${failed ? 'bg-error/8 dark:bg-error/14' : 'bg-bg-subtle dark:bg-bg-muted'}`}
+      className={`group relative flex h-[46px] w-[248px] min-w-0 items-center gap-[9px] rounded-[14px] pl-[9px] pr-[3px] max-sm:w-full ${failed ? 'bg-error/8 dark:bg-error/14' : 'glass-solid'}`}
       aria-label={`${item.name}, ${detail}`}
     >
       <span
@@ -2052,6 +2053,8 @@ function MailComposer({ initialKind = 'new', message = null, sender = null, iden
     label: option.label,
     checked: option.value === formatMenu.value,
     ...(formatMenu.swatches ? { swatch: option.value } : null),
+    // The fonts, each named in itself.
+    ...(option.family ? { labelStyle: { fontFamily: option.family } } : null),
     onSelect: () => applyFormat(menu.kind, option.value, menu.range),
   })) : menu?.kind === 'attach'
     ? [
@@ -2076,11 +2079,12 @@ function MailComposer({ initialKind = 'new', message = null, sender = null, iden
   const sendButton = (
     <button
       type="button"
-      className={`group relative inline-flex size-9 shrink-0 items-center justify-center rounded-full border-0 bg-text text-bg cursor-pointer transition-[transform,filter,opacity] duration-100 ease-out hover:brightness-110 active:scale-[0.92] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-text ${uploading ? 'opacity-40' : ''}`}
+      className="lent-button group inline-flex size-9 shrink-0 items-center justify-center rounded-full cursor-pointer focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-text"
       aria-label="Envoyer"
       aria-disabled={uploading || undefined}
       onClick={send}
     >
+      <SmoothSurface />
       <Icon icon="ph:arrow-up" className="size-[19px]" aria-hidden="true" />
       <Tooltip title={uploading ? 'Pièces jointes en cours de chargement' : 'Envoyer'} detail={uploading ? null : `${MOD_KEY} Entrée`} side="bottom-end" className="max-4xl:hidden" />
     </button>
@@ -2164,11 +2168,12 @@ function MailComposer({ initialKind = 'new', message = null, sender = null, iden
           <CloseButton onClick={requestClose} />
           <button
             type="button"
-            className="close-button close-button--plain group relative inline-flex size-[34px] shrink-0 cursor-pointer items-center justify-center rounded-full border-0 p-0 text-text"
+            className="close-button material group relative inline-flex size-[34px] shrink-0 cursor-pointer items-center justify-center rounded-full border-0 p-0 text-text"
             aria-label={isFullscreen ? 'Quitter le plein écran' : 'Plein écran'}
             aria-pressed={isFullscreen}
             onClick={toggleFullscreen}
           >
+            <SmoothSurface />
             <Icon icon={isFullscreen ? 'ph:arrows-in' : 'ph:arrows-out'} className="size-[15px]" aria-hidden="true" />
             <Tooltip title={isFullscreen ? 'Quitter le plein écran' : 'Plein écran'} side="bottom-start" />
           </button>
@@ -2304,7 +2309,7 @@ function MailComposer({ initialKind = 'new', message = null, sender = null, iden
       </div>
 
       {dragActive ? (
-        <div className="pointer-events-none absolute inset-2 z-20 flex flex-col items-center justify-center gap-2 rounded-[20px] border-2 border-dashed border-text/25 bg-widget-bg/85 backdrop-blur-[6px]" aria-hidden="true">
+        <div className="mail-drop-overlay pointer-events-none absolute inset-2 z-20 flex flex-col items-center justify-center gap-2 rounded-[20px] backdrop-blur-[6px]" aria-hidden="true">
           <MailDropSheets />
           <span className="text-[15px] font-semibold leading-tight text-text">Déposer pour joindre</span>
           <span className="text-[12.5px] font-medium leading-tight text-text-muted">{formatAttachmentLimit(limits.maxTotalBytes)} au maximum par mail</span>

@@ -829,7 +829,7 @@ function WidgetNextClass({
                     <Icon icon="ph:clock" className="w-[15px] h-[15px] shrink-0" aria-hidden="true" />
                     <span ref={timeLabelRef} className="block min-w-0 leading-[1.06] text-[15px] font-semibold overflow-hidden text-ellipsis whitespace-nowrap max-md:text-[14px]">{timeLabel}</span>
                     {shouldShowExactDateTooltip ? (
-                      <span className="pointer-events-none absolute left-1/2 top-full z-20 mt-2 inline-flex -translate-x-1/2 translate-y-1 scale-95 whitespace-nowrap rounded-full border border-white/70 bg-[rgba(17,24,39,0.92)] px-3 py-1.5 text-[12px] font-medium leading-none text-white opacity-0 shadow-[0_12px_32px_rgba(17,24,39,0.18)] transition-[opacity,transform] duration-180 ease-out invisible group-hover/next-class:visible group-hover/next-class:translate-y-0 group-hover/next-class:scale-100 group-hover/next-class:opacity-100">
+                      <span className="pointer-events-none absolute left-1/2 top-full z-20 mt-2 inline-flex -translate-x-1/2 translate-y-1 scale-95 whitespace-nowrap rounded-full tooltip-bubble bg-black px-3 py-1.5 text-[12px] font-medium leading-none text-white opacity-0 transition-[opacity,transform] duration-180 ease-out invisible group-hover/next-class:visible group-hover/next-class:translate-y-0 group-hover/next-class:scale-100 group-hover/next-class:opacity-100">
                         {exactDateLabel}
                       </span>
                     ) : null}

@@ -1,10 +1,11 @@
 import { useEffect, useId, useLayoutEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { Icon } from '@iconify/react'
+import SmoothSurface from './SmoothSurface'
 
 // The rows and panel of the apps' context menu (AvailableApplications), so
 // every menu looks and opens the same way. Long lists scroll.
-const MENU_CLASSES = 'favorites-context-menu fixed z-[80] max-h-[min(340px,60vh)] overflow-y-auto p-[6px] border border-border corners-[18px] bg-context-bg shadow-[0_18px_40px_var(--color-shadow)] backdrop-blur-[12px] animate-context-menu-in'
+const MENU_CLASSES = 'glass glass--menu favorites-context-menu fixed z-[80] max-h-[min(340px,60vh)] overflow-y-auto p-[6px] border corners-[18px] animate-context-menu-in'
 const OPTION_CLASSES = 'favorites-context-action w-full flex items-center gap-[10px] min-h-[44px] px-3 border-0 corners-[12px] bg-transparent text-brand font-inherit text-[15px] font-semibold text-left cursor-pointer animate-context-action-in hover:bg-context-hover focus-visible:bg-context-hover focus-visible:outline-none'
 const MENU_MIN_WIDTH = 220
 const MENU_GAP = 8
@@ -172,6 +173,8 @@ function Dropdown({
         }}
         className={triggerClassName}
       >
+        {/* A trigger in a button material: its smooth surface too. */}
+        {/\b(material|lent-button)\b/.test(triggerClassName) ? <SmoothSurface /> : null}
         <span className="min-w-0 truncate">{triggerLabel ?? selected?.label ?? placeholder}</span>
         <Icon icon="ph:caret-down" className={`shrink-0 transition-transform duration-150 ${isOpen ? 'rotate-180' : ''} ${chevronClassName}`} aria-hidden="true" />
       </button>

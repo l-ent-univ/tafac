@@ -13,6 +13,7 @@ import { getMailOrigins, opensMailPageInApp } from '../mailPortalApp'
 import ContextMenu from './ContextMenu'
 import LoadingDots from './LoadingDots'
 import MailAttachDrawer, { ATTACH_CARD_CLASS, AttachDrawerNote } from './MailAttachDrawer'
+import SmoothSurface from './SmoothSurface'
 import {
   ENT_AUTH_PREFIX,
   ENT_ORIGIN,
@@ -1990,7 +1991,7 @@ function AvailableApplications({
       ? 'flex flex-col gap-0.5 min-w-0'
       : home
         ? 'flex min-w-0 flex-1 flex-wrap gap-1.5 overflow-hidden max-md:gap-1'
-        : 'flex flex-wrap gap-1.5 max-md:flex-nowrap max-md:gap-1 max-md:overflow-x-auto max-md:overflow-y-hidden max-md:-mx-3 max-md:px-3 favorites-scroll-hide'
+        : 'flex flex-wrap gap-1.5 max-md:flex-nowrap max-md:gap-1 max-md:overflow-x-auto max-md:overflow-y-hidden max-md:-mx-3 max-md:-my-2 max-md:px-3 max-md:py-2 favorites-scroll-hide'
     // The « Accueil » row on a phone: compact tiles (a 38px icon, its
     // name on one line under it), concentric as the others.
     const favoriteItemClassName = isSidebarFavorites
@@ -2051,7 +2052,8 @@ function AvailableApplications({
               <p className="m-0 text-sm font-medium leading-[1.3] text-text-secondary font-body">{viewState.error}</p>
             </div>
 
-            <button type="button" className="min-h-[34px] px-[14px] border border-border rounded-full bg-bg text-brand font-inherit text-sm font-semibold hover:bg-bg-subtle" onClick={handleRetry}>
+            <button type="button" className="material min-h-[34px] px-[14px] rounded-full text-brand font-inherit text-sm font-semibold" onClick={handleRetry}>
+              <SmoothSurface />
               Réessayer
             </button>
           </div>
@@ -2108,7 +2110,7 @@ function AvailableApplications({
                           className={favoriteIconClassName}
                           letterClassName="text-sm max-md:text-base"
                         />
-                        <span className="absolute -top-1 -right-1 inline-flex size-[15px] items-center justify-center rounded-full bg-widget-bg text-brand shadow-[0_1px_3px_rgba(0,0,0,0.18)]" title="Favori">
+                        <span className="glass-solid absolute -top-1 -right-1 inline-flex size-[15px] items-center justify-center rounded-full text-brand" title="Favori">
                           <Icon icon="ph:star-fill" className="size-[9px]" aria-hidden="true" />
                           <span className="sr-only">Favori</span>
                         </span>
@@ -2214,15 +2216,15 @@ function AvailableApplications({
                 placeholder="Rechercher..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="app-search-input w-[180px] h-[36px] pl-8 pr-3 border border-border rounded-full bg-widget-bg text-text text-sm font-body leading-none placeholder:text-text-muted transition-[width,border-color] duration-200 focus:w-[240px] focus:border-text-muted max-sm:w-[140px] max-sm:focus:w-[180px]"
+                className="field app-search-input w-[180px] h-[36px] pl-8 pr-3 rounded-full text-text text-sm font-body leading-none placeholder:text-text-muted transition-[width,border-color,box-shadow] duration-200 focus:w-[240px] max-sm:w-[140px] max-sm:focus:w-[180px]"
               />
             </div>
           </div>
           {SHOW_CATEGORY_FILTERS && categories.length > 1 ? (
-            <div className="flex items-center gap-2 flex-wrap max-md:flex-nowrap max-md:overflow-x-auto max-md:-mx-3 max-md:px-3 favorites-scroll-hide">
+            <div className="flex items-center gap-2 flex-wrap max-md:flex-nowrap max-md:overflow-x-auto max-md:-mx-3 max-md:-my-2 max-md:px-3 max-md:py-2 favorites-scroll-hide">
               <button
                 type="button"
-                className={`min-h-[34px] px-[14px] border rounded-full font-inherit text-sm font-semibold transition-[background-color,border-color,color] duration-[120ms] ${selectedCategory === null ? 'border-brand bg-brand text-bg' : 'border-border bg-bg text-brand hover:bg-bg-subtle'}`}
+                className={`min-h-[34px] px-[14px] border rounded-full font-inherit text-sm font-semibold transition-[background-color,border-color,color] duration-[120ms] ${selectedCategory === null ? 'lent-button' : 'glass-solid text-brand'}`}
                 onClick={() => setSelectedCategory(null)}
               >
                 Tout
@@ -2231,7 +2233,7 @@ function AvailableApplications({
                 <button
                   key={category}
                   type="button"
-                  className={`min-h-[34px] px-[14px] border rounded-full font-inherit text-sm font-semibold whitespace-nowrap transition-[background-color,border-color,color] duration-[120ms] ${selectedCategory === category ? 'border-brand bg-brand text-bg' : 'border-border bg-bg text-brand hover:bg-bg-subtle'}`}
+                  className={`min-h-[34px] px-[14px] border rounded-full font-inherit text-sm font-semibold whitespace-nowrap transition-[background-color,border-color,color] duration-[120ms] ${selectedCategory === category ? 'lent-button' : 'glass-solid text-brand'}`}
                   onClick={() => setSelectedCategory(category)}
                 >
                   {category}

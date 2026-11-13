@@ -60,7 +60,7 @@ function MailHeader({ unreadCount = 0, icon = null }) {
       {icon ? <img src={icon} alt="" width="22" height="22" draggable="false" className="mr-[3px] size-[22px] shrink-0 select-none" aria-hidden="true" /> : null}
       <span className="m-0 min-w-0 leading-[1.06] text-base font-medium text-text-muted overflow-hidden text-ellipsis whitespace-nowrap max-md:text-[15px]">Mails récents</span>
       {unreadCount > 0 ? (
-        <span className="mail-unread-pill ml-[3px] inline-flex items-center justify-center min-w-[18px] h-[18px] px-[6px] rounded-full text-[11px] font-semibold leading-none tabular-nums shrink-0" aria-label={`${unreadCount} non lu${unreadCount > 1 ? 's' : ''}`}>
+        <span className="lent-button lent-button--tag mail-unread-pill ml-[3px] inline-flex items-center justify-center min-w-[18px] h-[18px] px-[6px] rounded-full text-[11px] font-semibold leading-none tabular-nums shrink-0" aria-label={`${unreadCount} non lu${unreadCount > 1 ? 's' : ''}`}>
           {unreadCount > 99 ? '99+' : unreadCount}
         </span>
       ) : null}
@@ -119,7 +119,7 @@ function MailRow({ message, fallbackHref, now, onOpen = null }) {
       <span className="col-start-2 col-span-2 flex min-w-0 items-center gap-[6px]">
         <span className={`min-w-0 truncate text-[14px] leading-[1.15] max-md:text-[13.5px] ${unread ? 'font-semibold text-text' : 'font-medium text-text-70'}`}>{subject}</span>
         {message.count > 1 ? (
-          <span className="shrink-0 rounded-full bg-bg-muted px-[5px] text-[10.5px] font-semibold leading-[15px] text-text-muted tabular-nums" aria-label={`${message.count} mails`}>{message.count}</span>
+          <span className="glass-solid shrink-0 rounded-full px-[5px] text-[10.5px] font-semibold leading-[15px] text-text-muted tabular-nums" aria-label={`${message.count} mails`}>{message.count}</span>
         ) : null}
         {unread ? <span className="mail-unread-dot size-[6px] shrink-0 rounded-full" aria-hidden="true" /> : null}
       </span>

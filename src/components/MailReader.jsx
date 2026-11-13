@@ -20,6 +20,7 @@ import { addressMenuItems, attachmentMenuItems } from '../contextMenuItems'
 import { copyToClipboard, useContextMenu } from '../useContextMenu'
 import { trackMailAction } from '../analytics'
 import { bindFrameContextMenu } from '../contextMenuEvents'
+import SmoothSurface from './SmoothSurface'
 
 const fullDateFormatter = new Intl.DateTimeFormat('fr-FR', { dateStyle: 'full', timeStyle: 'short' })
 const weekdayFormatter = new Intl.DateTimeFormat('fr-FR', { weekday: 'short' })
@@ -28,7 +29,7 @@ const dayMonthYearFormatter = new Intl.DateTimeFormat('fr-FR', { day: 'numeric',
 // Recipients shown before « +N » (a promo-wide mail lists hundreds).
 const RECIPIENTS_SHOWN = 2
 
-const SECONDARY_BUTTON_CLASSES = 'inline-flex shrink-0 items-center gap-[6px] px-3 py-2 border border-white dark:border-[rgba(255,255,255,0.08)] rounded-full bg-widget-bg text-text-secondary text-[13px] font-medium leading-none no-underline cursor-pointer transition-[background-color] duration-120 ease-in-out hover:bg-bg-subtle focus-visible:outline-2 focus-visible:outline-text'
+const SECONDARY_BUTTON_CLASSES = 'material inline-flex shrink-0 items-center gap-[6px] px-3 py-2 rounded-full text-text-secondary text-[13px] font-medium leading-none no-underline cursor-pointer ease-in-out focus-visible:outline-2 focus-visible:outline-text'
 
 // The mail is cleaned on the server (server/mailMessage.js) and shown here in
 // a sandboxed iframe as a second wall: no scripts, no forms, no top
@@ -210,7 +211,7 @@ function AddressCard({ address, onClose, anchorRef }) {
       ref={cardRef}
       role="dialog"
       aria-label={name || email}
-      className="absolute left-0 top-[calc(100%+8px)] z-20 grid w-[340px] max-w-[calc(100vw-32px)] gap-4 p-4 rounded-[22px] border border-border bg-widget-bg text-left shadow-[0_16px_40px_-8px_rgba(52,18,0,0.18)] animate-modal-card-in"
+      className="glass-solid absolute left-0 top-[calc(100%+8px)] z-20 grid w-[340px] max-w-[calc(100vw-32px)] gap-4 p-4 rounded-[22px] border text-left animate-modal-card-in"
       style={shift ? { translate: `${shift}px 0` } : undefined}
     >
       <div className="flex items-center gap-3 min-w-0">
@@ -227,6 +228,7 @@ function AddressCard({ address, onClose, anchorRef }) {
         </div>
       </div>
       <button type="button" className="material inline-flex h-9 w-full items-center justify-center gap-2 rounded-full px-4 cursor-pointer" onClick={copy}>
+        <SmoothSurface />
         <Icon icon={copied ? 'ph:check' : 'ph:copy'} className="size-[14px] shrink-0" aria-hidden="true" />
         <span className="text-[13px] font-semibold leading-none">{copied ? 'Adresse copiée' : 'Copier l’adresse'}</span>
       </button>
@@ -582,6 +584,7 @@ function MailBodyFrame({ message, showRemoteImages, title, onResumeDraft = null 
         <div className="-mt-1 flex flex-wrap items-center gap-2">
           {onResumeDraft ? (
             <button type="button" className="material inline-flex h-8 items-center gap-2 rounded-full px-3 cursor-pointer" onClick={onResumeDraft}>
+              <SmoothSurface />
               <Icon icon="ph:pencil-simple" className="size-4 shrink-0 text-text-muted" aria-hidden="true" />
               <span className="text-[13px] font-semibold leading-none text-text">Reprendre le brouillon</span>
             </button>
@@ -593,6 +596,7 @@ function MailBodyFrame({ message, showRemoteImages, title, onResumeDraft = null 
               aria-expanded={quoteShown}
               onClick={toggleQuote}
             >
+              <SmoothSurface />
               <Icon icon={quoteShown ? 'ph:caret-up' : 'ph:dots-three'} className="size-4 shrink-0 text-text-muted" aria-hidden="true" />
               <span className="text-[13px] font-semibold leading-none text-text">{quoteShown ? 'Masquer le message cité' : 'Afficher le message cité'}</span>
             </button>
@@ -618,6 +622,7 @@ function ReaderBackRow({ onBack, label = 'Réception' }) {
         aria-label={`Retour : ${label}`}
         onClick={onBack}
       >
+        <SmoothSurface />
         <Icon icon="ph:caret-left" className="size-[18px] shrink-0" aria-hidden="true" />
         <span className="text-[15px] font-semibold leading-none">{label}</span>
       </button>
@@ -695,10 +700,10 @@ function MailReader({ id, webmailHref, onBack, onLoaded, embedded = false, autoF
           <p className="m-0 text-[14px] text-text-muted">{state.notFound ? 'Ce mail n’existe plus' : 'Ce mail n’a pas chargé'}</p>
           <div className="flex flex-wrap gap-2">
             {state.notFound ? null : (
-              <button type="button" className={SECONDARY_BUTTON_CLASSES} onClick={() => setAttempt((value) => value + 1)}>Réessayer</button>
+              <button type="button" className={SECONDARY_BUTTON_CLASSES} onClick={() => setAttempt((value) => value + 1)}><SmoothSurface />Réessayer</button>
             )}
             {webmailHref ? (
-              <a className={SECONDARY_BUTTON_CLASSES} href={webmailHref} target="_blank" rel="noopener noreferrer">
+              <a className={SECONDARY_BUTTON_CLASSES} href={webmailHref} target="_blank" rel="noopener noreferrer"><SmoothSurface />
                 Ouvrir le webmail
                 <Icon icon="ph:arrow-up-right" className="size-[14px] shrink-0" aria-hidden="true" />
               </a>
@@ -749,7 +754,7 @@ function MailReader({ id, webmailHref, onBack, onLoaded, embedded = false, autoF
                   </time>
                 ) : null}
               </div>
-              <h2 ref={headingRef} tabIndex={-1} className="m-0 text-[14px] font-medium leading-[1.35] text-text break-words outline-none">{subject}</h2>
+              <h2 ref={headingRef} tabIndex={-1} className="m-0 text-[14px] font-medium leading-[1.35] text-text break-words outline-none select-text">{subject}</h2>
               <dl className="m-0 mt-2 grid grid-cols-[max-content_minmax(0,1fr)] gap-x-3 gap-y-2">
                 <RecipientsRow label="À" list={message.to} />
                 <RecipientsRow label="Cc" list={message.cc} />
@@ -764,7 +769,7 @@ function MailReader({ id, webmailHref, onBack, onLoaded, embedded = false, autoF
               on a tint so the white card stands out of the white panel; its
               corners the card's plus the tint's 8px. */}
           {message.attachments.length ? (
-            <section className="grid gap-[10px] rounded-[28px] bg-bg-subtle p-2 dark:bg-bg-muted" aria-labelledby="mail-attachments-title">
+            <section className="glass-solid grid gap-[10px] rounded-[28px] p-2" aria-labelledby="mail-attachments-title">
               <div className="flex items-center gap-[5px] px-2 pt-[6px] text-brand">
                 <Icon icon="ph:paperclip" className="size-[17px] shrink-0" aria-hidden="true" />
                 <h3 id="mail-attachments-title" className="m-0 font-body text-base font-medium leading-[1.06]">Pièces jointes</h3>
@@ -939,7 +944,7 @@ export function MailThread({ id, folder, webmailHref, onBack, onLoaded, backLabe
       {state.status === 'error' ? (
         <div className="grid justify-items-start gap-3">
           <p className="m-0 text-[14px] text-text-muted">Ce fil n’a pas chargé</p>
-          <button type="button" className={SECONDARY_BUTTON_CLASSES} onClick={() => setAttempt((value) => value + 1)}>Réessayer</button>
+          <button type="button" className={SECONDARY_BUTTON_CLASSES} onClick={() => setAttempt((value) => value + 1)}><SmoothSurface />Réessayer</button>
         </div>
       ) : null}
       {state.status === 'ok' && messages.length > 1 ? (

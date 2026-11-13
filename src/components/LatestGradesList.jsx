@@ -66,7 +66,7 @@ export function LatestGradeCardBody({ moduleTitle, moduleCode, day, title, value
         // the pill's padding is even above and below the number. The page's
         // text scale: the subject rows' sizes and their grade pill's.
         <span className="flex items-center gap-[6px] self-start">
-          <span className="inline-flex items-end gap-[2px] rounded-full border border-border bg-bg-subtle px-[9px] py-[8px] text-text">
+          <span className="glass-solid inline-flex items-end gap-[2px] rounded-full border px-[9px] py-[8px] text-text">
             <span className="font-display text-[17px] font-bold leading-none [text-box:trim-both_cap_alphabetic]">{value}</span>
             {scale ? <span className="font-body text-[13px] font-medium leading-none text-text-muted [text-box:trim-both_cap_alphabetic]">{scale}</span> : null}
           </span>

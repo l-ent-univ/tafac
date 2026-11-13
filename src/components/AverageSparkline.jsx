@@ -142,23 +142,23 @@ function AverageSparkline({ history, semesterEnd = null, className = '' }) {
       {chart.isOngoing ? (
         <span
           aria-hidden="true"
-          className="pointer-events-none absolute size-[9px] -translate-x-1/2 -translate-y-1/2"
+          className="pointer-events-none absolute size-[13px] -translate-x-1/2 -translate-y-1/2"
           style={{ left: `${chart.tip.x}%`, top: `${chart.tip.y}%` }}
         >
           <span className="absolute inset-0 rounded-full bg-current opacity-50 animate-ping motion-reduce:animate-none motion-reduce:opacity-0" />
-          <span className="absolute inset-0 rounded-full bg-current ring-2 ring-widget-bg" />
+          <span className="chart-dot absolute inset-0 rounded-full" />
         </span>
       ) : null}
       {hovered ? (
         <>
           <span
             aria-hidden="true"
-            className="pointer-events-none absolute size-[9px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-current ring-2 ring-widget-bg"
+            className="chart-dot pointer-events-none absolute size-[13px] -translate-x-1/2 -translate-y-1/2 rounded-full"
             style={{ left: `${hovered.x}%`, top: `${hovered.y}%` }}
           />
           <span
             aria-hidden="true"
-            className="pointer-events-none absolute -translate-x-1/2 -translate-y-[calc(100%+9px)] whitespace-nowrap rounded-full bg-black px-2 py-[3px] text-[11px] font-semibold leading-none text-white dark:bg-white dark:text-black"
+            className="pointer-events-none absolute -translate-x-1/2 -translate-y-[calc(100%+11px)] whitespace-nowrap rounded-full bg-black px-2 py-[3px] text-[11px] font-semibold leading-none text-white dark:bg-white dark:text-black"
             style={{ left: `clamp(52px, ${hovered.x}%, calc(100% - 52px))`, top: `${hovered.y}%` }}
           >
             {DAY_FORMAT.format(hovered.time)} · {formatAverage(hovered.average)}

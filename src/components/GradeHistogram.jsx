@@ -2,6 +2,7 @@ import { useId, useState } from 'react'
 import { Icon } from '@iconify/react'
 import { BUCKET_COUNT, countLabel, describeBucket, summarizeDistribution } from '../gradeDetail'
 import { r } from '../register.js'
+import SmoothSurface from './SmoothSurface'
 
 const BUCKETS = Array.from({ length: BUCKET_COUNT }, (_, index) => index)
 const TICKS = new Set([0, 5, 10, 15, 20])
@@ -29,7 +30,7 @@ function Axis({ studentBucket = null }) {
       {BUCKETS.map((index) => (
         <span key={index} className="flex min-w-0 justify-center">
           {index === studentBucket ? (
-            <span className="gh-axis-you shrink-0 rounded-full bg-brand px-[6px] py-[3px] font-body text-[11px] font-bold leading-none tabular-nums text-bg">{index}</span>
+            <span className="lent-button lent-button--tag gh-axis-you shrink-0 rounded-full px-[6px] py-[3px] font-body text-[11px] font-bold leading-none tabular-nums">{index}</span>
           ) : isShown(index) ? (
             <span className="font-body text-[11px] font-medium leading-none tabular-nums text-text-muted">{index}</span>
           ) : null}
@@ -59,7 +60,7 @@ function HistogramUnavailable({ status, reason, isPending, onRetry }) {
   const notYet = isPending && !isError
   const tooFew = reason === 'too-few'
   return (
-    <Frame className="grid place-items-center corners-[14px] border border-dashed border-border-input">
+    <Frame className="engraved status-tag--dashed grid place-items-center corners-[14px]">
       <div className="grid max-w-[260px] justify-items-center gap-[6px] px-4 text-center">
         <Icon icon="ph:chart-bar-horizontal" className="size-5 text-text-muted" aria-hidden="true" />
         <p className="m-0 font-body text-[14px] font-semibold leading-[1.3] text-text">{notYet ? 'Pas encore de répartition' : tooFew ? 'Pas assez de notes' : 'Répartition indisponible'}</p>
@@ -73,7 +74,8 @@ function HistogramUnavailable({ status, reason, isPending, onRetry }) {
               : 'ScoDoc ne partage pas la répartition des notes de cette évaluation.'}
         </p>
         {isError && onRetry ? (
-          <button type="button" onClick={onRetry} className="gh-retry mt-1 inline-flex items-center gap-[5px] rounded-full border border-border bg-transparent px-3 py-[6px] text-text cursor-pointer">
+          <button type="button" onClick={onRetry} className="material mt-1 inline-flex items-center gap-[5px] rounded-full px-3 py-[6px] text-text cursor-pointer">
+            <SmoothSurface />
             <Icon icon="ph:arrows-clockwise" className="size-[14px]" aria-hidden="true" />
             <span className="font-body text-[13px] font-semibold leading-none">Réessayer</span>
           </button>

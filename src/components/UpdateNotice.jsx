@@ -1,6 +1,12 @@
 import { useCallback, useState } from 'react'
 import { Icon } from '@iconify/react'
 
+// « Nouvelle version »: a new build is waiting (PwaUpdateManager), a tap
+// installs it. Quiet: the whole card one button of solid glass, the rocket
+// muted, the words shimmering over « Mettre à jour » in small, an arrow at
+// its end; no primary button. Two lines, so it fits the sidebar's narrow
+// column. `className`: its place (the floating pill over a phone's tab bar,
+// the tablet's top).
 function UpdateNotice({ onUpdateClick, className = '' }) {
   const [isApplying, setIsApplying] = useState(false)
 
@@ -16,23 +22,24 @@ function UpdateNotice({ onUpdateClick, className = '' }) {
   }, [isApplying, onUpdateClick])
 
   return (
-    <div className={`flex items-center gap-2 px-3 py-2 corners-[16px] border border-border/70 bg-widget-bg/60 text-[13px] font-body leading-[1.3] ${className}`}>
-      <Icon icon="ph:rocket" className="w-[14px] h-[14px] shrink-0 text-text-muted" aria-hidden="true" />
-      <span
-        className="bg-[linear-gradient(90deg,var(--color-text-muted)_0%,var(--color-text)_50%,var(--color-text-muted)_100%)] bg-[length:200%_100%] bg-clip-text text-transparent animate-shimmer"
-        style={{ animationDuration: '3s' }}
-      >
-        Nouvelle version
+    <button
+      type="button"
+      onClick={handleClick}
+      disabled={isApplying}
+      className={`glass-solid flex w-full min-w-0 cursor-pointer items-center gap-2.5 corners-[16px] py-2 pr-3 pl-3 text-left disabled:cursor-wait ${className}`}
+    >
+      <Icon icon="ph:rocket-launch" className="size-[17px] shrink-0 text-text-muted" aria-hidden="true" />
+      <span className="flex min-w-0 flex-1 flex-col gap-[3px]">
+        <span
+          className="min-w-0 truncate bg-[linear-gradient(90deg,var(--color-text-muted)_0%,var(--color-text)_50%,var(--color-text-muted)_100%)] bg-[length:200%_100%] bg-clip-text font-body text-[13.5px] font-semibold leading-[1.2] text-transparent animate-shimmer"
+          style={{ animationDuration: '3s' }}
+        >
+          Nouvelle version
+        </span>
+        <span className="truncate font-body text-[12px] font-medium leading-none text-text-muted">{isApplying ? 'Mise à jour…' : 'Mettre à jour'}</span>
       </span>
-      <button
-        type="button"
-        onClick={handleClick}
-        disabled={isApplying}
-        className="ml-auto bg-transparent border-0 p-0 text-text font-medium underline underline-offset-2 decoration-text-muted/40 hover:decoration-text cursor-pointer transition-colors disabled:opacity-50 disabled:cursor-wait"
-      >
-        {isApplying ? 'Mise à jour…' : 'Mettre à jour'}
-      </button>
-    </div>
+      <Icon icon="ph:arrow-right" className="size-[14px] shrink-0 text-text-muted" aria-hidden="true" />
+    </button>
   )
 }
 

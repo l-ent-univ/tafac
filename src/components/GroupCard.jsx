@@ -22,7 +22,7 @@ export function GroupRow({ icon, title, detail, onClick, href, download, trailin
     <>
       {icon && compact ? <Icon icon={icon} className="size-[18px] shrink-0 text-text-muted" aria-hidden="true" /> : null}
       {icon && !compact ? (
-        <span className="inline-flex size-7 shrink-0 items-center justify-center corners-[8px] bg-brand-subtle text-text-secondary" aria-hidden="true">
+        <span className="glass-solid inline-flex size-7 shrink-0 items-center justify-center corners-[8px] text-text-secondary" aria-hidden="true">
           <Icon icon={icon} className="size-[15px]" />
         </span>
       ) : null}

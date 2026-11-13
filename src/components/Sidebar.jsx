@@ -215,7 +215,7 @@ function CompactUpdateButton({ onUpdateClick }) {
       onClick={handleClick}
       disabled={isApplying}
       aria-label="Nouvelle version, mettre à jour"
-      className="group relative inline-flex items-center justify-center size-10 rounded-full border border-border/70 bg-widget-bg/60 text-text cursor-pointer transition-[background-color] duration-150 hover:bg-brand-subtle disabled:opacity-50 disabled:cursor-wait"
+      className="glass-solid group relative inline-flex items-center justify-center size-10 rounded-full border text-text cursor-pointer transition-[background-color] duration-150 hover:bg-brand-subtle disabled:opacity-50 disabled:cursor-wait"
     >
       <Icon icon="ph:rocket" className="size-4" aria-hidden="true" />
       <span className="changelog-new-dot absolute top-[6px] right-[6px] size-[7px] rounded-full" aria-hidden="true" />
@@ -360,21 +360,31 @@ function Sidebar({
                 aria-current={isActive ? 'page' : undefined}
                 className={`group relative inline-flex items-center gap-2 w-full h-10 px-3 rounded-full border text-left text-text text-base font-body font-medium leading-6 whitespace-nowrap transition-[background-color,box-shadow,border-color] duration-150 ease-in-out ${
                   isActive
-                    ? 'bg-widget-bg border-white dark:border-[rgba(255,255,255,0.08)] shadow-[0_1px_3px_rgba(0,0,0,0.06)]'
+                    ? 'glass-solid'
                     : item.disabled
                       ? 'bg-transparent border-transparent cursor-not-allowed opacity-55 grayscale'
                       : 'bg-transparent border-transparent hover:bg-brand-subtle'
                 }`}
               >
+                {/* Selected: the icon filled (its -fill twin, navItems'
+                    iconActive) and the label semibold. */}
                 <Icon
-                  icon={item.icon}
+                  icon={isActive ? item.iconActive ?? item.icon : item.icon}
                   className="w-[17px] h-[17px] shrink-0"
                   aria-hidden="true"
                 />
                 {/* Cut short with an ellipsis when it can't fit (a larger
                     text size, a narrow sidebar), whole in its tooltip (a
                     disabled one has its own). */}
-                <span className="min-w-0 truncate" title={item.disabled ? undefined : item.label}>{item.label}</span>
+                {/* Its weight eases from medium to semibold: Collab Sans has
+                    no variable axis, so the two weights are stacked in one
+                    cell (sized to the wider, semibold: selecting one doesn't
+                    shift it) and cross-fade. Read once (the medium is
+                    hidden from screen readers). */}
+                <span className="grid min-w-0" title={item.disabled ? undefined : item.label}>
+                  <span className={`col-start-1 row-start-1 min-w-0 truncate font-medium transition-opacity duration-200 ease-out motion-reduce:transition-none ${isActive ? 'opacity-0' : 'opacity-100'}`} aria-hidden="true">{item.label}</span>
+                  <span className={`col-start-1 row-start-1 min-w-0 truncate font-semibold transition-opacity duration-200 ease-out motion-reduce:transition-none ${isActive ? 'opacity-100' : 'opacity-0'}`}>{item.label}</span>
+                </span>
                 {/* Just launched (its « Nouveautés » entry unseen): gone once
                     the page is visited or its dashboard card closed. */}
                 {isNew ? (
@@ -397,7 +407,7 @@ function Sidebar({
                 {item.disabled ? (
                   <span
                     role="tooltip"
-                    className="pointer-events-none absolute left-1/2 top-full z-30 mt-2 flex flex-col gap-[2px] w-max max-w-[260px] -translate-x-1/2 -translate-y-1 scale-95 whitespace-normal text-center corners-[14px] border border-black/10 bg-black px-3 py-[6px] text-[12px] font-medium leading-tight text-white opacity-0 shadow-[0_12px_32px_rgba(0,0,0,0.18)] transition-[opacity,transform] duration-180 ease-out invisible group-hover:visible group-hover:translate-y-0 group-hover:scale-100 group-hover:opacity-100 group-focus-visible:visible group-focus-visible:translate-y-0 group-focus-visible:scale-100 group-focus-visible:opacity-100 dark:border-white/15 dark:bg-white dark:text-black"
+                    className="pointer-events-none absolute left-1/2 top-full z-30 mt-2 flex flex-col gap-[2px] w-max max-w-[260px] -translate-x-1/2 -translate-y-1 scale-95 whitespace-normal text-center corners-[14px] tooltip-bubble bg-black px-3 py-[6px] text-[12px] font-medium leading-tight text-white opacity-0 transition-[opacity,transform] duration-180 ease-out invisible group-hover:visible group-hover:translate-y-0 group-hover:scale-100 group-hover:opacity-100 group-focus-visible:visible group-focus-visible:translate-y-0 group-focus-visible:scale-100 group-focus-visible:opacity-100 dark:bg-white dark:text-black"
                   >
                     <span className="block font-semibold">{item.disabledTitle}</span>
                     {item.disabledDetail ? (
@@ -433,7 +443,7 @@ function Sidebar({
             className="flex items-center gap-2 min-w-0 flex-1 bg-transparent border-0 p-0 text-left cursor-pointer disabled:opacity-40 disabled:cursor-wait"
             aria-label="Mon compte"
           >
-            <span className="inline-flex shrink-0 size-9 rounded-full overflow-hidden border border-border-input bg-bg-input items-center justify-center">
+            <span className="glass-solid inline-flex shrink-0 size-9 rounded-full overflow-hidden items-center justify-center">
               {profilePhotoSrc ? (
                 <img
                   src={profilePhotoSrc}
@@ -509,14 +519,14 @@ function Sidebar({
                     aria-current={isActive ? 'page' : undefined}
                     className={`group relative inline-flex items-center justify-center size-10 shrink-0 rounded-full border text-text transition-[background-color,box-shadow,border-color] duration-150 ease-in-out ${
                       isActive
-                        ? 'bg-widget-bg border-white dark:border-[rgba(255,255,255,0.08)] shadow-[0_1px_3px_rgba(0,0,0,0.06)]'
+                        ? 'glass-solid'
                         : item.disabled
                           ? 'bg-transparent border-transparent cursor-not-allowed'
                           : 'bg-transparent border-transparent hover:bg-brand-subtle'
                     }`}
                   >
                     <Icon
-                      icon={item.icon}
+                      icon={isActive ? item.iconActive ?? item.icon : item.icon}
                       className={`w-[18px] h-[18px] shrink-0 ${item.disabled ? 'opacity-55 grayscale' : ''}`}
                       aria-hidden="true"
                     />
@@ -542,7 +552,7 @@ function Sidebar({
                   type="button"
                   onClick={onAccountClick}
                   disabled={checking}
-                  className="group relative inline-flex shrink-0 size-9 rounded-full border border-border-input bg-bg-input p-0 items-center justify-center cursor-pointer disabled:opacity-40 disabled:cursor-wait"
+                  className="glass-solid group relative inline-flex shrink-0 size-9 rounded-full p-0 items-center justify-center cursor-pointer disabled:opacity-40 disabled:cursor-wait"
                   aria-label={userName ? `Mon compte, ${userName}` : 'Mon compte'}
                 >
                   <span className="inline-flex size-full rounded-full overflow-hidden items-center justify-center">

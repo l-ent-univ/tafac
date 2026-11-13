@@ -5,6 +5,7 @@ import { trackPlanningAction } from '../analytics'
 import { SECONDARY_BUTTON } from '../scodocPageUtils'
 import LoadingDots from './LoadingDots'
 import { r } from '../register.js'
+import SmoothSurface from './SmoothSurface'
 
 // The planning service's name (planning.providerName), ADE by default.
 const PROVIDER = universityConfig.planning?.providerName ?? 'ADE'
@@ -89,6 +90,7 @@ function PlanningNote({ kind, text = null, compact = false, stacked = false, onR
       ) : null}
       {action ? (
         <button type="button" className={`${SECONDARY_BUTTON} planning-note-action mt-1 cursor-pointer`} onClick={handleAction}>
+          <SmoothSurface />
           <Icon icon={action.icon} className="size-4 shrink-0" aria-hidden="true" />
           {action.label}
         </button>
@@ -97,6 +99,7 @@ function PlanningNote({ kind, text = null, compact = false, stacked = false, onR
         <div className="mt-1 flex flex-wrap justify-center gap-2">
           {OTHER_TIMETABLES.map((link) => (
             <a key={link.href} className={`${SECONDARY_BUTTON} planning-note-action no-underline`} href={link.href} target="_blank" rel="noopener noreferrer">
+              <SmoothSurface />
               <Icon icon="ph:arrow-square-out" className="size-4 shrink-0" aria-hidden="true" />
               {link.label}
             </a>

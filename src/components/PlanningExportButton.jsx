@@ -38,7 +38,7 @@ function PlanningExportButton({ selection, from = 'header', className = '' }) {
       {/* Under the button, not beside it: nothing in the row moves. */}
       {notice ? (
         <span
-          className="absolute top-full right-0 z-10 mt-2 whitespace-nowrap rounded-full border border-border bg-widget-bg px-3 py-2 font-body text-[13px] font-medium leading-none text-text-secondary shadow-md"
+          className="glass-solid absolute top-full right-0 z-10 mt-2 whitespace-nowrap rounded-full border px-3 py-2 font-body text-[13px] font-medium leading-none text-text-secondary"
           role={notice.role}
         >
           <span className="md:hidden">{notice.short}</span>

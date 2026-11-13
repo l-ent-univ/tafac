@@ -27,7 +27,7 @@ const SHOW_ACCOUNT_LINKS = false
 
 // Pill fields like the rest of the app's inputs, in the widget colour so they
 // stand out on the page. Focus keeps the app-wide outline (index.css).
-const FIELD_CLASS = 'box-border w-full min-h-[52px] rounded-full border border-border-input bg-widget-bg px-[18px] py-[15px] text-base leading-none text-text font-body transition-[border-color,box-shadow] duration-150 hover:border-text-30 focus-visible:border-text-60'
+export const FIELD_CLASS = 'box-border w-full min-h-[52px] field rounded-full px-[18px] py-[15px] text-base leading-none text-text font-body'
 const LINK_CLASS = 'corners-[4px] text-[14px] font-medium leading-[1.2] text-text-70 underline decoration-text-30 underline-offset-[3px] transition-colors duration-120 hover:text-text hover:decoration-current font-body'
 
 // No university picked yet (tafac.fr serves them all): the page lists them
@@ -85,7 +85,7 @@ function UniversityPicker() {
         {shown.map((entry) => (
           <a
             key={entry.id}
-            className="group box-border flex min-h-[76px] items-center gap-4 rounded-full border border-border-input bg-widget-bg py-3 pl-6 pr-5 text-left text-text no-underline transition-[border-color] duration-150 hover:border-text-30 focus-visible:border-text-60 max-md:gap-3 max-md:pl-5 max-md:pr-4"
+            className="glass-solid group box-border flex min-h-[76px] items-center gap-4 rounded-full border py-3 pl-6 pr-5 text-left text-text no-underline transition-[border-color] duration-150 hover:border-text-30 focus-visible:border-text-60 max-md:gap-3 max-md:pl-5 max-md:pr-4"
             href={`/${entry.slug}`}
             onClick={(event) => openUniversityLogin(event, entry)}
           >
@@ -305,7 +305,7 @@ function LoginPage({
         <div className="flex shrink-0 items-center justify-end gap-3 px-6 pt-6 max-3xl:px-5 max-3xl:pt-5 max-md:px-4 max-md:pt-4">
           <button
             type="button"
-            className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-border/70 bg-widget-bg/60 text-text-muted transition-colors duration-120 hover:bg-widget-bg hover:text-text"
+            className="glass-solid inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full border text-text-muted transition-colors duration-120 hover:text-text"
             onClick={() => setAboutOpen(true)}
             aria-label="À propos"
           >
@@ -522,7 +522,7 @@ function LoginPage({
 
                 {/* What happens to the password. */}
                 {passwordNote ? (
-                  <p className="m-0 mt-5 box-border w-full corners-[16px] border border-border bg-widget-bg px-4 py-3 text-[13px] font-medium leading-[1.4] text-text-muted font-body">
+                  <p className="glass-solid m-0 mt-5 box-border w-full corners-[16px] border px-4 py-3 text-[13px] font-medium leading-[1.4] text-text-muted font-body">
                     <Icon icon="ph:lock" className="mr-[6px] inline-block h-[14px] w-[14px] align-[-2px]" aria-hidden="true" />
                     {passwordNote}
                   </p>

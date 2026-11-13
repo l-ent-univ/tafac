@@ -10,6 +10,7 @@ import { getSenderInitial } from './mailSender'
 import { directoryTintStyle } from '../directoryTint'
 import { SHIMMER_CLASSES } from './widgetListUtils'
 import { r } from '../register.js'
+import SmoothSurface from './SmoothSurface'
 
 const TABS = [
   { id: 'room', label: 'Salles', placeholder: 'Salle, bâtiment…' },
@@ -59,8 +60,10 @@ function DirectoryRow({ entry, detail, selected, onPick }) {
         type="button"
         aria-current={selected || undefined}
         onClick={() => onPick(entry)}
-        className={`flex min-w-0 flex-1 items-center gap-3 rounded-[12px] border-0 px-3 py-2 text-left cursor-pointer transition-colors duration-150 focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-brand ${
-          selected ? 'bg-brand-subtle' : 'bg-transparent hover:bg-bg-subtle'
+        className={`flex min-w-0 flex-1 items-center gap-3 rounded-[12px] border border-transparent px-3 py-2 text-left cursor-pointer transition-colors duration-150 focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-brand ${
+          selected
+            ? 'glass-solid'
+            : 'bg-transparent hover:bg-card hover:shadow-[0_0_0_1px_color-mix(in_srgb,var(--color-text)_9%,transparent),0_1px_2px_rgb(0_0_0/0.06)] dark:hover:bg-white/8 dark:hover:shadow-[0_0_0_1px_rgb(255_255_255/0.06)]'
         }`}
       >
         {isRoom ? <RoomIcon entry={entry} /> : entry.kind === 'group' ? <GroupIcon entry={entry} /> : <PersonBadge name={entry.name} />}
@@ -114,7 +117,7 @@ function GroupSettingsNotice({ onOpenSettings }) {
     >
       <div className="min-h-0 overflow-hidden">
         <div className="widget-card widget-card-visible relative mb-4 grid grid-cols-[auto_minmax(0,1fr)] gap-x-3 gap-y-3 card-corners-sm border bg-widget-bg p-4 animate-modal-card-in" role="note">
-          <span className="inline-flex size-10 items-center justify-center rounded-full bg-brand-subtle text-brand" aria-hidden="true">
+          <span className="glass-solid inline-flex size-10 items-center justify-center rounded-full text-brand" aria-hidden="true">
             <Icon icon="ph:users-three-duotone" className="size-[22px]" />
           </span>
           <div className="grid min-w-0 gap-1 pr-7">
@@ -133,6 +136,7 @@ function GroupSettingsNotice({ onOpenSettings }) {
               onOpenSettings()
             }}
           >
+            <SmoothSurface />
             <Icon icon="ph:gear-six" className="size-4 shrink-0" aria-hidden="true" />
             {/* The font on a span: index.css gives buttons `font: inherit`, outside Tailwind's layers. */}
             <span className="font-body text-[14px] font-semibold leading-none">Changer de groupe</span>
@@ -199,7 +203,7 @@ function PlanningDirectoryContent({ header = null, stickyClassName = '', user = 
     body = (
       <div className="grid justify-items-center gap-3 py-6">
         <DirectoryNote>{r('ADE n’a pas répondu. Vérifie ta connexion, puis réessaie', 'ADE n’a pas répondu. Vérifiez votre connexion, puis réessayez')}</DirectoryNote>
-        <button type="button" className={`${SECONDARY_BUTTON} cursor-pointer`} onClick={directory.retry}>Réessayer</button>
+        <button type="button" className={`${SECONDARY_BUTTON} cursor-pointer`} onClick={directory.retry}><SmoothSurface />Réessayer</button>
       </div>
     )
   } else if (isSearching) {

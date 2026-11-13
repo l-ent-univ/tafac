@@ -100,10 +100,10 @@ test('the recipe in tokens.css is the one the checks stand on', () => {
 // Sable is the light and dark themes as they are: no palette attribute,
 // and its colours untouched.
 test('Sable sets no attribute and keeps its colours', () => {
-  assert.deepEqual(paletteColors(PALETTES[0]), { swatch: '#341200', swatchDark: '#e4e4e4', page: { light: '#FCFBF8', dark: '#0f0f0f' } })
+  assert.deepEqual(paletteColors(PALETTES[0]), { swatch: '#491d11', swatchDark: '#e4e4e4', page: { light: '#FCFBF8', dark: '#0f0f0f' } })
   assert.match(tokens, /--sand-1: #fcfbf8;/)
   assert.match(tokens, /--night-0: #0f0f0f;/)
-  assert.match(tokens, /--cocoa-900: #341200;/)
+  assert.match(tokens, /--cocoa-900: #491d11;/)
   assert.match(tokens, /--ink-muted: color-mix\(in srgb, var\(--ink\) 50%, transparent\);/)
 })
 

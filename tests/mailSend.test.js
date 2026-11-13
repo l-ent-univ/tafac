@@ -83,6 +83,10 @@ test('the mail as sent: styles inline, the signature in its placeholder', () => 
   assert.match(html, /<a href="https:\/\/x.fr" style="color:#1a73e8">/)
   // Inter isn't on the reader's machine: the system's font instead.
   assert.doesNotMatch(html, /Inter Variable/)
+  // Nor is Collab Sans, the editor's font now.
+  const collab = buildMailHtml(sanitizeComposerHtml('<p><span style="font-family: Collab Sans, system-ui, sans-serif">collab</span></p>'))
+  assert.match(collab, /collab/)
+  assert.doesNotMatch(collab, /Collab Sans/)
   assert.doesNotMatch(html, /data-mail-signature/)
   // No signature: the placeholder goes; a draft keeps it.
   assert.doesNotMatch(buildMailHtml(clean), /data-mail-signature|SIG/)
