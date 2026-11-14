@@ -98,6 +98,19 @@ app.get('/robots.txt', (req, res) => {
   ].join('\n'))
 })
 
+// Apple's link from tafac.fr to the Tafac desktop app (fr.tafac.desktop):
+// with it, and the app's signed webcredentials:tafac.fr entitlement, the
+// app's login page can offer the passwords students saved for tafac.fr.
+// APPLE_APP_IDS: <team id>.fr.tafac.desktop, comma-separated; unset, no file.
+const APPLE_APP_IDS = String(process.env.APPLE_APP_IDS ?? '').split(',').map((id) => id.trim()).filter(Boolean)
+app.get('/.well-known/apple-app-site-association', (req, res) => {
+  if (APPLE_APP_IDS.length === 0) {
+    res.status(404).end()
+    return
+  }
+  res.type('application/json').send(JSON.stringify({ webcredentials: { apps: APPLE_APP_IDS } }))
+})
+
 app.get('/sitemap.xml', (req, res) => {
   const origin = getPublicOrigin(req)
 
