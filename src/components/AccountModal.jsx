@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { Icon } from '@iconify/react'
 import universityConfig from '@university'
 import { openChangelog, useChangelog } from '../changelogStore'
@@ -19,6 +19,7 @@ import SegmentedControl from './SegmentedControl'
 import { r } from '../register.js'
 import { PALETTES } from '../theme'
 import PalettePicker from './PalettePicker'
+import WallpaperSwitchGlow from './WallpaperSwitchGlow'
 import { SIDEBAR_NEXT_CLASS_ENABLED, setSidebarNextClassShown, useSidebarNextClassShown } from '../sidebarNextClassPref'
 
 // Also the debug menu's toggles (src/components/debug/).
@@ -463,11 +464,11 @@ function WallpaperTile({ selected, label, onSelect, children }) {
       aria-label={label}
       title={label}
       onClick={() => { if (!selected) onSelect() }}
-      className={`relative block aspect-[16/10] w-full overflow-hidden corners-[10px] border-0 bg-[var(--color-bg-muted)] p-0 cursor-pointer outline-2 outline-offset-2 transition-[outline-color,filter] duration-150 ${selected ? 'outline outline-[var(--color-brand)]' : 'outline-transparent hover:brightness-[0.92]'}`}
+      className={`wallpaper-tile relative block aspect-[16/10] w-full overflow-hidden corners-[10px] border-0 bg-[var(--color-bg-muted)] p-0 cursor-pointer outline-2 ${selected ? 'outline outline-[var(--color-brand)]' : 'outline-transparent hover:brightness-[0.92]'}`}
     >
       {children}
       {selected ? (
-        <span className="lent-button lent-button--tag absolute right-[5px] top-[5px] flex h-[18px] w-[18px] items-center justify-center rounded-full" aria-hidden="true">
+        <span className="wallpaper-tile-check lent-button lent-button--tag absolute right-[5px] top-[5px] flex h-[18px] w-[18px] items-center justify-center rounded-full" aria-hidden="true">
           <Icon icon="ph:check-bold" className="h-[10px] w-[10px]" />
         </span>
       ) : null}
@@ -496,6 +497,75 @@ function describeWallpaper(choice, folders) {
   return choice.image
     ? { icon: 'ph:push-pin-bold', text: folder.label }
     : { icon: 'ph:shuffle-bold', text: folder.label }
+}
+
+// The caption's words at their own width, never cut: the tag only shows
+// more or less of them as it eases to its size.
+function WallpaperCaptionContent({ caption, className = '' }) {
+  return (
+    <span className={`inline-flex shrink-0 items-center gap-[5px] whitespace-nowrap p-[6px] ${className}`}>
+      <Icon icon={caption.icon} className="h-[12px] w-[12px] shrink-0" />
+      <span>{caption.text}</span>
+    </span>
+  )
+}
+
+// The preview's caption, on the photo: the glass material, darkened for its
+// white text, the same padding all round. Another wallpaper picked: the
+// tag eases to its new width (measured on a hidden copy), the old words
+// leaving upwards as the new ones rise in (.wallpaper-caption in
+// overrides.css). Laid out at once the first time.
+function WallpaperCaption({ caption }) {
+  const tagRef = useRef(null)
+  const measureRef = useRef(null)
+  const key = `${caption.icon}|${caption.text}`
+  const shownRef = useRef({ key, caption })
+  const [width, setWidth] = useState(null)
+  const [settled, setSettled] = useState(false)
+  const [leaving, setLeaving] = useState(null)
+
+  useLayoutEffect(() => {
+    const tag = tagRef.current
+    const content = measureRef.current
+    if (!tag || !content) return
+    // Its stroke too (the tag's width is its border box), rounded up: a
+    // fraction short would clip the last letter.
+    setWidth(Math.ceil(content.getBoundingClientRect().width + (tag.offsetWidth - tag.clientWidth)))
+    if (shownRef.current.key !== key) {
+      setLeaving(shownRef.current)
+      shownRef.current = { key, caption }
+    }
+  }, [key, caption])
+
+  // Laid out, then free to move.
+  useEffect(() => {
+    if (width === null || settled) return undefined
+    const frame = requestAnimationFrame(() => setSettled(true))
+    return () => cancelAnimationFrame(frame)
+  }, [width, settled])
+
+  // The old words, gone once they've left.
+  useEffect(() => {
+    if (!leaving) return undefined
+    const timer = window.setTimeout(() => setLeaving(null), 240)
+    return () => window.clearTimeout(timer)
+  }, [leaving])
+
+  return (
+    <span
+      ref={tagRef}
+      className="glass wallpaper-caption absolute bottom-2 left-2 inline-flex max-w-[calc(100%-16px)] overflow-hidden rounded-full font-body text-[12px] font-semibold leading-none text-white [--glass-fill:rgb(20_20_20/0.32)]"
+      style={width === null ? undefined : { width }}
+      data-settled={settled || undefined}
+    >
+      <span ref={measureRef} className="invisible absolute top-0 left-0 inline-flex items-center gap-[5px] whitespace-nowrap p-[6px]" aria-hidden="true">
+        <Icon icon={caption.icon} className="h-[12px] w-[12px] shrink-0" />
+        <span>{caption.text}</span>
+      </span>
+      {leaving ? <WallpaperCaptionContent key={`out-${leaving.key}`} caption={leaving.caption} className="wallpaper-caption-out absolute top-0 left-0" /> : null}
+      <WallpaperCaptionContent key={key} caption={caption} className={settled ? 'wallpaper-caption-in' : ''} />
+    </span>
+  )
 }
 
 function WallpaperSetting({
@@ -552,14 +622,10 @@ function WallpaperSetting({
               style={{ backgroundImage: `url("${previewSrc}")`, ...(previewPosition ? { backgroundPosition: previewPosition } : null) }}
               aria-hidden="true"
             >
-              {/* On the photo: the glass material, darkened for its white
-                  text, the same padding all round. */}
-              {enabled && caption ? (
-                <span className="glass absolute bottom-2 left-2 inline-flex max-w-[calc(100%-16px)] items-center gap-[5px] rounded-full p-[6px] font-body text-[12px] font-semibold leading-none text-white [--glass-fill:rgb(20_20_20/0.32)]">
-                  <Icon icon={caption.icon} className="h-[12px] w-[12px] shrink-0" />
-                  <span className="truncate">{caption.text}</span>
-                </span>
-              ) : null}
+              {/* Another wallpaper picked: a glow from the old photo to the
+                  new one, under the caption. */}
+              <WallpaperSwitchGlow src={previewSrc} position={previewPosition} enabled={enabled} />
+              {enabled && caption ? <WallpaperCaption caption={caption} /> : null}
             </div>
           </div>
         ) : null}

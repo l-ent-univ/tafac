@@ -10274,3 +10274,72 @@ div:has(> .justify-ticket) {
   }
 }
 
+
+/* ── Réglages › Fond d’écran: the section in motion ──
+   The preview's caption (WallpaperCaption) eases to its new width, the old
+   words leaving upwards, blurred, as the new ones rise in. A tile picked:
+   its ring springs out from its edge, its check pops in, and a tile gives
+   a little under the finger. Still without motion. */
+.wallpaper-caption[data-settled] {
+  transition: width 420ms cubic-bezier(0.32, 0.72, 0, 1);
+}
+
+.wallpaper-caption-in {
+  animation: wallpaper-caption-in 340ms cubic-bezier(0.2, 0.8, 0.2, 1) 60ms both;
+}
+
+.wallpaper-caption-out {
+  animation: wallpaper-caption-out 200ms ease-in both;
+}
+
+@keyframes wallpaper-caption-in {
+  from { opacity: 0; filter: blur(4px); transform: translateY(6px); }
+  to { opacity: 1; filter: blur(0); transform: none; }
+}
+
+@keyframes wallpaper-caption-out {
+  to { opacity: 0; filter: blur(4px); transform: translateY(-6px); }
+}
+
+.wallpaper-tile {
+  outline-offset: 0;
+  transition: outline-color 200ms ease, outline-offset 320ms cubic-bezier(0.34, 1.56, 0.64, 1), filter 150ms ease, transform 160ms ease-out;
+}
+
+.wallpaper-tile[aria-checked="true"] {
+  outline-offset: 2px;
+}
+
+.wallpaper-tile:active {
+  transform: scale(0.96);
+}
+
+.wallpaper-tile-check {
+  animation: wallpaper-tile-check 380ms cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+
+@keyframes wallpaper-tile-check {
+  from { opacity: 0; transform: scale(0.3) rotate(-35deg); }
+  to { opacity: 1; transform: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .wallpaper-caption[data-settled],
+  .wallpaper-tile {
+    transition: none;
+  }
+
+  .wallpaper-caption-in,
+  .wallpaper-caption-out,
+  .wallpaper-tile-check {
+    animation: none;
+  }
+
+  .wallpaper-caption-out {
+    display: none;
+  }
+
+  .wallpaper-tile:active {
+    transform: none;
+  }
+}
