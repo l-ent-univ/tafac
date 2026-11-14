@@ -508,6 +508,7 @@ function Sidebar({
         <aside
           className="sidebar-panel sidebar-panel--compact hidden 4xl:flex flex-col items-start justify-between px-4 py-5 w-[var(--sidebar-width,72px)] fixed top-3 left-3 bottom-3 z-30 card-corners border overflow-visible"
           aria-label="Navigation principale"
+          data-tauri-drag-region=""
           onPointerEnter={handleFoldedPointer}
           onPointerMove={handleFoldedPointer}
           onPointerLeave={handlePeekLeave}
@@ -602,6 +603,7 @@ function Sidebar({
           <aside
             className={`sidebar-panel sidebar-peek hidden 4xl:flex flex-col justify-between p-5 fixed top-3 left-3 bottom-3 z-40 card-corners border overflow-y-auto overflow-x-hidden ${isPeekOpen ? 'is-open' : ''}`}
             aria-label="Navigation principale"
+            data-tauri-drag-region=""
             inert={!isPeekOpen}
             onPointerEnter={handlePeekEnter}
             onPointerLeave={handlePeekLeave}
@@ -619,6 +621,7 @@ function Sidebar({
       <aside
         className="sidebar-panel hidden 4xl:flex flex-col justify-between p-5 w-[var(--sidebar-width,280px)] fixed top-3 left-3 bottom-3 z-30 card-corners border overflow-y-auto overflow-x-hidden"
         aria-label="Navigation principale"
+        data-tauri-drag-region=""
       >
         {fullContent}
       </aside>

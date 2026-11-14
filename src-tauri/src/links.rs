@@ -92,14 +92,14 @@ static WINDOW_COUNT: AtomicUsize = AtomicUsize::new(0);
 pub fn open_app_window(app: &AppHandle, url: Url) -> tauri::Result<()> {
     let label = format!("page-{}", WINDOW_COUNT.fetch_add(1, Ordering::Relaxed));
     let handle = app.clone();
-    WebviewWindowBuilder::new(app, label, WebviewUrl::CustomProtocol(url))
+    let window = crate::window::style(WebviewWindowBuilder::new(app, label, WebviewUrl::CustomProtocol(url)))
         .title("Tafac")
         .inner_size(1100.0, 780.0)
         .on_navigation(allow_navigation)
         .on_new_window(move |url, _features| new_window(&handle, url))
         .on_download(download)
         .build()?;
-    Ok(())
+    crate::window::show(&window)
 }
 
 pub fn download(_webview: tauri::Webview, event: DownloadEvent<'_>) -> bool {

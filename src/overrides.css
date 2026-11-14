@@ -10367,3 +10367,201 @@ div:has(> .justify-ticket) {
     transform: none;
   }
 }
+
+/* ── Desktop app (src-tauri, <html data-desktop-app>, src/desktopApp.js) ──
+   Like a Mac app rather than a page: the arrow over buttons and
+   everything that acts like one (the hand is for links in text), no
+   rubber band past the page's ends, and no link or picture dragged out of
+   the window (its address is tafac://, of no use anywhere else). */
+:root[data-desktop-app],
+:root[data-desktop-app] body {
+  overscroll-behavior: none;
+}
+
+:root[data-desktop-app] :is(img, a) {
+  -webkit-user-drag: none;
+}
+
+:root[data-desktop-app] :is(button, summary, label, select, [role="button"], [role="tab"], [role="menuitem"], [role="option"], [role="switch"], [role="checkbox"], [role="radio"], .cursor-pointer, a.no-underline, nav a):not(:disabled, [aria-disabled="true"]) {
+  cursor: default;
+}
+
+/* macOS (data-desktop-macos): the sidebar is the window's own, on the
+   system's sidebar material (src-tauri/src/window.rs puts it behind the
+   page, the window being see-through). Flush with the window's edges, full
+   height, see-through, a hairline on its right, the window's buttons in its
+   top corner and its content below them. 12px wider than --sidebar-width:
+   the gap the floating panel kept from the window's edge, so the page
+   starts where it did. Nothing else paints under it: the column starts
+   after it (its margin, not its padding: the top band's spread stops at
+   the column's edge) and paints the page's background, and the page
+   behind it is clear. */
+:root[data-desktop-macos]:has(.sidebar-panel),
+:root[data-desktop-macos]:has(.sidebar-panel) body,
+:root[data-desktop-macos] main:has(.sidebar-panel) {
+  background: transparent;
+}
+
+:root[data-desktop-macos] .app-column {
+  margin-left: calc(var(--sidebar-width, 280px) + 12px);
+  padding-left: 0;
+  background-color: var(--color-bg);
+}
+
+:root[data-desktop-macos] {
+  /* macOS' separator colour: a hairline between the material and the page. */
+  --desktop-separator: rgb(0 0 0 / 0.1);
+}
+
+:root[data-desktop-macos]:where([data-theme="dark"]) {
+  --desktop-separator: rgb(255 255 255 / 0.1);
+}
+
+:root[data-desktop-macos] .sidebar-panel {
+  top: 0;
+  left: 0;
+  bottom: 0;
+  width: calc(var(--sidebar-width, 280px) + 12px);
+  padding: 52px 20px 20px;
+  border: 0;
+  border-right: 0.5px solid var(--desktop-separator);
+  border-radius: 0;
+  outline: none;
+}
+
+:root[data-desktop-macos] .sidebar-panel:not(.sidebar-peek) {
+  background-color: transparent;
+  box-shadow: none;
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+
+/* Folded: its 40px column of icons in the middle, under the buttons. */
+:root[data-desktop-macos] .sidebar-panel--compact {
+  padding-inline: 28px;
+}
+
+/* Unfolding over the page on hover (canPeek), on the material too. The
+   material is behind the whole page, so the page makes way: the column
+   clips its left edge as the panel grows (same timing as its width), the
+   material shows there, and the panel over it is see-through. The page
+   under it is hidden rather than blurred, as under a Mac sidebar laid over
+   a window's content. The folded strip's icons, under the panel, go. */
+:root[data-desktop-macos] .sidebar-panel.sidebar-peek {
+  width: calc(var(--sidebar-width) + 12px);
+  background-color: transparent;
+}
+
+:root[data-desktop-macos] .sidebar-panel.sidebar-peek.is-open {
+  width: calc(var(--sidebar-full-width, 280px) + 12px);
+}
+
+:root[data-desktop-macos] .sidebar-peek ~ .app-column {
+  clip-path: inset(-100vmax -100vmax -100vmax 0);
+  transition: clip-path 260ms cubic-bezier(0.32, 0.72, 0, 1);
+}
+
+:root[data-desktop-macos] .sidebar-peek.is-open ~ .app-column {
+  clip-path: inset(-100vmax -100vmax -100vmax calc(var(--sidebar-full-width, 280px) - var(--sidebar-width)));
+  transition: clip-path 340ms cubic-bezier(0.32, 0.72, 0, 1);
+}
+
+:root[data-desktop-macos] .sidebar-panel--compact > * {
+  transition: opacity 120ms ease-out;
+}
+
+:root[data-desktop-macos] .sidebar-panel--compact:has(~ .sidebar-peek.is-open) {
+  border-right-color: transparent;
+}
+
+:root[data-desktop-macos] .sidebar-panel--compact:has(~ .sidebar-peek.is-open) > * {
+  opacity: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root[data-desktop-macos] .sidebar-peek ~ .app-column,
+  :root[data-desktop-macos] .sidebar-panel--compact > * {
+    transition: none;
+  }
+}
+
+/* The right side panels (the mail reader, the planning's « Salles et
+   personnels »): flush with the window's right edge, full height, in their
+   own colour (Tafac's, solid: no material), a hairline on their left (half
+   a pixel, macOS' separator colour). 12px wider than their width property,
+   the gap they kept from the window's edge, given to their content: the
+   page's content stops where it did. */
+:root[data-desktop-macos] :is(.mail-reader-panel, .side-panel) {
+  top: 0;
+  right: 0;
+  bottom: 0;
+  border: 0;
+  border-left: 0.5px solid var(--desktop-separator);
+  border-radius: 0;
+  outline: none;
+  box-shadow: none;
+}
+
+:root[data-desktop-macos] .mail-reader-panel {
+  width: calc(var(--mail-reader-width) + 12px);
+}
+
+:root[data-desktop-macos] .side-panel {
+  width: calc(var(--side-panel-width) + 12px);
+}
+
+/* The mail composer full screen: below the window's buttons (52px, the
+   band that moves the window), not under them. */
+:root[data-desktop-macos] .mail-composer.is-fullscreen {
+  top: 52px;
+}
+
+/* ── Desktop app: printing (Fichier › Imprimer…, ⌘P) ──
+   The page in view without the app around it (sidebar, resize handles,
+   side panels), at its full length (on screen the column scrolls, a print
+   would stop at the window's height), its colours kept (the planning's
+   blocks). A mail open in the reader prints alone, as in Mail. */
+@media print {
+  :root[data-desktop-app] {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  :root[data-desktop-app] :is(.sidebar-panel, .side-panel, .mail-toolbar-veil, [role="separator"]),
+  :root[data-desktop-app] :has(> [role="separator"]) {
+    display: none !important;
+  }
+
+  :root[data-desktop-app] :is(.dashboard-no-wallpaper, .app-column) {
+    height: auto !important;
+    min-height: 0 !important;
+    overflow: visible !important;
+    margin-left: 0 !important;
+    padding-left: 0 !important;
+  }
+
+  :root[data-desktop-app] :has(> .mail-reader-panel) {
+    padding: 0 !important;
+  }
+
+  :root[data-desktop-app] :has(> .mail-reader-panel) > :not(.mail-reader-panel) {
+    display: none !important;
+  }
+
+  /* The week can't be cut across pages (one block, its classes placed in
+     it), and 06:00–22:00 under the header is taller than a page: a little
+     smaller, it fits on one. */
+  :root[data-desktop-app] .planning-page {
+    zoom: 0.8;
+  }
+
+  :root[data-desktop-app] .mail-reader-panel {
+    position: static !important;
+    width: auto !important;
+    overflow: visible !important;
+    border: 0 !important;
+    padding: 0 !important;
+    background: none !important;
+    animation: none !important;
+  }
+}

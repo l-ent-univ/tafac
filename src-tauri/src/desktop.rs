@@ -7,6 +7,8 @@
 //                                  200 { username, password }, or 204
 //   POST /__desktop/password/save  { username, password }: offered to be
 //                                  saved for tafac.fr; 204
+//   POST /__desktop/menu           what the page has, for the menu bar
+//                                  (macOS, menu.rs): 204
 
 use serde::{Deserialize, Serialize};
 use tauri::AppHandle;
@@ -45,6 +47,13 @@ pub async fn handle(app: &AppHandle, window_label: &str, request: http::Request<
                 if !body.username.is_empty() && !body.password.is_empty() {
                     passwords::save(Credential { username: body.username, password: body.password });
                 }
+            }
+            status(204)
+        }
+        "/__desktop/menu" => {
+            #[cfg(target_os = "macos")]
+            if let Ok(state) = serde_json::from_slice::<crate::menu::PageState>(request.body()) {
+                crate::menu::update(app, state);
             }
             status(204)
         }

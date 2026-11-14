@@ -10,7 +10,7 @@ publish = false
 tauri-build = { version = "2", features = [] }
 
 [dependencies]
-tauri = { version = "2", features = [] }
+tauri = { version = "2", features = ["macos-private-api"] }
 tokio = { version = "1", features = ["net", "time", "io-util", "sync"] }
 hyper = { version = "1", features = ["client", "http1"] }
 hyper-util = { version = "0.1", features = ["tokio"] }
@@ -22,6 +22,7 @@ serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 rand = "0.8"
 tauri-plugin-opener = "2"
+tauri-plugin-window-state = "2"
 
 # Saved passwords (macOS): AuthenticationServices' password sheet and the
 # Security framework's shared web credentials (src/passwords.rs).

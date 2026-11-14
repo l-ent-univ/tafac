@@ -31,6 +31,55 @@ the university (CAS, ADE, webmail…)
 - The server stops with the app: its stdin is a pipe from the app, and when
   the pipe closes the server exits, even if the app crashed.
 
+## The window
+
+- **macOS, the system's sidebar** (`src-tauri/src/window.rs`): the window
+  is see-through over the sidebar material Finder and Notes use (an
+  NSVisualEffectView, greyed when the window isn't active). The sidebar is
+  flush with the window's edges and lets it show; the rest of the page is
+  opaque (`src/overrides.css`, on `<html data-desktop-macos>`,
+  `src/desktopApp.js`). The material is light or dark as the window is, and
+  the page sets the window's theme to the app's (`src/desktopWindowTheme.js`:
+  Clair or Sombre forces it, Automatique leaves it to the system). It needs
+  `macOSPrivateApi` (tauri.conf.json): fine for Developer ID, not for the
+  Mac App Store. Liquid Glass is a one-line change there
+  (`Effect::LiquidGlassRegular`), darker over a dark desktop.
+- **The right panels** (mail reader, « Salles et personnels ») are flush
+  with the window's right edge in their own solid colour, a hairline on
+  their left; the sidebar unfolding on hover sits on the material. The
+  mail composer full screen starts below the window's buttons.
+- **No title bar**: the page runs up to the window's top edge, the window's
+  buttons sit in the sidebar's top corner, the sidebar's content below
+  them. Folded, the sidebar is 84px wide instead of 72 to hold them
+  (`src/sidebarWidth.js`). The window is no narrower than 1024px, the
+  sidebar's layout: the phone's has no sidebar.
+- **Moving it**: the sidebar is a Tauri drag region
+  (`data-tauri-drag-region`), and the band along the top (52px) moves the
+  window except on what's clickable there (`src/desktopWindowDrag.js`). A
+  double click zooms it. Both call Tauri's IPC, which
+  `src-tauri/capabilities/default.json` limits to those two commands and
+  the window's theme.
+- **Like an app** (`<html data-desktop-app>`, `src/overrides.css`): the
+  arrow over buttons, no rubber band, links and pictures can't be dragged
+  out. Elsewhere than on macOS, windows open in the app's background colour
+  (no white flash). The main one comes back at its size and place (`tauri-plugin-window-state`).
+- **Menu bar** (macOS, `src-tauri/src/menu.rs`), in French: Tafac (À
+  propos, Réglages… ⌘,), Fichier (Nouveau message ⌘N, Fermer la fenêtre
+  ⌘W, Imprimer… ⌘P), Édition (+ Rechercher ⌘F), Présentation (Actualiser
+  ⌘R), Aller (the university's pages, ⌘1…, the one in view ticked),
+  Fenêtre. Commands reach the page as `tafac:command` events; the page
+  sends what it has (`POST /__desktop/menu`, `src/desktopMenu.js`) and the
+  menu greys what doesn't apply. `src-tauri/Info.plist` sets the app's
+  language to French, so what macOS adds (Outils d'écriture, Dictée…) is
+  French too.
+- **Closing isn't quitting** (macOS): the main window hides, the app and
+  its server keep running, a click on the Dock icon shows it again; ⌘Q
+  quits.
+- **Printing** (⌘P): the page in view without the app around it, a mail
+  open in the reader alone (`@media print` in `src/overrides.css`).
+- **Spelling** is checked as you type (WebKit's
+  `WebContinuousSpellCheckingEnabled`, set once in the app's defaults).
+
 ## Saved passwords (macOS)
 
 On the login page the app asks macOS for the passwords saved for tafac.fr

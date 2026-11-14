@@ -6,12 +6,15 @@ import { createRoot } from 'react-dom/client'
 import './index.css'
 import './overrides.css'
 import { bootUniversity } from './universityBoot'
-import { isDesktopApp } from './desktopApp'
+import { isDesktopApp, isMacDesktopApp, markDesktopApp } from './desktopApp'
+import { enableWindowMoveBand } from './desktopWindowDrag'
 import { blockNativeContextMenu } from './contextMenuEvents'
 
 // Desktop app: no webview menu (Reload…) on a right click, from the start
 // (the login page too).
 if (isDesktopApp()) blockNativeContextMenu(window)
+markDesktopApp()
+if (isMacDesktopApp()) enableWindowMoveBand(window)
 
 // App and everything it imports (the landing and its copy too) read the
 // university config when they load: imported once bootUniversity() has
