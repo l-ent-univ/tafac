@@ -10371,10 +10371,12 @@ div:has(> .justify-ticket) {
 /* ── Desktop app (src-tauri, <html data-desktop-app>, src/desktopApp.js) ──
    Like a Mac app rather than a page: the arrow over buttons and
    everything that acts like one (the hand is for links in text), no
-   rubber band past the page's ends, and no link or picture dragged out of
+   rubber band past the ends of anything that scrolls (the page's column,
+   the mail list, the planning, carousels: in the app the page itself
+   rarely scrolls, its columns do), and no link or picture dragged out of
    the window (its address is tafac://, of no use anywhere else). */
 :root[data-desktop-app],
-:root[data-desktop-app] body {
+:root[data-desktop-app] * {
   overscroll-behavior: none;
 }
 
