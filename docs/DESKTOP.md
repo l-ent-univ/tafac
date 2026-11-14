@@ -122,8 +122,9 @@ state and asks for the install through `/__desktop/update/*`
   with a short note (« Tafac est à jour · 0.25.0 »).
 - **A newer version** is downloaded in the background, checked against its
   signature and kept in `~/Library/Caches/fr.tafac.desktop/updates/`. The
-  sidebar then shows « Mise à jour prête » and « Redémarrer »
-  (`src/components/DesktopUpdateRow.jsx`). Quitting installs it (⌘Q, not
+  sidebar then shows « Mise à jour prête », the web's « Nouvelle version »
+  card with the rocket (`src/components/DesktopUpdateRow.jsx`,
+  `UpdateNotice.jsx`); folded, the rocket with the new dot. Quitting installs it (⌘Q, not
   closing the window); « Redémarrer » does it now. What is installed is
   checked against the signature again. A package left there by a run that
   never installed it (the computer shut down) is used at the next launch,
@@ -145,6 +146,13 @@ state and asks for the install through `/__desktop/update/*`
   installer's address (`installer`).
 - **After an update** nothing announces it but « Nouveautés », as on the
   web: same entries, same seen ids.
+- **Réglages › Mises à jour** (desktop app only,
+  `src/components/DesktopUpdateSettings.jsx`): the app's card (its version,
+  where its update is, the download's bar, « Redémarrer »), « Rechercher les
+  mises à jour » with when the last check got an answer
+  (`POST /__desktop/update/check`, the menu's note as its answer),
+  « Nouveautés », and after a failed install the installer. A local 0.0.0
+  build says it doesn't look for updates.
 - **Quitting installs only when it takes no password**: the student's
   account can write to the app and to its folder. An app installed by
   another account waits for « Redémarrer », where macOS asks for an

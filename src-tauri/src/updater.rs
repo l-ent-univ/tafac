@@ -83,12 +83,18 @@ pub struct PageState {
     failed: bool,
     // Where to get the new version by hand, if latest.json says.
     download: Option<String>,
+    // This build looks for updates (not a local 0.0.0 build).
+    enabled: bool,
+    // A check is under way.
+    checking: bool,
+    // When the last check got an answer, in milliseconds since 1970.
+    checked: Option<u64>,
 }
 
 // The answer to « Rechercher les mises à jour… », shown by the page.
 #[derive(Serialize)]
 #[serde(tag = "kind", rename_all = "lowercase")]
-enum Note {
+pub enum Note {
     Current { version: String },
     Downloading { version: String },
     Ready { version: String },
@@ -164,6 +170,9 @@ pub fn start(app: &AppHandle) -> tauri::Result<()> {
                 total: None,
                 failed: false,
                 download: None,
+                enabled: enabled(&version),
+                checking: false,
+                checked: None,
             },
             update: None,
             install_asked: false,
@@ -186,7 +195,7 @@ pub fn start(app: &AppHandle) -> tauri::Result<()> {
 }
 
 async fn keep_checking(app: AppHandle) {
-    let mut answered = check(&app, None).await;
+    let (mut answered, _) = check(&app, None).await;
     let mut checked_at = SystemTime::now();
     let mut read_at = checked_at;
     loop {
@@ -203,7 +212,7 @@ async fn keep_checking(app: AppHandle) {
         if woke {
             tokio::time::sleep(AFTER_WAKE).await;
         }
-        answered = check(&app, None).await;
+        (answered, _) = check(&app, None).await;
         checked_at = SystemTime::now();
         read_at = checked_at;
     }
@@ -219,14 +228,22 @@ pub fn check_from_menu(app: &AppHandle, window: Option<WebviewWindow>) {
     });
 }
 
-// One check. False: no answer (offline, tafac.fr down, a latest.json that
-// doesn't read).
-async fn check(app: &AppHandle, asked_from: Option<&WebviewWindow>) -> bool {
+// Réglages › Mises à jour, « Rechercher » (POST /__desktop/update/check):
+// checks now, the answer as the menu's note.
+pub async fn check_from_page(app: &AppHandle) -> Note {
+    check(app, None).await.1
+}
+
+// One check, and the note that says how it went. False: no answer (offline,
+// tafac.fr down, a latest.json that doesn't read).
+async fn check(app: &AppHandle, asked_from: Option<&WebviewWindow>) -> (bool, Note) {
     let state = app.state::<Updates>();
     let current = app.package_info().version.clone();
     if !enabled(&current) {
-        return true;
+        return (true, Note::Current { version: current.to_string() });
     }
+    state.inner.lock().unwrap().page.checking = true;
+    tell_state(app);
     let (answered, note) = match find_update(app).await {
         Err(error) => {
             trace!("no answer ({error})");
@@ -244,12 +261,22 @@ async fn check(app: &AppHandle, asked_from: Option<&WebviewWindow>) -> bool {
             (true, state.found(app, update, required))
         }
     };
+    {
+        let mut inner = state.inner.lock().unwrap();
+        inner.page.checking = false;
+        if answered {
+            inner.page.checked = SystemTime::now()
+                .duration_since(SystemTime::UNIX_EPOCH)
+                .ok()
+                .map(|since| since.as_millis() as u64);
+        }
+    }
     state.launch_checked.send_replace(true);
     tell_state(app);
     if let Some(window) = asked_from {
         tell(window, "tafac:update-note", &note);
     }
-    answered
+    (answered, note)
 }
 
 async fn find_update(app: &AppHandle) -> tauri_plugin_updater::Result<Option<Update>> {

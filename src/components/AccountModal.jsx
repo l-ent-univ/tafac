@@ -6,6 +6,7 @@ import { getPillIds } from '../changelogState'
 import { downloadSchoolCertificate, getCachedSchoolCertificateStatus, getSchoolCertificateStatus } from '../entApi'
 import { usePlanningExport } from '../usePlanningExport'
 import { AboutPage } from './AboutModal'
+import DesktopUpdateSettings from './DesktopUpdateSettings'
 import SettingsGroup, { RowText } from './SettingsGroup'
 import { CARD_CLASSES, MUTED_FILL_CLASSES, PRESSABLE_ROW_CLASSES, ROW_CLASSES } from '../settingsStyles'
 import { PrivacyContent } from './PrivacyModal'
@@ -1093,6 +1094,7 @@ function AccountModal({
       case 'about':
         return (
           <AboutPage
+            updates={<DesktopUpdateSettings />}
             leading={<ChangelogRow />}
             onPrivacyClick={hasPrivacy ? () => selectSection('privacy') : null}
           />

@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import {
+  describeChecked,
   describeDownload,
   describeSize,
   describeUpdateNote,
@@ -12,14 +13,31 @@ const MEGABYTE = 1024 * 1024
 
 test('the app\'s state is read in the shapes the page counts on', () => {
   assert.deepEqual(
-    parseUpdateState({ current: '0.25.0', phase: 'downloading', version: '0.26.0', required: true, downloaded: 10, total: 100, failed: false, download: 'https://example.org/Tafac.dmg' }),
-    { current: '0.25.0', phase: 'downloading', version: '0.26.0', required: true, downloaded: 10, total: 100, failed: false, download: 'https://example.org/Tafac.dmg' },
+    parseUpdateState({ current: '0.25.0', phase: 'downloading', version: '0.26.0', required: true, downloaded: 10, total: 100, failed: false, download: 'https://example.org/Tafac.dmg', enabled: true, checking: true, checked: 1_800_000_000_000 }),
+    { current: '0.25.0', phase: 'downloading', version: '0.26.0', required: true, downloaded: 10, total: 100, failed: false, download: 'https://example.org/Tafac.dmg', enabled: true, checking: true, checked: 1_800_000_000_000 },
   )
   // Nothing announced: no version, no size, nothing required.
   assert.deepEqual(
-    parseUpdateState({ current: '0.25.0', phase: 'idle', version: null, required: false, downloaded: 0, total: null, failed: false, download: null }),
-    { current: '0.25.0', phase: 'idle', version: null, required: false, downloaded: 0, total: null, failed: false, download: null },
+    parseUpdateState({ current: '0.25.0', phase: 'idle', version: null, required: false, downloaded: 0, total: null, failed: false, download: null, enabled: false, checking: false, checked: null }),
+    { current: '0.25.0', phase: 'idle', version: null, required: false, downloaded: 0, total: null, failed: false, download: null, enabled: false, checking: false, checked: null },
   )
+  // An app from before `enabled`, `checking` and `checked`: it looks for
+  // updates, nothing under way, no check known.
+  const older = parseUpdateState({ current: '0.25.0', phase: 'idle' })
+  assert.equal(older.enabled, true)
+  assert.equal(older.checking, false)
+  assert.equal(older.checked, null)
+})
+
+test('the last check reads as a short while ago', () => {
+  const now = Date.UTC(2026, 10, 14, 18, 0)
+  assert.equal(describeChecked(null, now), null)
+  assert.equal(describeChecked(now - 20 * 1000, now), 'à l’instant')
+  assert.equal(describeChecked(now - 5 * 60 * 1000, now), 'il y a 5\u00a0min')
+  assert.equal(describeChecked(now - 3 * 60 * 60 * 1000, now), 'il y a 3\u00a0h')
+  assert.equal(describeChecked(Date.UTC(2026, 10, 12, 12, 0), now), 'le 12 novembre')
+  // A clock set back: never « il y a -2 min ».
+  assert.equal(describeChecked(now + 2 * 60 * 1000, now), 'à l’instant')
 })
 
 test('what isn\'t a state is no state, and only a clear yes blocks', () => {

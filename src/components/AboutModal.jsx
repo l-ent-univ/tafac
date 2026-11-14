@@ -230,13 +230,16 @@ function AboutPeople() {
 // rows on top of the links' card (Réglages' « Nouveautés »).
 // `onPrivacyClick`: Réglages jumps to its Confidentialité section instead
 // of opening the privacy modal on top.
-export function AboutPage({ leading = null, onPrivacyClick = null, demoLinkLabel = '', onDemoLinkClick = null }) {
+// `updates`: the desktop app's « Mises à jour » (DesktopUpdateSettings),
+// right under the hero.
+export function AboutPage({ updates = null, leading = null, onPrivacyClick = null, demoLinkLabel = '', onDemoLinkClick = null }) {
   const shouldShowDemoLink = typeof onDemoLinkClick === 'function' && demoLinkLabel.trim()
   const repoSlug = readRepoSlug(about.repoUrl)
   const hasLinks = Boolean(leading || about.repoUrl || papillonUrl || about.contactEmail)
   return (
     <div className="flex flex-col gap-[18px]">
       <AboutHero />
+      {updates}
       {hasLinks ? (
         <SettingsGroup>
           {leading}

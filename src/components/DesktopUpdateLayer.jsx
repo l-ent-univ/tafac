@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
-import { Icon } from '@iconify/react'
 import LentButton from './LentButton'
+import ClothBackdrop from './ClothBackdrop'
+import DownloadIcon3D from './DownloadIcon3D'
 import {
   describeDownload,
   describeSize,
@@ -15,7 +16,9 @@ import {
 // in a root of their own (main.jsx), so they show whether or not the app
 // itself has started:
 // - « Mise à jour nécessaire », when the running version can't sign in any
-//   more: it takes the page, nothing behind it can be reached;
+//   more: it takes the page, nothing behind it can be reached. The app's
+//   widgets press through a cloth behind it (ClothBackdrop), the dialog
+//   with the 3D download icon (DownloadIcon3D) in the middle;
 // - the answer to the menu's « Rechercher les mises à jour… », a short note
 //   in the window's top corner.
 // The update that is ready has its row in the sidebar (DesktopUpdateRow).
@@ -96,18 +99,17 @@ function RequiredSheet({ update }) {
   const progress = restarting ? 1 : downloadProgress(update)
 
   return (
-    <div className="desktop-update-sheet fixed inset-0 z-[80] flex items-center justify-center bg-backdrop p-5 animate-modal-backdrop-in" role="presentation">
+    <div className="desktop-update-sheet fixed inset-0 z-[80] flex items-center justify-center p-5 animate-modal-backdrop-in" role="presentation">
+      <ClothBackdrop />
       <section
-        className="glass-solid glass--quiet modal-surface w-[min(380px,100%)] modal-corners [--modal-inset:24px] [--modal-inner-radius:20px] border text-[var(--color-text)] animate-modal-card-in"
+        className="glass-solid glass--quiet modal-surface relative w-[min(380px,100%)] modal-corners [--modal-inset:24px] [--modal-inner-radius:20px] border text-[var(--color-text)] animate-modal-card-in"
         role="alertdialog"
         aria-modal="true"
         aria-labelledby="desktop-update-title"
         aria-describedby="desktop-update-text"
       >
         <div className="grid justify-items-center gap-3 p-6 text-center">
-          <span className="grid size-11 place-items-center rounded-[12px] bg-warning-soft text-warning" aria-hidden="true">
-            <Icon icon="ph:download-simple" className="size-[22px]" />
-          </span>
+          <DownloadIcon3D size={92} className="-mt-2 -mb-1" />
           <div className="grid gap-[6px]">
             <h2 id="desktop-update-title" className="m-0 text-[18px] font-bold leading-[1.2] tracking-[-0.01em]">Mise à jour nécessaire</h2>
             <p id="desktop-update-text" className="m-0 text-[14px] font-medium leading-[1.4] text-text-muted">
