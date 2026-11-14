@@ -13,8 +13,8 @@ export const INK_70 = 'rgb(52 18 0 / 0.7)'
 export const INK_50 = 'rgb(52 18 0 / 0.5)'
 export const BORDER = 'rgb(52 18 0 / 0.1)'
 export const SUBTLE = '#f3f1ec'
-export const DISPLAY = '"SN Pro", "Inter Variable", system-ui, sans-serif'
-export const BODY = '"Inter Variable", system-ui, -apple-system, "Segoe UI", sans-serif'
+export const DISPLAY = '"SN Pro", "Collab Sans", system-ui, sans-serif'
+export const BODY = '"Collab Sans", system-ui, -apple-system, "Segoe UI", sans-serif'
 const FONT_WAIT_MS = 1500
 
 // The fonts a card uses (`fonts`: CSS font shorthands), loaded (they may

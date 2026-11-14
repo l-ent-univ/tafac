@@ -6,6 +6,7 @@ import { copy, copyText } from '../landingCopy'
 import { useRevealOnce } from '../landingMotion'
 import { getPapillonUrl, readPapillonDebugOverride } from '../papillon'
 import LogoBut1 from './LogoBut1'
+import SmoothSurface from './SmoothSurface'
 
 const papillonUrl = getPapillonUrl(universityConfig.branding, readPapillonDebugOverride())
 
@@ -47,8 +48,9 @@ function PapillonVision({ className = '' }) {
           href={papillonUrl}
           target="_blank"
           rel="noopener noreferrer"
-          className="mt-8 inline-flex min-h-12 items-center gap-2.5 whitespace-nowrap rounded-full bg-brand px-6 text-[16px] font-semibold text-bg no-underline transition-transform duration-150 hover:scale-[1.03] active:scale-[0.98] max-md:gap-2 max-md:px-5 max-md:text-[15px]"
+          className="mt-8 inline-flex min-h-12 items-center gap-2.5 whitespace-nowrap lent-button relative rounded-full px-6 text-[16px] no-underline max-md:gap-2 max-md:px-5 max-md:text-[15px]"
         >
+          <SmoothSurface />
           <Icon icon="ph:users" className="size-5" aria-hidden="true" />
           {copyText(copy.papillon.cta)}
         </a>

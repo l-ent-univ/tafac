@@ -101,6 +101,7 @@ const MAIL_ACTION_REQUIRED = {
 const SETTING_VALUES = {
   theme: ['auto', 'light', 'dark'],
   mail_signature_kind: ['auto', 'partage', 'custom'],
+  wallpaper_choice: ['university_daily', 'university_photo', 'tafac_daily', 'tafac_photo', 'custom'],
 }
 const SIMULATOR_STEPS = ['opened', 'ue_picked', 'reveal_shown', 'back_to_edit', 'closed']
 // The simulator's outcome, sent with reveal_shown only. Never a grade, an
@@ -164,8 +165,8 @@ export const ANALYTICS_EVENTS = {
   },
   setting_changed: {
     properties: {
-      setting: oneOf('widget_visibility', 'app_descriptions', 'custom_background', 'profile_photo', 'wallpaper', 'university_logo', 'theme', 'analytics', 'mail_signature', 'mail_signature_kind', 'assiduity_tab'),
-      value: oneOf('on', 'off', 'auto', 'light', 'dark', 'partage', 'custom'),
+      setting: oneOf('widget_visibility', 'app_descriptions', 'custom_background', 'profile_photo', 'wallpaper', 'wallpaper_choice', 'university_logo', 'theme', 'analytics', 'mail_signature', 'mail_signature_kind', 'assiduity_tab'),
+      value: oneOf('on', 'off', 'auto', 'light', 'dark', 'partage', 'custom', 'university_daily', 'university_photo', 'tafac_daily', 'tafac_photo'),
       widget: oneOf(...WIDGET_IDS),
     },
     required: ['setting', 'value'],
@@ -173,7 +174,9 @@ export const ANALYTICS_EVENTS = {
       // Turning analytics off must not be reported at all.
       if (props.setting === 'analytics' && props.value === 'off') return null
       // The theme reports which one was picked, the signature's kind which
-      // one (auto, partage, custom); every other setting is on/off.
+      // one (auto, partage, custom), the wallpaper which folder and
+      // whether daily or one photo (never which); every other setting is
+      // on/off.
       const allowed = SETTING_VALUES[props.setting] ?? ['on', 'off']
       if (!allowed.includes(props.value)) return null
       if (props.setting === 'widget_visibility') {

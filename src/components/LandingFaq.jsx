@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Icon } from '@iconify/react'
 import universityConfig from '@university'
 import { copy, copyText, renderCopy } from '../landingCopy'
+import SmoothSurface from './SmoothSurface'
 
 const repoUrl = universityConfig.branding.about?.repoUrl ?? null
 
@@ -62,7 +63,7 @@ function LandingFaq({ className = '' }) {
               key={id}
               hidden={hiddenCount > 0 && index >= FIRST_QUESTIONS}
               name="landing-faq"
-              className="group corners-[20px] border border-border bg-white px-6 transition-shadow duration-300 hover:shadow-[0_6px_20px_-10px_rgb(52_18_0/0.25)] open:shadow-[0_6px_20px_-10px_rgb(52_18_0/0.25)] dark:border-white/10 dark:bg-[#1c1c1c] max-md:corners-[18px] max-md:px-4"
+              className="group corners-[20px] glass-solid landing-faq-item px-6 max-md:corners-[18px] max-md:px-4"
             >
               <summary className="flex cursor-pointer list-none items-center gap-4 py-5 text-left text-[18px] font-bold leading-snug text-text max-md:gap-3 max-md:py-4 max-md:text-base [&::-webkit-details-marker]:hidden">
                 <span aria-hidden="true" className="w-7 shrink-0 text-center text-[24px] leading-none max-md:w-6 max-md:text-[20px]">{emoji}</span>
@@ -73,7 +74,7 @@ function LandingFaq({ className = '' }) {
                   aria-hidden="true"
                 />
               </summary>
-              <p className="m-0 pb-5 pl-11 pr-9 text-[16px] leading-relaxed text-text-secondary font-body max-md:pb-4 max-md:pl-9 max-md:pr-0 max-md:text-[15px]">
+              <p className="m-0 select-text pb-5 pl-11 pr-9 text-[16px] leading-relaxed text-text-secondary font-body max-md:pb-4 max-md:pl-9 max-md:pr-0 max-md:text-[15px]">
                 {renderCopy(answer)}
               </p>
             </details>
@@ -82,9 +83,10 @@ function LandingFaq({ className = '' }) {
         {hiddenCount > 0 ? (
           <button
             type="button"
-            className="mt-6 inline-flex min-h-11 cursor-pointer items-center gap-2 rounded-full border border-border bg-white px-5 text-[15px] font-semibold text-text transition-colors hover:bg-bg-subtle dark:border-white/10 dark:bg-[#1c1c1c] dark:hover:bg-[#242424]"
+            className="material mt-6 inline-flex min-h-11 cursor-pointer items-center gap-2 rounded-full px-5 text-[15px] font-semibold text-text"
             onClick={() => setExpanded(true)}
           >
+            <SmoothSurface />
             {copyText(copy.faq.showMore)}
             <Icon icon="ph:caret-down" className="size-4" aria-hidden="true" />
           </button>

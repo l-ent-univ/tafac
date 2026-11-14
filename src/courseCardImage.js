@@ -113,7 +113,7 @@ function layout(context, event, { color }, draw) {
 // `accent`: the course's colour (eventAccents' index), as the Planning
 // paints it in the light theme. → { blob (image/png, 2×), width, height }.
 export async function renderCourseCardImage({ event, accent = 0 }) {
-  await loadCardFonts(['700 30px "SN Pro"', '700 21px "SN Pro"', '500 13px "Inter Variable"', '500 14px "Inter Variable"', '600 11.5px "Inter Variable"'])
+  await loadCardFonts(['700 30px "SN Pro"', '700 21px "SN Pro"', '500 13px "Collab Sans"', '500 14px "Collab Sans"', '600 11.5px "Collab Sans"'])
   const color = accentColor(Number.isInteger(accent) ? accent : 0)
   return renderCardPng({
     layout: (context, draw) => layout(context, event, { color }, draw),

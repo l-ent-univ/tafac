@@ -62,7 +62,7 @@ export default function WelcomeFromLent({ visible, importedKeys = [], signedIn =
         aria-modal="true"
         aria-labelledby="welcome-from-lent-title"
       >
-        <div className="max-w-[420px] mx-auto corners-[20px] bg-widget-bg border border-border overflow-hidden shadow-[0_-8px_40px_var(--color-shadow)]">
+        <div className="glass-solid glass--quiet max-w-[420px] mx-auto corners-[20px] border overflow-hidden">
           <img
             src={transitionDoneImage}
             alt="Le logo Tafac avec une coche"
@@ -86,7 +86,7 @@ export default function WelcomeFromLent({ visible, importedKeys = [], signedIn =
                 {labels.map((label) => (
                   <li
                     key={label}
-                    className="inline-flex items-center gap-1 rounded-full border border-border bg-bg-subtle px-2.5 py-1 text-[0.8rem] font-body font-medium text-text"
+                    className="glass-solid inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-[0.8rem] font-body font-medium text-text"
                   >
                     <Icon icon="ph:check" className="h-3 w-3 text-success-text" aria-hidden="true" />
                     {label}
@@ -103,7 +103,7 @@ export default function WelcomeFromLent({ visible, importedKeys = [], signedIn =
               <button
                 type="button"
                 onClick={() => dismiss(onInstall)}
-                className="mt-1 flex w-full items-center gap-3 corners-[16px] border border-border bg-bg-subtle px-3.5 py-3 text-left text-text transition-colors hover:bg-bg cursor-pointer"
+                className="glass-solid mt-1 flex w-full items-center gap-3 corners-[16px] border px-3.5 py-3 text-left text-text transition-colors cursor-pointer"
               >
                 <Icon icon="ph:device-mobile-speaker" className="h-5 w-5 shrink-0 text-text-muted" aria-hidden="true" />
                 <span className="flex min-w-0 flex-1 flex-col gap-0.5 font-body leading-snug">

@@ -67,6 +67,17 @@ function readWideView() {
   }
 }
 
+// Back to the page's top: whatever scrolls it (the column on a wide
+// screen, the window on a phone), gently unless motion is reduced.
+function scrollToPageTop(element) {
+  const reduce = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
+  const behavior = reduce ? 'auto' : 'smooth'
+  for (let node = element?.parentElement; node; node = node.parentElement) {
+    if (node.scrollTop > 0) node.scrollTo({ top: 0, behavior })
+  }
+  if (window.scrollY > 0) window.scrollTo({ top: 0, behavior })
+}
+
 function storeView(key, value) {
   try {
     localStorage.setItem(key, value)
@@ -284,6 +295,7 @@ function PlanningPage({ selection = null, user = null, showWeekend = false, onOp
     user,
     siteLabel: siteLabelFromSelection(selection),
     formationLabel: selection?.programLabel ?? null,
+    ownId: ownGroupId,
     shownId: viewed?.id ?? null,
     tab: directoryTab,
     onTabChange: setDirectoryTab,
@@ -356,6 +368,14 @@ function PlanningPage({ selection = null, user = null, showWeekend = false, onOp
   // The week's pages are its Mondays; moving by weeks selects the Monday.
   const pageValue = byWeek ? startOfWeek(selectedDay) : selectedDay
   const stepPage = byWeek ? stepWeeks : stepDays
+  // Another page of hours (swiped, stepped, picked in the strip): seen
+  // from its top, as it slides in. The list scrolls itself to the day.
+  const shownPageRef = useRef(pageValue)
+  useEffect(() => {
+    if (shownPageRef.current === pageValue) return
+    shownPageRef.current = pageValue
+    if (!isList) scrollToPageTop(daysRef.current)
+  }, [pageValue, isList])
   // A step through pages, for the analytics: `via` 'arrow', 'keyboard' or
   // 'swipe' (bursts of them count once, see trackPlanningNavigation).
   const reportStep = (via) => trackPlanningNavigation(byWeek ? 'week_changed' : 'day_changed', via)

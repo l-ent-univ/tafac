@@ -15,7 +15,7 @@ function prefersReducedMotion() {
 // "En cours", in the brand colour as the grid's "Maint." mark.
 function OngoingBadge({ className = '' }) {
   return (
-    <span className={`inline-flex h-[22px] shrink-0 items-center rounded-full bg-brand px-2 font-body text-[12px] font-semibold leading-none text-bg ${className}`}>
+    <span className={`lent-button lent-button--tag inline-flex h-[22px] shrink-0 items-center rounded-full px-2 font-body text-[12px] font-semibold leading-none ${className}`}>
       En cours
     </span>
   )

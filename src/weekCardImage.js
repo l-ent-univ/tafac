@@ -134,7 +134,7 @@ function drawBlock(context, { event, x, y, width, height, color }) {
 // accent index, `group`: the group's name, top right.
 // → { blob (image/png, 2×), width, height }.
 export async function renderWeekCardImage({ monday, days, events, accentFor, group = '' }) {
-  await loadCardFonts([`700 26px "SN Pro"`, `600 31px "SN Pro"`, `700 17px "SN Pro"`, '600 12.5px "Inter Variable"', '500 11px "Inter Variable"', '500 13px "Inter Variable"', '600 13px "Inter Variable"'])
+  await loadCardFonts([`700 26px "SN Pro"`, `600 31px "SN Pro"`, `700 17px "SN Pro"`, '600 12.5px "Collab Sans"', '500 11px "Collab Sans"', '500 13px "Collab Sans"', '600 13px "Collab Sans"'])
   const weekEvents = (Array.isArray(events) ? events : []).filter((event) => days.includes(event.day))
   const { first, last } = shareHourRange(weekEvents, days)
   const columnWidth = days.length > 5 ? 136 : 168

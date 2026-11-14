@@ -25,6 +25,8 @@ import GradeSimulatorModal from './GradeSimulatorModal'
 import GradesNotices from './GradesNotice'
 import LatestGradesList from './LatestGradesList'
 import LoadingDots from './LoadingDots'
+import PageLoading from './PageLoading'
+import { useLoadingSimulated } from '../loadingDebug'
 import Material from './Material'
 import PageEmptyState from './PageEmptyState'
 import SemesterSelect from './SemesterSelect'
@@ -35,6 +37,7 @@ import WidgetAverageGrade from './WidgetAverageGrade'
 import WidgetEcts from './WidgetEcts'
 import WidgetUes from './WidgetUes'
 import { r } from '../register.js'
+import SmoothSurface from './SmoothSurface'
 
 // Why the semester has nothing to show, if it doesn't: no relevé, a relevé
 // ScoDoc hasn't published (with its own notice), or no grade yet. Mirrors
@@ -98,6 +101,7 @@ function ReportPdfButton({ semesterId, semester, releveType }) {
         aria-label={`Télécharger le relevé PDF ${semesterName(semester)}`}
         className={`${SECONDARY_BUTTON} cursor-pointer disabled:cursor-wait max-md:relative max-md:size-10 max-md:justify-center max-md:p-0 max-md:shadow-xs max-md:after:absolute max-md:after:-inset-[3px]`}
       >
+        <SmoothSurface />
         {state === 'loading'
           ? <LoadingDots label={null} className="w-4" />
           : <Icon icon="ph:file-pdf" className="size-4 max-md:size-[18px]" aria-hidden="true" />}
@@ -161,6 +165,8 @@ function OpenGradeDetail({ request, onHandled }) {
 // composer (« Écrire au sujet de cette note »); null without the in-app
 // mail page, and the action isn't offered.
 function GradesPage({ user = null, arrivalSource = 'other', initialGradeRequest = null, onInitialGradeRequestHandled = () => {}, onComposeMail = null }) {
+  // Dev: the debug panel can hold the page on its first load (loadingDebug.js).
+  const simulateLoading = useLoadingSimulated()
   const { base, semesters, activeId, activeSemester, selectSemester, entry, releve, config, department, departmentMessage } = useScodocReleve()
   const status = base.status === 'error' ? base : entry
   const empty = useMemo(() => (status.status === 'ok' ? readEmptyReason(releve, config) : null), [status.status, releve, config])
@@ -295,10 +301,12 @@ function GradesPage({ user = null, arrivalSource = 'other', initialGradeRequest 
   }, [])
 
   let body
-  if (status.status === 'error') {
+  if (simulateLoading) {
+    body = <PageLoading />
+  } else if (status.status === 'error') {
     body = <p className="m-0 font-body text-[15px] font-medium text-text-secondary" role="alert">{status.error}</p>
   } else if (status.status === 'loading') {
-    body = <LoadingDots label="Chargement des notes" className="justify-self-start py-2 text-text-muted" />
+    body = <PageLoading />
   } else if (empty?.kind === 'unpublished') {
     body = (
       <PageEmptyState key={activeId} icon="ph:file-dashed" title="Relevé pas encore publié">

@@ -10,6 +10,10 @@
 //   - `launch.allowedDomains` (universities/<id>/server.js): domains whose
 //     services the ENT lists, matched with their subdomains.
 //
+// Over HTTPS only: the session's cookies never go out in clear. A host the
+// config itself gives over plain http (a development or test stand-in) is
+// the one exception.
+//
 // Anything else is opened directly by the browser (launch-preview answers
 // useServerLaunch: false) and the relay itself sends it back to the app.
 
@@ -26,8 +30,8 @@ function normalizeDomain(value) {
   return /^[a-z0-9.-]+$/.test(domain) && domain.includes('.') ? domain : null
 }
 
-export function collectLaunchHosts(config = {}) {
-  const urls = [
+function listConfigUrls(config = {}) {
+  return [
     ...Object.values(config.origins ?? {}),
     config.planning?.serviceUrl,
     config.grades?.origin,
@@ -35,9 +39,16 @@ export function collectLaunchHosts(config = {}) {
     config.mail?.origin,
     config.mail?.webmailUrl,
     config.schoolCertificate?.origin,
-  ]
+  ].filter((url) => typeof url === 'string' && url)
+}
 
-  return new Set(urls.filter(Boolean).map(getHostname).filter(Boolean))
+export function collectLaunchHosts(config = {}) {
+  return new Set(listConfigUrls(config).map(getHostname).filter(Boolean))
+}
+
+// The hosts the config reaches over plain http.
+export function collectInsecureLaunchHosts(config = {}) {
+  return new Set(listConfigUrls(config).filter((url) => /^http:\/\//i.test(url)).map(getHostname).filter(Boolean))
 }
 
 export function collectLaunchDomains(config = {}) {
@@ -54,6 +65,7 @@ export function collectLaunchDomains(config = {}) {
 export function createLaunchTargetPolicy(config = {}) {
   const hosts = collectLaunchHosts(config)
   const domains = [...collectLaunchDomains(config)]
+  const insecureHosts = collectInsecureLaunchHosts(config)
 
   function isAllowedHost(hostname) {
     const host = String(hostname ?? '').toLowerCase()
@@ -72,6 +84,7 @@ export function createLaunchTargetPolicy(config = {}) {
     }
     // No credentials in the URL: they would change what the host means.
     if (url.username || url.password) return false
+    if (url.protocol !== 'https:' && !insecureHosts.has(url.hostname.toLowerCase())) return false
     return isAllowedHost(url.hostname)
   }
 

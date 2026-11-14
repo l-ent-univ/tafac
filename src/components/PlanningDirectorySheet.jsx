@@ -37,7 +37,7 @@ function PlanningDirectorySheet({ onClose, ...contentProps }) {
       <div className="weather-modal-backdrop absolute inset-0 bg-backdrop animate-modal-backdrop-in" onClick={dismiss} aria-hidden="true" />
       <section
         ref={dialogRef}
-        className="gd-dialog planning-sheet relative isolate flex h-[min(820px,calc(100dvh-40px))] w-[min(560px,100%)] flex-col modal-corners [--modal-inset:24px] [--modal-inner-radius:20px] max-sm:[--modal-inset:16px] max-sm:[--modal-inner-radius:18px] border border-border bg-bg text-text shadow-[0_24px_80px_var(--color-shadow)] outline-none max-sm:h-[calc(100dvh-16px)] max-sm:rounded-b-none max-sm:border-b-0"
+        className="glass-solid glass--quiet modal-surface gd-dialog planning-sheet relative isolate flex h-[min(820px,calc(100dvh-40px))] w-[min(560px,100%)] flex-col modal-corners [--modal-inset:24px] [--modal-inner-radius:20px] max-sm:[--modal-inset:16px] max-sm:[--modal-inner-radius:18px] border text-text outline-none max-sm:h-[calc(100dvh-16px)] max-sm:rounded-b-none max-sm:border-b-0"
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}

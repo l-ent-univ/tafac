@@ -7,7 +7,10 @@
 // up from the bottom edge and drifting. With a mouse, the wash leans towards
 // the pointer: its offset from the middle, -1 to 1, as --material-shift (set
 // on the element, no re-render). None by default.
-// `as`: the element, a button by default.
+// `as`: the element, a button by default. As a button or a link, its
+// surface is the smooth one (SmoothSurface); a div or a span, a surface
+// that isn't pressed, is the default solid glass (.glass-solid) instead,
+// unless it has the rainbow wash.
 
 function followPointer(event) {
   const rect = event.currentTarget.getBoundingClientRect()
@@ -18,6 +21,8 @@ function followPointer(event) {
 function releasePointer(event) {
   event.currentTarget.style.removeProperty('--material-shift')
 }
+
+import SmoothSurface from './SmoothSurface'
 
 export default function Material({
   as: Element = 'button',
@@ -34,10 +39,13 @@ export default function Material({
     ? `linear-gradient(100deg, ${[...colors, colors[0]].join(', ')})`
     : null
   const buttonType = Element === 'button' ? { type: 'button' } : null
+  const interactive = Element === 'button' || Element === 'a'
+  const surface = interactive ? <SmoothSurface /> : null
 
   if (!rainbow) {
     return (
-      <Element {...buttonType} {...props} className={`material ${className}`} style={style} onPointerMove={onPointerMove} onPointerLeave={onPointerLeave}>
+      <Element {...buttonType} {...props} className={`${interactive ? 'material' : 'glass-solid'} ${className}`} style={style} onPointerMove={onPointerMove} onPointerLeave={onPointerLeave}>
+        {surface}
         {children}
       </Element>
     )
@@ -58,6 +66,7 @@ export default function Material({
         onPointerLeave?.(event)
       }}
     >
+      {surface}
       <span className="material-wash-frame rounded-[inherit]" aria-hidden="true">
         <span className="material-wash" />
       </span>

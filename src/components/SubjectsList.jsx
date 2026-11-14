@@ -23,7 +23,7 @@ const GROUPS_CLASSES = 'grid items-start gap-3 max-md:gap-2'
 const CARD_CLASSES = '@container widget-card widget-card-visible shadow-md border border-white card-corners bg-widget-bg text-text p-2 min-w-0'
 // The pills of the "Dernières notes" cards, a size down: neutral, the number
 // and "/20" trimmed to cap height so the padding is even.
-const PILL_CLASSES = 'inline-flex shrink-0 items-end gap-[2px] rounded-full border border-border bg-bg-subtle text-text'
+const PILL_CLASSES = 'glass-solid inline-flex shrink-0 items-end gap-[2px] rounded-full text-text'
 const TRIM = '[text-box:trim-both_cap_alphabetic]'
 
 function formatDay(date) {
@@ -56,7 +56,7 @@ export function ScoreText({ value, size = 'md' }) {
 // "Nouveau": a grade that appeared since the last visit (see seenGrades.js).
 export function NewBadge() {
   return (
-    <span className="mt-[1px] shrink-0 rounded-full bg-brand px-[7px] py-[3px] font-body text-[11px] font-semibold leading-none text-bg">Nouveau</span>
+    <span className="lent-button lent-button--tag mt-[1px] shrink-0 rounded-full px-[7px] py-[3px] font-body text-[11px] font-semibold leading-none">Nouveau</span>
   )
 }
 
@@ -64,7 +64,7 @@ export function NewBadge() {
 // (it replaces the subject's result rather than adding to it).
 export function TypeBadge({ label }) {
   return (
-    <span className="mt-[1px] shrink-0 rounded-full bg-brand-subtle px-[7px] py-[3px] font-body text-[11px] font-semibold leading-none text-text-secondary">{label}</span>
+    <span className="glass-solid mt-[1px] shrink-0 rounded-full px-[7px] py-[3px] font-body text-[11px] font-semibold leading-none text-text-secondary">{label}</span>
   )
 }
 
@@ -72,7 +72,7 @@ export function TypeBadge({ label }) {
 // dashed while it's still to come.
 function StatusPill({ grade }) {
   return (
-    <span className={`inline-flex shrink-0 items-center rounded-full border px-[9px] py-[6px] font-body text-[12px] font-semibold leading-none text-text-secondary ${TRIM} ${grade.kind === 'pending' ? 'border-dashed border-border-input' : 'border-border'}`}>
+    <span className={`inline-flex shrink-0 items-center rounded-full px-[9px] py-[6px] font-body text-[12px] font-semibold leading-none text-text-secondary ${TRIM} ${grade.kind === 'pending' ? 'status-tag status-tag--carved status-tag--dashed' : 'glass-solid'}`}>
       {grade.label}
     </span>
   )
@@ -84,7 +84,7 @@ function StatusPill({ grade }) {
 function PromoRange({ place }) {
   return (
     <span className="subject-promo-range relative hidden h-4 w-[92px] shrink-0 @md:block" aria-hidden="true">
-      <span className="absolute inset-x-0 top-1/2 h-[4px] -translate-y-1/2 rounded-full bg-brand-subtle" />
+      <span className="engraved absolute inset-x-0 top-1/2 h-[4px] -translate-y-1/2 rounded-full" />
       <span
         className="absolute top-1/2 h-[4px] -translate-y-1/2 rounded-full bg-text-30"
         style={{ left: `${place.min}%`, width: `${Math.max(place.max - place.min, 2)}%` }}
@@ -256,7 +256,7 @@ function SubjectRow({ module, isOpen, onToggle, icon, wash, ueTitles, showPromoS
         className={`${isEmpty ? '' : 'subject-row-toggle cursor-pointer '}flex w-full min-w-0 items-center gap-3 corners-[16px] border-0 bg-transparent px-2 py-2 text-left text-text max-md:gap-[10px]`}
       >
         {/* The wash of the UEs the subject feeds, as on the grade cards. */}
-        <span className="relative isolate inline-flex size-10 shrink-0 items-center justify-center overflow-hidden corners-[12px] bg-brand-subtle max-md:size-9 max-md:corners-[11px]" aria-hidden="true">
+        <span className="glass-solid relative isolate inline-flex size-10 shrink-0 items-center justify-center overflow-hidden corners-[12px] max-md:size-9 max-md:corners-[11px]" aria-hidden="true">
           {wash ? <span className="subject-tile-wash" style={{ background: wash }} /> : null}
           {icon ? <Icon icon={icon} className="size-5 text-text max-md:size-[18px]" /> : null}
         </span>

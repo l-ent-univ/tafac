@@ -55,7 +55,7 @@ function ShowcasePanel({ tab, selected, showPreview, preview }) {
       <ul className="landing-showcase-items m-0 flex w-full min-w-0 list-none flex-col gap-4 p-0">
         {items.map((item) => (
           <li key={item.title} className="flex items-start gap-3">
-            <span className="mt-[1px] inline-flex size-9 shrink-0 items-center justify-center rounded-full bg-bg-subtle text-text" aria-hidden="true">
+            <span className="glass-solid mt-[1px] inline-flex size-9 shrink-0 items-center justify-center rounded-full text-text" aria-hidden="true">
               <Icon icon={item.icon} className="size-[17px]" />
             </span>
             <span className="flex min-w-0 flex-col gap-0.5">

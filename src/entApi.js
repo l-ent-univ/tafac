@@ -201,6 +201,15 @@ async function parseJsonPayload(response) {
         : `Request failed with status ${response.status}.`
 
     const error = createHttpError(errorMessage, response.status)
+    // What the server says the failure is, when it names it (the login's
+    // 'mfa_required', 'mfa_invalid'…), and what the code step offers
+    // (`mfa`: { methods, sent }).
+    if (typeof data === 'object' && typeof data?.code === 'string') {
+      error.code = data.code
+    }
+    if (typeof data === 'object' && data?.mfa && typeof data.mfa === 'object') {
+      error.mfa = data.mfa
+    }
     // Seconds until the login rate limit lifts (429), for the message.
     const retryAfterSeconds = Number(response.headers.get('Retry-After'))
     if (retryAfterSeconds > 0) {
@@ -263,7 +272,10 @@ export async function getAuthSession() {
   return payload
 }
 
-export async function loginToEnt({ username, password }) {
+// `otp`: the one-time code, once the server asked for it ('mfa_required').
+// `sendCode` ('sms', 'mail'): have a code sent instead; the answer is
+// 'mfa_required' again, with `mfa.sent`.
+export async function loginToEnt({ username, password, otp, sendCode }) {
   clearGradesCache()
   localStorage.removeItem(ADE_TIMETABLE_CACHE_KEY)
 
@@ -277,7 +289,7 @@ export async function loginToEnt({ username, password }) {
       'Content-Type': 'application/json',
       ...getUniversityRequestHeaders(),
     },
-    body: JSON.stringify({ username, password, ...(university ? { university } : {}) }),
+    body: JSON.stringify({ username, password, ...(otp ? { otp } : {}), ...(sendCode ? { sendCode } : {}), ...(university ? { university } : {}) }),
   })
 
   const payload = await parseJsonPayload(response)

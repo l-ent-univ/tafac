@@ -169,7 +169,7 @@ export function PrivacyContent({ embedded = false, control = null, actions = nul
         </div>
 
         {HAS_MAIL_PAGE ? (
-          <section className="flex w-full flex-col gap-3 corners-[20px] border border-[var(--color-border)] bg-white/60 px-5 py-5 text-left dark:bg-white/[0.04] max-sm:px-4" aria-labelledby={embedded ? undefined : 'privacy-mail-title'}>
+          <section className="glass-solid glass--quiet flex w-full flex-col gap-3 corners-[20px] border px-5 py-5 text-left max-sm:px-4" aria-labelledby={embedded ? undefined : 'privacy-mail-title'}>
             <p
               id={embedded ? undefined : 'privacy-mail-title'}
               role="heading"
@@ -236,7 +236,7 @@ function PrivacyModal({ open, onClose }) {
       role="presentation"
     >
       <section
-        className="privacy-modal relative font-body w-[min(500px,100%)] max-h-[calc(100dvh-40px)] overflow-y-auto overflow-x-hidden corners-[28px] border border-[var(--color-border)] bg-[#f5f3ed] text-[#341200] animate-modal-card-in dark:bg-[var(--color-bg)] dark:text-[var(--color-text)]"
+        className="glass-solid glass--quiet modal-surface privacy-modal relative font-body w-[min(500px,100%)] max-h-[calc(100dvh-40px)] overflow-y-auto overflow-x-hidden corners-[28px] border text-[#341200] animate-modal-card-in dark:text-[var(--color-text)]"
         role="dialog"
         aria-modal="true"
         aria-labelledby="privacy-modal-title"

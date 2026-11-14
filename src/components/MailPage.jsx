@@ -26,7 +26,6 @@ import { useContextMenu } from '../useContextMenu'
 import { trackMailAction, useMailPageReport } from '../analytics'
 import { createSearchReporter, describeMailLoad, toComposeKind, toFolderKind, toMailPageSource, toMailVia, toRemoveAction } from '../mailAnalytics'
 import {
-  SHIMMER_CLASSES,
   formatReceivedAt,
   getSenderLabel,
   parseDate,
@@ -34,6 +33,9 @@ import {
   storeHref,
 } from './widgetListUtils'
 import { r } from '../register.js'
+import SmoothSurface from './SmoothSurface'
+import { Skeleton } from 'skullet/react'
+import { SAMPLE_MAIL_ROWS, useSkeletonsForced } from '../skeletonSamples'
 
 // The composer and its editor (Tiptap) load the first time one opens: most
 // visits only read.
@@ -208,9 +210,10 @@ function SignInAgainButton({ onClick }) {
   return (
     <button
       type="button"
-      className="inline-flex shrink-0 items-center px-3 py-2 border border-white dark:border-[rgba(255,255,255,0.08)] rounded-full bg-widget-bg text-text cursor-pointer transition-[background-color] duration-120 ease-in-out hover:bg-bg-subtle focus-visible:outline-2 focus-visible:outline-text"
+      className="material inline-flex shrink-0 items-center px-3 py-2 rounded-full text-text cursor-pointer focus-visible:outline-2 focus-visible:outline-text"
       onClick={onClick}
     >
+      <SmoothSurface />
       {/* On a span: index.css gives buttons the inherited font. */}
       <span className="text-[13px] font-semibold leading-none">Se reconnecter</span>
     </button>
@@ -222,7 +225,7 @@ function SignInAgainButton({ onClick }) {
 // than « Mails indisponibles », which reads as an outage).
 function MailSessionNotice({ onSignInAgain, className = '' }) {
   return (
-    <div className={`flex min-w-0 items-center gap-3 rounded-[14px] bg-bg-subtle px-4 py-3 ${className}`} role="status">
+    <div className={`glass-solid flex min-w-0 items-center gap-3 rounded-[14px] px-4 py-3 ${className}`} role="status">
       <Icon icon="ph:lock" className="size-[18px] shrink-0 text-text-muted" aria-hidden="true" />
       <div className="grid min-w-0 flex-1 gap-0.5">
         <p className="m-0 text-[14px] font-semibold leading-tight text-text">Session expirée</p>
@@ -340,7 +343,9 @@ const PILL_CLASSES = 'mail-folder-pill group relative inline-flex h-10 min-w-0 b
 // The mailbox's folders as Apple Mail's category pills: each an icon, the
 // one shown a dark pill wider than the others with its name (they ease
 // between the two). On a phone the others keep 44px and it takes the rest,
-// so its name fits however many folders there are. A dot on a folder holding unread mails (not Envoyés,
+// so its name fits however many folders there are. Each folder has its
+// colour (data-tint, .mail-folder-pill in overrides.css): its icon in it,
+// the shown one's pill washed with it. A dot on a folder holding unread mails (not Envoyés,
 // Brouillons or Corbeille, whose unread ones don't call for reading).
 // The last pill, « Dossiers » (when the student has folders of their own or
 // sub-folders), opens the tree's menu (`onOpenMenu(rect)`, under the pill);
@@ -404,6 +409,7 @@ function MailFolderPills({ folders, currentId, currentUnread, onSelect, onOpenMe
             key={folder.id}
             type="button"
             className={`${PILL_CLASSES} ${current ? 'mail-folder-pill--current grow-[2.6] text-text max-md:grow max-md:px-4' : 'grow bg-transparent text-text-muted hover:bg-bg-muted max-md:grow-0'}`}
+            data-tint={FOLDER_ICONS[folder.kind] ? folder.kind : 'folder'}
             aria-current={current || undefined}
             aria-label={unread > 0 && dot ? `${label}, ${unread} non lu${unread > 1 ? 's' : ''}` : label}
             {...pillProps(folder.id, () => onSelect(folder.id))}
@@ -426,6 +432,7 @@ function MailFolderPills({ folders, currentId, currentUnread, onSelect, onOpenMe
         <button
           type="button"
           className={`${PILL_CLASSES} ${currentMenuFolder ? 'mail-folder-pill--current grow-[2.6] text-text max-md:grow max-md:px-4' : 'grow bg-transparent text-text-muted hover:bg-bg-muted max-md:grow-0'}`}
+          data-tint={currentMenuFolder && FOLDER_ICONS[currentMenuFolder.kind] ? currentMenuFolder.kind : 'folder'}
           aria-current={currentMenuFolder ? true : undefined}
           aria-haspopup="menu"
           aria-label={currentMenuFolder
@@ -458,34 +465,34 @@ function MailSelection({ count, onClear }) {
   return (
     <div className="mail-reader-enter grid justify-items-center gap-4 px-4 pt-16 pb-10 text-center">
       <span className="relative inline-flex size-16 items-center justify-center" aria-hidden="true">
-        <span className="absolute inset-0 rotate-[-8deg] rounded-[16px] border border-border bg-bg-subtle" />
-        <span className="absolute inset-0 rotate-[5deg] rounded-[16px] border border-border bg-bg-muted" />
+        <span className="glass-solid absolute inset-0 rotate-[-8deg] rounded-[16px]" />
+        <span className="glass-solid absolute inset-0 rotate-[5deg] rounded-[16px]" />
         <span className="material relative inline-flex size-16 items-center justify-center rounded-[16px]">
           <Icon icon="ph:envelope-simple" className="size-7 text-text-muted" />
         </span>
       </span>
       <p className="m-0 text-[17px] font-semibold leading-tight text-text" role="status">{count} mails sélectionnés</p>
       <button type="button" className="material inline-flex h-9 items-center rounded-full px-4 cursor-pointer" onClick={onClear}>
+        <SmoothSurface />
         <span className="text-[13px] font-semibold leading-none text-text">Désélectionner</span>
       </button>
     </div>
   )
 }
 
+// While the list loads: a skeleton (skullet) measured from sample rows
+// drawn as real ones (MailRowContent), a bar per line of text.
 function MailListPlaceholder() {
   return (
-    <ul className="mail-skeleton-delayed m-0 p-0 list-none grid" role="status" aria-label="Chargement des mails">
-      {['w-[34%]', 'w-[26%]', 'w-[40%]', 'w-[30%]'].map((senderWidth) => (
-        <li key={senderWidth} className={`${ROW_CLASSES} ${ITEM_CLASSES}`} aria-hidden="true">
-          <span className="flex items-center gap-2 h-6">
-            <span className={`text-placeholder-shimmer size-6 rounded-[6px] ${SHIMMER_CLASSES}`} />
-            <span className={`text-placeholder-shimmer h-2.5 rounded-full ${senderWidth} ${SHIMMER_CLASSES}`} />
-          </span>
-          <span className={`text-placeholder-shimmer mt-1 h-2.5 w-[58%] rounded-full ${SHIMMER_CLASSES}`} />
-          <span className={`text-placeholder-shimmer mt-1 h-2 w-[86%] rounded-full ${SHIMMER_CLASSES}`} />
-        </li>
-      ))}
-    </ul>
+    <Skeleton loading label="Chargement des mails">
+      <ul className="m-0 p-0 list-none grid">
+        {SAMPLE_MAIL_ROWS.map((message) => (
+          <li key={message.id} className={`${ROW_CLASSES} ${ITEM_CLASSES} px-3`}>
+            <MailRowContent message={message} person={message.from} sender={message.from.name} timeLabel="10h12" />
+          </li>
+        ))}
+      </ul>
+    </Skeleton>
   )
 }
 
@@ -545,7 +552,7 @@ function MailListItem({ message, fallbackHref, now, onOpen, onContextMenu, onHov
         >
         <button
           type="button"
-          className={`${ITEM_CLASSES} w-full px-3 rounded-[10px] ${joinTop ? 'rounded-t-none' : ''} ${joinBottom ? 'rounded-b-none -mb-px relative' : ''} text-left border-0 cursor-pointer ${selected ? 'bg-bg-subtle' : 'bg-transparent'} text-inherit transition-[background-color] duration-[120ms] ease-in-out hover:bg-bg-subtle focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-text`}
+          className={`${ITEM_CLASSES} w-full px-3 rounded-[10px] ${joinTop ? 'rounded-t-none' : ''} ${joinBottom ? 'rounded-b-none -mb-px relative' : ''} text-left border-0 cursor-pointer ${selected ? 'bg-card shadow-[0_0_0_1px_color-mix(in_srgb,var(--color-text)_9%,transparent),0_1px_2px_rgb(0_0_0/0.06)] dark:bg-white/8 dark:shadow-[0_0_0_1px_rgb(255_255_255/0.06)]' : 'bg-transparent'} text-inherit transition-[background-color,box-shadow] duration-[120ms] ease-in-out hover:bg-card hover:shadow-[0_0_0_1px_color-mix(in_srgb,var(--color-text)_9%,transparent),0_1px_2px_rgb(0_0_0/0.06)] dark:hover:bg-white/8 dark:hover:shadow-[0_0_0_1px_rgb(255_255_255/0.06)] focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-text`}
           aria-label={ariaLabel}
           aria-current={selected || undefined}
           data-mail-id={message.id}
@@ -601,6 +608,7 @@ function MailListItem({ message, fallbackHref, now, onOpen, onContextMenu, onHov
 // `planning`: { selection, user }, the composer's « Un cours… » (the
 // Planning in the app), null without.
 function MailPage({ onReaderOpenChange, onSignInAgain, sender = null, composeRequest = null, onComposeRequestHandled = () => {}, arrivalSource = 'other', canAttachGrades = false, planning = null }) {
+  const skeletonsForced = useSkeletonsForced()
   // nextOffset: where the next page starts on the server.
   // `folder`: the folder the list is of (the one shown until another's
   // first page arrives).
@@ -1958,6 +1966,7 @@ function MailPage({ onReaderOpenChange, onSignInAgain, sender = null, composeReq
           disabled={isRefreshing}
           onClick={() => void refresh()}
         >
+          <SmoothSurface />
           <Icon icon="ph:arrows-clockwise" className={`size-[18px] ${isRefreshing ? 'mail-refresh-spin' : ''}`} aria-hidden="true" />
           <Tooltip title="Actualiser" side="bottom-end" className="max-4xl:hidden" />
         </button>
@@ -1971,8 +1980,9 @@ function MailPage({ onReaderOpenChange, onSignInAgain, sender = null, composeReq
           aria-label="Nouveau message"
           onClick={() => void startCompose('new')}
         >
+          <SmoothSurface />
           <Icon icon="ph:pencil-simple" className="size-[18px] shrink-0" aria-hidden="true" />
-          <span className="whitespace-nowrap text-[14px] font-semibold leading-none max-sm:hidden" aria-hidden="true">Nouveau message</span>
+          <span className="whitespace-nowrap text-[14px] font-medium leading-none max-sm:hidden" aria-hidden="true">Nouveau message</span>
         </button>
       </div>
 
@@ -1995,6 +2005,7 @@ function MailPage({ onReaderOpenChange, onSignInAgain, sender = null, composeReq
 
       {state.status === 'loading' ? <MailListPlaceholder /> : null}
 
+
       {state.status === 'ok' && visibleMessages.length === 0 && isSearching && !isSearchPending ? (
         <p className="m-0 py-10 text-center text-[14px] font-medium text-text-muted" role="status">Aucun mail ne correspond</p>
       ) : null}
@@ -2008,6 +2019,7 @@ function MailPage({ onReaderOpenChange, onSignInAgain, sender = null, composeReq
             className="material inline-flex h-8 items-center gap-1.5 rounded-full px-3 cursor-pointer"
             onClick={() => setConfirmation({ kind: 'empty', folder: state.folder })}
           >
+            <SmoothSurface />
             {/* The red on the icon and the text: .material sets the button's
                 colour outside Tailwind's layers. */}
             <Icon icon="ph:trash" className="size-[14px] shrink-0 text-[#d1342f] dark:text-[#ff6b63]" aria-hidden="true" />
@@ -2017,6 +2029,8 @@ function MailPage({ onReaderOpenChange, onSignInAgain, sender = null, composeReq
       ) : null}
 
       {state.status === 'ok' && visibleMessages.length > 0 ? (
+        // Held as a skeleton from the debug panel (« Simuler le chargement »).
+        <Skeleton loading={skeletonsForced || undefined} label="Chargement des mails">
         <div className={`${hasOpenedMail ? 'mail-pop-in' : ''} grid min-w-0`}>
           <ul
             key={state.folder}
@@ -2050,9 +2064,10 @@ function MailPage({ onReaderOpenChange, onSignInAgain, sender = null, composeReq
                   <span className="text-[13px] font-medium">Les mails plus anciens n’ont pas chargé</span>
                   <button
                     type="button"
-                    className="inline-flex shrink-0 items-center px-3 py-2 border border-white dark:border-[rgba(255,255,255,0.08)] rounded-full bg-widget-bg text-text-secondary cursor-pointer transition-[background-color] duration-120 ease-in-out hover:bg-bg-subtle focus-visible:outline-2 focus-visible:outline-text"
+                    className="material inline-flex shrink-0 items-center px-3 py-2 rounded-full text-text-secondary cursor-pointer focus-visible:outline-2 focus-visible:outline-text"
                     onClick={() => setMoreStatus('idle')}
                   >
+                    <SmoothSurface />
                     {/* The font on a span: index.css gives buttons `font: inherit`, outside Tailwind's layers. */}
                     <span className="text-[13px] font-medium leading-none">Réessayer</span>
                   </button>
@@ -2063,6 +2078,7 @@ function MailPage({ onReaderOpenChange, onSignInAgain, sender = null, composeReq
             </div>
           ) : null}
         </div>
+        </Skeleton>
       ) : null}
 
       {isSearchPending && state.status === 'ok' ? (

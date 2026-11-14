@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { Icon } from '@iconify/react'
 import universityConfig from '@university'
 import calendarIcon from '../assets/home-icons/calendar.png'
@@ -25,10 +25,13 @@ import { useScodocReleve } from '../useScodocReleve'
 import { GradesNotice } from './GradesNotice'
 import JustifyAbsenceSheet from './JustifyAbsenceSheet'
 import LoadingDots from './LoadingDots'
+import PageLoading from './PageLoading'
+import { useLoadingSimulated } from '../loadingDebug'
 import PageEmptyState from './PageEmptyState'
 import SemesterSelect from './SemesterSelect'
 import ServiceNotice from './ServiceNotice'
 import { r } from '../register.js'
+import SmoothSurface from './SmoothSurface'
 
 // « Assiduité »: the absences and lateness ScoDoc holds for the semester
 // picked next to the title (shared with « Mes notes »), from the relevé's
@@ -46,9 +49,11 @@ const RANGE_DAY = new Intl.DateTimeFormat('fr-FR', { day: 'numeric', month: 'sho
 
 // How each status reads: its pill, its mark on the semester line.
 const STATUS_STYLES = {
-  unjustified: { pill: 'bg-error-bg text-error border-transparent', icon: 'ph:warning-circle' },
-  justified: { pill: 'bg-bg-subtle text-text-secondary border-border', icon: 'ph:check-circle' },
-  late: { pill: 'bg-transparent text-text-secondary border-dashed border-border-input', icon: 'ph:clock' },
+  // Engraved tags (.status-tag): pressed into the card, not justified
+  // tinted red; a lateness's edge dashed, as lighter.
+  unjustified: { pill: 'status-tag status-tag--error text-error', icon: 'ph:warning-circle' },
+  justified: { pill: 'status-tag status-tag--carved text-text-secondary', icon: 'ph:check-circle' },
+  late: { pill: 'status-tag status-tag--carved status-tag--dashed text-text-secondary', icon: 'ph:clock' },
 }
 
 const FILTERS = [
@@ -97,8 +102,10 @@ function SectionTitle({ id, icon, children, count = null }) {
 function StatusPill({ status, className = '' }) {
   const style = STATUS_STYLES[status] ?? STATUS_STYLES.justified
   return (
-    <span className={`inline-flex shrink-0 items-center gap-1 rounded-full border px-[9px] py-[5px] font-body text-[12px] font-semibold leading-none ${style.pill} ${className}`}>
-      <Icon icon={style.icon} className="size-[13px]" aria-hidden="true" />
+    // As tall as « Justifier » beside it (30px, its text size), the same
+    // padding all round: 8px about the 14px icon.
+    <span className={`inline-flex h-[30px] shrink-0 items-center gap-[5px] rounded-full p-2 font-body text-[13px] font-semibold leading-none ${style.pill} ${className}`}>
+      <Icon icon={style.icon} className="size-[14px]" aria-hidden="true" />
       {ABSENCE_STATUS_LABELS[status]}
     </span>
   )
@@ -135,9 +142,9 @@ function TotalsCard({ totals, sums, counts }) {
       </dl>
       {/* The hours missed, the unjustified part in red. */}
       {missed > 0 ? (
-        <div className="relative h-[6px] overflow-hidden rounded-full bg-brand-subtle" aria-hidden="true">
-          <span className="assiduity-bar absolute inset-y-0 left-0 rounded-full bg-text-30" style={{ width: '100%' }} />
-          <span className="assiduity-bar absolute inset-y-0 left-0 rounded-full bg-error" style={{ width: `${unjustifiedShare}%` }} />
+        <div className="assiduity-track relative h-[6px] overflow-hidden rounded-full" aria-hidden="true">
+          <span className="assiduity-bar assiduity-fill absolute inset-y-0 left-0 rounded-full bg-text-30" style={{ width: '100%' }} />
+          <span className="assiduity-bar assiduity-fill absolute inset-y-0 left-0 rounded-full bg-error" style={{ width: `${unjustifiedShare}%` }} />
         </div>
       ) : null}
     </article>
@@ -186,7 +193,7 @@ function SemesterLine({ timeline, entriesById, onPick, activeId }) {
         <div className="relative h-[30px]" aria-hidden="true">
           {shown ? (
             <span
-              className="assiduity-line-tip absolute bottom-[6px] max-w-[min(260px,100%)] -translate-x-1/2 truncate rounded-full border border-border bg-context-bg px-2.5 py-[6px] font-body text-[12px] font-semibold leading-none text-text shadow-md"
+              className="assiduity-line-tip absolute bottom-[6px] max-w-[min(260px,100%)] -translate-x-1/2 truncate rounded-full glass-solid px-2.5 py-[6px] font-body text-[12px] font-semibold leading-none text-text"
               style={{ left: `clamp(70px, ${markPosition}%, calc(100% - 70px))` }}
             >
               {capitalize(formatDay(shown.date))} · {shown.start} · {shown.subjectTitle ?? ABSENCE_STATUS_LABELS[shown.status]}
@@ -206,11 +213,11 @@ function SemesterLine({ timeline, entriesById, onPick, activeId }) {
           }}
         >
           {/* The track, the part of the semester gone, today. */}
-          <span className="absolute inset-x-0 bottom-[10px] h-[4px] rounded-full border border-dashed border-border-input" aria-hidden="true" />
-          <span className="assiduity-elapsed absolute left-0 bottom-[10px] h-[4px] rounded-full bg-brand-subtle" style={{ width: `${timeline.elapsed}%` }} aria-hidden="true" />
+          <span className="assiduity-track absolute inset-x-0 bottom-[9px] h-[6px] rounded-full" aria-hidden="true" />
+          <span className="assiduity-elapsed assiduity-fill absolute left-0 bottom-[9px] h-[6px] rounded-full" style={{ width: `${timeline.elapsed}%` }} aria-hidden="true" />
           {timeline.today != null ? (
             <span className="absolute bottom-[4px] flex -translate-x-1/2 flex-col items-center" style={{ left: `${timeline.today}%` }} aria-hidden="true">
-              <span className="h-[16px] w-[2px] rounded-full bg-brand" />
+              <span className="assiduity-today h-[18px] w-[4px] rounded-full" />
             </span>
           ) : null}
           <ul className="m-0 list-none p-0" aria-label="Absences sur le semestre">
@@ -300,8 +307,8 @@ function ToJustify({ open, subjectIcon, canJustify: offersJustify, onPick }) {
                 </span>
               </span>
               {offersJustify ? (
-                <span className="ml-auto inline-flex h-[30px] shrink-0 items-center gap-1 self-center rounded-full bg-brand px-3 text-bg" aria-hidden="true">
-                  <span className="font-body text-[13px] font-semibold leading-none">Justifier</span>
+                <span className="lent-button lent-button--tag ml-auto inline-flex h-[30px] shrink-0 items-center gap-1 self-center rounded-full px-3" aria-hidden="true">
+                  <span className="font-body text-[13px] font-medium leading-none">Justifier</span>
                 </span>
               ) : null}
             </button>
@@ -333,9 +340,9 @@ function SubjectBreakdown({ subjects, subjectIcon, selected, onSelect }) {
                 type="button"
                 aria-pressed={isSelected}
                 onClick={() => onSelect(isSelected ? null : subject.key)}
-                className={`assiduity-subject flex w-full cursor-pointer items-center gap-3 rounded-[14px] border-0 p-2 text-left text-text transition-colors ${isSelected ? 'bg-brand-subtle' : 'bg-transparent hover:bg-bg-subtle'}`}
+                className={`assiduity-subject card-inset-corners flex w-full cursor-pointer items-center gap-3 border-0 p-2 text-left text-text transition-[background-color,box-shadow] duration-150 ${isSelected ? 'bg-card shadow-[0_0_0_1px_color-mix(in_srgb,var(--color-text)_9%,transparent),0_1px_2px_rgb(0_0_0/0.06)] dark:bg-white/8 dark:shadow-[0_0_0_1px_rgb(255_255_255/0.06)]' : 'bg-transparent hover:bg-card hover:shadow-[0_0_0_1px_color-mix(in_srgb,var(--color-text)_9%,transparent),0_1px_2px_rgb(0_0_0/0.06)] dark:hover:bg-white/8 dark:hover:shadow-[0_0_0_1px_rgb(255_255_255/0.06)]'}`}
               >
-                <span className="inline-flex size-9 shrink-0 items-center justify-center rounded-full bg-brand-subtle text-text" aria-hidden="true">
+                <span className="glass-solid inline-flex size-9 shrink-0 items-center justify-center rounded-full text-text" aria-hidden="true">
                   <Icon icon={icon ?? 'ph:book'} className="size-[18px]" />
                 </span>
                 <span className="flex min-w-0 flex-1 flex-col gap-[6px]">
@@ -347,9 +354,9 @@ function SubjectBreakdown({ subjects, subjectIcon, selected, onSelect }) {
                     </span>
                   </span>
                   {subject.hours > 0 ? (
-                    <span className="relative block h-[4px] overflow-hidden rounded-full bg-brand-subtle" aria-hidden="true">
-                      <span className="assiduity-bar absolute inset-y-0 left-0 rounded-full bg-text-30" style={{ width: `${(subject.hours / maxHours) * 100}%` }} />
-                      <span className="assiduity-bar absolute inset-y-0 left-0 rounded-full bg-error" style={{ width: `${(subject.unjustifiedHours / maxHours) * 100}%` }} />
+                    <span className="assiduity-track relative block h-[5px] overflow-hidden rounded-full" aria-hidden="true">
+                      <span className="assiduity-bar assiduity-fill absolute inset-y-0 left-0 rounded-full bg-text-30" style={{ width: `${(subject.hours / maxHours) * 100}%` }} />
+                      <span className="assiduity-bar assiduity-fill absolute inset-y-0 left-0 rounded-full bg-error" style={{ width: `${(subject.unjustifiedHours / maxHours) * 100}%` }} />
                     </span>
                   ) : null}
                   <span className="flex min-w-0 items-center gap-2 font-body text-[12px] font-medium leading-none text-text-muted">
@@ -381,7 +388,7 @@ function AbsenceRow({ entry, icon, evaluations, highlighted, menuProps, onJustif
     <li
       id={`absence-${entry.id}`}
       {...menuProps(entry.id)}
-      className={`assiduity-row flex items-start gap-3 border-b border-border px-3 py-3 last:border-b-0 ${highlighted ? 'is-highlighted' : ''}`}
+      className={`assiduity-row inset-separator flex items-start gap-3 px-3 py-3 ${highlighted ? 'is-highlighted' : ''}`}
     >
       <span className="flex w-[40px] shrink-0 flex-col items-center pt-[2px] leading-none" aria-hidden="true">
         <span className="font-display text-[22px] font-bold text-text">{day ? day.getDate() : '—'}</span>
@@ -402,7 +409,7 @@ function AbsenceRow({ entry, icon, evaluations, highlighted, menuProps, onJustif
         {evaluations?.length ? (
           <span className="flex flex-wrap gap-1.5 pt-[2px]">
             {evaluations.map((evaluation) => (
-              <span key={evaluation.id} className="inline-flex min-w-0 max-w-full items-center gap-1 rounded-full bg-bg-subtle px-2 py-[4px] font-body text-[12px] font-medium leading-none text-text-secondary">
+              <span key={evaluation.id} className="glass-solid inline-flex min-w-0 max-w-full items-center gap-1 rounded-full px-2 py-[4px] font-body text-[12px] font-medium leading-none text-text-secondary">
                 <Icon icon="ph:exam" className="size-[13px] shrink-0" aria-hidden="true" />
                 <span className="truncate">{evaluation.description}</span>
                 <span className="shrink-0 font-semibold text-text">· {evaluation.grade.kind === 'number' ? `${evaluation.grade.label}/20` : evaluation.grade.label}</span>
@@ -419,10 +426,11 @@ function AbsenceRow({ entry, icon, evaluations, highlighted, menuProps, onJustif
             type="button"
             onClick={() => onJustify(entry)}
             aria-label={`Justifier ${entry.status === 'late' ? 'ce retard' : 'cette absence'} du ${formatDay(entry.date, DAY_LONG)}`}
-            className="justify-button relative inline-flex h-[30px] cursor-pointer items-center gap-1.5 rounded-full border-0 bg-brand px-3 text-bg after:absolute after:-inset-[7px]"
+            className="lent-button justify-button relative inline-flex h-[30px] cursor-pointer items-center gap-1.5 rounded-full px-3 after:absolute after:-inset-[7px]"
           >
+            <SmoothSurface />
             <Icon icon="ph:seal-check" className="size-[15px]" aria-hidden="true" />
-            <span className="font-body text-[13px] font-semibold leading-none">Justifier</span>
+            <span className="font-body text-[13px] font-medium leading-none">Justifier</span>
           </button>
         ) : null}
       </div>
@@ -430,7 +438,39 @@ function AbsenceRow({ entry, icon, evaluations, highlighted, menuProps, onJustif
   )
 }
 
+// The history's filter chips move when one comes or goes (a subject picked
+// in « Par matière », a status emptied): each glides from where it was to
+// its new place, a little past it and back, and a new one pops in (FLIP:
+// their places, by offsetLeft, read after every render). Still for
+// reduced motion.
+function useChipsGlide(rowRef) {
+  const places = useRef(null)
+  useLayoutEffect(() => {
+    const row = rowRef.current
+    if (!row) {
+      places.current = null
+      return
+    }
+    const still = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
+    const before = places.current
+    const now = new Map()
+    for (const chip of row.querySelectorAll('[data-chip]')) {
+      const key = chip.dataset.chip
+      now.set(key, chip.offsetLeft)
+      if (!before || still) continue
+      if (!before.has(key)) {
+        chip.animate([{ opacity: 0, transform: 'scale(0.7)' }, { opacity: 1, transform: 'none' }], { duration: 420, easing: 'cubic-bezier(0.34, 1.56, 0.64, 1)' })
+      } else if (before.get(key) !== chip.offsetLeft) {
+        chip.animate([{ transform: `translateX(${before.get(key) - chip.offsetLeft}px)` }, { transform: 'none' }], { duration: 460, easing: 'cubic-bezier(0.34, 1.3, 0.64, 1)' })
+      }
+    }
+    places.current = now
+  })
+}
+
 function AbsenceHistory({ entries, filter, onFilter, subject, onClearSubject, highlightId, subjectIcon, evaluationsByEntry, onJustify }) {
+  const chipsRef = useRef(null)
+  useChipsGlide(chipsRef)
   const counts = useMemo(() => countAbsencesByStatus(entries), [entries])
   const bySubject = subject ? entries.filter((entry) => (entry.moduleCode ?? entry.subjectTitle ?? entry.subject ?? '') === subject.key) : entries
   const visible = filter === 'all' ? bySubject : bySubject.filter((entry) => entry.status === filter)
@@ -448,25 +488,29 @@ function AbsenceHistory({ entries, filter, onFilter, subject, onClearSubject, hi
     <section className="grid gap-3" aria-labelledby="assiduity-history-title">
       <SectionTitle id="assiduity-history-title" icon="ph:clock-counter-clockwise" count={visible.length}>Historique</SectionTitle>
       {options.length > 2 || subject ? (
-        <div className="-mx-6 flex gap-2 overflow-x-auto px-6 favorites-scroll-hide max-md:-mx-3 max-md:px-3" role="group" aria-label="Filtrer les absences">
+        <div ref={chipsRef} className="relative -mx-6 -my-2 flex gap-2 overflow-x-auto px-6 py-2 favorites-scroll-hide max-md:-mx-3 max-md:px-3" role="group" aria-label="Filtrer les absences">
           {subject ? (
             <button
+              key={subject.key}
+              data-chip={`subject-${subject.key}`}
               type="button"
               onClick={onClearSubject}
-              className="inline-flex shrink-0 cursor-pointer items-center gap-1.5 rounded-full border border-transparent bg-brand px-3 py-[7px] font-body text-[13px] font-semibold leading-none text-bg"
+              className="lent-button inline-flex shrink-0 cursor-pointer items-center gap-1.5 rounded-full px-3 py-[7px] font-body text-[13px] font-medium leading-none"
               aria-label={`Retirer le filtre ${subject.subject}`}
             >
-              <span className="font-body text-[13px] font-semibold leading-none">{subject.subject}</span>
+              <SmoothSurface />
+              <span className="font-body text-[13px] font-medium leading-none">{subject.subject}</span>
               <Icon icon="ph:x-bold" className="size-[12px]" aria-hidden="true" />
             </button>
           ) : null}
           {options.length > 2 ? options.map((option) => (
             <button
               key={option.value}
+              data-chip={option.value}
               type="button"
               aria-pressed={filter === option.value}
               onClick={() => onFilter(option.value)}
-              className={`inline-flex shrink-0 cursor-pointer items-center gap-1.5 rounded-full border px-3 py-[7px] font-body text-[13px] font-semibold leading-none transition-colors ${filter === option.value ? 'border-transparent bg-brand-subtle text-text' : 'border-border bg-transparent text-text-secondary hover:bg-bg-subtle'}`}
+              className={`inline-flex shrink-0 cursor-pointer items-center gap-1.5 rounded-full border px-3 py-[7px] font-body text-[13px] font-semibold leading-none transition-colors ${filter === option.value ? 'border-transparent bg-brand-subtle text-text' : 'glass-solid text-text-secondary'}`}
             >
               <span className="font-body text-[13px] font-semibold leading-none">{option.label}</span>
               <span className="font-body text-[13px] font-medium leading-none text-text-muted">{counts[option.value]}</span>
@@ -478,7 +522,7 @@ function AbsenceHistory({ entries, filter, onFilter, subject, onClearSubject, hi
         <div className={`${CARD} overflow-hidden p-0`}>
           {groupAbsencesByMonth(visible).map((group) => (
             <div key={group.key}>
-              <h3 className="m-0 border-b border-border bg-bg-subtle/60 px-3 py-2 font-body text-[13px] font-semibold text-text-secondary">{group.label}</h3>
+              <h3 className="inset-separator inset-separator--dashed m-0 px-3 pt-3 pb-2 font-body text-[13px] font-semibold text-text-muted">{group.label}</h3>
               <ul className="m-0 list-none p-0">
                 {group.entries.map((entry) => (
                   <AbsenceRow
@@ -511,6 +555,8 @@ function AbsenceHistory({ entries, filter, onFilter, subject, onClearSubject, hi
 // `arrivalSource`: how the student got here, for the anonymous analytics
 // (src/assiduityAnalytics.js); the page mounts once per arrival.
 function AssiduityPage({ arrivalSource = 'other', onComposeMail = null, absenceReasons = [], findsClassTeacher = false }) {
+  // Dev: the debug panel can hold the page on its first load (loadingDebug.js).
+  const simulateLoading = useLoadingSimulated()
   const { base, semesters, activeId, selectSemester, entry, releve, config } = useScodocReleve()
   const status = base.status === 'error' ? base : entry
   const now = useMinuteClock()
@@ -637,10 +683,12 @@ function AssiduityPage({ arrivalSource = 'other', onComposeMail = null, absenceR
 
   const isReady = status.status === 'ok' && absences?.visible
   let body = null
-  if (status.status === 'error') {
+  if (simulateLoading) {
+    body = <PageLoading />
+  } else if (status.status === 'error') {
     body = <p className="m-0 font-body text-[15px] font-medium text-text-secondary" role="alert">{status.error}</p>
   } else if (status.status === 'loading') {
-    body = <LoadingDots label="Chargement des absences" className="justify-self-start py-2 text-text-muted" />
+    body = <PageLoading />
   } else if (!releve) {
     body = (
       <PageEmptyState key={activeId} icon="ph:file" title="Aucun relevé pour ce semestre">

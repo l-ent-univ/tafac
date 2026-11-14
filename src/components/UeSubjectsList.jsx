@@ -12,6 +12,7 @@ import UeLink from './UeLink'
 import { useUeColor } from '../useUeColor'
 import { useContextMenu } from '../useContextMenu'
 import { r } from '../register.js'
+import SmoothSurface from './SmoothSurface'
 
 // UE tiles side by side, as many ≥320px as fit a row (one on a phone), in
 // UE order, a row's tiles at one height. Wrapping boxes, not grid columns:
@@ -224,7 +225,7 @@ function UeValidationTag({ ue, withTip = false }) {
   const tag = VALIDATION_TAGS[ue.validatedBy]
   if (!tag) return null
   return (
-    <span className="ue-validation-tag inline-flex items-center gap-[4px] whitespace-nowrap rounded-full bg-bg-subtle px-[7px] py-[3px] font-body dark:bg-white/[0.08] text-[12px] font-semibold leading-none text-text-secondary has-[button]:py-[1px] has-[button]:pr-[2px]">
+    <span className="glass-solid ue-validation-tag inline-flex items-center gap-[4px] whitespace-nowrap rounded-full px-[7px] py-[3px] font-body text-[12px] font-semibold leading-none text-text-secondary has-[button]:py-[1px] has-[button]:pr-[2px]">
       <Icon icon="ph:check" className="size-[12px] shrink-0" aria-hidden="true" />
       <span aria-hidden="true">{tag.label}</span>
       {withTip ? <CardInfoTip label={`${tag.label} : qu’est-ce que ça veut dire ?`}>{tag.tip}</CardInfoTip> : null}
@@ -236,7 +237,7 @@ function UeAdjustments({ ue, withTips = false }) {
   return ADJUSTMENTS.filter(({ key }) => ue[key] != null).map(({ key, label, sign, tip }) => {
     const points = formatSignedPoints(sign * ue[key])
     return (
-      <span key={key} className="inline-flex items-center gap-[3px] whitespace-nowrap rounded-full bg-bg-subtle px-[7px] py-[3px] font-body dark:bg-white/[0.08] text-[12px] font-semibold leading-none text-text-secondary has-[button]:py-[1px] has-[button]:pr-[2px]">
+      <span key={key} className="glass-solid inline-flex items-center gap-[3px] whitespace-nowrap rounded-full px-[7px] py-[3px] font-body text-[12px] font-semibold leading-none text-text-secondary has-[button]:py-[1px] has-[button]:pr-[2px]">
         {label} {points}{withTips ? ' inclus' : ''}
         {withTips ? <CardInfoTip label={`${label} ${points} : qu’est-ce que c’est ?`}>{tip(points)}</CardInfoTip> : null}
       </span>
@@ -291,7 +292,7 @@ function UeModuleRow({ rowId, ueCode, module, isOpen, onToggle, icon, showPromoS
       >
         {/* Neutral: the card already carries the UE's colour. Outlined so the
             tile still reads on the card's tinted top. */}
-        <span className="inline-flex size-9 shrink-0 items-center justify-center corners-[11px] border border-border bg-bg-subtle" aria-hidden="true">
+        <span className="glass-solid inline-flex size-9 shrink-0 items-center justify-center corners-[11px] border" aria-hidden="true">
           {icon ? <Icon icon={icon} className="size-[18px] text-text-secondary" /> : null}
         </span>
         <span className="grid min-w-0 flex-1 gap-[3px]">
@@ -682,7 +683,7 @@ function UeSubjectsList({ report, subjectIcon = () => null, newEvaluationIds = n
                     onClick={() => openFromTile(ue.code, newsModules[0])}
                     className="ue-card-news flex w-full min-w-0 items-center gap-2 corners-[14px] border-0 bg-transparent px-2 py-[8px] text-left text-text-muted cursor-pointer"
                   >
-                    <span className="shrink-0 rounded-full bg-brand px-[7px] py-[3px] font-body text-[11px] font-semibold leading-none text-bg">
+                    <span className="lent-button lent-button--tag shrink-0 rounded-full px-[7px] py-[3px] font-body text-[11px] font-semibold leading-none">
                       {newsCount} {newsCount > 1 ? 'nouvelles notes' : 'nouvelle note'}
                     </span>
                     <span className="min-w-0 flex-1 truncate font-body text-[13px] font-medium leading-none">{newsModules.map((module) => module.title).join(', ')}</span>
@@ -710,7 +711,7 @@ function UeFullView({ id, ue, headingId, backButtonRef, onClose, onKeyDown, hasN
       aria-labelledby={titleId}
       aria-describedby={`${headingId}-${ue.code}-full-state`}
       onKeyDown={onKeyDown}
-      className="ue-full-view ue-vt-card relative isolate min-h-[calc(100dvh-24px)] scroll-mt-3 overflow-clip corners-[28px] border border-white bg-widget-bg dark:border-white/[0.08] text-text shadow-md max-md:corners-[22px]"
+      className="ue-full-view ue-vt-card relative isolate min-h-[calc(100dvh-24px)] scroll-mt-3 overflow-clip corners-[28px] glass-solid glass--quiet border text-text max-md:corners-[22px]"
       style={morph('card', ue.code)}
     >
       {hasNews ? <span className="latest-grade-wash" style={{ background: color, height: '240px' }} aria-hidden="true" /> : null}
@@ -722,8 +723,9 @@ function UeFullView({ id, ue, headingId, backButtonRef, onClose, onKeyDown, hasN
             ref={backButtonRef}
             type="button"
             onClick={onClose}
-            className="ue-full-close pointer-events-auto inline-flex items-center gap-[6px] rounded-full border border-border bg-widget-bg/85 py-[7px] pr-[13px] pl-[10px] text-text shadow-[0_6px_18px_-8px_rgb(52_18_0/0.25)] backdrop-blur-md cursor-pointer"
+            className="material ue-full-close pointer-events-auto inline-flex items-center gap-[6px] rounded-full py-[7px] pr-[13px] pl-[10px] text-text cursor-pointer"
           >
+            <SmoothSurface />
             <Icon icon="ph:arrow-left" className="size-4" aria-hidden="true" />
             <span className="font-body text-[13px] font-semibold leading-none">Toutes les UE</span>
           </button>

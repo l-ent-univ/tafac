@@ -9,17 +9,21 @@ const NOTICE_DURATION_MS = 3200
 
 // « Accueil » (HomeDraftPage): selected unless another in-app page
 // (grades…) is shown. Tapping the selected tab scrolls back to the top.
-const HOME_TAB = { id: 'home', label: 'Accueil', icon: 'ph:house', page: 'home' }
+const HOME_TAB = { id: 'home', label: 'Accueil', icon: 'ph:house', iconActive: 'ph:house-fill', page: 'home' }
 
-// The bar's icons, all Phosphor (as the sidebar's), regular weight: the tab
-// shown is told by its lens (.mobile-tab-bar-item--selected). Moodle, without
-// a Phosphor logo, is its graduation cap.
+// The bar's icons, all Phosphor (as the sidebar's): regular, the tab shown
+// filled (its `iconActive`) on its lens (.mobile-tab-bar-item--selected), as
+// the sidebar's. Moodle, without a Phosphor logo, is its graduation cap.
 const TAB_ICONS = {
   moodle: 'ph:graduation-cap',
 }
 
 function getTabIcon(item) {
   return TAB_ICONS[item.id] ?? item.icon
+}
+
+function getShownIcon(item) {
+  return item.selected ? TAB_ICONS[item.id] ?? item.iconActive ?? item.icon : getTabIcon(item)
 }
 
 // Up to three tabs: a compact pill sized to roomy tabs. From four on, like
@@ -51,7 +55,7 @@ function MobileTabBar({ establishment, gradesSupported = true, activePage = 'hom
     item.page ? { ...item, selected: item.page === activePage } : item
   ))
   const tabSizeClasses = getTabSizeClasses(items.length)
-  const iconNames = items.map(getTabIcon)
+  const iconNames = [...new Set(items.flatMap((item) => [getTabIcon(item), item.iconActive].filter(Boolean)))]
   const iconKey = iconNames.join(',')
   const [noticeItem, setNoticeItem] = useState(null)
   const { unseenIds } = useChangelog()
@@ -126,7 +130,7 @@ function MobileTabBar({ establishment, gradesSupported = true, activePage = 'hom
       ) : null}
       <div className={`mobile-tab-bar pointer-events-auto flex items-center gap-1 rounded-full p-1.5 animate-modal-card-in ${items.length >= WIDE_BAR_MIN_TABS ? 'w-full max-w-[420px]' : 'max-w-full'}`}>
         {items.map((item) => {
-          const className = `mobile-tab-bar-item flex h-[54px] ${tabSizeClasses} flex-col items-center justify-center gap-[3px] rounded-full border-0 text-text no-underline cursor-pointer transition-[background-color,transform] duration-150 ease-out active:scale-[0.94] ${item.selected ? 'mobile-tab-bar-item--selected' : 'bg-transparent'} ${item.disabled ? 'opacity-45' : ''}`
+          const className = `mobile-tab-bar-item flex h-[54px] ${tabSizeClasses} flex-col items-center justify-center gap-[3px] rounded-full border-0 text-text no-underline cursor-pointer transition-[background-color,box-shadow,outline-color,transform] duration-200 ease-out active:scale-[0.94] ${item.selected ? 'mobile-tab-bar-item--selected' : 'bg-transparent'} ${item.disabled ? 'opacity-45' : ''}`
           // Just launched (as in the sidebar): a blue dot on the icon, no
           // room for the word.
           const isNew = Boolean(item.announcedBy) && unseenIds.includes(item.announcedBy)
@@ -135,11 +139,17 @@ function MobileTabBar({ establishment, gradesSupported = true, activePage = 'hom
               {/* `ssr`: draw on the first render. The bar only mounts once these icons
                   are loaded, so there's nothing to wait for. */}
               <span className="relative flex">
-                <Icon icon={getTabIcon(item)} ssr className="h-[22px] w-[22px]" aria-hidden="true" />
+                <Icon icon={getShownIcon(item)} ssr className="h-[22px] w-[22px]" aria-hidden="true" />
                 {isNew ? <span className="mobile-tab-bar-new-dot changelog-new-dot nav-new-pulse absolute -right-[3px] -top-[2px] h-[9px] w-[9px] rounded-full" aria-hidden="true" /> : null}
               </span>
-              {/* Font on the label: index.css gives buttons `font: inherit` outside Tailwind's layers. */}
-              <span className="font-body text-[11px] font-semibold leading-none whitespace-nowrap">{item.shortLabel ?? item.label}</span>
+              {/* Font on the label: index.css gives buttons `font: inherit` outside Tailwind's layers.
+                  Medium, semibold once selected, the two weights stacked and
+                  cross-fading (as the sidebar's: Collab Sans has no variable
+                  axis); read once. */}
+              <span className="grid font-body text-[11px] leading-none whitespace-nowrap">
+                <span className={`col-start-1 row-start-1 text-center font-medium transition-opacity duration-200 ease-out motion-reduce:transition-none ${item.selected ? 'opacity-0' : 'opacity-100'}`} aria-hidden="true">{item.shortLabel ?? item.label}</span>
+                <span className={`col-start-1 row-start-1 text-center font-semibold transition-opacity duration-200 ease-out motion-reduce:transition-none ${item.selected ? 'opacity-100' : 'opacity-0'}`}>{item.shortLabel ?? item.label}</span>
+              </span>
               {isNew ? <span className="sr-only">, nouveau</span> : null}
             </>
           )

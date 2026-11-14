@@ -13,6 +13,7 @@ import { getPapillonUrl, readPapillonDebugOverride } from '../papillon'
 import { CARD_CLASSES, MUTED_FILL_CLASSES, PRESSABLE_ROW_CLASSES } from '../settingsStyles'
 import useRepoContributors, { readRepoSlug } from '../useRepoContributors'
 import BetaTag from './BetaTag'
+import betaTagSound from '../assets/sounds/beta-tag.mp3'
 import PrivacyModal from './PrivacyModal'
 import SettingsGroup, { RowText } from './SettingsGroup'
 import CloseButton from './CloseButton'
@@ -22,6 +23,14 @@ import { r } from '../register.js'
 
 const about = universityConfig.branding.about ?? {}
 const papillonUrl = getPapillonUrl(universityConfig.branding, readPapillonDebugOverride())
+
+// The Bêta tag's voice line (À propos): one player, made on the first click.
+let betaTagAudio = null
+function playBetaTagSound() {
+  betaTagAudio ??= new Audio(betaTagSound)
+  betaTagAudio.currentTime = 0
+  betaTagAudio.play().catch(() => {})
+}
 
 const BUILD_LABEL = import.meta.env.DEV ? 'dev' : `build ${typeof __BUILD_HASH__ !== 'undefined' ? __BUILD_HASH__ : 'dev'}`
 
@@ -43,8 +52,8 @@ const ARROW = <Icon icon="ph:arrow-up-right" className="h-4 w-4 shrink-0 text-te
 function AboutHero() {
   const { appName } = universityConfig.branding
   return (
-    <div className="relative flex flex-col gap-[10px] overflow-hidden modal-inner-corners border border-[color-mix(in_srgb,var(--color-brand)_14%,var(--color-bg))] bg-[color-mix(in_srgb,var(--color-brand)_7%,var(--color-bg))] px-[18px] pb-[18px] pt-[16px] dark:border-[color-mix(in_srgb,#ffffff_11%,var(--color-bg))] dark:bg-[color-mix(in_srgb,#ffffff_5%,var(--color-bg))]">
-      <span className="absolute right-[14px] top-[14px] rounded-full bg-white/70 px-[8px] py-[3px] font-mono text-[11px] leading-[1.3] text-text-50 ring-1 ring-inset ring-[var(--color-border)] dark:bg-white/5">
+    <div className="relative flex flex-col gap-[10px] overflow-hidden modal-inner-corners engraved px-[18px] pb-[18px] pt-[16px]">
+      <span className="glass-solid absolute right-[14px] top-[14px] rounded-full px-[8px] py-[3px] font-mono text-[11px] leading-[1.3] text-text-50">
         {BUILD_LABEL}
       </span>
       <div className="flex items-center gap-1.5" aria-hidden="true">
@@ -56,7 +65,15 @@ function AboutHero() {
       </div>
       <div className="flex items-center gap-2">
         <h4 className="m-0 font-body text-[24px] font-bold leading-[1.1] tracking-[-0.02em]">{appName}</h4>
-        <BetaTag />
+        {/* A click on « Bêta » plays a voice line, from its start each time. */}
+        <button
+          type="button"
+          onClick={playBetaTagSound}
+          aria-label="Bêta, écouter"
+          className="inline-flex cursor-pointer rounded-full border-0 bg-transparent p-0 transition-transform duration-100 ease-out active:scale-[0.92] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-text"
+        >
+          <BetaTag />
+        </button>
       </div>
       {about.intro ? (
         <p className="m-0 max-w-[46ch] font-body text-[15px] font-medium leading-[1.4] text-text-secondary">
@@ -192,7 +209,7 @@ function AboutPeople() {
                 target="_blank"
                 rel="noopener noreferrer"
                 title={`${contributor.contributions} contribution${contributor.contributions > 1 ? 's' : ''}`}
-                className="flex items-center gap-2 rounded-full border border-white bg-white py-[5px] pl-[5px] pr-3 font-body text-[14px] font-medium text-[var(--color-text)] no-underline shadow-[0_1px_3px_rgba(0,0,0,0.06)] transition-colors duration-[120ms] hover:bg-[#f8f7f3] dark:border-[var(--color-border)] dark:bg-[var(--color-bg-surface)] dark:hover:bg-[var(--color-bg-subtle)]"
+                className="glass-solid flex items-center gap-2 rounded-full border py-[5px] pl-[5px] pr-3 font-body text-[14px] font-medium text-[var(--color-text)] no-underline transition-colors duration-[120ms] dark:"
               >
                 <Avatar login={contributor.login} size={24} />
                 {contributor.login}
@@ -291,7 +308,7 @@ function AboutModal({
       role="presentation"
     >
       <section
-        className="w-[min(440px,100%)] max-h-[calc(100dvh-40px)] overflow-y-auto overscroll-contain modal-corners [--modal-inset:21px] [--modal-inner-radius:20px] border border-[var(--color-border)] bg-[var(--color-bg)] text-[var(--color-text)] animate-modal-card-in max-sm:max-h-[calc(100dvh-28px)]"
+        className="glass-solid glass--quiet modal-surface w-[min(440px,100%)] max-h-[calc(100dvh-40px)] overflow-y-auto overscroll-contain modal-corners [--modal-inset:21px] [--modal-inner-radius:20px] border text-[var(--color-text)] animate-modal-card-in max-sm:max-h-[calc(100dvh-28px)]"
         role="dialog"
         aria-modal="true"
         aria-labelledby="about-modal-title"

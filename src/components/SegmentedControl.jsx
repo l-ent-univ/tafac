@@ -1,5 +1,6 @@
 import { useLayoutEffect, useRef, useState } from 'react'
 import { Icon } from '@iconify/react'
+import SmoothSurface from './SmoothSurface'
 
 // The app's segmented control (.segmented, overrides.css): options side by
 // side in a recessed track, the picked one under a raised thumb of the
@@ -11,6 +12,8 @@ import { Icon } from '@iconify/react'
 // 'tabs' (a tab list over a tabpanel). `size`: 'md' (34px options, the
 // header's 42px row) or 'sm' (30px). `stretch`: options share the width
 // (else each its own). The arrow keys, Home and End move the pick.
+// In the buttons' textures: the track a well, the thumb a raised knob, both
+// on the smooth pill (SmoothSurface, .segmented in overrides.css).
 function SegmentedControl({ options, value, onChange, label, kind = 'radio', size = 'md', stretch = true, className = '' }) {
   const trackRef = useRef(null)
   const optionRefs = useRef(new Map())
@@ -79,7 +82,8 @@ function SegmentedControl({ options, value, onChange, label, kind = 'radio', siz
       onKeyDown={handleKeyDown}
       style={thumb ? { '--segmented-x': `${thumb.x}px`, '--segmented-w': `${thumb.w}px` } : undefined}
     >
-      {thumb ? <span className="segmented-thumb" aria-hidden="true" /> : null}
+      <SmoothSurface />
+      {thumb ? <span className="segmented-thumb" aria-hidden="true"><SmoothSurface /></span> : null}
       {options.map((option, index) => {
         const isActive = index === activeIndex
         return (

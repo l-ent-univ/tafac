@@ -7,14 +7,14 @@ import { isOngoing } from '../planningEvents'
 import { usePlanningWeeks, useEventAccents } from '../usePlanningWeeks'
 import MailAttachDrawer, { ATTACH_CARD_CLASS, AttachDrawerError, AttachDrawerNote } from './MailAttachDrawer'
 import { PlanningListCard } from './PlanningListView'
-import { SHIMMER_CLASSES } from './widgetListUtils'
+import { Skeleton } from 'skullet/react'
+import { SAMPLE_COURSE_EVENTS } from '../skeletonSamples'
 import { r } from '../register.js'
 
 // The planning service's name (planning.providerName), ADE by default.
 const PROVIDER = universityConfig.planning?.providerName ?? 'ADE'
 // From this many classes, a search field over the list.
 const SEARCH_FROM = 7
-const SKELETON_CARDS = 4
 const SHORT_DAY_FORMAT = new Intl.DateTimeFormat('fr-FR', { day: 'numeric', month: 'short' })
 
 // A day's heading, as the planning list's (« Aujourd’hui · mardi 28
@@ -90,15 +90,16 @@ function MailCoursePicker({ planning, onPick, onClose }) {
     body = <AttachDrawerNote>{r('Indique ton groupe de TD/TP dans Mon compte pour voir tes cours', 'Indiquez votre groupe de TD/TP dans Mon compte pour voir vos cours')}</AttachDrawerNote>
   } else if (!count && isLoading) {
     body = (
-      <ul className="mx-auto grid w-full max-w-[760px] list-none gap-2 p-0" aria-label="Chargement des cours" aria-busy="true">
-        {Array.from({ length: SKELETON_CARDS }, (_, index) => (
-          <li key={index} className="widget-card widget-card-visible grid gap-2 card-corners-sm border bg-widget-bg p-[13px]">
-            <span className={`h-3 w-[30%] rounded-full ${SHIMMER_CLASSES}`} />
-            <span className={`h-3.5 ${index % 2 ? 'w-[55%]' : 'w-[75%]'} rounded-full ${SHIMMER_CLASSES}`} />
-            <span className={`h-3 w-[45%] rounded-full ${SHIMMER_CLASSES}`} />
-          </li>
-        ))}
-      </ul>
+      // Measured from sample classes drawn as real cards (skullet).
+      <Skeleton loading label="Chargement des cours">
+        <ul className="mx-auto grid w-full max-w-[760px] list-none gap-2 p-0">
+          {SAMPLE_COURSE_EVENTS.map((event) => (
+            <li key={event.id} className="flex min-w-0">
+              <PlanningListCard event={event} accent={accentFor(event.title)} ongoing={false} onOpen={() => {}} className={ATTACH_CARD_CLASS} />
+            </li>
+          ))}
+        </ul>
+      </Skeleton>
     )
   } else if (!count && statuses.includes('unavailable')) {
     body = (

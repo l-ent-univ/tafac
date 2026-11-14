@@ -22,7 +22,7 @@ import { r } from '../register.js'
 
 const FOCUSABLE_SELECTOR = 'button:not([disabled]), [href], [tabindex]:not([tabindex="-1"])'
 const DATE_FORMAT = new Intl.DateTimeFormat('fr-FR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })
-const CARD = 'gd-card gd-rise grid gap-4 modal-inner-corners border border-border bg-widget-bg p-4 max-sm:p-[14px]'
+const CARD = 'glass-solid gd-card gd-rise grid gap-4 modal-inner-corners p-4 max-sm:p-[14px]'
 
 // What a grade that isn't a number means for the averages.
 const STATE_NOTES = {
@@ -70,7 +70,7 @@ function Hero({ evaluation, gap, summaryId }) {
           <span className="sr-only">{r('Ta note', 'Votre note')} : {formatScore(grade.value)} sur 20{gap ? `, ${gap.spoken}` : ''}.</span>
         </p>
         {gap ? (
-          <span className="mb-[2px] inline-flex items-center gap-[5px] rounded-full border border-border bg-widget-bg/70 py-[6px] pr-[11px] pl-[8px] text-text-secondary" aria-hidden="true">
+          <span className="glass-solid mb-[2px] inline-flex items-center gap-[5px] rounded-full border py-[6px] pr-[11px] pl-[8px] text-text-secondary" aria-hidden="true">
             <Icon icon={gap.gap > 0 ? 'ph:arrow-up-right' : gap.gap < 0 ? 'ph:arrow-down-right' : 'ph:minus-circle'} className="size-[14px]" />
             <span className="font-body text-[13px] font-semibold leading-none">{gap.text}</span>
           </span>
@@ -82,7 +82,7 @@ function Hero({ evaluation, gap, summaryId }) {
   return (
     <div className="gd-rise grid gap-[10px]" style={{ '--d': '40ms' }}>
       <p id={summaryId} className="m-0 flex items-center gap-[10px] leading-none">
-        <span className={`gd-state inline-flex size-11 items-center justify-center rounded-full border ${grade.kind === 'pending' ? 'border-dashed border-border-input' : 'border-border'} bg-widget-bg/70`} aria-hidden="true">
+        <span className={`gd-state inline-flex size-11 items-center justify-center rounded-full border ${grade.kind === 'pending' ? 'border-dashed border-border-input bg-widget-bg/70' : 'glass-solid'}`} aria-hidden="true">
           <Icon icon={note?.icon ?? 'ph:info'} className="size-[22px] text-text-secondary" />
         </span>
         <span className="font-display text-[34px] font-bold leading-none text-text max-sm:text-[30px]">{grade.label}</span>
@@ -113,7 +113,7 @@ function PromoScale({ evaluation }) {
     <div className="grid gap-4">
       {hasBand || moy != null ? (
         <div className="gd-scale relative mx-[6px]" style={{ height: top + 28 }} aria-hidden="true">
-          <span className="absolute inset-x-0 h-[6px] rounded-full bg-brand-subtle" style={{ top }} />
+          <span className="engraved absolute inset-x-0 h-[6px] rounded-full" style={{ top }} />
           {hasBand ? <span className="gd-scale-band absolute h-[6px] rounded-full" style={{ top, left: at(min), width: `calc(${at(max)} - ${at(min)})` }} /> : null}
           {moy != null ? (
             <>
@@ -123,17 +123,17 @@ function PromoScale({ evaluation }) {
           ) : null}
           {value != null ? (
             <span className="gd-scale-you absolute" style={{ top: top + 3, '--x': at(value) }}>
-              <span className="absolute bottom-[10px] left-0 -translate-x-1/2 whitespace-nowrap rounded-full bg-brand px-[7px] py-[4px] font-display text-[12px] font-bold leading-none text-bg">
+              <span className="lent-button lent-button--tag absolute bottom-[14px] left-0 z-10 -translate-x-1/2 whitespace-nowrap rounded-full px-[7px] py-[4px] font-display text-[12px] font-bold leading-none">
                 {formatScore(value)}
               </span>
-              <span className="gd-scale-dot absolute top-0 left-0 size-[14px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-text" />
+              <span className="lent-button lent-button--tag gd-scale-dot absolute top-0 left-0 size-[14px] -translate-x-1/2 -translate-y-1/2 rounded-full" />
             </span>
           ) : null}
         </div>
       ) : null}
       <dl className="m-0 grid grid-cols-3 gap-2">
         {stats.map((stat) => (
-          <div key={stat.label} className="grid justify-items-center gap-[6px] corners-[14px] bg-bg-subtle px-2 py-[10px] text-center dark:bg-white/[0.04]">
+          <div key={stat.label} className="glass-solid grid justify-items-center gap-[6px] corners-[14px] px-2 py-[10px] text-center">
             <dt className="font-body text-[12px] font-medium leading-none text-text-muted">
               <span aria-hidden="true">{stat.label}</span>
               <span className="sr-only">{stat.spoken}</span>
@@ -219,7 +219,7 @@ function WeightCard({ report, module, evaluation, titleId }) {
         </div>
       ) : null}
       {typeNote ? (
-        <p className="m-0 flex items-start gap-2 corners-[14px] bg-bg-subtle px-3 py-[10px] font-body text-[13px] font-medium leading-[1.4] text-text-secondary dark:bg-white/[0.04]">
+        <p className="glass-solid m-0 flex items-start gap-2 corners-[14px] px-3 py-[10px] font-body text-[13px] font-medium leading-[1.4] text-text-secondary">
           <Icon icon="ph:info" className="mt-[1px] size-[15px] shrink-0" aria-hidden="true" />
           {typeNote}
         </p>
@@ -387,7 +387,7 @@ function GradeDetailModal({ report, module, evaluation, semesterId, icon = null,
       <div className="weather-modal-backdrop absolute inset-0 bg-backdrop animate-modal-backdrop-in" onClick={dismiss} aria-hidden="true" />
       <section
         ref={dialogRef}
-        className="gd-dialog relative isolate flex max-h-[min(820px,calc(100dvh-40px))] w-[min(540px,100%)] flex-col modal-corners [--modal-inset:24px] [--modal-inner-radius:20px] max-sm:[--modal-inset:16px] max-sm:[--modal-inner-radius:18px] border border-border bg-bg text-text shadow-[0_24px_80px_var(--color-shadow)] outline-none max-sm:max-h-[calc(100dvh-16px)] max-sm:rounded-b-none max-sm:border-b-0"
+        className="glass-solid glass--quiet modal-surface gd-dialog relative isolate flex max-h-[min(820px,calc(100dvh-40px))] w-[min(540px,100%)] flex-col modal-corners [--modal-inset:24px] [--modal-inner-radius:20px] max-sm:[--modal-inset:16px] max-sm:[--modal-inner-radius:18px] border text-text outline-none max-sm:max-h-[calc(100dvh-16px)] max-sm:rounded-b-none max-sm:border-b-0"
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}
@@ -411,7 +411,7 @@ function GradeDetailModal({ report, module, evaluation, semesterId, icon = null,
               </span>
               <span className="gd-grabber relative mx-auto hidden h-[4px] w-9 rounded-full bg-text-30 max-sm:block max-sm:translate-y-2" aria-hidden="true" />
               <div className="relative flex items-center gap-3 px-6 pt-5 pb-3 max-sm:px-4 max-sm:pt-[14px]">
-                <span className="inline-flex size-10 shrink-0 items-center justify-center corners-[12px] border border-border bg-widget-bg/80" aria-hidden="true">
+                <span className="glass-solid inline-flex size-10 shrink-0 items-center justify-center corners-[12px] border" aria-hidden="true">
                   {icon ? <Icon icon={icon} className="size-5 text-text" /> : <Icon icon="ph:book" className="size-5 text-text" />}
                 </span>
                 <span className="grid min-w-0 flex-1 gap-[4px]">
@@ -421,7 +421,7 @@ function GradeDetailModal({ report, module, evaluation, semesterId, icon = null,
                 {/* The grade, small, once the big one has scrolled away. */}
                 <span className="gd-header-grade-slot shrink-0" aria-hidden="true">
                   <span>
-                    <span className="inline-flex items-end gap-[2px] whitespace-nowrap rounded-full border border-border bg-widget-bg/80 px-[10px] py-[7px] text-text">
+                    <span className="glass-solid inline-flex items-end gap-[2px] whitespace-nowrap rounded-full px-[10px] py-[7px] text-text">
                       {evaluation.grade.kind === 'number' ? (
                         <>
                           <span className="font-display text-[15px] font-bold leading-none [text-box:trim-both_cap_alphabetic]">{formatScore(evaluation.grade.value)}</span>
@@ -463,7 +463,7 @@ function GradeDetailModal({ report, module, evaluation, semesterId, icon = null,
                     </span>
                   ) : null}
                   {evaluation.typeLabel ? (
-                    <span className="rounded-full bg-brand-subtle px-[8px] py-[4px] font-body text-[11.5px] font-semibold leading-none text-text-secondary">{evaluation.typeLabel}</span>
+                    <span className="glass-solid rounded-full px-[8px] py-[4px] font-body text-[11.5px] font-semibold leading-none text-text-secondary">{evaluation.typeLabel}</span>
                   ) : null}
                   {isNew ? <NewBadge /> : null}
                 </div>

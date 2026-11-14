@@ -17,7 +17,7 @@ import { r } from '../register.js'
 
 const FOCUSABLE_SELECTOR = 'button:not([disabled]), input:not([disabled]), [href], [tabindex]:not([tabindex="-1"])'
 
-const ARROW_CLASSES = 'absolute top-3 z-10 inline-flex size-11 items-center justify-center rounded-full border border-border bg-widget-bg p-0 text-text cursor-pointer transition-colors duration-150 hover:bg-bg-subtle max-sm:top-2'
+const ARROW_CLASSES = 'glass-solid absolute top-3 z-10 inline-flex size-11 items-center justify-center rounded-full border p-0 text-text cursor-pointer transition-colors duration-150 max-sm:top-2'
 
 // The dial: the UE ring, large, its top only showing over the sheet's
 // bottom edge. A thicker band than the card's, narrower gaps.
@@ -435,7 +435,7 @@ function GradeSimulatorModal({ report = null, releve = null, config = null, seme
       <div className="weather-modal-backdrop absolute inset-0 bg-backdrop animate-modal-backdrop-in" onClick={dismiss} aria-hidden="true" />
       <section
         ref={dialogRef}
-        className="gd-dialog relative isolate flex max-h-[min(860px,calc(100dvh-40px))] w-[min(600px,100%)] flex-col modal-corners [--modal-inset:24px] [--modal-inner-radius:20px] max-sm:[--modal-inset:16px] max-sm:[--modal-inner-radius:18px] border border-border bg-bg text-text shadow-[0_24px_80px_var(--color-shadow)] outline-none max-sm:max-h-[calc(100dvh-16px)] max-sm:rounded-b-none max-sm:border-b-0"
+        className="glass-solid glass--quiet modal-surface gd-dialog relative isolate flex max-h-[min(860px,calc(100dvh-40px))] w-[min(600px,100%)] flex-col modal-corners [--modal-inset:24px] [--modal-inner-radius:20px] max-sm:[--modal-inset:16px] max-sm:[--modal-inner-radius:18px] border text-text outline-none max-sm:max-h-[calc(100dvh-16px)] max-sm:rounded-b-none max-sm:border-b-0"
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}

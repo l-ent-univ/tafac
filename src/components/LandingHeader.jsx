@@ -4,12 +4,12 @@ import { Icon } from '@iconify/react'
 import universityConfig from '@university'
 import { copy, copyText } from '../landingCopy'
 import { scrollToSection } from '../landingMotion'
-import BetaTag from './BetaTag'
 import LogoBut1 from './LogoBut1'
 import PapillonBadge from './PapillonBadge'
+import SmoothSurface from './SmoothSurface'
 
 const repoUrl = universityConfig.branding.about?.repoUrl
-const LINK_CLASSES = 'inline-flex items-center gap-1.5 rounded-full px-3.5 py-2 border-0 bg-transparent text-[15px] font-semibold text-text no-underline transition-colors hover:bg-white/60 dark:hover:bg-white/10'
+const LINK_CLASSES = 'inline-flex items-center gap-1.5 rounded-full px-3.5 py-2 border-0 bg-transparent text-[15px] font-semibold text-text no-underline transition-[background-color,box-shadow] duration-150 hover:bg-card hover:shadow-[0_0_0_1px_color-mix(in_srgb,var(--color-text)_9%,transparent),0_1px_2px_rgb(0_0_0/0.06)] dark:hover:bg-white/8 dark:hover:shadow-[0_0_0_1px_rgb(255_255_255/0.06)]'
 const MENU_LINK_CLASSES = 'flex min-h-12 items-center gap-2 corners-[16px] px-4 text-[17px] font-semibold text-text no-underline transition-colors hover:bg-bg-subtle dark:hover:bg-white/10'
 
 // The page's sections, in the bar on wide screens and in the menu otherwise.
@@ -115,18 +115,20 @@ function LandingHeader({ onLogin }) {
           className="landing-header pointer-events-none fixed inset-x-0 top-0 z-40 flex justify-center px-2 pt-3 max-md:px-1.5 max-md:pt-2"
         >
           <div ref={barRef} className="landing-header-bar pointer-events-auto relative flex items-center justify-between gap-4 rounded-full border px-4 py-2 max-md:gap-2 max-md:pl-3 max-md:pr-2">
-            {/* Under the logo, the family it belongs to (branding.papillon). Its logo
-                white in dark mode (overrides.css). */}
+            {/* The logo, « Bêta » quiet beside it (a word at its top, not a
+                pill), and under them, smaller and greyed until hovered, the
+                family it belongs to (branding.papillon; its logo white in dark
+                mode): one thing to read first. */}
             <div className="flex min-w-0 flex-1 flex-col items-start">
-              <div className="flex items-center gap-2">
+              <div className="flex items-start gap-1.5">
                 <LogoBut1 className="h-9 max-md:h-8" wordmarkClassName="landing-header-wordmark" />
-                <BetaTag />
+                <span className="font-body text-[11px] font-semibold uppercase leading-none tracking-[0.08em] text-text-muted">Bêta</span>
               </div>
               <div ref={foldRef} className="landing-header-papillon-fold">
                 <div className="min-h-0 overflow-hidden">
                   <PapillonBadge
-                    className="landing-header-papillon mt-1.5 text-text/75 hover:text-text"
-                    logoClassName="landing-header-papillon-logo dark:[filter:brightness(0)_invert(1)]"
+                    className="landing-header-papillon group mt-1 text-text-muted hover:text-text"
+                    logoClassName="landing-header-papillon-logo h-3! opacity-60 transition-opacity group-hover:opacity-100 dark:[filter:brightness(0)_invert(1)]"
                   />
                 </div>
               </div>
@@ -148,8 +150,9 @@ function LandingHeader({ onLogin }) {
               <button
                 type="button"
                 onClick={onLogin}
-                className="min-h-10 whitespace-nowrap rounded-full border-0 bg-brand px-5 text-[15px] font-semibold text-bg transition-transform duration-150 hover:scale-[1.03] active:scale-[0.98] cursor-pointer max-md:px-4"
+                className="lent-button min-h-10 whitespace-nowrap rounded-full px-5 text-[15px] font-medium cursor-pointer max-md:px-4"
               >
+                <SmoothSurface />
                 {copyText(copy.header.login)}
               </button>
               <button

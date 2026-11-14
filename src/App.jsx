@@ -11,6 +11,7 @@ import { markChangelogEntrySeen, setChangelogAudience } from './changelogStore'
 import ChangelogSheet from './components/ChangelogSheet'
 import LandingPage from './components/LandingPage'
 import LoginPage from './components/LoginPage'
+import { playOtpSound } from './otpSound'
 import OnboardingCompletionPage from './components/OnboardingCompletionPage'
 import PwaInstallPrompt from './components/PwaInstallPrompt'
 import OnboardingPage from './components/OnboardingPage'
@@ -36,6 +37,7 @@ import {
   getStoredLogoSource,
   getStoredShowUniversityLogo,
   getStoredShowWallpaper,
+  getStoredWallpaperChoice,
   getStoredTpSelection,
   persistAnonymousAnalytics,
   persistEstablishment,
@@ -46,6 +48,7 @@ import {
   persistLogoSource,
   persistShowUniversityLogo,
   persistShowWallpaper,
+  persistWallpaperChoice,
   persistTpSelection,
 } from './profileStorage'
 import { getStoredSidebarCompact, persistSidebarCompact } from './sidebarWidth'
@@ -56,13 +59,17 @@ import MailPage from './components/MailPage'
 import AssiduityPage from './components/AssiduityPage'
 import HomeDraftPage from './components/HomeDraftPage'
 import LoadingDots from './components/LoadingDots'
-import { resolveHeroImage } from './heroImage'
+import PageLoading from './components/PageLoading'
+import { listWallpaperFolderImages, resolveHeroImage } from './heroImage'
+import { WALLPAPER_FOLDERS, effectiveWallpaperChoice, wallpaperChoiceAnalyticsValue } from './wallpaperChoice'
 import { useWallpaperTint } from './useWallpaperTint'
-import { getStoredTheme, persistTheme, watchTheme } from './theme'
+import { getStoredPalette, getStoredTheme, persistPalette, persistTheme, watchTheme } from './theme'
 import MobileTabBar from './components/MobileTabBar'
 import { getMobileTabItems } from './navItems'
 import { getHomeWidgets } from './dashboardWidgets'
 import { bindHistorySession, readHistoryNav, writeHistoryNav } from './appHistory'
+import { forgetShapes } from 'skullet'
+import { clearNextClassCache } from './upcomingClasses'
 import { clearMailReadCache } from './mailReadCache'
 import { clearMailSignatures } from './mailSignatureStore'
 import { clearMailSends, flushMailSends } from './useMailSend'
@@ -114,6 +121,17 @@ function clearLegacySensitiveClientCaches() {
 
   clearGradesCache()
   clearAdeTimetableCache()
+  // The shapes of « Accueil »'s skeletons (layout only, no text, but
+  // shaped by this student's mails and classes).
+  forgetShapes()
+}
+
+// Signed out (a logout, a session the server no longer knows): what the
+// browser kept for the student's next visit goes too. Not on a failed
+// session check, which may only be the network.
+function clearSignedOutClientCaches() {
+  clearLegacySensitiveClientCaches()
+  clearNextClassCache()
 }
 
 // What the mail page keeps at the module's level for the signed-in student:
@@ -430,9 +448,25 @@ function getFrenchAuthErrorMessage(error, context = 'login') {
   // the checks below and showed as wrong credentials.
   if (error?.status === 429) {
     const minutes = Math.ceil((error.retryAfterSeconds ?? 0) / 60)
+    // Too many codes asked by SMS or mail (two-factor login).
+    if (error.code === 'mfa_send_limit') {
+      return minutes > 0
+        ? r(`Trop de codes demandés, réessaie dans ${minutes} min`, `Trop de codes demandés, réessayez dans ${minutes} min`)
+        : r('Trop de codes demandés. Réessaie dans quelques instants', 'Trop de codes demandés. Réessayez dans quelques instants')
+    }
     return minutes > 0
       ? r(`Trop de tentatives de connexion, réessaie dans ${minutes} min`, `Trop de tentatives de connexion, réessayez dans ${minutes} min`)
       : r('Trop de tentatives de connexion. Réessaie dans quelques instants', 'Trop de tentatives de connexion. Réessayez dans quelques instants')
+  }
+
+  // A two-factor login whose one-time code the CAS refused.
+  if (error?.code === 'mfa_invalid') {
+    return 'Code incorrect ou expiré'
+  }
+
+  // The code asked by SMS or mail was not sent.
+  if (error?.code === 'mfa_send_failed') {
+    return 'Envoi du code impossible'
   }
 
   const rawMessage = getErrorMessage(error).trim()
@@ -927,6 +961,8 @@ function App() {
   const [credentials, setCredentials] = useState({
     username: '',
     password: '',
+    // The one-time code of a two-factor login (LoginPage's second step).
+    otp: '',
   })
   const [establishment, setEstablishment] = useState(() => getStoredEstablishment())
   // « tu » or « vous » for every string built from here on (src/register.js):
@@ -937,6 +973,7 @@ function App() {
   const [hiddenWidgets, setHiddenWidgets] = useState(() => getStoredHiddenWidgets())
   const [customBackground, setCustomBackground] = useState(() => getStoredCustomBackground())
   const [showWallpaper, setShowWallpaper] = useState(() => getStoredShowWallpaper())
+  const [wallpaperChoice, setWallpaperChoice] = useState(() => getStoredWallpaperChoice())
   const [showUniversityLogo, setShowUniversityLogo] = useState(() => getStoredShowUniversityLogo())
   const [logoSource, setLogoSource] = useState(() => getStoredLogoSource())
   // Page shown next to the sidebar: 'home' (« Accueil »), 'grades',
@@ -956,6 +993,7 @@ function App() {
   // Page-switch animations only once the user has switched, not on first load.
   const [hasSwitchedPage, setHasSwitchedPage] = useState(false)
   const [theme, setTheme] = useState(() => getStoredTheme())
+  const [palette, setPalette] = useState(() => getStoredPalette())
   const [showAppDescriptions, setShowAppDescriptions] = useState(() => getStoredShowAppDescriptions())
   // Compact sidebar (icons alone): kept for the device, like its width.
   // Toggled from the sidebar's handle and the settings.
@@ -1016,7 +1054,20 @@ function App() {
     sessionSource: null,
     canUseServerLaunch: false,
     error: '',
+    // The CAS accepted the password and asks for a one-time code: the
+    // login form is on its second step.
+    requireOTP: false,
   })
+  // The code step of a two-factor login: what the student can type a code
+  // from (`methods`: { app, sms, mail }, null when the server doesn't know),
+  // the transport a code was sent by, the one being asked.
+  const [loginMfa, setLoginMfa] = useState({ methods: null, sent: null, sending: null })
+  // Dev only (debug menu): the login's code step shown for one way of
+  // getting the code and one state of the form, without a request:
+  // { method: 'app' | 'sms' | 'mail', state: 'idle' | 'sending' | 'sent' |
+  // 'checking' | 'refused' }, null when off.
+  const [loginCodePreview, setLoginCodePreview] = useState(null)
+  const loginCodePreviewTimer = useRef(0)
   const [hasCheckedInitialSession, setHasCheckedInitialSession] = useState(false)
   const [pathname, setPathname] = useState(() => window.location.pathname)
   const [opensOnLogin] = useState(shouldOpenOnLogin)
@@ -1080,7 +1131,7 @@ function App() {
         } catch {
           // Signed out here all the same: the next check tries again.
         }
-        clearLegacySensitiveClientCaches()
+        clearSignedOutClientCaches()
         forgetMailAccount()
         bindHistorySession(null)
         setActivePage('home')
@@ -1133,7 +1184,7 @@ function App() {
       })
 
       if (!authenticated) {
-        clearLegacySensitiveClientCaches()
+        clearSignedOutClientCaches()
       }
 
       if (exposeOutput) {
@@ -1289,6 +1340,7 @@ function App() {
     setCustomBackground(getStoredCustomBackground(sessionState.user))
     setCustomProfilePhoto(getStoredCustomProfilePhoto(sessionState.user))
     setShowWallpaper(getStoredShowWallpaper(sessionState.user))
+    setWallpaperChoice(getStoredWallpaperChoice(sessionState.user))
     setShowUniversityLogo(getStoredShowUniversityLogo(sessionState.user))
     setLogoSource(getStoredLogoSource(sessionState.user))
     setShowAppDescriptions(getStoredShowAppDescriptions(sessionState.user))
@@ -1877,11 +1929,25 @@ function App() {
     setSelectedTp(nextSelection)
   }, [selectedTp, sessionState.user])
 
-  const heroImage = useMemo(() => (
-    customBackground
-      ? { src: customBackground, position: null, credit: null }
-      : resolveHeroImage(establishment, new Date(), heroOffset)
-  ), [customBackground, establishment, heroOffset])
+  // The wallpaper's folders (Réglages › Apparence): each one's photos and
+  // its photo of the day. A university without photos has no folder.
+  const wallpaperFolders = useMemo(() => WALLPAPER_FOLDERS.map((id) => ({
+    id,
+    label: id === 'tafac' ? 'Tafac' : (universityConfig.establishments?.byId?.[establishment]?.heroImages?.length
+      ? universityConfig.establishments.byId[establishment].label
+      : universityConfig.university?.shortName || 'Université'),
+    images: listWallpaperFolderImages(id, establishment),
+    today: resolveHeroImage(establishment, new Date(), heroOffset, id),
+  })).filter((folder) => folder.images.length > 0), [establishment, heroOffset])
+  const activeWallpaper = useMemo(() => effectiveWallpaperChoice(wallpaperChoice, {
+    hasCustom: Boolean(customBackground),
+    folderImages: (id) => wallpaperFolders.find((folder) => folder.id === id)?.images ?? [],
+  }), [customBackground, wallpaperChoice, wallpaperFolders])
+  const heroImage = useMemo(() => {
+    if (activeWallpaper.folder === 'custom') return { src: customBackground, position: null, credit: null }
+    const folder = wallpaperFolders.find((entry) => entry.id === activeWallpaper.folder)
+    return (activeWallpaper.image && folder.images.find((image) => image.src === activeWallpaper.image)) || folder.today
+  }, [activeWallpaper, customBackground, wallpaperFolders])
   // BUT-only features ("Mes notes", the grade card) hide for a student whose
   // relevé is another formation's; unknown keeps them (no flicker for BUT).
   const gradesFormation = useGradesFormation({
@@ -1914,13 +1980,16 @@ function App() {
   const hasConfirmedPlanningPage = hasPlanningPage && sessionState.authenticated
   // And those about the Messagerie, students signed in at a school with its page.
   const hasConfirmedMailPage = hasMailPage && sessionState.authenticated
+  // Once signed in: a device's first visit is settled there, with what the
+  // student has (changelogStore), not on the landing or the login page.
   useEffect(() => {
+    if (!sessionState.authenticated) return
     setChangelogAudience([
       ...(hasConfirmedGradesPage ? ['grades-page'] : []),
       ...(hasConfirmedPlanningPage ? ['planning-page'] : []),
       ...(hasConfirmedMailPage ? ['mail-page'] : []),
     ])
-  }, [hasConfirmedGradesPage, hasConfirmedPlanningPage, hasConfirmedMailPage])
+  }, [sessionState.authenticated, hasConfirmedGradesPage, hasConfirmedPlanningPage, hasConfirmedMailPage])
   // Falls back to « Accueil » if the grades item goes away (establishment
   // without grade widgets, feature switched off, a relevé that isn't BUT).
   const isGradesPage = useMemo(
@@ -1974,6 +2043,9 @@ function App() {
   const handleCustomBackgroundChange = useCallback(async (file) => {
     const dataUrl = await saveCustomBackground(file, sessionState.user)
     setCustomBackground(dataUrl)
+    // The image just added is the one shown.
+    persistWallpaperChoice({ folder: 'custom', image: null }, sessionState.user)
+    setWallpaperChoice({ folder: 'custom', image: null })
     track('setting_changed', { setting: 'custom_background', value: 'on' })
   }, [sessionState.user])
 
@@ -1990,19 +2062,45 @@ function App() {
     track('setting_changed', { setting: 'profile_photo', value: 'off' })
   }, [])
 
+  // Removing their image while it shows brings the default back (the
+  // university's photo of the day, else Tafac's); another tile picked stays.
   const handleCustomBackgroundReset = useCallback(() => {
     clearStoredCustomBackground()
     setCustomBackground(null)
+    if (activeWallpaper.folder === 'custom') {
+      persistWallpaperChoice(null, sessionState.user)
+      setWallpaperChoice(null)
+    }
     track('setting_changed', { setting: 'custom_background', value: 'off' })
-  }, [])
+  }, [activeWallpaper.folder, sessionState.user])
 
-  useEffect(() => watchTheme(theme), [theme])
+  useEffect(() => watchTheme(theme, palette), [theme, palette])
 
   const handleThemeChange = useCallback((nextTheme) => {
     persistTheme(nextTheme)
     setTheme(nextTheme)
     track('setting_changed', { setting: 'theme', value: nextTheme })
   }, [])
+
+  // A preset by its id; a custom pick with its hue and tint too.
+  const handlePaletteChange = useCallback((nextPalette) => {
+    persistPalette(nextPalette)
+    setPalette(nextPalette)
+    track('setting_changed', {
+      setting: 'palette',
+      value: nextPalette.id,
+      ...(nextPalette.id === 'custom' ? { hue: nextPalette.hue, tint: nextPalette.tint } : {}),
+    })
+  }, [])
+
+  // A tile of the gallery: a folder's photo of the day, one of its photos,
+  // or the student's own image (kept when they pick another tile).
+  const handleWallpaperChoiceChange = useCallback((choice) => {
+    persistWallpaperChoice(choice, sessionState.user)
+    setWallpaperChoice(choice)
+    setHeroOffset(0)
+    track('setting_changed', { setting: 'wallpaper_choice', value: wallpaperChoiceAnalyticsValue(choice) })
+  }, [sessionState.user])
 
   const handleShowWallpaperChange = useCallback((show) => {
     persistShowWallpaper(show, sessionState.user)
@@ -2428,6 +2526,21 @@ function App() {
 
   async function handleLogin(event) {
     event.preventDefault()
+    // The identifiers as the form holds them: a password manager may have
+    // filled the fields without an input event, so the state can lag.
+    const fields = event?.currentTarget?.elements
+    const fieldValue = (name, fallback) => {
+      const value = fields?.namedItem?.(name)?.value
+      return typeof value === 'string' ? value : fallback
+    }
+    const submitted = {
+      ...credentials,
+      username: fieldValue('username', credentials.username),
+      password: fieldValue('password', credentials.password),
+    }
+    if (submitted.username !== credentials.username || submitted.password !== credentials.password) {
+      setCredentials((current) => ({ ...current, username: submitted.username, password: submitted.password }))
+    }
 
     setSessionState((current) => ({
       ...current,
@@ -2437,14 +2550,18 @@ function App() {
     startDebugState('Connexion')
 
     try {
-      const result = await loginToEnt(credentials)
+      // A code only goes with the code step: one filled in before it (a
+      // password manager's) would be checked in place of the password.
+      const result = await loginToEnt(sessionState.requireOTP ? submitted : { ...submitted, otp: '' })
       const isDemo = result?.sessionMode === DEMO_SESSION_MODE
+      // The code went through: the code step's last sound.
+      if (sessionState.requireOTP) playOtpSound('success')
       track('login_result', { result: 'success', demo: isDemo })
       flushAnalytics()
       // Offer the accepted login to the browser's password manager (Chrome's
       // Credential Management API; others rely on the form submission).
       if (!isDemo) {
-        storeBrowserPasswordCredential(credentials)
+        storeBrowserPasswordCredential(submitted)
       }
       setCredentials((current) => ({
         ...current,
@@ -2454,9 +2571,31 @@ function App() {
       if (reloadForOtherUniversity(result)) return
       await refreshSession()
     } catch (error) {
+      // Two-factor: the password is right, the code is still to come. Not a
+      // failure: the form moves on to its second step.
+      if (error?.code === 'mfa_required') {
+        // `sent`: the student's only way to a code, sent without asking.
+        setLoginMfa({ methods: error.mfa?.methods ?? null, sent: error.mfa?.sent ?? null, sending: null })
+        setCredentials((current) => ({ ...current, otp: '' }))
+        setSessionState((current) => ({
+          ...current,
+          checking: false,
+          error: '',
+          requireOTP: true,
+        }))
+        commitDebugState('Connexion', null, 'Code à usage unique demandé')
+        return
+      }
+
       const message = getFrenchAuthErrorMessage(error, 'login')
+      // On the code step, only an answer about the identifiers (a 401 that
+      // isn't the code's) sends back to them: a refused code, the rate limit
+      // or a network error leave the student there, to type a code again.
+      const codeRefused = error?.code === 'mfa_invalid'
+      const leavesCodeStep = error?.status === 401 && !codeRefused
       clearLegacySensitiveClientCaches()
-      setSessionState({
+      setCredentials((current) => ({ ...current, otp: '' }))
+      setSessionState((current) => ({
         checking: false,
         authenticated: false,
         user: null,
@@ -2467,17 +2606,85 @@ function App() {
         sessionSource: null,
         canUseServerLaunch: false,
         error: message,
-      })
+        requireOTP: codeRefused || (Boolean(current.requireOTP) && !leavesCodeStep),
+      }))
       track('login_result', { result: 'failure', demo: false })
       flushAnalytics()
       commitDebugState('Connexion', null, message)
     }
   }
 
+  // Two-factor: has the university send a code by SMS or by mail. The
+  // server signs in again up to the code step to ask for it, so the answer
+  // is 'mfa_required' once more, with the transport in `mfa.sent`.
+  async function handleSendLoginCode(transport) {
+    setLoginMfa((current) => ({ ...current, sending: transport }))
+    setSessionState((current) => ({ ...current, error: '' }))
+
+    try {
+      await loginToEnt({ username: credentials.username, password: credentials.password, sendCode: transport })
+      // No code asked this time: signed in.
+      setCredentials((current) => ({ ...current, password: '' }))
+      await refreshSession()
+    } catch (error) {
+      const sent = error?.code === 'mfa_required' && error.mfa?.sent === transport
+      setLoginMfa((current) => ({
+        methods: error?.mfa?.methods ?? current.methods,
+        sent: sent ? transport : current.sent,
+        sending: null,
+      }))
+      if (sent) return
+
+      setSessionState((current) => ({
+        ...current,
+        error: error?.code === 'mfa_required' ? 'Envoi du code impossible' : getFrenchAuthErrorMessage(error, 'login'),
+        // An answer about the identifiers sends back to them.
+        requireOTP: !(error?.status === 401 && !error?.code),
+      }))
+    }
+  }
+
+  // The debug preview of the code step: `next` now, then `thenState` a
+  // moment later, as a request would (a code sent, a code refused). `sent`
+  // (a code is on its way) follows the states: set by 'sent', kept through
+  // a check and a refusal, dropped at rest.
+  function previewLoginCode(next, thenState = null) {
+    const withSent = (preview, previous) => ({
+      ...preview,
+      sent: preview.method !== 'app' && (
+        preview.state === 'sent'
+        || (['checking', 'refused'].includes(preview.state) && previous?.method === preview.method && Boolean(previous?.sent))
+      ),
+    })
+
+    window.clearTimeout(loginCodePreviewTimer.current)
+    setLoginCodePreview((current) => (next ? withSent(next, current) : null))
+    if (!next || !thenState) return
+
+    loginCodePreviewTimer.current = window.setTimeout(() => {
+      setLoginCodePreview((current) => (current ? withSent({ ...current, state: thenState }, current) : current))
+      if (thenState === 'refused') {
+        setCredentials((current) => ({ ...current, otp: '' }))
+      }
+    }, 1100)
+  }
+
+  // From the code step back to the identifiers (another account, a typo).
+  function handleCancelOtp() {
+    setLoginMfa({ methods: null, sent: null, sending: null })
+    setCredentials((current) => ({ ...current, otp: '' }))
+    setSessionState((current) => ({
+      ...current,
+      error: '',
+      requireOTP: false,
+    }))
+  }
+
   async function handleDemoLogin() {
     setCredentials({
       username: DEMO_CREDENTIALS.username,
       password: DEMO_CREDENTIALS.password,
+      otp: '',
     })
 
     setSessionState((current) => ({
@@ -2541,7 +2748,7 @@ function App() {
 
     try {
       const result = await logoutFromEnt()
-      clearLegacySensitiveClientCaches()
+      clearSignedOutClientCaches()
       // No reload follows: the mails read, the signatures, any send and the
       // history's mail entries must not carry over to whoever signs in
       // next in this tab.
@@ -2638,7 +2845,7 @@ function App() {
     sessionState.user,
     sessionState.givenName,
   )
-  const simpleLoadingDots = <LoadingDots className="text-text-muted" />
+  const simpleLoadingDots = <PageLoading />
   // The composer's « De : » (MailPage): the account's name and address,
   // and its automatic signature's lines: the name, the group picked for the
   // planning (its year and TP, or TD, when there's one), the establishment
@@ -2669,6 +2876,48 @@ function App() {
     },
   }
 
+  // The login page, on its real state or on the debug preview's.
+  const loginCode = loginCodePreview
+    ? {
+        checking: loginCodePreview.state === 'checking',
+        errorMessage: loginCodePreview.state === 'refused' ? 'Code incorrect ou expiré' : '',
+        requireOTP: true,
+        // The method's own, and with the application the two others, to
+        // go from one to the next by the page's links.
+        otpMethods: {
+          app: loginCodePreview.method === 'app',
+          sms: loginCodePreview.method === 'mail' ? null : '06******12',
+          mail: loginCodePreview.method === 'sms' ? null : 'pr***@exemple.fr',
+        },
+        otpSent: loginCodePreview.sent ? loginCodePreview.method : null,
+        otpSending: loginCodePreview.method !== 'app' && loginCodePreview.state === 'sending' ? loginCodePreview.method : null,
+        onSendOtp: (transport) => previewLoginCode({ method: transport, state: 'sending' }, 'sent'),
+        onCancelOtp: () => previewLoginCode(null),
+        onSubmit: (event) => {
+          event.preventDefault()
+          previewLoginCode({ ...loginCodePreview, state: 'checking' }, 'refused')
+        },
+      }
+    : {
+        checking: sessionState.checking,
+        errorMessage: sessionState.error,
+        requireOTP: Boolean(sessionState.requireOTP),
+        otpMethods: loginMfa.methods,
+        otpSent: loginMfa.sent,
+        otpSending: loginMfa.sending,
+        onSendOtp: (transport) => void handleSendLoginCode(transport),
+        onCancelOtp: handleCancelOtp,
+        onSubmit: handleLogin,
+      }
+  const loginPage = (
+    <LoginPage
+      credentials={credentials}
+      {...loginCode}
+      onCredentialsChange={(field, value) => setCredentials((current) => ({ ...current, [field]: value }))}
+      onDemoLogin={() => void handleDemoLogin()}
+    />
+  )
+
   return (
     // viewport-fit=cover (index.html): the page runs under the notch and the
     // rounded corners, its background filling the screen instead of iOS's
@@ -2677,7 +2926,9 @@ function App() {
     // so the bands' tint and photo still reach the edges. Bars fixed to
     // the screen carry their own insets.
     <main className="relative min-h-screen flex flex-col bg-bg overflow-x-clip pl-[env(safe-area-inset-left)] pr-[env(safe-area-inset-right)]">
-      {shouldHoldInitialRender ? (
+      {loginCodePreview ? (
+        loginPage
+      ) : shouldHoldInitialRender ? (
         <div className="flex-1 min-h-0 bg-bg" aria-hidden="true" />
       ) : isProfileSwitching ? (
         <div className="flex-1 min-h-0 bg-bg flex items-center justify-center p-8">
@@ -2735,6 +2986,9 @@ function App() {
             gradesSupported={gradesSupported}
             activePage={shownPage}
             onNavigatePage={handleNavigatePage}
+            nextClassSelection={hasPlanningPage ? selectedTp : null}
+            sessionUser={sessionState.user}
+            onOpenPlanningDay={hasPlanningPage ? handleOpenPlanningDay : null}
             onOpenLatestGrade={universityConfig.features?.sidebarLatestGrade === true && sessionState.authenticated && hasGradesPage ? handleOpenSidebarGrade : null}
             compact={sidebarCompact || isSidebarAutoCompact}
             canPeek={isSidebarAutoCompact}
@@ -2757,9 +3011,13 @@ function App() {
                 onAccountAction={handleOpenAccountModal}
               />
             </div>
+            {/* « Nouvelle version » without the sidebar: under the top bar
+                on a tablet; on a phone a pill floating over the tab bar, as
+                « Accueil »'s band runs up behind the top bar and would cover
+                it there (and the other pages have no top bar). */}
             {hasPendingUpdate ? (
-              <div className="4xl:hidden px-6 pt-3 max-md:px-3">
-                <UpdateNotice onUpdateClick={handleApplyUpdate} />
+              <div className="update-notice-dock 4xl:hidden px-6 pt-3 max-md:pointer-events-none max-md:fixed max-md:inset-x-0 max-md:bottom-[calc(env(safe-area-inset-bottom)+96px)] max-md:z-30 max-md:flex max-md:justify-center max-md:px-4 max-md:pt-0">
+                <UpdateNotice onUpdateClick={handleApplyUpdate} className="update-notice-float max-md:pointer-events-auto max-md:w-auto max-md:max-w-[360px] md:max-w-[360px]" />
               </div>
             ) : null}
             {showChangelogPill ? (
@@ -2855,14 +3113,7 @@ function App() {
       ) : !showLoginPage ? (
         <LandingPage onLogin={() => navigate(LOGIN_PATH)} />
       ) : (
-        <LoginPage
-          credentials={credentials}
-          checking={sessionState.checking}
-          errorMessage={sessionState.error}
-          onCredentialsChange={(field, value) => setCredentials((current) => ({ ...current, [field]: value }))}
-          onDemoLogin={() => void handleDemoLogin()}
-          onSubmit={handleLogin}
-        />
+        loginPage
       )}
       <AccountModal
         open={isAccountModalOpen}
@@ -2879,8 +3130,13 @@ function App() {
         widgetToggles={widgetToggles}
         onWidgetVisibilityChange={handleWidgetVisibilityChange}
         backgroundPreviewSrc={heroImage.src}
+        backgroundPreviewPosition={heroImage.position}
         showWallpaper={showWallpaper}
         onShowWallpaperChange={handleShowWallpaperChange}
+        wallpaperFolders={wallpaperFolders}
+        wallpaperChoice={activeWallpaper}
+        onWallpaperChoiceChange={handleWallpaperChoiceChange}
+        customBackgroundSrc={customBackground}
         showUniversityLogo={showUniversityLogo}
         onShowUniversityLogoChange={handleShowUniversityLogoChange}
         establishmentLogoLabel={universityConfig.establishments?.byId?.[establishment]?.logo ? universityConfig.establishments.byId[establishment].label : null}
@@ -2888,7 +3144,8 @@ function App() {
         onLogoSourceChange={handleLogoSourceChange}
         theme={theme}
         onThemeChange={handleThemeChange}
-        hasCustomBackground={Boolean(customBackground)}
+        palette={palette}
+        onPaletteChange={handlePaletteChange}
         onCustomBackgroundChange={handleCustomBackgroundChange}
         onCustomBackgroundReset={handleCustomBackgroundReset}
         hasCustomProfilePhoto={hasCustomProfilePhoto}
@@ -2950,7 +3207,8 @@ function App() {
             onThemeChange={setTheme}
             establishment={establishment}
             heroImage={heroImage}
-            hasCustomBackground={Boolean(customBackground)}
+            wallpaperFolder={activeWallpaper.folder}
+            hasCustomBackground={activeWallpaper.folder === 'custom' || Boolean(activeWallpaper.image)}
             onHeroShift={(step) => setHeroOffset((current) => current + step)}
             debugNextClass={debugNextClass}
             onDebugNextClassChange={setDebugNextClass}
@@ -2960,6 +3218,11 @@ function App() {
             onShowIosPrompt={() => { setForceIosPrompt(true); setTimeout(() => setForceIosPrompt(false), 100) }}
             onShowUpdatePrompt={() => setForceUpdatePrompt(true)}
             onShowWelcomeFromLent={() => setWelcomeFromLentOpen(true)}
+            loginCodePreview={loginCodePreview}
+            onLoginCodePreviewChange={(next) => {
+              setCredentials((current) => ({ ...current, otp: '' }))
+              previewLoginCode(next)
+            }}
             selectedTp={selectedTp}
           />
         </Suspense>

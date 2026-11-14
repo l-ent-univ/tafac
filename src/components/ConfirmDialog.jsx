@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
+import SmoothSurface from './SmoothSurface'
 
 // A small « are you sure » card for what can't be undone (the mail page's
 // « Supprimer définitivement », « Vider la corbeille »), drawn as the app's
@@ -9,8 +10,8 @@ import { createPortal } from 'react-dom'
 // « Annuler » call `onCancel`. The focus lands on the safe choice: « Annuler »
 // for a destructive one (Enter can't erase by accident, as Apple's
 // guidelines ask), else the confirm button. `extraLabel` and `onExtra`: a
-// third choice, on the left in red (the composer's « Supprimer » beside
-// « Enregistrer », as Apple Mail asks on closing a draft).
+// third choice in red, under the confirm beside « Annuler » (the composer's
+// « Supprimer », as Apple Mail asks on closing a draft).
 // Text sits on spans: a <button> takes its font from index.css's
 // `button { font: inherit }`, outside Tailwind's layers.
 function ConfirmDialog({ open, title, children = null, confirmLabel, cancelLabel = 'Annuler', destructive = false, extraLabel = null, onExtra = null, onConfirm, onCancel }) {
@@ -46,34 +47,41 @@ function ConfirmDialog({ open, title, children = null, confirmLabel, cancelLabel
       role="presentation"
     >
       <section
-        className="w-[min(360px,100%)] modal-corners [--modal-inset:21px] [--modal-inner-radius:20px] border border-[var(--color-border)] bg-[var(--color-bg)] text-[var(--color-text)] animate-modal-card-in"
+        className="glass-solid glass--quiet modal-surface w-[min(340px,100%)] modal-corners [--modal-inset:20px] [--modal-inner-radius:20px] border text-[var(--color-text)] animate-modal-card-in"
         role="alertdialog"
         aria-modal="true"
         aria-labelledby="confirm-dialog-title"
         aria-describedby={children ? 'confirm-dialog-text' : undefined}
         onClick={(event) => event.stopPropagation()}
       >
-        <div className="grid gap-[15px] p-[21px]">
-          <div className="grid gap-[6px]">
-            <h2 id="confirm-dialog-title" className="m-0 text-[18px] font-bold leading-[1.2]">{title}</h2>
+        <div className="grid gap-5 p-5">
+          <div className="grid gap-[6px] px-1 pt-1">
+            <h2 id="confirm-dialog-title" className="m-0 text-[18px] font-bold leading-[1.2] tracking-[-0.01em]">{title}</h2>
             {children ? <p id="confirm-dialog-text" className="m-0 text-[14px] font-medium leading-[1.4] text-text-muted">{children}</p> : null}
           </div>
-          <div className="flex justify-end gap-2">
-            {extraLabel && onExtra ? (
-              <button type="button" className="mr-auto inline-flex h-9 items-center rounded-full border-0 bg-transparent px-3 -ml-3 cursor-pointer transition-[background-color] duration-120 hover:bg-[#d1342f]/8 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-text" onClick={onExtra}>
-                <span className="text-[13px] font-semibold leading-none text-[#d1342f] dark:text-[#ff6b63]">{extraLabel}</span>
-              </button>
-            ) : null}
-            <button ref={cancelRef} type="button" className="material inline-flex h-9 items-center rounded-full px-4 cursor-pointer" onClick={onCancel}>
-              <span className="text-[13px] font-semibold leading-none text-text">{cancelLabel}</span>
-            </button>
+          {/* Stacked, full width: the confirm on top when there's a third
+              choice, the other two side by side under it; else the two side
+              by side, the safe one first. Pills as tall as the card's inset
+              is wide: their curve follows its corners. */}
+          <div className="grid grid-cols-2 gap-2">
             <button
               ref={confirmRef}
               type="button"
-              className={`inline-flex h-9 items-center rounded-full border-0 px-4 cursor-pointer transition-[transform,filter] duration-100 ease-out active:scale-[0.96] hover:brightness-110 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-text ${destructive ? 'bg-[#d1342f] text-white dark:bg-[#e5443d]' : 'bg-text text-bg'}`}
+              className={`lent-button inline-flex h-10 items-center justify-center rounded-full px-4 cursor-pointer focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-text ${destructive ? 'lent-button--danger' : ''} ${extraLabel && onExtra ? 'col-span-2' : 'order-2'}`}
               onClick={onConfirm}
             >
-              <span className="text-[13px] font-semibold leading-none">{confirmLabel}</span>
+              <SmoothSurface />
+              <span className="text-[14px] font-medium leading-none">{confirmLabel}</span>
+            </button>
+            {extraLabel && onExtra ? (
+              <button type="button" className="material inline-flex h-10 items-center justify-center rounded-full px-4 cursor-pointer" onClick={onExtra}>
+                <SmoothSurface />
+                <span className="text-[14px] font-semibold leading-none text-[#d1342f] dark:text-[#ff6b63]">{extraLabel}</span>
+              </button>
+            ) : null}
+            <button ref={cancelRef} type="button" className={`material inline-flex h-10 items-center justify-center rounded-full px-4 cursor-pointer ${extraLabel && onExtra ? '' : 'order-1'}`} onClick={onCancel}>
+              <SmoothSurface />
+              <span className="text-[14px] font-semibold leading-none text-text">{cancelLabel}</span>
             </button>
           </div>
         </div>

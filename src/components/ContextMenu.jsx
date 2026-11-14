@@ -13,7 +13,8 @@ const EDGE_MARGIN = 12
 // `detail` (a muted count at the end), `checked` (the one shown, ticked)
 // and `hint` (a tooltip: the folder's path); for a colour, `swatch` (a
 // CSS colour drawn as a dot in the icon's place; an empty string draws the
-// « none » dot). `title`: an optional muted
+// « none » dot); `labelStyle`, the label's own style (a font, shown in
+// it). `title`: an optional muted
 // line on top (what the actions apply to); `above`: it grows upwards from
 // (x, y), for a button at the screen's foot. A long list scrolls inside the
 // menu. Closes on a pick, a click elsewhere, Escape, a scroll (of the page,
@@ -78,7 +79,7 @@ function ContextMenu({ x, y, items, title = null, label, above = false, anchor =
   return createPortal(
     <div
       ref={menuRef}
-      className="context-menu fixed z-60 min-w-[232px] max-w-[300px] max-h-[calc(100dvh-24px)] overflow-y-auto overscroll-contain p-[5px] border border-border corners-[16px] bg-context-bg shadow-[0_1px_3px_rgb(52_18_0/0.08),0_18px_44px_-12px_var(--color-shadow)] backdrop-blur-[16px] animate-context-menu-in"
+      className="context-menu glass glass--menu fixed z-60 min-w-[232px] max-w-[300px] max-h-[calc(100dvh-24px)] overflow-y-auto overscroll-contain p-[5px] border corners-[16px] animate-context-menu-in"
       role="menu"
       aria-label={label}
       style={{ left: position.left, top: position.top, '--context-origin-x': position.originX, '--context-origin-y': position.originY }}
@@ -109,7 +110,7 @@ function ContextMenu({ x, y, items, title = null, label, above = false, anchor =
               aria-hidden="true"
             />
           ) : item.icon ? <Icon icon={item.icon} className={`size-[16px] shrink-0 ${item.destructive ? '' : 'text-text-muted'}`} aria-hidden="true" /> : null}
-          <span className="min-w-0 flex-1 truncate text-[14px] font-medium leading-tight">{item.label}</span>
+          <span className="min-w-0 flex-1 truncate text-[14px] font-medium leading-tight" style={item.labelStyle}>{item.label}</span>
           {item.detail != null ? <span className="shrink-0 text-[12px] font-semibold leading-none tabular-nums text-text-muted">{item.detail}</span> : null}
           {item.checked ? <Icon icon="ph:check" className="size-[14px] shrink-0 text-text" aria-hidden="true" /> : null}
         </button>

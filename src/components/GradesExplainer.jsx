@@ -10,6 +10,7 @@ import CloseButton from './CloseButton'
 import LentButton from './LentButton'
 import { r } from '../register.js'
 import { useSheetDrag } from '../useSheetDrag'
+import SmoothSurface from './SmoothSurface'
 
 const FOCUSABLE_SELECTOR = 'button:not([disabled]), [href], [tabindex]:not([tabindex="-1"])'
 const PASS_MARK = 10
@@ -116,7 +117,7 @@ const FLOW = {
 
 function Gauge({ value, color, delay }) {
   return (
-    <span className="relative block h-[6px] w-full rounded-full bg-bg-muted">
+    <span className="engraved relative block h-[6px] w-full rounded-full">
       <span className="gx-fill-x absolute inset-y-0 left-0 rounded-full" style={{ width: `${(value / 20) * 100}%`, background: color, '--d': `${delay}ms` }} />
       {/* The 10/20 line the average has to reach. */}
       <span className="absolute -top-[4px] -bottom-[4px] left-1/2 w-[2px] -translate-x-1/2 rounded-full bg-text" />
@@ -232,7 +233,7 @@ function CompensationFigure({ ue, average }) {
                 {row.code}
               </span>
             </span>
-            <span className="absolute h-[14px] overflow-hidden rounded-full bg-bg-muted" style={{ left: TRACK.left, width: TRACK.width, top: 9 }}>
+            <span className="engraved absolute h-[14px] overflow-hidden rounded-full" style={{ left: TRACK.left, width: TRACK.width, top: 9 }}>
               <span
                 className="gx-fill-x absolute inset-y-0 left-0 rounded-full"
                 style={{ width: `${(row.value / 20) * 100}%`, background: ue.color, opacity: row.isYear ? 1 : 0.6, '--d': `${delays[index]}ms`, '--dur': row.isYear ? '1100ms' : '800ms' }}
@@ -291,7 +292,7 @@ function EctsFigure({ ues }) {
               </span>
               {!isValidated ? <Icon icon="ph:warning-fill" className="ue-below-warning size-[14px]" aria-hidden="true" /> : null}
               <span
-                className={`gx-pop ml-auto inline-flex items-center gap-[5px] rounded-full px-[8px] py-[5px] ${isValidated ? 'bg-bg-subtle' : 'border border-dashed border-border-input'}`}
+                className={`gx-pop ml-auto inline-flex items-center gap-[5px] rounded-full px-[8px] py-[5px] ${isValidated ? 'glass-solid' : 'status-tag status-tag--carved status-tag--dashed'}`}
                 style={{ '--d': `${550 + index * 150}ms` }}
               >
                 {isValidated ? <span className="gx-coin" style={{ background: row.ue.color }} /> : null}
@@ -318,7 +319,7 @@ function EctsFigure({ ues }) {
             const isValidated = row.average >= PASS_MARK
             const delay = 1100 + (isValidated ? fillIndex++ : 0) * 350
             return (
-              <span key={row.ue.code} className={`relative h-full overflow-hidden rounded-full ${isValidated ? 'bg-bg-muted' : 'border border-dashed border-border-input'}`} style={{ flex: creditsOf(row) }}>
+              <span key={row.ue.code} className={`relative h-full overflow-hidden rounded-full ${isValidated ? 'assiduity-fill bg-text-30' : 'engraved status-tag--dashed'}`} style={{ flex: creditsOf(row) }}>
                 {isValidated ? <span className="gx-fill-x absolute inset-0 rounded-full" style={{ background: row.ue.color, '--d': `${delay}ms` }} /> : null}
               </span>
             )
@@ -377,7 +378,7 @@ function PageFigure({ ues, example }) {
       </div>
       <div className="gx-card grid gap-[8px] corners-[18px] bg-widget-bg p-[10px] shadow-sm">
         <span className="flex items-center gap-[10px]">
-          <span className="inline-flex size-8 shrink-0 items-center justify-center corners-[10px] border border-border bg-bg-subtle">
+          <span className="glass-solid inline-flex size-8 shrink-0 items-center justify-center corners-[10px]">
             <Icon icon="ph:book" className="size-4 text-text-secondary" aria-hidden="true" />
           </span>
           <span className="grid min-w-0 flex-1 gap-[3px]">
@@ -580,7 +581,7 @@ function ExplainerDialog({ ues, onClose }) {
       <div className="weather-modal-backdrop absolute inset-0 bg-backdrop animate-modal-backdrop-in" onClick={dismiss} aria-hidden="true" />
       <section
         ref={dialogRef}
-        className="gx-dialog relative flex h-[min(700px,calc(100dvh-40px))] w-[min(560px,100%)] flex-col overflow-hidden corners-[22px] border border-border bg-bg text-text shadow-[0_24px_80px_var(--color-shadow)] outline-none animate-modal-card-in max-sm:h-[calc(100dvh-12px)] max-sm:rounded-b-none max-sm:border-b-0"
+        className="glass-solid glass--quiet modal-surface gx-dialog relative flex h-[min(700px,calc(100dvh-40px))] w-[min(560px,100%)] flex-col overflow-hidden corners-[22px] border text-text outline-none animate-modal-card-in max-sm:h-[calc(100dvh-12px)] max-sm:rounded-b-none max-sm:border-b-0"
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}
@@ -671,13 +672,14 @@ function GradesExplainer({ ues = [] }) {
     <>
       <button
         type="button"
-        className="ml-auto inline-flex shrink-0 items-center gap-[5px] rounded-full border border-border bg-transparent py-[6px] pr-[11px] pl-[8px] text-text-muted transition-colors duration-150 hover:bg-bg-subtle hover:text-text max-md:relative max-md:min-h-8 max-md:after:absolute max-md:after:inset-x-0 max-md:after:-inset-y-[7px]"
+        className="material ml-auto inline-flex shrink-0 items-center gap-[5px] rounded-full py-[6px] pr-[11px] pl-[8px] text-text-muted hover:text-text max-md:relative max-md:min-h-8 max-md:after:absolute max-md:after:inset-x-0 max-md:after:-inset-y-[7px]"
         aria-haspopup="dialog"
         onClick={() => {
           trackGradesAction('explainer_opened')
           setIsOpen(true)
         }}
       >
+        <SmoothSurface />
         <Icon icon="ph:question" className="size-[15px]" aria-hidden="true" />
         {/* Shorter on phones, so the section title stays on one line; its
             touch area reaches 44px there (::after). */}

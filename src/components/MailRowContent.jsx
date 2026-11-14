@@ -42,7 +42,7 @@ function MailRowContent({ message, person, sender, senderDomain = null, timeLabe
         <span className={`min-w-0 truncate text-[14px] leading-[1.3] text-text ${unread ? 'font-semibold' : 'font-medium'}`}>{subject}</span>
         {/* A thread's size, as Apple Mail's. */}
         {message.count > 1 ? (
-          <span className="shrink-0 rounded-full bg-bg-muted px-[6px] text-[11.5px] font-semibold leading-[17px] text-text-muted tabular-nums" aria-label={`${message.count} mails`}>{message.count}</span>
+          <span className="glass-solid shrink-0 rounded-full px-[6px] text-[11.5px] font-semibold leading-[17px] text-text-muted tabular-nums" aria-label={`${message.count} mails`}>{message.count}</span>
         ) : null}
         {unread ? <span className="mail-unread-dot size-[6px] shrink-0 rounded-full" aria-hidden="true" /> : null}
       </span>

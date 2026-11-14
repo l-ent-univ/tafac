@@ -100,10 +100,10 @@ function FilmShowcase({ className = '' }) {
                   aria-pressed={isCurrent}
                   onClick={() => seek(chapter)}
                   className={`flex w-full cursor-pointer items-center gap-3 rounded-full border py-1.5 pl-1.5 pr-5 text-left font-[inherit] transition-[background-color,border-color,box-shadow,opacity] duration-300 max-md:gap-2 max-md:py-1 max-md:pl-1 max-md:pr-3.5 ${isCurrent
-                    ? 'border-white bg-white opacity-100 shadow-[0_1px_3px_rgb(52_18_0/0.06),0_10px_28px_-14px_rgb(52_18_0/0.16)] dark:border-white/10 dark:bg-[#1c1c1c]'
+                    ? 'glass-solid opacity-100'
                     : 'border-transparent bg-transparent opacity-60 hover:opacity-100'}`}
                 >
-                  <span className="inline-flex size-10 shrink-0 items-center justify-center rounded-full bg-bg-subtle text-text max-md:size-8" aria-hidden="true">
+                  <span className="glass-solid inline-flex size-10 shrink-0 items-center justify-center rounded-full text-text max-md:size-8" aria-hidden="true">
                     <Icon icon={chapter.icon} className="size-[18px] max-md:size-4" />
                   </span>
                   <span className="flex min-w-0 flex-col">

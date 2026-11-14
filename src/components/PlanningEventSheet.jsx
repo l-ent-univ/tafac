@@ -50,6 +50,22 @@ function PlanningEventSheet({ event, accent, events, todayKey, searching, onWrit
     return () => observer.disconnect()
   }, [])
 
+  // The occurrences come in after the sheet opens (their weeks still on
+  // their way): their section's height follows its content, eased
+  // (.planning-occurrences-frame), so the sheet grows smoothly instead of
+  // jumping; the list itself rises in, row after row.
+  const occurrencesRef = useRef(null)
+  const [occurrencesHeight, setOccurrencesHeight] = useState(null)
+  useLayoutEffect(() => {
+    const element = occurrencesRef.current
+    if (!element) return undefined
+    const measure = () => setOccurrencesHeight(element.offsetHeight)
+    const observer = new ResizeObserver(measure)
+    observer.observe(element)
+    measure()
+    return () => observer.disconnect()
+  }, [])
+
   useEffect(() => {
     const scroller = scrollRef.current
     if (!scroller) return undefined
@@ -77,7 +93,7 @@ function PlanningEventSheet({ event, accent, events, todayKey, searching, onWrit
       <div className="weather-modal-backdrop absolute inset-0 bg-backdrop animate-modal-backdrop-in" onClick={dismiss} aria-hidden="true" />
       <section
         ref={dialogRef}
-        className="gd-dialog planning-sheet relative isolate flex max-h-[min(820px,calc(100dvh-40px))] w-[min(448px,100%)] flex-col modal-corners [--modal-inset:24px] [--modal-inner-radius:20px] max-sm:[--modal-inset:16px] max-sm:[--modal-inner-radius:18px] border border-border bg-bg text-text shadow-[0_24px_80px_var(--color-shadow)] outline-none max-sm:max-h-[calc(100dvh-16px)] max-sm:rounded-b-none max-sm:border-b-0"
+        className="glass-solid glass--quiet modal-surface gd-dialog planning-sheet relative isolate flex max-h-[min(820px,calc(100dvh-40px))] w-[min(448px,100%)] flex-col modal-corners [--modal-inset:24px] [--modal-inner-radius:20px] max-sm:[--modal-inset:16px] max-sm:[--modal-inner-radius:18px] border text-text outline-none max-sm:max-h-[calc(100dvh-16px)] max-sm:rounded-b-none max-sm:border-b-0"
         style={accentStyle(accent)}
         role="dialog"
         aria-modal="true"
@@ -112,7 +128,7 @@ function PlanningEventSheet({ event, accent, events, todayKey, searching, onWrit
               </div>
             </header>
 
-            <div ref={contentRef} className="grid min-w-0 grid-cols-[minmax(0,1fr)] gap-6 px-6 pt-1 pb-6 max-sm:px-4 max-sm:pb-[max(20px,env(safe-area-inset-bottom))]">
+            <div ref={contentRef} className="grid min-w-0 grid-cols-[minmax(0,1fr)] gap-6 select-text px-6 pt-1 pb-6 max-sm:px-4 max-sm:pb-[max(20px,env(safe-area-inset-bottom))]">
               <h2 id="planning-sheet-title" className="sr-only">{event.title}</h2>
               <div className="gd-rise grid gap-3">
                 {contentWidth > 0 ? (
@@ -135,22 +151,28 @@ function PlanningEventSheet({ event, accent, events, todayKey, searching, onWrit
                   <h3 id="planning-occurrences-title" className="m-0 font-body text-base font-medium leading-[1.06]">Occurrences</h3>
                   <span className="ml-auto font-body text-[13px] font-medium leading-none text-text-muted">sur 30 jours</span>
                 </div>
-                {occurrences.length ? (
-                  <ul className={GROUP_CARD_CLASSES}>
-                    {occurrences.map((occurrence) => (
-                      <GroupRow
-                        key={occurrence.id}
-                        title={relativeDayText(occurrence.day, todayKey)}
-                        detail={[`${formatTime(occurrence.start)} – ${formatTime(occurrence.end)}`, occurrence.location].filter(Boolean).join(' · ')}
-                        onClick={() => onPickDay(occurrence.day)}
-                      />
-                    ))}
-                  </ul>
-                ) : (
-                  <p className="m-0 font-body text-[14px] font-medium leading-[1.4] text-text-secondary">
-                    {searching ? 'Recherche d’autres séances…' : 'Aucune autre séance dans les 30 prochains jours'}
-                  </p>
-                )}
+                {/* 8px of room about the cards (their strokes and shadow),
+                    taken back by the margin. */}
+                <div className="planning-occurrences-frame -m-2 overflow-hidden p-2" style={occurrencesHeight != null ? { height: occurrencesHeight + 16 } : undefined}>
+                  <div ref={occurrencesRef}>
+                    {occurrences.length ? (
+                      <ul className={`${GROUP_CARD_CLASSES} planning-occurrences-in`}>
+                        {occurrences.map((occurrence) => (
+                          <GroupRow
+                            key={occurrence.id}
+                            title={relativeDayText(occurrence.day, todayKey)}
+                            detail={[`${formatTime(occurrence.start)} – ${formatTime(occurrence.end)}`, occurrence.location].filter(Boolean).join(' · ')}
+                            onClick={() => onPickDay(occurrence.day)}
+                          />
+                        ))}
+                      </ul>
+                    ) : (
+                      <p key={searching ? 'searching' : 'none'} className="semester-fade m-0 font-body text-[14px] font-medium leading-[1.4] text-text-secondary">
+                        {searching ? 'Recherche d’autres séances…' : 'Aucune autre séance dans les 30 prochains jours'}
+                      </p>
+                    )}
+                  </div>
+                </div>
               </section>
             </div>
           </div>

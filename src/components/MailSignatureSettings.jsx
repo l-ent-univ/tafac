@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { plainSignatureHtml, normalizeCustomSignatureText, pickShownSignature, signatureClassName } from '../mailSignatureChoice'
 import { setMailSignatureEnabled, setMailSignatureKind, useMailSignaturePrefs, useMailSignatures, writeCustomMailSignature } from '../mailSignatureStore'
-import { MUTED_FILL_CLASSES, ROW_CLASSES } from '../settingsStyles'
+import { MUTED_FILL_CLASSES, WELL_CLASSES, ROW_CLASSES } from '../settingsStyles'
 import SettingsGroup, { RowText } from './SettingsGroup'
 import MailSignatureContent from './MailSignatureContent'
 import Switch from './Switch'
@@ -86,7 +86,7 @@ function CustomSignatureEditor({ saved, maxLength, draft, onDraftChange }) {
           maxLength={maxLength * 2}
           spellCheck
           placeholder={'Camille Martin\nBUT Informatique, 2e année'}
-          className={`min-h-[104px] w-full resize-y corners-[12px] border border-[var(--color-border)] bg-widget-bg px-3 py-[9px] font-body text-[15px] font-medium leading-[1.45] text-[var(--color-text)] outline-none placeholder:text-text-50 focus-visible:ring-2 focus-visible:ring-brand/45 ${tooLong ? 'border-[#b91c1c] dark:border-[var(--color-error)]' : ''}`}
+          className={`field min-h-[104px] w-full resize-y corners-[12px] px-3 py-[9px] font-body text-[15px] font-medium leading-[1.45] text-[var(--color-text)] placeholder:text-text-50 ${tooLong ? 'border-[#b91c1c] dark:border-[var(--color-error)]' : ''}`}
         />
       </label>
       <div className="flex flex-wrap items-center justify-between gap-2">
@@ -146,7 +146,7 @@ function MailSignatureSettings({ autoSignature }) {
             ) : null}
             <div className="flex flex-col gap-[7px]">
               <span className="font-body text-[13px] font-semibold leading-none text-text-60">Aperçu</span>
-              <div className={`corners-[12px] ${MUTED_FILL_CLASSES} px-4 py-3 font-body text-[16px] text-[var(--color-text)]`}>
+              <div className={`corners-[12px] ${WELL_CLASSES} px-4 py-3 font-body text-[16px] text-[var(--color-text)]`}>
                 <p className="m-0 text-text-50">Bonjour,</p>
                 <div className={`${signatureClassName(preview)} !my-[10px] [&_.mail-composer-signature-logos_img]:h-7`}>
                   <MailSignatureContent value={preview} />

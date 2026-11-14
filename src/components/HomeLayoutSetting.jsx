@@ -47,9 +47,9 @@ function CardTile({ widget, onToggle, refusing = null, className = '' }) {
       role="switch"
       aria-checked={shown}
       onClick={() => onToggle(widget)}
-      className={`${refusing ? 'home-tile-refuse ' : ''}group relative flex min-w-0 flex-col items-start justify-between gap-2 corners-[14px] border p-[10px] text-left cursor-pointer transition-[background-color,border-color,box-shadow,transform] duration-150 ease-out active:scale-[0.97] motion-reduce:transition-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-text ${shown
-        ? 'border-white bg-widget-bg shadow-[0_1px_3px_rgba(0,0,0,0.08)] hover:shadow-[0_3px_10px_rgba(0,0,0,0.1)] dark:border-[var(--color-border)]'
-        : 'border-dashed border-text-30 bg-transparent hover:border-text-50 hover:bg-widget-bg/40'} ${className}`}
+      className={`${refusing ? 'home-tile-refuse ' : ''}group relative flex min-w-0 flex-col items-start justify-between gap-2 corners-[14px] p-[10px] text-left cursor-pointer transition-[background-color,border-color,box-shadow,transform] duration-150 ease-out active:scale-[0.97] motion-reduce:transition-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-text ${shown
+        ? 'glass-solid'
+        : 'engraved border-transparent'} ${className}`}
     >
       <img
         src={CARD_ICONS[widget.id]}
@@ -120,7 +120,7 @@ function HomeLayoutSetting({ widgets, onChange, wallpaperSrc = null, firstName =
         </span>
       </div>
 
-      <div className="overflow-hidden modal-inner-corners border border-white bg-bg shadow-[0_1px_3px_rgba(0,0,0,0.06)] dark:border-[var(--color-border)] dark:shadow-[0_1px_3px_rgba(0,0,0,0.3)]">
+      <div className="glass-solid glass--quiet overflow-hidden modal-inner-corners border">
         {/* The band: not a card, always there. */}
         <div
           aria-hidden="true"

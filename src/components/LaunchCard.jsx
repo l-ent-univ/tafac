@@ -3,6 +3,7 @@ import { Icon } from '@iconify/react'
 import { track } from '../analytics'
 import { getLaunchId } from '../changelogState'
 import { markChangelogEntrySeen, useChangelog } from '../changelogStore'
+import SmoothSurface from './SmoothSurface'
 
 // Closing: the card fades, then its room folds up (.launch-card-slot).
 const LEAVE_MS = 480
@@ -79,11 +80,12 @@ function LaunchCard({ entryId, launch, stage, title, line, ctaLabel, closeLabel,
             {/* Font on the label: index.css gives buttons `font: inherit` outside Tailwind's layers. */}
             <button
               type="button"
-              className="launch-card-rise inline-flex h-10 shrink-0 items-center gap-2 rounded-full border-0 bg-brand px-4 text-bg cursor-pointer transition-[background-color,transform] duration-150 ease-out hover:bg-brand-hover active:scale-[0.97] max-md:h-8 max-md:px-3"
+              className="lent-button launch-card-rise inline-flex h-10 shrink-0 items-center gap-2 rounded-full px-4 cursor-pointer max-md:h-8 max-md:px-3"
               style={{ '--delay': '320ms' }}
               onClick={handleOpen}
             >
-              <span className="font-body text-[14px] font-semibold leading-none whitespace-nowrap max-md:text-[13px]">{ctaLabel}</span>
+              <SmoothSurface />
+              <span className="font-body text-[14px] font-medium leading-none whitespace-nowrap max-md:text-[13px]">{ctaLabel}</span>
               <Icon icon="ph:arrow-right" className="launch-card-cta-arrow h-4 w-4 max-md:h-3.5 max-md:w-3.5" aria-hidden="true" />
             </button>
           </div>

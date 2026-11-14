@@ -80,17 +80,18 @@ export function siteEntries(entries, kind, siteLabel) {
 
 const compareNames = (left, right) => left.name.localeCompare(right.name, 'fr', { numeric: true, sensitivity: 'base' })
 
+const compareText = (left, right) => left.localeCompare(right, 'fr', { numeric: true, sensitivity: 'base' })
+
 // How many folders under the site's own make a section's title, by kind:
 // a room's building ("Bâtiment 05 - INFO", its type on its row), a
-// person's whole department ("Permanents · Informatique"), a group's
-// formation and year ("BUT MMI · MMI A2", its TD on its row).
-const SECTION_DEPTH = { room: 1, person: Infinity, group: 2 }
+// person's whole department ("Permanents · Informatique").
+const SECTION_DEPTH = { room: 1, person: Infinity }
 
-// The site's entries in sections, by the folders under the site's own:
-// the sections and their entries in order, those whose title starts as
-// `first` before the others (the student's own formation). What's below
-// the title is on the entry's row (`detail`).
-export function sectionEntries(entries, kind, { first = null } = {}) {
+// The site's rooms or staff in sections, by the folders under the site's
+// own: the sections and their entries in order. What's below the title is
+// on the entry's row (`detail`). The groups have their own layout
+// (groupCollections).
+export function sectionEntries(entries, kind) {
   const depth = SECTION_DEPTH[kind] ?? Infinity
   const sections = new Map()
   for (const entry of entries) {
@@ -100,12 +101,106 @@ export function sectionEntries(entries, kind, { first = null } = {}) {
     if (!sections.has(title)) sections.set(title, [])
     sections.get(title).push({ ...entry, detail })
   }
-  const firstWords = foldedWords(first)
-  const isFirst = (title) => firstWords.length > 0 && foldDirectoryText(title).startsWith(firstWords.join(' '))
   return [...sections.entries()]
-    .sort(([left], [right]) => (isFirst(right) - isFirst(left))
-      || left.localeCompare(right, 'fr', { numeric: true, sensitivity: 'base' }))
+    .sort(([left], [right]) => compareText(left, right))
     .map(([title, sectionItems]) => ({ title, entries: sectionItems.sort(compareNames) }))
+}
+
+// `name` without its words found in `drop` (folded words, a Set): "1A1 MMI"
+// → "1A1" when "MMI" is the formation's. Kept whole when nothing's left.
+function withoutWords(name, drop) {
+  const kept = String(name ?? '').split(/\s+/).filter((word) => {
+    const folded = foldedWords(word)
+    return folded.length === 0 || !folded.every((part) => drop.has(part))
+  })
+  return kept.join(' ').trim() || String(name ?? '').trim()
+}
+
+// The last words every one of `names` ends with, folded ("1A1 I", "2B2 I"
+// → ["i"]), each name keeping a word at least; none for a lone name.
+function sharedEnding(names) {
+  if (names.length < 2) return []
+  const lists = names.map((name) => name.split(/\s+/).map(foldDirectoryText))
+  const ending = []
+  while (lists.every((words) => words.length > ending.length + 1 && words.at(-1 - ending.length) === lists[0].at(-1 - ending.length))) {
+    ending.unshift(lists[0].at(-1 - ending.length))
+  }
+  return ending
+}
+
+// `name` without those last words, when it ends with them and more.
+function withoutEnding(name, ending) {
+  const words = name.split(/\s+/)
+  const cut = words.length - ending.length
+  if (ending.length === 0 || cut < 1 || !ending.every((word, index) => foldDirectoryText(words[cut + index]) === word)) return name
+  return words.slice(0, cut).join(' ')
+}
+
+// A year's folder as shown, from its short name: "A1" ("MMI A1" of "BUT
+// MMI") → "1re année", "3" ("Info-Com 3") → "3e année"; any other as it is.
+function yearLabel(short) {
+  const match = /^(?:a|annee|année)?\s*(\d)$/i.exec(short)
+  if (!match) return short
+  return match[1] === '1' ? '1re année' : `${match[1]}e année`
+}
+
+// The site's groups as collections (« Formations »): one per formation,
+// its years in rows, a year's groups by TD (the folders under the site's
+// own; the TPs, ADE's leaves, at the end, whatever lies between). Each
+// name shown short: without the words its formation already says ("1A1
+// MMI" → "1A1") or all its groups end with ("1A1 I" → "1A1"), the full
+// one kept on `entry`. A TD's label only where its groups' names don't
+// start with it ("TD A" over "TP 1", none for "1A" over "1A1"), its full
+// name in `name`. The student's own formation first (`own`): the one
+// holding their group (`ownId`), else the one named `first`; the others,
+// the years, the TDs and the groups in order. → [{ id, label, own, years:
+// [{ id, label, tds: [{ id, name, label, groups: [{ entry, label }] }] }] }].
+export function groupCollections(entries, { ownId = null, first = null } = {}) {
+  const formations = new Map()
+  let holder = null
+  for (const entry of entries) {
+    if (entry.kind !== 'group') continue
+    const [formation = '', year = '', td = ''] = entry.path.slice(1).map(cleanFolderName).filter(Boolean)
+    if (!formations.has(formation)) formations.set(formation, new Map())
+    const years = formations.get(formation)
+    if (!years.has(year)) years.set(year, new Map())
+    const tds = years.get(year)
+    if (!tds.has(td)) tds.set(td, [])
+    tds.get(td).push(entry)
+    if (ownId !== null && entry.id === String(ownId)) holder = { title: formation }
+  }
+  const titles = [...formations.keys()]
+  // Without their group here (a TD or a year chosen): the formation named
+  // as theirs, or the only one starting so ("BUT INFO" isn't "BUT
+  // Info-Com").
+  const firstText = foldDirectoryText(first)
+  const named = firstText ? titles.filter((title) => foldDirectoryText(title).startsWith(firstText)) : []
+  const own = holder?.title ?? named.find((title) => foldDirectoryText(title) === firstText) ?? (named.length === 1 ? named[0] : null)
+  const byName = ([left], [right]) => compareText(left, right)
+
+  return titles
+    .sort((left, right) => ((right === own) - (left === own)) || compareText(left, right))
+    .map((title) => {
+      const years = formations.get(title)
+      const drop = new Set(foldedWords(title))
+      const ending = sharedEnding([...years.values()].flatMap((tds) => [...tds.values()].flat()).map((entry) => withoutWords(entry.name, drop)))
+      const short = (name) => withoutEnding(withoutWords(name, drop), ending)
+      return {
+        id: title,
+        label: title || 'Autres groupes',
+        own: title === own,
+        years: [...years.entries()].sort(byName).map(([year, tds]) => ({
+          id: year,
+          label: year ? yearLabel(short(year)) : '',
+          tds: [...tds.entries()].sort(byName).map(([td, tdEntries]) => {
+            const groups = tdEntries.sort(compareNames).map((entry) => ({ entry, label: short(entry.name) }))
+            const label = td ? short(td) : ''
+            const said = groups.every((group) => foldDirectoryText(group.label).startsWith(foldDirectoryText(label)))
+            return { id: td, name: td, label: said ? '' : label, groups }
+          }),
+        })),
+      }
+    })
 }
 
 // Where an entry is, on its row in a search: its folders, the site's

@@ -3,6 +3,7 @@ import { Icon } from '@iconify/react'
 import CloseButton from './CloseButton'
 import MailSearchField from './MailSearchField'
 import { useSheetDrag } from '../useSheetDrag'
+import SmoothSurface from './SmoothSurface'
 
 // The cards a drawer's arrows move through (MailGradePicker's grades,
 // MailCoursePicker's classes).
@@ -19,6 +20,7 @@ export function AttachDrawerError({ text, onRetry }) {
     <div className="grid justify-items-center gap-3 px-2 py-8 text-center" role="alert">
       <p className="m-0 max-w-[340px] font-body text-[14px] font-medium leading-[1.4] text-text-secondary">{text}</p>
       <button type="button" className="material inline-flex cursor-pointer items-center gap-1.5 rounded-full px-3.5 py-2" onClick={onRetry}>
+        <SmoothSurface />
         <Icon icon="ph:arrows-clockwise" className="size-4" aria-hidden="true" />
         <span className="font-body text-[14px] font-semibold text-text">Réessayer</span>
       </button>
@@ -104,7 +106,7 @@ function MailAttachDrawer({ titleId, title, subtitle = null, search = null, onSu
       <div className="absolute inset-0 bg-backdrop animate-modal-backdrop-in" onClick={dismiss} aria-hidden="true" />
       <section
         ref={dialogRef}
-        className="mail-grade-drawer planning-sheet relative flex h-[min(640px,calc(100%-56px))] w-full flex-col overflow-hidden rounded-t-[24px] border-t border-border bg-bg text-text shadow-[0_-12px_48px_var(--color-shadow)] outline-none"
+        className="glass-solid glass--quiet modal-surface mail-grade-drawer planning-sheet relative flex h-[min(640px,calc(100%-56px))] w-full flex-col overflow-hidden rounded-t-[24px] border-t text-text outline-none"
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}

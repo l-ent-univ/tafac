@@ -22,10 +22,11 @@ function WidgetListStatus({ icon, title, body, action = null }) {
             event.stopPropagation()
             action.onClick()
           }}
-          className="mt-1 inline-flex shrink-0 cursor-pointer items-center gap-1 self-start border-0 bg-transparent p-0 font-body text-[13px] font-semibold text-text-muted underline-offset-2 transition-colors duration-150 hover:text-text hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-text"
+          className="glass-solid mt-1 inline-flex shrink-0 cursor-pointer items-center gap-1 self-start rounded-full py-1 pr-2.5 pl-2 text-text focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-text"
         >
           <Icon icon="ph:arrows-clockwise" className="size-[14px] shrink-0" aria-hidden="true" />
-          {action.label}
+          {/* The font on the span: a button takes index.css' `font: inherit`. */}
+          <span className="font-body text-[13px] font-semibold leading-none">{action.label}</span>
         </button>
       ) : null}
     </div>

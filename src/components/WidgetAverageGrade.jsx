@@ -38,7 +38,7 @@ function AverageGradeHeader({ estimated = false, final = false, icon = null }) {
       ) : null}
       {/* The jury has ruled (ScoDoc's decision on the semester or its year). */}
       {final ? (
-        <span className="ml-[3px] inline-flex shrink-0 items-center rounded-full bg-brand-subtle px-2 py-[4px] font-body text-[12px] font-semibold leading-none text-text max-md:ml-0 max-md:px-[7px] max-md:text-[11px]">
+        <span className="glass-solid ml-[3px] inline-flex shrink-0 items-center rounded-full px-2 py-[4px] font-body text-[12px] font-semibold leading-none text-text max-md:ml-0 max-md:px-[7px] max-md:text-[11px]">
           {/* "Moyenne finale" on a phone too: the title beside it reads "Moyenne". */}
           <span className="max-md:hidden">Moyenne finale</span>
           <span className="md:hidden">finale</span>
@@ -78,7 +78,7 @@ function PocRank({ poc }) {
   return (
     <span className="flex min-w-0 items-center gap-[5px] leading-[1.06] text-[14px] font-medium text-text-muted max-md:text-[12px]">
       <span className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap">{text}</span>
-      <span className="shrink-0 rounded-full border border-dashed border-border-input px-[6px] py-[2px] text-[11px] font-semibold leading-none">{poc.hidden ? 'masqué' : 'estimé'}</span>
+      <span className="status-tag status-tag--carved status-tag--dashed shrink-0 rounded-full px-[6px] py-[2px] text-[11px] font-semibold leading-none">{poc.hidden ? 'masqué' : 'estimé'}</span>
       <span className="pointer-events-auto inline-flex">
         <CardInfoTip label="D’où vient ce rang ?">
           {poc.hidden ? (
@@ -96,7 +96,7 @@ function PocRank({ poc }) {
 // The average sits at the bottom left like the latest grade's value, with the
 // promo average (and the rank, if shown) under it. Pointer events pass through
 // to the evolution line drawn behind (its hover), and on to the card.
-function AverageGradeValues({ avgDisplay, promoDisplay, ranks = null, pocRank = null }) {
+export function AverageGradeValues({ avgDisplay, promoDisplay, ranks = null, pocRank = null }) {
   return (
     <div className="pointer-events-none relative z-10 flex-1 flex flex-col gap-[5px] justify-end min-w-0">
       <div className="flex items-end gap-[3px] leading-[1.06]">

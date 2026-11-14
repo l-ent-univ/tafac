@@ -3,6 +3,7 @@ import { Icon } from '@iconify/react'
 import universityConfig from '@university'
 import { copy, copyText } from '../landingCopy'
 import { useRevealOnce } from '../landingMotion'
+import SmoothSurface from './SmoothSurface'
 
 const about = universityConfig.branding.about ?? {}
 const team = about.team ?? []
@@ -23,7 +24,7 @@ function LandingContact({ className = '' }) {
       <div
         ref={ref}
         data-revealed={isRevealed || undefined}
-        className="landing-contact flex w-full max-w-[720px] flex-col items-center gap-5 corners-[32px] border border-white bg-white px-10 py-10 text-center shadow-[0_1px_3px_rgb(52_18_0/0.06),0_10px_28px_-14px_rgb(52_18_0/0.16)] dark:border-white/10 dark:bg-[#1c1c1c] max-md:corners-[28px] max-md:px-5 max-md:py-8"
+        className="landing-contact flex w-full max-w-[720px] glass-solid glass--quiet border flex-col items-center gap-5 corners-[32px] px-10 py-10 text-center max-md:corners-[28px] max-md:px-5 max-md:py-8"
       >
         <span className="inline-flex items-center gap-1.5 rounded-full bg-success-bg px-3 py-1 text-[13px] font-bold uppercase tracking-[0.06em] text-success-text">
           <Icon icon="ph:check-circle" className="size-4" aria-hidden="true" />
@@ -43,7 +44,7 @@ function LandingContact({ className = '' }) {
                   href={`https://github.com/${login}`}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="flex items-center gap-2.5 rounded-full bg-bg-subtle py-1.5 pl-1.5 pr-4 text-left no-underline transition-colors hover:bg-bg-muted dark:bg-white/[0.07] dark:hover:bg-white/[0.12]"
+                  className="glass-solid flex items-center gap-2.5 rounded-full py-1.5 pl-1.5 pr-4 text-left no-underline"
                 >
                   <img
                     src={`https://github.com/${login}.png?size=96`}
@@ -67,8 +68,9 @@ function LandingContact({ className = '' }) {
             href={issuesUrl}
             target="_blank"
             rel="noopener noreferrer"
-            className="inline-flex min-h-12 items-center gap-2 rounded-full bg-brand px-6 text-[16px] font-semibold text-bg no-underline transition-transform duration-150 hover:scale-[1.03] active:scale-[0.98]"
+            className="inline-flex min-h-12 items-center gap-2 lent-button relative rounded-full px-6 text-[16px] no-underline"
           >
+            <SmoothSurface />
             <Icon icon="ph:github-logo" className="size-5" aria-hidden="true" />
             {copyText(copy.contact.cta)}
           </a>

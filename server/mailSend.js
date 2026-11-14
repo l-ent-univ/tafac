@@ -65,7 +65,7 @@ const ORIGIN_KINDS = { reply: 'r', replyAll: 'r', forward: 'w' }
 // the editor writes them (hex, or rgb() once a browser has reread them).
 const COLOR = /^(?:#[0-9a-f]{3,8}|rgba?\(\s*\d{1,3}\s*,\s*\d{1,3}\s*,\s*\d{1,3}\s*(?:,\s*(?:0|1|0?\.\d+)\s*)?\))$/i
 const FONT_SIZE = /^(?:10|13|16|18|24|32)px$/
-const FONT_FAMILY = /^(?:"?Inter Variable"?, system-ui, sans-serif|Georgia, serif|ui-monospace, Menlo, monospace)$/
+const FONT_FAMILY = /^(?:"?(?:Collab Sans|Inter Variable)"?, system-ui, sans-serif|Georgia, serif|ui-monospace, Menlo, monospace)$/
 const INDENT = /^(?:32|64|96|128|160|192)px$/
 const SPAN_STYLES = { color: [COLOR], 'background-color': [COLOR], 'font-size': [FONT_SIZE], 'font-family': [FONT_FAMILY] }
 const BLOCK_STYLES = { 'margin-left': [INDENT] }
@@ -184,7 +184,7 @@ export function selectInlineImages(cleanHtml, references = []) {
 
 // Mail clients read <style> blocks unevenly (Gmail drops some, Outlook
 // most): every rule the editor's look needs sits on its element. The text's
-// default look is the wrapping div's; the editor's own font (Inter) isn't on
+// default look is the wrapping div's; the editor's own font (Collab Sans) isn't on
 // the reader's machine, the system's sans-serif stands in for it.
 const DEFAULT_FONT = "-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif"
 const TEXT_COLOR = '#1d1d1f'
@@ -211,7 +211,8 @@ function withStyle(base, own) {
 
 // The sanitized HTML (sanitizeComposerHtml) with its styles inline: an empty
 // paragraph (an empty line) keeps its height with a <br>; an indent
-// becomes the paragraph's left margin; the editor's Inter, the default font.
+// becomes the paragraph's left margin; the editor's Collab Sans (or Inter,
+// in a draft from before), the default font.
 // `images`: Map(cid → { src, width, height, alt }), the mail's inline
 // images (src: their cid: URL, or a data: URL for the demo's copy); an
 // image not in it goes.
@@ -242,7 +243,7 @@ export function inlineComposerStyles(cleanHtml, { images = new Map() } = {}) {
         if (tagName === 'table') return { tagName, attribs: { cellpadding: '0', cellspacing: '0', style: ELEMENT_STYLES.table } }
         const base = ELEMENT_STYLES[tagName]
         if (tagName === 'span' && attribs.style) {
-          return { tagName, attribs: { style: attribs.style.replace(/font-family:\s*"?Inter Variable"?, system-ui, sans-serif/, `font-family:${DEFAULT_FONT}`) } }
+          return { tagName, attribs: { style: attribs.style.replace(/font-family:\s*"?(?:Collab Sans|Inter Variable)"?, system-ui, sans-serif/, `font-family:${DEFAULT_FONT}`) } }
         }
         // A dark text on the highlight, whatever the client: its light
         // backgrounds stay as written, while a dark-mode client lightens

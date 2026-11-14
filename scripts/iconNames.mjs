@@ -23,7 +23,9 @@ async function listFiles(dir) {
   const entries = await readdir(dir, { withFileTypes: true })
   const files = await Promise.all(entries.map((entry) => {
     const full = path.join(dir, entry.name)
-    if (entry.isDirectory()) return listFiles(full)
+    // src/dev: dev-only pages (the design gallery), never built: their
+    // icons load from Iconify in dev rather than weigh on the bundle.
+    if (entry.isDirectory()) return entry.name === 'dev' && path.basename(dir) === 'src' ? [] : listFiles(full)
     return SCANNED_FILE.test(entry.name) && entry.name !== 'iconBundle.json' ? [full] : []
   }))
   return files.flat()

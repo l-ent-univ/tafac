@@ -6,7 +6,7 @@ import { Icon } from '@iconify/react'
 function PageEmptyState({ icon, title, children = null, action = null }) {
   return (
     <div className="page-enter flex flex-col items-center justify-center gap-3 px-6 py-16 text-center max-md:py-12" role="status">
-      <span className="inline-flex size-14 items-center justify-center rounded-full bg-brand-subtle text-text" aria-hidden="true">
+      <span className="glass-solid inline-flex size-14 items-center justify-center rounded-full text-text" aria-hidden="true">
         <Icon icon={icon} className="size-[26px]" />
       </span>
       <p className="m-0 font-body text-[17px] font-semibold leading-[1.2] text-text">{title}</p>

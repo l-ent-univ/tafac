@@ -24,7 +24,7 @@ function AppHeader({ authenticated, checking, establishment = null, showUniversi
 
               <button
                 type="button"
-                className="header-logout-btn inline-flex items-center justify-center gap-2 px-3 py-[10px] border border-white dark:border-[rgba(255,255,255,0.08)] rounded-full bg-widget-bg text-text-secondary text-[0.9rem] font-medium leading-[1.06] whitespace-nowrap cursor-pointer transition-[background-color,opacity] duration-120 ease-in-out hover:not-disabled:bg-bg-subtle disabled:opacity-40 disabled:cursor-wait max-md:w-[42px] max-md:min-w-[42px] max-md:h-[42px] max-md:p-0 max-md:justify-center max-md:gap-0 max-md:text-text"
+                className="glass-solid header-logout-btn inline-flex items-center justify-center gap-2 px-3 py-[10px] border rounded-full text-text-secondary text-[0.9rem] font-medium leading-[1.06] whitespace-nowrap cursor-pointer transition-[background-color,opacity] duration-120 ease-in-out hover:not-disabled: disabled:opacity-40 disabled:cursor-wait max-md:w-[42px] max-md:min-w-[42px] max-md:h-[42px] max-md:p-0 max-md:justify-center max-md:gap-0 max-md:text-text"
                 onClick={onPrimaryAction}
                 disabled={checking}
                 aria-label={actionLabel}
@@ -35,7 +35,7 @@ function AppHeader({ authenticated, checking, establishment = null, showUniversi
 
               <button
                 type="button"
-                className="header-account-btn inline-flex items-center justify-center gap-2 px-3 py-[10px] border border-white dark:border-[rgba(255,255,255,0.08)] rounded-full bg-widget-bg text-text text-[0.9rem] font-semibold leading-[1.06] whitespace-nowrap cursor-pointer transition-[background-color,opacity] duration-120 ease-in-out hover:not-disabled:bg-bg-subtle disabled:opacity-40 disabled:cursor-wait max-md:w-[42px] max-md:min-w-[42px] max-md:h-[42px] max-md:p-0 max-md:justify-center max-md:gap-0"
+                className="glass-solid header-account-btn inline-flex items-center justify-center gap-2 px-3 py-[10px] border rounded-full text-text text-[0.9rem] font-semibold leading-[1.06] whitespace-nowrap cursor-pointer transition-[background-color,opacity] duration-120 ease-in-out hover:not-disabled: disabled:opacity-40 disabled:cursor-wait max-md:w-[42px] max-md:min-w-[42px] max-md:h-[42px] max-md:p-0 max-md:justify-center max-md:gap-0"
                 onClick={onAccountAction}
                 disabled={checking}
                 aria-label="Mon compte"

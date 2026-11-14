@@ -21,6 +21,9 @@ export default {
 
   auth: {
     portalEntryPath,
+    // The CAS asks students who turned it on for a second factor (Esup
+    // OTP): the login form then takes its one-time code.
+    mfa: 'esup-otp',
   },
 
   moodle: {

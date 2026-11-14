@@ -15,7 +15,7 @@ function UeLink({ code, color, onClick = null, label, title, children }) {
     <Tag
       {...(onClick ? { type: 'button', onClick, 'aria-label': label } : {})}
       title={title}
-      className={`ue-also-link inline-flex max-w-full min-w-0 items-center gap-[7px] rounded-full border border-border bg-widget-bg p-[3px] text-text ${onClick ? 'pr-[9px] cursor-pointer' : 'pr-[10px]'}`}
+      className={`glass-solid ue-also-link inline-flex max-w-full min-w-0 items-center gap-[7px] rounded-full border p-[3px] text-text ${onClick ? 'pr-[9px] cursor-pointer' : 'pr-[10px]'}`}
     >
       <span
         className="ue-also-tag shrink-0 rounded-full px-[9px] py-[5px] font-display text-[12px] font-semibold leading-none tracking-[0.2px]"
