@@ -69,7 +69,8 @@ import { WALLPAPER_FOLDERS, effectiveWallpaperChoice, wallpaperChoiceAnalyticsVa
 import { useWallpaperTint } from './useWallpaperTint'
 import { getStoredPalette, getStoredTheme, persistPalette, persistTheme, watchTheme } from './theme'
 import MobileTabBar from './components/MobileTabBar'
-import { buildNavItems, getMobileTabItems } from './navItems'
+import { buildNavItems, getMobileTabItems, MOODLE_HREF } from './navItems'
+import MoodlePage from './components/MoodlePage'
 import { getHomeWidgets } from './dashboardWidgets'
 import { bindHistorySession, readHistoryNav, writeHistoryNav } from './appHistory'
 import { forgetShapes } from 'skullet'
@@ -1979,7 +1980,12 @@ function App() {
   )
   // « Accueil » (HomeDraftPage), every university: the page shown when no
   // other is.
-  const isHomePage = !isGradesPage && !isPlanningPage && !isMailPage && !isAssiduityPage
+  // « Moodle » in the desktop app (MoodlePage): Moodle in the window.
+  const isMoodlePage = useMemo(
+    () => activePage === 'moodle' && getMobileTabItems(establishment, { gradesSupported }).some((item) => item.page === 'moodle'),
+    [activePage, establishment, gradesSupported],
+  )
+  const isHomePage = !isGradesPage && !isPlanningPage && !isMailPage && !isAssiduityPage && !isMoodlePage
   // The « Accueil » band's tint (--page-top-band, overrides.css): the
   // wallpaper's main colour when it shows one, else the brand's.
   const homeBandTint = useWallpaperTint(isHomePage && showWallpaper ? heroImage.src : null)
@@ -1988,7 +1994,7 @@ function App() {
   const isSidePanelOpen = (isMailPage && mailReaderOpen) || (isPlanningPage && planningSidePanelOpen)
   const isSidebarAutoCompact = isSidePanelOpen && !sidebarCompact && !sidebarAutoCompactDismissed
   // The page the sidebar and the tab bar show as selected.
-  const shownPage = isGradesPage ? 'grades' : isPlanningPage ? 'planning' : isMailPage ? 'mail' : isAssiduityPage ? 'assiduity' : 'home'
+  const shownPage = isGradesPage ? 'grades' : isPlanningPage ? 'planning' : isMailPage ? 'mail' : isAssiduityPage ? 'assiduity' : isMoodlePage ? 'moodle' : 'home'
   // Being on « Mes notes » is having seen its launch, however the student
   // got there (tab, card, "Dernière note", app list, a reload on the page):
   // the dashboard card and the tab's « Nouveau » go. After the audience
@@ -3088,6 +3094,7 @@ function App() {
                 <AssiduityPage arrivalSource={assiduityArrivalSource} onComposeMail={hasMailPage ? handleComposeMail : null} absenceReasons={universityConfig.establishments?.byId?.[establishment]?.absenceReasons} findsClassTeacher={hasPlanningPage} />
               </div>
             ) : null}
+            {isMoodlePage ? <MoodlePage launchHref={MOODLE_HREF} /> : null}
             {isMailPage ? (
               <div className="page-enter flex-1 min-h-0 4xl:flex-none 4xl:min-h-0">
                 <MailPage onReaderOpenChange={handleMailReaderOpenChange} onSignInAgain={() => void handleSignInAgain()} sender={mailSender} composeRequest={pendingMailCompose} onComposeRequestHandled={clearPendingMailCompose} arrivalSource={mailArrivalSource} canAttachGrades={hasGradesPage} planning={mailPlanning} />

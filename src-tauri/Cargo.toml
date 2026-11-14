@@ -10,7 +10,8 @@ publish = false
 tauri-build = { version = "2", features = [] }
 
 [dependencies]
-tauri = { version = "2", features = ["macos-private-api"] }
+# unstable: a second web view in the window (src/moodle.rs, Window::add_child).
+tauri = { version = "2", features = ["macos-private-api", "unstable"] }
 tokio = { version = "1", features = ["net", "time", "io-util", "sync"] }
 hyper = { version = "1", features = ["client", "http1"] }
 hyper-util = { version = "0.1", features = ["tokio"] }

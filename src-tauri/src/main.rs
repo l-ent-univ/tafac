@@ -10,6 +10,7 @@ mod jar;
 mod links;
 #[cfg(target_os = "macos")]
 mod menu;
+mod moodle;
 mod passwords;
 mod secret;
 mod sidecar;

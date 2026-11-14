@@ -19,6 +19,13 @@
 //   POST /__desktop/update/install the update now, then the app again: 204
 //   POST /__desktop/update/check   checks now (Réglages › Mises à jour): 200
 //                                  { kind, version }, the menu's note
+//   POST /__desktop/moodle/show    { launch, x, y, width, height }: Moodle's
+//                                  web view over the page's slot (moodle.rs),
+//                                  made the first time: 204, or 400
+//   POST /__desktop/moodle/bounds  { x, y, width, height }: the slot moved: 204
+//   POST /__desktop/moodle/hide    the page left « Moodle » or covers it: 204
+//   POST /__desktop/moodle/command { command: back | forward | reload | home |
+//                                  browser, home? }: the page's toolbar: 204
 
 use serde::{Deserialize, Serialize};
 use tauri::AppHandle;
@@ -79,6 +86,32 @@ pub async fn handle(app: &AppHandle, window_label: &str, request: http::Request<
             .header("cache-control", "no-store")
             .body(serde_json::to_vec(&crate::updater::check_from_page(app).await).unwrap_or_default())
             .unwrap(),
+        "/__desktop/moodle/show" => match serde_json::from_slice::<crate::moodle::ShowBody>(request.body()) {
+            Ok(body) => match crate::moodle::show(app, window_label, body).await {
+                Ok(()) => status(204),
+                Err(error) => {
+                    eprintln!("[tafac] Moodle view: {error}");
+                    status(400)
+                }
+            },
+            Err(_) => status(400),
+        },
+        "/__desktop/moodle/bounds" => {
+            if let Ok(bounds) = serde_json::from_slice::<crate::moodle::Bounds>(request.body()) {
+                crate::moodle::bounds(app, bounds);
+            }
+            status(204)
+        }
+        "/__desktop/moodle/hide" => {
+            crate::moodle::hide(app);
+            status(204)
+        }
+        "/__desktop/moodle/command" => {
+            if let Ok(body) = serde_json::from_slice::<crate::moodle::CommandBody>(request.body()) {
+                crate::moodle::command(app, body);
+            }
+            status(204)
+        }
         "/__desktop/update/install" => {
             crate::updater::install(app);
             status(204)

@@ -1,6 +1,7 @@
 import universityConfig from '@university'
 import { track } from './analytics'
 import { ENT_AUTH_PREFIX } from './entApi'
+import { isDesktopApp } from './desktopApp'
 import {
   GRADES_FEATURE_DISABLED,
   GRADES_FEATURE_ENABLED,
@@ -11,7 +12,7 @@ import {
 // Main navigation, shared by the desktop sidebar and the mobile tab bar.
 
 const MOODLE_ORIGIN = universityConfig.origins?.moodle ?? null
-const MOODLE_HREF = universityConfig.features?.moodle && MOODLE_ORIGIN
+export const MOODLE_HREF = universityConfig.features?.moodle && MOODLE_ORIGIN
   ? `${ENT_AUTH_PREFIX}/launch?url=${encodeURIComponent(`${MOODLE_ORIGIN.replace(/\/$/, '')}/my/`)}`
   : null
 // Without the in-app mail page (mail.page: false in client.js), « Messagerie »
@@ -72,8 +73,12 @@ export function buildNavItems(establishment, { gradesSupported = true } = {}) {
     ...(gradesNavItem?.page === 'grades'
       ? [{ id: 'assiduity', label: 'Assiduité', icon: 'ph:user-check', iconActive: 'ph:user-check-fill', page: 'assiduity' }]
       : []),
+    // Moodle: in the desktop app, a page of its own (MoodlePage, Moodle in
+    // the window); elsewhere, a new tab signed in through the launch relay.
     ...(MOODLE_HREF
-      ? [{ id: 'moodle', label: 'Moodle', icon: 'devicon-plain:moodle', href: MOODLE_HREF, target: '_blank' }]
+      ? [isDesktopApp()
+        ? { id: 'moodle', label: 'Moodle', icon: 'devicon-plain:moodle', page: 'moodle' }
+        : { id: 'moodle', label: 'Moodle', icon: 'devicon-plain:moodle', href: MOODLE_HREF, target: '_blank' }]
       : []),
   ]
 }

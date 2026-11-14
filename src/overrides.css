@@ -10631,3 +10631,12 @@ div:has(> .justify-ticket) {
     opacity: 0.85;
   }
 }
+
+/* « Moodle » in the desktop app (src/components/MoodlePage.jsx): the page
+   beside the sidebar, the whole height; Moodle's own web view lies over
+   its slot (src-tauri/src/moodle.rs). */
+.moodle-page {
+  left: calc(var(--sidebar-width, 280px) + 12px);
+  z-index: 1;
+  background: var(--color-bg);
+}
