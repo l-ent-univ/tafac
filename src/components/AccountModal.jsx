@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { Icon } from '@iconify/react'
 import universityConfig from '@university'
 import { openChangelog, useChangelog } from '../changelogStore'
@@ -19,6 +19,8 @@ import SegmentedControl from './SegmentedControl'
 import { r } from '../register.js'
 import { PALETTES } from '../theme'
 import PalettePicker from './PalettePicker'
+import WallpaperSwitchGlow from './WallpaperSwitchGlow'
+import { SIDEBAR_NEXT_CLASS_ENABLED, setSidebarNextClassShown, useSidebarNextClassShown } from '../sidebarNextClassPref'
 
 // Also the debug menu's toggles (src/components/debug/).
 export { Switch }
@@ -59,6 +61,21 @@ function SwitchRow({ icon, label, description, checked, onChange }) {
       <RowText icon={icon} label={label} description={description} />
       <Switch checked={checked} onChange={onChange} />
     </label>
+  )
+}
+
+// « Prochain cours » in the sidebar (SidebarNextClass), on or off: the same
+// choice as its right-click « Masquer ».
+function SidebarNextClassRow() {
+  const shown = useSidebarNextClassShown()
+  return (
+    <SwitchRow
+      icon="ph:calendar-blank"
+      label="Prochain cours"
+      description="Dans la barre latérale, quand elle a la place"
+      checked={shown}
+      onChange={setSidebarNextClassShown}
+    />
   )
 }
 
@@ -282,6 +299,10 @@ function PaletteSetting({ value, onChange }) {
   )
 }
 
+// « Descriptions des applications » (Apparence), hidden for now: a student
+// who switched it on keeps the descriptions.
+const SHOW_APP_DESCRIPTIONS_SETTING = false
+
 const LOGO_SOURCE_CHOICES = [
   { id: 'establishment', label: 'Composante' },
   { id: 'university', label: 'Université' },
@@ -333,8 +354,6 @@ function LogoSetting({ shown, onShownChange, establishmentLabel, source, onSourc
   )
 }
 
-// Dashboard background: large preview, an on/off switch, and (when on) pick
-// an image or go back to the default photo.
 // The account card: the photo (the student's own, kept on this device, or
 // the ENT's), the name and address. With `onChange`, the badge on the photo
 // is the only control: a camera picks a photo, then a bin removes it and
@@ -415,12 +434,159 @@ function ProfileCard({ photoSrc, displayInfo, hasCustom, onChange, onReset }) {
   )
 }
 
-function WallpaperSetting({ previewSrc, hasCustom, enabled, onEnabledChange, onChange, onReset }) {
+// Fond d'écran, a gallery: the preview of what shows and its switch, then
+// one row of tiles per collection, any tile picked in one tap. A folder's
+// first tile is its photo of the day (« Chaque jour »), then its photos one
+// by one; « Mes images » holds the student's own image and the tile that
+// adds one. Switched off, the gallery folds away.
+const WALLPAPER_GRID_CLASSES = 'grid grid-cols-[repeat(auto-fill,minmax(84px,1fr))] gap-2'
+
+function WallpaperTileImage({ image }) {
+  return (
+    <img
+      src={image.src}
+      alt=""
+      loading="lazy"
+      decoding="async"
+      draggable="false"
+      className="absolute inset-0 h-full w-full object-cover"
+      style={image.position ? { objectPosition: image.position } : undefined}
+    />
+  )
+}
+
+function WallpaperTile({ selected, label, onSelect, children }) {
+  return (
+    <button
+      type="button"
+      role="radio"
+      aria-checked={selected}
+      aria-label={label}
+      title={label}
+      onClick={() => { if (!selected) onSelect() }}
+      className={`wallpaper-tile relative block aspect-[16/10] w-full overflow-hidden corners-[10px] border-0 bg-[var(--color-bg-muted)] p-0 cursor-pointer outline-2 ${selected ? 'outline outline-[var(--color-brand)]' : 'outline-transparent hover:brightness-[0.92]'}`}
+    >
+      {children}
+      {selected ? (
+        <span className="wallpaper-tile-check lent-button lent-button--tag absolute right-[5px] top-[5px] flex h-[18px] w-[18px] items-center justify-center rounded-full" aria-hidden="true">
+          <Icon icon="ph:check-bold" className="h-[10px] w-[10px]" />
+        </span>
+      ) : null}
+    </button>
+  )
+}
+
+function WallpaperCollection({ title, meta = null, children }) {
+  return (
+    <div className="flex flex-col gap-[9px]">
+      <div className="flex items-baseline justify-between gap-2 px-[2px]">
+        <h5 className="m-0 truncate font-body text-[14px] font-semibold leading-[1.2] text-[var(--color-text)]">{title}</h5>
+        {meta ? <span className="shrink-0 font-body text-[12px] font-medium leading-none text-text-50">{meta}</span> : null}
+      </div>
+      <div className={WALLPAPER_GRID_CLASSES}>{children}</div>
+    </div>
+  )
+}
+
+// What the preview's caption says: the folder and how it changes, or
+// « Mon image ».
+function describeWallpaper(choice, folders) {
+  if (choice?.folder === 'custom') return { icon: 'ph:image-bold', text: 'Mon image' }
+  const folder = folders.find((entry) => entry.id === choice?.folder)
+  if (!folder) return null
+  return choice.image
+    ? { icon: 'ph:push-pin-bold', text: folder.label }
+    : { icon: 'ph:shuffle-bold', text: folder.label }
+}
+
+// The caption's words at their own width, never cut: the tag only shows
+// more or less of them as it eases to its size.
+function WallpaperCaptionContent({ caption, className = '' }) {
+  return (
+    <span className={`inline-flex shrink-0 items-center gap-[5px] whitespace-nowrap p-[6px] ${className}`}>
+      <Icon icon={caption.icon} className="h-[12px] w-[12px] shrink-0" />
+      <span>{caption.text}</span>
+    </span>
+  )
+}
+
+// The preview's caption, on the photo: the glass material, darkened for its
+// white text, the same padding all round. Another wallpaper picked: the
+// tag eases to its new width (measured on a hidden copy), the old words
+// leaving upwards as the new ones rise in (.wallpaper-caption in
+// overrides.css). Laid out at once the first time.
+function WallpaperCaption({ caption }) {
+  const tagRef = useRef(null)
+  const measureRef = useRef(null)
+  const key = `${caption.icon}|${caption.text}`
+  const shownRef = useRef({ key, caption })
+  const [width, setWidth] = useState(null)
+  const [settled, setSettled] = useState(false)
+  const [leaving, setLeaving] = useState(null)
+
+  useLayoutEffect(() => {
+    const tag = tagRef.current
+    const content = measureRef.current
+    if (!tag || !content) return
+    // Its stroke too (the tag's width is its border box), rounded up: a
+    // fraction short would clip the last letter.
+    setWidth(Math.ceil(content.getBoundingClientRect().width + (tag.offsetWidth - tag.clientWidth)))
+    if (shownRef.current.key !== key) {
+      setLeaving(shownRef.current)
+      shownRef.current = { key, caption }
+    }
+  }, [key, caption])
+
+  // Laid out, then free to move.
+  useEffect(() => {
+    if (width === null || settled) return undefined
+    const frame = requestAnimationFrame(() => setSettled(true))
+    return () => cancelAnimationFrame(frame)
+  }, [width, settled])
+
+  // The old words, gone once they've left.
+  useEffect(() => {
+    if (!leaving) return undefined
+    const timer = window.setTimeout(() => setLeaving(null), 240)
+    return () => window.clearTimeout(timer)
+  }, [leaving])
+
+  return (
+    <span
+      ref={tagRef}
+      className="glass wallpaper-caption absolute bottom-2 left-2 inline-flex max-w-[calc(100%-16px)] overflow-hidden rounded-full font-body text-[12px] font-semibold leading-none text-white [--glass-fill:rgb(20_20_20/0.32)]"
+      style={width === null ? undefined : { width }}
+      data-settled={settled || undefined}
+    >
+      <span ref={measureRef} className="invisible absolute top-0 left-0 inline-flex items-center gap-[5px] whitespace-nowrap p-[6px]" aria-hidden="true">
+        <Icon icon={caption.icon} className="h-[12px] w-[12px] shrink-0" />
+        <span>{caption.text}</span>
+      </span>
+      {leaving ? <WallpaperCaptionContent key={`out-${leaving.key}`} caption={leaving.caption} className="wallpaper-caption-out absolute top-0 left-0" /> : null}
+      <WallpaperCaptionContent key={key} caption={caption} className={settled ? 'wallpaper-caption-in' : ''} />
+    </span>
+  )
+}
+
+function WallpaperSetting({
+  previewSrc,
+  previewPosition = null,
+  enabled,
+  onEnabledChange,
+  folders = [],
+  choice = null,
+  onChoiceChange = null,
+  customSrc = null,
+  onCustomAdd = null,
+  onCustomRemove = null,
+}) {
   const inputRef = useRef(null)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const canToggle = typeof onEnabledChange === 'function'
-  const canPick = typeof onChange === 'function'
+  const canChoose = typeof onChoiceChange === 'function' && folders.length > 0
+  const canAdd = typeof onCustomAdd === 'function'
+  const caption = describeWallpaper(choice, folders)
 
   const handleFile = async (event) => {
     const file = event.target.files?.[0]
@@ -430,7 +596,7 @@ function WallpaperSetting({ previewSrc, hasCustom, enabled, onEnabledChange, onC
     setBusy(true)
     setError('')
     try {
-      await onChange(file)
+      await onCustomAdd(file)
     } catch (changeError) {
       setError(changeError instanceof Error ? changeError.message : String(changeError))
     } finally {
@@ -438,54 +604,125 @@ function WallpaperSetting({ previewSrc, hasCustom, enabled, onEnabledChange, onC
     }
   }
 
+  const pick = (next) => {
+    setError('')
+    onChoiceChange(next)
+  }
+
   return (
     <SettingsGroup
       title="Fond d’écran"
-      footer={canPick ? r('Ton image reste sur cet appareil, elle n’est envoyée nulle part.', 'Votre image reste sur cet appareil, elle n’est envoyée nulle part.') : null}
+      footer={canAdd && enabled ? r('Ton image reste sur cet appareil, elle n’est envoyée nulle part', 'Votre image reste sur cet appareil, elle n’est envoyée nulle part') : null}
     >
-      {previewSrc ? (
-        <div className="p-2">
-          <div
-            className={`relative aspect-[16/6] w-full corners-[14px] bg-cover bg-center transition-[opacity,filter] duration-200 ${enabled ? '' : 'opacity-35 grayscale'}`}
-            style={{ backgroundImage: `url("${previewSrc}")` }}
-            aria-hidden="true"
-          >
-            {hasCustom && enabled ? (
-              <span className="absolute left-2 top-2 rounded-full bg-black/45 px-[9px] py-[4px] font-body text-[12px] font-semibold leading-none text-white backdrop-blur-sm">
-                Image personnalisée
-              </span>
-            ) : null}
+      <div>
+        {previewSrc ? (
+          <div className="p-2 pb-0">
+            <div
+              className={`relative aspect-[16/6] w-full corners-[14px] bg-cover bg-center transition-[opacity,filter] duration-200 ${enabled ? '' : 'opacity-35 grayscale'}`}
+              style={{ backgroundImage: `url("${previewSrc}")`, ...(previewPosition ? { backgroundPosition: previewPosition } : null) }}
+              aria-hidden="true"
+            >
+              {/* Another wallpaper picked: a glow from the old photo to the
+                  new one, under the caption. */}
+              <WallpaperSwitchGlow src={previewSrc} position={previewPosition} enabled={enabled} />
+              {enabled && caption ? <WallpaperCaption caption={caption} /> : null}
+            </div>
+          </div>
+        ) : null}
+        {canToggle ? (
+          <SwitchRow
+            label="Afficher le fond d’écran"
+            checked={enabled}
+            onChange={onEnabledChange}
+          />
+        ) : null}
+      {canChoose ? (
+        <div
+          className={`grid transition-[grid-template-rows] duration-300 ease-[cubic-bezier(0.2,0.8,0.2,1)] motion-reduce:transition-none ${enabled ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]'}`}
+          inert={!enabled}
+        >
+          <div className="min-h-0 overflow-hidden">
+            <div role="radiogroup" aria-label="Fond d’écran" className="flex flex-col gap-[18px] border-t border-[var(--color-border)] px-4 pb-4 pt-[14px]">
+              {folders.map((folder) => (
+                <WallpaperCollection
+                  key={folder.id}
+                  title={folder.label}
+                  meta={folder.images.length > 1 ? `${folder.images.length} photos` : null}
+                >
+                  {folder.images.length > 1 ? (
+                    <WallpaperTile
+                      selected={choice?.folder === folder.id && !choice.image}
+                      label={`${folder.label}, une photo différente chaque jour`}
+                      onSelect={() => pick({ folder: folder.id, image: null })}
+                    >
+                      {/* Today's photo, blurred: a way of choosing, not one
+                          more photo. */}
+                      <span className="absolute inset-[-8px] blur-[6px]" aria-hidden="true">
+                        <WallpaperTileImage image={folder.today} />
+                      </span>
+                      <span className="absolute inset-0 bg-black/35" aria-hidden="true" />
+                      <span className="absolute inset-0 flex flex-col items-center justify-center gap-[5px] font-body text-[11px] font-semibold leading-none whitespace-nowrap text-white" aria-hidden="true">
+                        <Icon icon="ph:shuffle-bold" className="h-[17px] w-[17px]" />
+                        Chaque jour
+                      </span>
+                    </WallpaperTile>
+                  ) : null}
+                  {folder.images.map((image, index) => (
+                    <WallpaperTile
+                      key={image.src}
+                      selected={choice?.folder === folder.id && (choice.image === image.src || (folder.images.length === 1 && !choice.image))}
+                      label={`${folder.label}, photo ${index + 1}${image.credit?.author ? ` de ${image.credit.author}` : ''}`}
+                      onSelect={() => pick({ folder: folder.id, image: folder.images.length > 1 ? image.src : null })}
+                    >
+                      <WallpaperTileImage image={image} />
+                    </WallpaperTile>
+                  ))}
+                </WallpaperCollection>
+              ))}
+              {canAdd ? (
+                <WallpaperCollection title="Mes images">
+                  {customSrc ? (
+                    <div className="relative">
+                      <WallpaperTile
+                        selected={choice?.folder === 'custom'}
+                        label="Mon image"
+                        onSelect={() => pick({ folder: 'custom', image: null })}
+                      >
+                        <WallpaperTileImage image={{ src: customSrc }} />
+                      </WallpaperTile>
+                      <button
+                        type="button"
+                        onClick={() => { setError(''); onCustomRemove() }}
+                        disabled={busy}
+                        aria-label="Retirer mon image"
+                        title="Retirer mon image"
+                        className="absolute left-[5px] top-[5px] flex h-[22px] w-[22px] cursor-pointer items-center justify-center rounded-full border-0 bg-black/55 p-0 text-white backdrop-blur-sm transition-colors hover:bg-black/75"
+                      >
+                        <Icon icon="ph:x-bold" className="h-[11px] w-[11px]" aria-hidden="true" />
+                      </button>
+                    </div>
+                  ) : null}
+                  <button
+                    type="button"
+                    onClick={() => inputRef.current?.click()}
+                    disabled={busy}
+                    className="flex aspect-[16/10] w-full cursor-pointer flex-col items-center justify-center gap-1 corners-[10px] engraved status-tag--dashed engraved-slot border-0 p-0 font-body text-[12px] font-semibold leading-none text-text-60 transition-colors hover:text-[var(--color-text)] disabled:cursor-wait disabled:opacity-60"
+                  >
+                    <Icon icon={busy ? 'ph:circle-notch-bold' : 'ph:plus-bold'} className={`h-[14px] w-[14px] ${busy ? 'animate-spin' : ''}`} aria-hidden="true" />
+                    {/* The font on a span: index.css gives buttons `font: inherit`, outside Tailwind's layers. */}
+                    <span className="font-body text-[12px] font-semibold leading-none">{customSrc ? 'Remplacer' : 'Ajouter'}</span>
+                  </button>
+                  <input ref={inputRef} type="file" accept="image/*" className="hidden" onChange={handleFile} />
+                </WallpaperCollection>
+              ) : null}
+              {error ? (
+                <p className="m-0 font-body text-[13px] font-semibold leading-[1.2] text-[#b91c1c] dark:text-[var(--color-error)]" role="alert">{error}</p>
+              ) : null}
+            </div>
           </div>
         </div>
       ) : null}
-      {canToggle ? (
-        <SwitchRow
-          label="Afficher le fond d’écran"
-          description="Photo en haut de l’accueil"
-          checked={enabled}
-          onChange={onEnabledChange}
-        />
-      ) : null}
-      {canPick && enabled ? (
-        <div className="flex flex-col gap-2 px-4 py-3">
-          <div className="flex flex-wrap items-center gap-2">
-            <button type="button" className={SETTING_BUTTON_CLASSES} onClick={() => inputRef.current?.click()} disabled={busy}>
-              <Icon icon="ph:upload-simple" className="h-[15px] w-[15px] shrink-0" aria-hidden="true" />
-              {busy ? 'Enregistrement…' : hasCustom ? 'Changer d’image' : 'Choisir une image'}
-            </button>
-            {hasCustom ? (
-              <button type="button" className={SETTING_BUTTON_CLASSES} onClick={() => { setError(''); onReset() }} disabled={busy}>
-                <Icon icon="ph:arrow-counter-clockwise" className="h-[15px] w-[15px] shrink-0" aria-hidden="true" />
-                Photo par défaut
-              </button>
-            ) : null}
-            <input ref={inputRef} type="file" accept="image/*" className="hidden" onChange={handleFile} />
-          </div>
-          {error ? (
-            <p className="m-0 font-body text-[13px] font-semibold leading-[1.2] text-[#b91c1c] dark:text-[var(--color-error)]" role="alert">{error}</p>
-          ) : null}
-        </div>
-      ) : null}
+      </div>
     </SettingsGroup>
   )
 }
@@ -508,6 +745,13 @@ function AccountModal({
   backgroundPreviewSrc = null,
   showWallpaper = true,
   onShowWallpaperChange,
+  backgroundPreviewPosition = null,
+  // [{ id, label, images, today }]: the wallpaper's folders (src/heroImage.js);
+  // `wallpaperChoice` what shows (src/wallpaperChoice.js).
+  wallpaperFolders = [],
+  wallpaperChoice = null,
+  onWallpaperChoiceChange = null,
+  customBackgroundSrc = null,
   showUniversityLogo = true,
   onShowUniversityLogoChange = null,
   establishmentLogoLabel = null,
@@ -517,7 +761,6 @@ function AccountModal({
   onThemeChange,
   palette = PALETTES[0],
   onPaletteChange,
-  hasCustomBackground = false,
   onCustomBackgroundChange,
   onCustomBackgroundReset,
   hasCustomProfilePhoto = false,
@@ -599,13 +842,15 @@ function AccountModal({
   const hasPrivacy = typeof onAnonymousAnalyticsChange === 'function'
 
   const sections = [
-    { id: 'account', label: 'Compte', icon: 'ph:user-circle' },
-    { id: 'planning', label: 'Planning', icon: 'ph:calendar-blank' },
-    mailSignature ? { id: 'mail', label: 'Messagerie', icon: 'ph:envelope-simple' } : null,
-    canToggleWidgets ? { id: 'dashboard', label: 'Accueil', icon: 'ph:layout' } : null,
-    hasAppearance ? { id: 'appearance', label: 'Apparence', icon: 'ph:image' } : null,
-    hasPrivacy ? { id: 'privacy', label: 'Confidentialité', icon: 'ph:lock' } : null,
-    { id: 'about', label: 'À propos', icon: 'ph:info' },
+    // `iconActive`: the section shown, filled (named whole: the icon bundle
+    // only finds names written out).
+    { id: 'account', label: 'Compte', icon: 'ph:user-circle', iconActive: 'ph:user-circle-fill' },
+    { id: 'planning', label: 'Planning', icon: 'ph:calendar-blank', iconActive: 'ph:calendar-blank-fill' },
+    mailSignature ? { id: 'mail', label: 'Messagerie', icon: 'ph:envelope-simple', iconActive: 'ph:envelope-simple-fill' } : null,
+    canToggleWidgets ? { id: 'dashboard', label: 'Accueil', icon: 'ph:layout', iconActive: 'ph:layout-fill' } : null,
+    hasAppearance ? { id: 'appearance', label: 'Apparence', icon: 'ph:image', iconActive: 'ph:image-fill' } : null,
+    hasPrivacy ? { id: 'privacy', label: 'Confidentialité', icon: 'ph:lock', iconActive: 'ph:lock-fill' } : null,
+    { id: 'about', label: 'À propos', icon: 'ph:info', iconActive: 'ph:info-fill' },
   ].filter(Boolean)
   const activeSection = sections.find((section) => section.id === activeSectionId) ?? sections[0]
 
@@ -764,11 +1009,15 @@ function AccountModal({
             {typeof onCustomBackgroundChange === 'function' || typeof onShowWallpaperChange === 'function' ? (
               <WallpaperSetting
                 previewSrc={backgroundPreviewSrc}
-                hasCustom={hasCustomBackground}
+                previewPosition={backgroundPreviewPosition}
                 enabled={showWallpaper}
                 onEnabledChange={onShowWallpaperChange}
-                onChange={onCustomBackgroundChange}
-                onReset={onCustomBackgroundReset}
+                folders={wallpaperFolders}
+                choice={wallpaperChoice}
+                onChoiceChange={onWallpaperChoiceChange}
+                customSrc={customBackgroundSrc}
+                onCustomAdd={onCustomBackgroundChange}
+                onCustomRemove={onCustomBackgroundReset}
               />
             ) : null}
             {typeof onShowUniversityLogoChange === 'function' ? (
@@ -780,7 +1029,7 @@ function AccountModal({
                 onSourceChange={onLogoSourceChange}
               />
             ) : null}
-            {typeof onShowAppDescriptionsChange === 'function' ? (
+            {SHOW_APP_DESCRIPTIONS_SETTING && typeof onShowAppDescriptionsChange === 'function' ? (
               <SettingsGroup title="Applications">
                 <SwitchRow
                   icon="ph:text-align-left"
@@ -816,6 +1065,7 @@ function AccountModal({
                     checked={sidebarCompact}
                     onChange={(compact) => onSidebarCompactChange(compact)}
                   />
+                  {SIDEBAR_NEXT_CLASS_ENABLED ? <SidebarNextClassRow /> : null}
                 </SettingsGroup>
               </div>
             ) : null}
@@ -860,7 +1110,7 @@ function AccountModal({
       role="presentation"
     >
       <section
-        className="account-modal-card flex h-[600px] w-[min(780px,100%)] max-h-[calc(100vh-40px)] flex-col overflow-hidden modal-corners [--modal-inset:21px] [--modal-inner-radius:20px] max-sm:[--modal-inset:14px] border border-[var(--color-border)] bg-[var(--color-bg)] text-[var(--color-text)] animate-modal-card-in max-sm:h-[calc(100dvh-28px)] max-sm:max-h-none"
+        className="glass-solid glass--quiet modal-surface account-modal-card flex h-[600px] w-[min(780px,100%)] max-h-[calc(100vh-40px)] flex-col overflow-hidden modal-corners [--modal-inset:21px] [--modal-inner-radius:20px] max-sm:[--modal-inset:14px] border text-[var(--color-text)] animate-modal-card-in max-sm:h-[calc(100dvh-28px)] max-sm:max-h-none"
         role="dialog"
         aria-modal="true"
         aria-labelledby="account-modal-title"
@@ -879,7 +1129,7 @@ function AccountModal({
 
         <div className="flex min-h-0 flex-1 max-sm:flex-col">
           <nav
-            className="flex w-[208px] shrink-0 flex-col gap-1 overflow-y-auto px-[13px] pb-[21px] max-sm:w-auto max-sm:flex-row max-sm:overflow-x-auto max-sm:px-[14px] max-sm:pb-[10px] max-sm:[scrollbar-width:none]"
+            className="-mt-1 flex w-[208px] shrink-0 flex-col gap-1 overflow-y-auto px-[13px] pt-1 pb-[21px] max-sm:w-auto max-sm:flex-row max-sm:overflow-x-auto max-sm:px-[14px] max-sm:pb-[10px] max-sm:[scrollbar-width:none]"
             role="tablist"
             aria-orientation="vertical"
             aria-label="Sections des réglages"
@@ -898,14 +1148,18 @@ function AccountModal({
                   tabIndex={isActive ? 0 : -1}
                   onClick={() => selectSection(section.id)}
                   onKeyDown={handleTabKeyDown}
-                  className={`inline-flex h-10 w-full shrink-0 items-center gap-2 rounded-full border px-3 text-left font-body text-[15px] font-medium leading-6 whitespace-nowrap text-text cursor-pointer transition-[background-color,box-shadow,border-color] duration-150 ease-in-out max-sm:w-auto max-sm:h-9 max-sm:text-[14px] ${
-                    isActive
-                      ? 'bg-widget-bg border-white dark:border-[rgba(255,255,255,0.08)] shadow-[0_1px_3px_rgba(0,0,0,0.06)]'
-                      : 'bg-transparent border-transparent hover:bg-brand-subtle'
+                  className={`settings-tab inline-flex h-10 w-full shrink-0 items-center gap-2 rounded-full border px-3 text-left font-body text-[15px] leading-6 whitespace-nowrap text-text cursor-pointer max-sm:w-auto max-sm:h-9 max-sm:text-[14px] ${
+                    isActive ? 'glass-solid' : 'border-transparent bg-transparent'
                   }`}
                 >
-                  <Icon icon={section.icon} className="h-[17px] w-[17px] shrink-0" aria-hidden="true" />
-                  {section.label}
+                  {/* As the sidebar's selected row: filled icon, the label
+                      semibold, its two weights stacked and cross-fading
+                      (Collab Sans has no variable axis); read once. */}
+                  <Icon icon={isActive ? section.iconActive : section.icon} className="h-[17px] w-[17px] shrink-0" aria-hidden="true" />
+                  <span className="grid">
+                    <span className={`col-start-1 row-start-1 font-body font-medium transition-opacity duration-200 ease-out motion-reduce:transition-none ${isActive ? 'opacity-0' : 'opacity-100'}`} aria-hidden="true">{section.label}</span>
+                    <span className={`col-start-1 row-start-1 font-body font-semibold transition-opacity duration-200 ease-out motion-reduce:transition-none ${isActive ? 'opacity-100' : 'opacity-0'}`}>{section.label}</span>
+                  </span>
                 </button>
               )
             })}

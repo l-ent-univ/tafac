@@ -18,8 +18,8 @@ const MOODLE_HREF = universityConfig.features?.moodle && MOODLE_ORIGIN
 // is the "Mails récents" card's link: the server opens the webmail already
 // signed in (or falls back to its launch URL).
 const MAIL_ITEM = universityConfig.mail?.page === false
-  ? { id: 'mail', label: 'Messagerie', shortLabel: 'Mail', icon: 'ph:envelope-simple', href: `${ENT_AUTH_PREFIX}/mail/open`, target: '_blank' }
-  : { id: 'mail', label: 'Messagerie', shortLabel: 'Mail', icon: 'ph:envelope-simple', page: 'mail', announcedBy: 'messagerie' }
+  ? { id: 'mail', label: 'Messagerie', shortLabel: 'Mail', icon: 'ph:envelope-simple', iconActive: 'ph:envelope-simple-fill', href: `${ENT_AUTH_PREFIX}/mail/open`, target: '_blank' }
+  : { id: 'mail', label: 'Messagerie', shortLabel: 'Mail', icon: 'ph:envelope-simple', iconActive: 'ph:envelope-simple-fill', page: 'mail', announcedBy: 'messagerie' }
 
 // "Mes notes" follows the tri-state grades feature: the in-app grades page
 // when live, a greyed-out item with the unavailability notice when
@@ -27,7 +27,7 @@ const MAIL_ITEM = universityConfig.mail?.page === false
 // `announcedBy`: the « Nouveautés » entry that launched the page; the item
 // says « Nouveau » while this device hasn't seen it (changelogStore).
 function buildGradesNavItem() {
-  const base = { id: 'grades', label: 'Mes notes', icon: 'ph:chart-pie-slice' }
+  const base = { id: 'grades', label: 'Mes notes', icon: 'ph:chart-pie-slice', iconActive: 'ph:chart-pie-slice-fill' }
 
   if (GRADES_FEATURE_ENABLED) {
     return { ...base, page: 'grades', announcedBy: 'mes-notes' }
@@ -57,12 +57,12 @@ export function buildNavItems(establishment, { gradesSupported = true } = {}) {
     // « Accueil » (HomeDraftPage), every university: the home page, its
     // « Toutes les applications » drawer listing every app. The tab bar has
     // its own home tab (getMobileTabItems leaves this one out).
-    { id: 'home', label: 'Accueil', icon: 'ph:house', page: 'home' },
+    { id: 'home', label: 'Accueil', icon: 'ph:house', iconActive: 'ph:house-fill', page: 'home' },
     ...(gradesNavItem ? [gradesNavItem] : []),
     // The in-app planning page (PlanningPage), launched by its own
     // « Nouveautés » entry (`announcedBy`, as « Mes notes »).
     ...(universityConfig.features?.planning
-      ? [{ id: 'planning', label: 'Planning', icon: 'ph:calendar-blank', page: 'planning', announcedBy: 'planning' }]
+      ? [{ id: 'planning', label: 'Planning', icon: 'ph:calendar-blank', iconActive: 'ph:calendar-blank-fill', page: 'planning', announcedBy: 'planning' }]
       : []),
     // The in-app mail page (MailPage), or the webmail link (MAIL_ITEM).
     // shortLabel: the tab bar's narrower tabs.
@@ -70,7 +70,7 @@ export function buildNavItems(establishment, { gradesSupported = true } = {}) {
     // « Assiduité » (AssiduityPage): the absences of the ScoDoc relevé,
     // so on the same terms as the live « Mes notes » page.
     ...(gradesNavItem?.page === 'grades'
-      ? [{ id: 'assiduity', label: 'Assiduité', icon: 'ph:user-check', page: 'assiduity' }]
+      ? [{ id: 'assiduity', label: 'Assiduité', icon: 'ph:user-check', iconActive: 'ph:user-check-fill', page: 'assiduity' }]
       : []),
     ...(MOODLE_HREF
       ? [{ id: 'moodle', label: 'Moodle', icon: 'devicon-plain:moodle', href: MOODLE_HREF, target: '_blank' }]

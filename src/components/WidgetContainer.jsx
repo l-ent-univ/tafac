@@ -28,6 +28,7 @@ import {
   getWeatherForQuery,
 } from '../weatherApi'
 import { r } from '../register.js'
+import SmoothSurface from './SmoothSurface'
 
 const WEATHER_CITY_KEY = 'l-ent:weather-city'
 const WEATHER_CONFIG = universityConfig.features?.weather ?? {}
@@ -349,7 +350,7 @@ function WidgetContainer({
           role="presentation"
         >
           <div
-            className="weather-modal-card w-[min(440px,100%)] border border-border corners-[22px] bg-bg shadow-none p-5 text-text animate-modal-card-in max-md:corners-[20px] max-md:p-4"
+            className="glass-solid glass--quiet weather-modal-card w-[min(440px,100%)] border corners-[22px] p-5 text-text animate-modal-card-in max-md:corners-[20px] max-md:p-4"
             role="dialog"
             aria-modal="true"
             aria-label="Choisir le lieu de la météo"
@@ -365,7 +366,7 @@ function WidgetContainer({
                 <span className="text-sm font-semibold leading-none text-text font-body">Ville ou code postal</span>
                 <input
                   type="text"
-                  className="w-full min-h-[48px] border border-border-input corners-[53px] bg-bg-input text-text font-inherit text-base leading-none py-[13px] px-4 box-border placeholder:text-text-muted focus-visible:border-brand focus-visible:outline-none font-body"
+                  className="field w-full min-h-[48px] corners-[53px] text-text font-inherit text-base leading-none py-[13px] px-4 box-border placeholder:text-text-muted font-body"
                   value={locationQuery}
                   onChange={(event) => setLocationQuery(event.target.value)}
                   placeholder={`Ex: ${DEFAULT_WEATHER_CITY} ou 35000`}
@@ -376,17 +377,19 @@ function WidgetContainer({
               <div className="flex items-center gap-2 flex-wrap">
                 <button
                   type="submit"
-                  className="min-h-[42px] px-[18px] border-0 corners-[53px] bg-brand text-bg font-inherit text-[15px] font-semibold leading-none transition-[background-color,opacity] duration-[120ms] ease-in-out hover:not-disabled:bg-brand-hover disabled:opacity-60 disabled:cursor-wait"
+                  className="lent-button min-h-[42px] px-[18px] corners-[53px] font-inherit text-[15px] font-medium leading-none disabled:opacity-60 disabled:cursor-wait"
                   disabled={isLocationActionDisabled}
                 >
+                  <SmoothSurface />
                   Appliquer
                 </button>
                 <button
                   type="button"
-                  className="min-h-[42px] px-[18px] border border-border-input corners-[53px] bg-bg-input text-text font-inherit text-[15px] font-semibold leading-none transition-[background-color,opacity] duration-[120ms] ease-in-out hover:not-disabled:bg-bg-subtle disabled:opacity-60 disabled:cursor-wait"
+                  className="material min-h-[42px] px-[18px] corners-[53px] text-text font-inherit text-[15px] font-semibold leading-none disabled:opacity-60 disabled:cursor-wait"
                   onClick={() => void handleUseCurrentPosition()}
                   disabled={isLocationActionDisabled}
                 >
+                  <SmoothSurface />
                   Ma position
                 </button>
               </div>

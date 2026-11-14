@@ -16,6 +16,7 @@
   },
   "dependencies": {
     "@iconify/react": "^6.0.2",
+    "@lisse/core": "0.7.3",
     "@tailwindcss/vite": "^4.2.2",
     "@tiptap/extension-highlight": "3.32.0",
     "@tiptap/extension-text-style": "3.32.0",
@@ -30,6 +31,7 @@
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
     "sanitize-html": "^2.18.1",
+    "skullet": "0.0.3",
     "tailwindcss": "^4.2.2"
   },
   "devDependencies": {

@@ -9,11 +9,11 @@ import { assignSubjectIcons } from '../subjectIcons'
 import { useUeColor } from '../useUeColor'
 import MailAttachDrawer, { ATTACH_CARD_CLASS, AttachDrawerError, AttachDrawerNote } from './MailAttachDrawer'
 import { CARD_CLASSES, LatestGradeCardBody } from './LatestGradesList'
-import { SHIMMER_CLASSES } from './widgetListUtils'
+import { Skeleton } from 'skullet/react'
+import { SAMPLE_GRADE_CARDS } from '../skeletonSamples'
 
 // From this many grades, a search field over the list.
 const SEARCH_FROM = 7
-const SKELETON_CARDS = 6
 
 // The newest semester's relevé, as « Mes notes » reads it (getGrades: its
 // cache, else the server): its report and its absences (the teachers'
@@ -111,15 +111,18 @@ function MailGradePicker({ onPick, onClose }) {
   let body
   if (state.status === 'loading') {
     body = (
-      <ul className={grid} aria-label="Chargement des notes" aria-busy="true">
-        {Array.from({ length: SKELETON_CARDS }, (_, index) => (
-          <li key={index} className={`${CARD_CLASSES} cursor-default`}>
-            <span className={`h-3 w-[70%] rounded-full ${SHIMMER_CLASSES}`} />
-            <span className={`mt-1 h-3.5 ${index % 2 ? 'w-[55%]' : 'w-[80%]'} rounded-full ${SHIMMER_CLASSES}`} />
-            <span className={`mt-3 h-[34px] w-[72px] rounded-full ${SHIMMER_CLASSES}`} />
-          </li>
-        ))}
-      </ul>
+      // Measured from sample grades drawn as real cards (skullet).
+      <Skeleton loading label="Chargement des notes">
+        <ul className={grid}>
+          {SAMPLE_GRADE_CARDS.map((card) => (
+            <li key={card.id} className="flex min-w-0">
+              <div className={`${ATTACH_CARD_CLASS} ${CARD_CLASSES} cursor-default`}>
+                <LatestGradeCardBody moduleTitle={card.moduleTitle} moduleCode={card.moduleCode} day="14 oct." title={card.title} value={card.value} scale="/20" icon={null} wash={null} typeLabel={null} />
+              </div>
+            </li>
+          ))}
+        </ul>
+      </Skeleton>
     )
   } else if (state.status === 'error') {
     body = <AttachDrawerError text={state.error} onRetry={retry} />

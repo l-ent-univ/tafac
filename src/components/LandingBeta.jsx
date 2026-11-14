@@ -21,7 +21,7 @@ function LandingBeta({ className = '' }) {
       <div
         ref={ref}
         data-revealed={isRevealed || undefined}
-        className="landing-contact flex w-full max-w-[860px] items-center gap-12 corners-[32px] border border-white bg-white px-12 py-10 shadow-[0_1px_3px_rgb(52_18_0/0.06),0_10px_28px_-14px_rgb(52_18_0/0.16)] dark:border-white/10 dark:bg-[#1c1c1c] max-md:flex-col max-md:gap-8 max-md:corners-[28px] max-md:px-5 max-md:py-8 max-md:text-center"
+        className="landing-contact flex w-full max-w-[860px] glass-solid glass--quiet border items-center gap-12 corners-[32px] px-12 py-10 max-md:flex-col max-md:gap-8 max-md:corners-[28px] max-md:px-5 max-md:py-8 max-md:text-center"
       >
         <figure className="m-0 w-[210px] shrink-0 -rotate-6 corners-[14px] bg-white p-2.5 pb-0 shadow-[0_2px_6px_rgb(52_18_0/0.1),0_18px_36px_-14px_rgb(52_18_0/0.35)] max-md:w-[180px]">
           <img

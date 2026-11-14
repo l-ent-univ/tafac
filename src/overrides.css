@@ -1,14 +1,147 @@
+/* ── Glass (the shared material) ──
+   Everything that blurs what's behind it shares one material: a
+   translucent fill over a blur, a thin dark stroke outside (an outline
+   at offset 0: it follows the corners and leaves shadows be), a white rim
+   inside, bright along the top and fading down the sides to the bottom
+   (the 1px border, a colour per side), and a close, sharp shadow. The
+   tokens below are the material; .glass applies them all; a component
+   with rules of its own reads the tokens (the cards, the sidebar, the tab
+   bar, the landing header…). .glass--menu: a denser fill, so a menu's
+   text reads over anything. */
+:root {
+  --glass-fill: var(--material-glass);
+  --glass-fill-strong: color-mix(in srgb, var(--surface-page) 86%, transparent);
+  --glass-blur: blur(20px) saturate(1.5);
+  --glass-outer: rgb(0 0 0 / 0.14);
+  --glass-rim-top: rgb(255 255 255 / 0.85);
+  --glass-rim-side: rgb(255 255 255 / 0.45);
+  --glass-rim-bottom: rgb(255 255 255 / 0.2);
+  --glass-edge: var(--glass-rim-top) var(--glass-rim-side) var(--glass-rim-bottom);
+  --glass-shadow: 0 1px 1px rgb(0 0 0 / 0.08), 0 2px 4px -1px rgb(0 0 0 / 0.12);
+  /* Quiet: the same material for large surfaces (cards, the sidebar,
+     modals, sheets), where the full strokes add up to too much. */
+  --glass-quiet-outer: rgb(0 0 0 / 0.06);
+  --glass-quiet-edge: rgb(255 255 255 / 0.6) rgb(255 255 255 / 0.25) rgb(255 255 255 / 0.1);
+  --glass-quiet-shadow: 0 1px 2px rgb(0 0 0 / 0.04), 0 2px 6px -2px rgb(0 0 0 / 0.06);
+}
+
+:root:where([data-theme="dark"]) {
+  --glass-fill-strong: color-mix(in srgb, var(--surface-raised) 88%, transparent);
+  --glass-outer: rgb(0 0 0 / 0.5);
+  --glass-rim-top: rgb(255 255 255 / 0.2);
+  --glass-rim-side: rgb(255 255 255 / 0.09);
+  --glass-rim-bottom: rgb(255 255 255 / 0.04);
+  --glass-shadow: 0 1px 1px rgb(0 0 0 / 0.3), 0 2px 4px -1px rgb(0 0 0 / 0.35);
+  --glass-quiet-outer: rgb(0 0 0 / 0.3);
+  --glass-quiet-edge: rgb(255 255 255 / 0.1) rgb(255 255 255 / 0.05) rgb(255 255 255 / 0.02);
+  --glass-quiet-shadow: 0 1px 2px rgb(0 0 0 / 0.25), 0 2px 6px -2px rgb(0 0 0 / 0.3);
+}
+
+.glass {
+  border: 1px solid;
+  border-color: var(--glass-edge);
+  background-color: var(--glass-fill);
+  outline: 1px solid var(--glass-outer);
+  outline-offset: 0;
+  box-shadow: var(--glass-shadow);
+  -webkit-backdrop-filter: var(--glass-blur);
+  backdrop-filter: var(--glass-blur);
+}
+
+.glass--menu {
+  --glass-fill: var(--glass-fill-strong);
+  /* A row under the pointer: white (the card's colour), a faint hairline
+     and a soft shadow, lifted off the menu; the old blue-grey hover was
+     lost on the glass. */
+  --color-context-hover: var(--surface-card);
+}
+
+:where([data-theme="dark"]) .glass--menu {
+  --color-context-hover: rgb(255 255 255 / 0.1);
+}
+
+.glass--menu :is(.context-menu-item, .favorites-context-action):is(:hover, :focus-visible):not(:disabled) {
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--color-text) 7%, transparent),
+    0 1px 2px rgb(0 0 0 / 0.06);
+}
+
+:where([data-theme="dark"]) .glass--menu :is(.context-menu-item, .favorites-context-action):is(:hover, :focus-visible):not(:disabled) {
+  box-shadow: 0 0 0 1px rgb(255 255 255 / 0.06);
+}
+
+/* A large surface of either material: the quiet strokes. */
+:is(.glass, .glass-solid).glass--quiet {
+  border-color: var(--glass-quiet-edge);
+  outline-color: var(--glass-quiet-outer);
+  box-shadow: var(--glass-quiet-shadow);
+}
+
+/* Solid glass: the material as it reads over a white card, always: the
+   same stroke, rim and shadow on an opaque fill, no blur. For surfaces
+   with nothing to see through (a notice, a pill, Réglages' cards, the
+   cards without wallpaper). A button or a link of it darkens a touch on
+   hover. */
+:root {
+  --glass-solid-fill: color-mix(in srgb, var(--surface-page) 66%, var(--surface-card));
+  --glass-solid-fill-hover: color-mix(in srgb, var(--glass-solid-fill), var(--ink) 4%);
+  /* Its strokes: between the glass' full ones and the quiet ones. */
+  --glass-solid-outer: rgb(0 0 0 / 0.1);
+  --glass-solid-edge: rgb(255 255 255 / 0.75) rgb(255 255 255 / 0.35) rgb(255 255 255 / 0.15);
+  --glass-solid-shadow: 0 1px 1px rgb(0 0 0 / 0.06), 0 2px 4px -1px rgb(0 0 0 / 0.09);
+}
+
+:root:where([data-theme="dark"]) {
+  --glass-solid-fill: color-mix(in srgb, var(--surface-card) 90%, var(--surface-page));
+  --glass-solid-fill-hover: color-mix(in srgb, var(--glass-solid-fill), var(--ink) 6%);
+  --glass-solid-outer: rgb(0 0 0 / 0.4);
+  --glass-solid-edge: rgb(255 255 255 / 0.15) rgb(255 255 255 / 0.07) rgb(255 255 255 / 0.03);
+  --glass-solid-shadow: 0 1px 1px rgb(0 0 0 / 0.28), 0 2px 4px -1px rgb(0 0 0 / 0.32);
+}
+
+.glass-solid {
+  border: 1px solid;
+  border-color: var(--glass-solid-edge);
+  background-color: var(--glass-solid-fill);
+  outline: 1px solid var(--glass-solid-outer);
+  outline-offset: 0;
+  box-shadow: var(--glass-solid-shadow);
+  transition: background-color 150ms ease;
+}
+
+@media (hover: hover) {
+  :is(button, a).glass-solid:hover:not(:disabled) {
+    background-color: var(--glass-solid-fill-hover);
+  }
+}
+
+/* The outer stroke is an outline: keyboard focus gets its own ring back
+   (a component's own :focus-visible rule, further down, still wins). Only
+   on what can be tabbed to: a dialog focused when it opens
+   (tabindex="-1") keeps its stroke. */
+:is(.glass, .glass-solid, .widget-card):is(button, a[href], input, textarea, select, [tabindex]:not([tabindex="-1"])):focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
 /* ── Widget card base: frosted glass over the hero photo ──
    Every card paints its background with --color-widget-bg (and hovers with
    --color-bg-subtle), so redefining both here makes all of them translucent
-   and tinted, with the photo blurred behind. */
+   and tinted, with the photo blurred behind.
+   In the glass material (its tokens, above), its fill through
+   --color-widget-bg so the cards' own hover still works. Quiet strokes:
+   the widgets are large surfaces (their items: the full ones, below). Solid cards (no
+   wallpaper, side panels) keep their own look: further down. */
 
 .widget-card {
-  --color-widget-bg: var(--material-glass);
+  --color-widget-bg: var(--glass-fill);
   --color-bg-subtle: var(--material-glass-hover);
-  border-color: var(--material-glass-edge);
-  -webkit-backdrop-filter: blur(20px) saturate(1.5);
-  backdrop-filter: blur(20px) saturate(1.5);
+  border-color: var(--glass-quiet-edge);
+  outline: 1px solid var(--glass-quiet-outer);
+  outline-offset: 0;
+  box-shadow: var(--glass-quiet-shadow);
+  -webkit-backdrop-filter: var(--glass-blur);
+  backdrop-filter: var(--glass-blur);
   /* Intro: cards rise and settle from a slightly smaller scale, staggered in
      reading order via --widget-delay (set per widget below). Hover colour
      changes stay instant-ish and undelayed. */
@@ -25,9 +158,29 @@
 }
 
 :where([data-theme="dark"]) .widget-card {
-  --color-widget-bg: var(--material-glass);
+  --color-widget-bg: var(--glass-fill);
   --color-bg-subtle: var(--material-glass-hover);
-  border-color: var(--material-glass-edge);
+}
+
+/* The quiet strokes are for the large widgets. An item in them or in a
+   sheet (an event, a grade, a notice, the launch card, a simulator's UE
+   card: the small corners) keeps the full ones. */
+.widget-card:is(.card-corners-sm, .planning-block, .latest-grade-card, .modal-inner-corners) {
+  border-color: var(--glass-edge);
+  outline-color: var(--glass-outer);
+  box-shadow: var(--glass-shadow);
+}
+
+/* The events (Planning's blocks and list cards), many side by side: the
+   strokes eased, between the full and the quiet ones (the outer stroke at
+   half, the quiet edge and shadow). */
+.widget-card:is(.planning-block, .planning-list-card) {
+  /* Tinted all over with the course's colour (no white left), its wash
+     deeper across the top. */
+  background-color: color-mix(in srgb, var(--accent) 8%, var(--color-widget-bg));
+  border-color: var(--glass-quiet-edge);
+  outline-color: color-mix(in srgb, var(--glass-outer) 55%, transparent);
+  box-shadow: var(--glass-quiet-shadow);
 }
 
 /* ── Concentric modal corners ──
@@ -136,6 +289,32 @@
   }
 }
 
+/* A row inset 8px in a card (Assiduité's subjects, the card's p-2): its
+   corners concentric with the card's, its radius less the inset, the same
+   curve. */
+.card-inset-corners {
+  border-radius: 23px;
+}
+
+@media (width < 48rem) {
+  .card-inset-corners {
+    border-radius: 19px;
+  }
+}
+
+@supports (corner-shape: superellipse(1.3)) {
+  .card-inset-corners {
+    corner-shape: superellipse(1.3);
+    border-radius: 28px;
+  }
+
+  @media (width < 48rem) {
+    .card-inset-corners {
+      border-radius: 24px;
+    }
+  }
+}
+
 /* A layer that takes its parent's corners takes its curve too: corner-shape
    isn't inherited by itself. */
 .rounded-\[inherit\] {
@@ -144,68 +323,55 @@
 
 /* ── Sidebar: floating frosted panel ── */
 
+/* In the glass material (its tokens), quiet: a large surface. */
 .sidebar-panel {
-  background-color: var(--material-sidebar);
-  border-color: var(--material-sidebar-edge);
-  -webkit-backdrop-filter: blur(24px) saturate(1.5);
-  backdrop-filter: blur(24px) saturate(1.5);
-  box-shadow: 0 12px 40px -16px rgb(52 18 0 / 0.22);
+  background-color: var(--glass-fill);
+  border-color: var(--glass-quiet-edge);
+  outline: 1px solid var(--glass-quiet-outer);
+  outline-offset: 0;
+  -webkit-backdrop-filter: var(--glass-blur);
+  backdrop-filter: var(--glass-blur);
+  box-shadow: var(--glass-quiet-shadow);
   /* Eases between frosted and solid when a page drops the wallpaper. */
   transition: background-color 280ms ease-out, border-color 280ms ease-out, box-shadow 280ms ease-out;
 }
 
-:where([data-theme="dark"]) .sidebar-panel {
-  background-color: var(--material-sidebar);
-  border-color: var(--material-sidebar-edge);
-  box-shadow: 0 12px 40px -16px rgb(0 0 0 / 0.6);
-}
-
 /* ── Wallpaper off (Réglages › Apparence) ──
-   Nothing behind the cards to see through: drop the blur and go back to
-   solid surfaces, with a crisper edge so they still lift off the page. */
+   Nothing behind the cards to see through: drop the blur, solid glass
+   (its fill; the glass' stroke, rim and shadow stay). */
 
 .dashboard-no-wallpaper .widget-card {
-  --color-widget-bg: var(--material-solid);
-  --color-bg-subtle: var(--material-solid-hover);
-  border-color: var(--material-solid-edge);
+  --color-widget-bg: var(--glass-solid-fill);
+  --color-bg-subtle: var(--glass-solid-fill-hover);
   -webkit-backdrop-filter: none;
   backdrop-filter: none;
-  box-shadow: 0 1px 3px rgb(52 18 0 / 0.06), 0 10px 28px -14px rgb(52 18 0 / 0.16);
 }
 
 /* Close to the page colour: a warm hairline and a deeper shadow keep it
    standing apart from the page. */
 .dashboard-no-wallpaper .sidebar-panel {
   background-color: var(--material-sidebar-solid);
-  border-color: color-mix(in srgb, var(--ink) 8%, transparent);
   -webkit-backdrop-filter: none;
   backdrop-filter: none;
-  box-shadow: 0 1px 3px rgb(52 18 0 / 0.06), 0 16px 40px -14px rgb(52 18 0 / 0.24);
 }
 
 /* The mail reader's side panel (MailPage, from 4xl), and the planning's
-   (PlanningDirectoryPanel): the sidebar's frame on a solid white, sliding
+   (PlanningDirectoryPanel): solid glass, quiet (a large surface), sliding
    in from the right edge and back out. */
 .mail-reader-panel,
 .side-panel {
-  --mail-panel-bg: var(--material-solid);
+  --mail-panel-bg: var(--glass-solid-fill);
   background-color: var(--mail-panel-bg);
-  border-color: color-mix(in srgb, var(--ink) 8%, transparent);
-  box-shadow: 0 1px 3px rgb(52 18 0 / 0.06), 0 16px 40px -14px rgb(52 18 0 / 0.24);
+  border-color: var(--glass-quiet-edge);
+  outline: 1px solid var(--glass-quiet-outer);
+  outline-offset: 0;
+  box-shadow: var(--glass-quiet-shadow);
   animation: mail-reader-panel-in 340ms cubic-bezier(0.32, 0.72, 0, 1) both;
 }
 
 .mail-reader-panel.is-closing,
 .side-panel.is-closing {
   animation: mail-reader-panel-out 240ms cubic-bezier(0.32, 0.72, 0, 1) both;
-}
-
-:where([data-theme="dark"]) .mail-reader-panel,
-:where([data-theme="dark"]) .side-panel {
-  --mail-panel-bg: var(--material-solid);
-  background-color: var(--mail-panel-bg);
-  border-color: var(--line);
-  box-shadow: 0 1px 3px rgb(0 0 0 / 0.4), 0 16px 40px -14px rgb(0 0 0 / 0.7);
 }
 
 @keyframes mail-reader-panel-in {
@@ -619,29 +785,43 @@
 }
 
 /* ── Mail composer (MailComposer) ──
-   From 1024px a window over the page's bottom right, of the reader panel's
-   solid white and frame with a deeper shadow (it floats over the panel);
-   below, a sheet over the whole screen sliding up, as iOS Mail's. */
+   From 1024px a window floating over the page's bottom right (often over
+   the reader's panel, as light as it): solid white, the solid glass's
+   edges, a lit top rim and a deep drop, so it reads as lifted off the
+   page; below, a sheet over the whole screen sliding up, as iOS Mail's. */
 .mail-composer {
-  background-color: #ffffff;
+  background-color: var(--surface-card);
   animation: mail-composer-sheet-in 380ms cubic-bezier(0.32, 0.72, 0, 1) both;
 }
 
 :where([data-theme="dark"]) .mail-composer {
-  background-color: #1c1c1c;
+  background-color: #1f1f1f;
 }
 
 @media (min-width: 1024px) {
   .mail-composer {
-    border-color: rgb(52 18 0 / 0.08);
-    box-shadow: 0 1px 3px rgb(52 18 0 / 0.08), 0 32px 80px -20px rgb(52 18 0 / 0.36);
-    transform-origin: 100% 100%;
-    animation: mail-composer-window-in 260ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+    border-color: var(--glass-solid-edge);
+    outline: 1px solid color-mix(in srgb, var(--ink) 14%, transparent);
+    outline-offset: 0;
+    box-shadow:
+      inset 0 1px 0 rgb(255 255 255 / 0.9),
+      0 1px 2px rgb(52 18 0 / 0.08),
+      0 8px 16px -6px rgb(52 18 0 / 0.14),
+      0 32px 72px -16px rgb(52 18 0 / 0.38);
   }
 
   :where([data-theme="dark"]) .mail-composer {
-    border-color: rgb(255 255 255 / 0.1);
-    box-shadow: 0 1px 3px rgb(0 0 0 / 0.4), 0 32px 80px -20px rgb(0 0 0 / 0.8);
+    outline-color: rgb(255 255 255 / 0.12);
+    box-shadow:
+      inset 0 1px 0 rgb(255 255 255 / 0.08),
+      0 1px 2px rgb(0 0 0 / 0.4),
+      0 8px 16px -6px rgb(0 0 0 / 0.5),
+      0 32px 72px -16px rgb(0 0 0 / 0.85);
+  }
+
+  .mail-composer {
+    transform-origin: 100% 100%;
+    animation: mail-composer-window-in 260ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
   }
 }
 
@@ -953,16 +1133,8 @@
 }
 
 :where([data-theme="dark"]) .dashboard-no-wallpaper .widget-card {
-  --color-widget-bg: var(--material-solid);
-  --color-bg-subtle: var(--material-solid-hover);
-  border-color: var(--material-solid-edge);
-  box-shadow: 0 1px 3px rgb(0 0 0 / 0.3);
-}
-
-:where([data-theme="dark"]) .dashboard-no-wallpaper .sidebar-panel {
-  background-color: var(--material-sidebar-solid);
-  border-color: var(--line);
-  box-shadow: 0 1px 3px rgb(0 0 0 / 0.4), 0 16px 40px -14px rgb(0 0 0 / 0.7);
+  --color-widget-bg: var(--glass-solid-fill);
+  --color-bg-subtle: var(--glass-solid-fill-hover);
 }
 
 /* The folded sidebar unfolding on hover over the page (Sidebar's canPeek):
@@ -1121,21 +1293,17 @@
   user-select: none;
 }
 
-/* ── Mobile tab bar: floating frosted pill (iOS 26 style) ──
-   Translucent tint over a strong blur, a light sheen from the top, a bright
-   inner edge and a soft drop shadow so it floats above the page. */
+/* ── Mobile tab bar: floating pill in the glass material ── */
 
 .mobile-tab-bar {
-  background-color: rgb(252 251 248 / 0.55);
-  background-image: linear-gradient(180deg, rgb(255 255 255 / 0.45), rgb(255 255 255 / 0.08));
-  border: 1px solid rgb(255 255 255 / 0.7);
-  -webkit-backdrop-filter: blur(22px) saturate(1.8);
-  backdrop-filter: blur(22px) saturate(1.8);
-  box-shadow:
-    inset 0 1px 0 rgb(255 255 255 / 0.85),
-    inset 0 -1px 0 rgb(52 18 0 / 0.04),
-    0 14px 34px -10px rgb(52 18 0 / 0.28),
-    0 2px 8px rgb(52 18 0 / 0.08);
+  background-color: var(--glass-fill);
+  border: 1px solid;
+  border-color: var(--glass-edge);
+  outline: 1px solid var(--glass-outer);
+  outline-offset: 0;
+  -webkit-backdrop-filter: var(--glass-blur);
+  backdrop-filter: var(--glass-blur);
+  box-shadow: var(--glass-shadow);
 }
 
 .mobile-tab-bar-item:active {
@@ -1158,31 +1326,28 @@
   outline-offset: -2px;
 }
 
-/* Selected tab: a brighter glass lens behind the icon and label. */
+/* Selected tab: a lens of solid glass behind the icon and label, as the
+   sidebar's selected row (its outer stroke, lit top rim, close shadow). */
+.mobile-tab-bar-item {
+  border: 1px solid transparent;
+  outline: 1px solid transparent;
+  outline-offset: 0;
+}
+
 .mobile-tab-bar-item--selected,
 .mobile-tab-bar-item--selected:hover,
 .mobile-tab-bar-item--selected:active {
-  background-color: rgb(255 255 255 / 0.85);
-  box-shadow:
-    inset 0 1px 0 rgb(255 255 255 / 0.9),
-    0 2px 8px -2px rgb(52 18 0 / 0.16);
-}
-
-:where([data-theme="dark"]) .mobile-tab-bar {
-  background-color: rgb(28 28 28 / 0.5);
-  background-image: linear-gradient(180deg, rgb(255 255 255 / 0.1), rgb(255 255 255 / 0.02));
-  border-color: rgb(255 255 255 / 0.12);
-  box-shadow:
-    inset 0 1px 0 rgb(255 255 255 / 0.14),
-    0 14px 34px -10px rgb(0 0 0 / 0.6),
-    0 2px 8px rgb(0 0 0 / 0.3);
+  border-color: var(--glass-solid-edge);
+  background-color: var(--glass-solid-fill);
+  outline-color: var(--glass-solid-outer);
+  box-shadow: var(--glass-solid-shadow);
 }
 
 /* The mail reader's toolbar (MailToolbar): hairlines between the buttons
    of a group. */
 /* A sheet's close button (a grade's, a class's), of the tab bar's glass. */
 /* ── Close button (CloseButton) ──
-   A soft tint of the text colour (plain) or frosted glass (below), the ×
+   The material of the secondary buttons (plain) or frosted glass (below), the ×
    a little muted until hovered; it gives a little when pressed. */
 
 .close-button {
@@ -1198,51 +1363,34 @@
   transform: scale(0.92);
 }
 
-.close-button--plain {
-  background-color: color-mix(in srgb, var(--color-text) 7%, transparent);
-}
-
 @media (hover: hover) {
   .close-button:hover:not(:disabled) svg {
     opacity: 1;
   }
-
-  .close-button--plain:hover:not(:disabled) {
-    background-color: color-mix(in srgb, var(--color-text) 12%, transparent);
-  }
 }
 
+/* In the glass material (its tokens). */
 .glass-close-button {
-  background-color: rgb(252 251 248 / 0.45);
-  background-image: linear-gradient(180deg, rgb(255 255 255 / 0.45), rgb(255 255 255 / 0.08));
-  -webkit-backdrop-filter: blur(22px) saturate(1.8);
-  backdrop-filter: blur(22px) saturate(1.8);
-  box-shadow:
-    inset 0 1px 0 rgb(255 255 255 / 0.85),
-    inset 0 -1px 0 rgb(52 18 0 / 0.04),
-    0 6px 16px -6px rgb(52 18 0 / 0.22),
-    0 1px 4px rgb(52 18 0 / 0.08);
+  border: 1px solid;
+  border-color: var(--glass-edge);
+  outline: 1px solid var(--glass-outer);
+  outline-offset: 0;
+  background-color: var(--glass-fill);
+  -webkit-backdrop-filter: var(--glass-blur);
+  backdrop-filter: var(--glass-blur);
+  box-shadow: var(--glass-shadow);
 }
 
 
 @media (hover: hover) {
   .glass-close-button:hover {
-    background-color: rgb(255 255 255 / 0.6);
+    background-color: var(--material-glass-hover);
   }
-}
-
-:where([data-theme="dark"]) .glass-close-button {
-  background-color: rgb(28 28 28 / 0.45);
-  background-image: linear-gradient(180deg, rgb(255 255 255 / 0.1), rgb(255 255 255 / 0.02));
-  box-shadow:
-    inset 0 1px 0 rgb(255 255 255 / 0.14),
-    0 6px 16px -6px rgb(0 0 0 / 0.6),
-    0 1px 4px rgb(0 0 0 / 0.3);
 }
 
 @media (hover: hover) {
   :where([data-theme="dark"]) .glass-close-button:hover {
-    background-color: rgb(255 255 255 / 0.12);
+    background-color: var(--material-glass-hover);
   }
 }
 
@@ -1297,31 +1445,435 @@
 }
 
 /* ── Primary button (LentButton) ──
-   The brand colour, flat, on a soft shadow that deepens on hover; pressed,
-   it settles (and shrinks a little, in LentButton). */
+   The brand colour on a close, sharp shadow (1–3 px, little blur) that
+   lifts a touch on hover. Its edge gives
+   it depth: a 1px dark stroke outside (--lent-button-edge, the fill
+   deepened) and a 1px white stroke inside, bright at the top and fading
+   down (--lent-button-rim-*), as light catching a raised rim.
+   Pressed, it sinks: down a pixel and a little smaller, fast (80 ms), its
+   drop shadow gone, a shade inside its top edge and the rim faded, as
+   pushed into the page. Let go, it springs back up past its place and
+   settles (320 ms).
+   Any filled button takes it with the class: --lent-button-fill (and
+   -hover, -ink) for another colour than the brand, .lent-button--danger for
+   the red of what can't be undone. Disabled, it fades and lies flat; a
+   caller's own disabled:… utilities still win (components layer).
+   Its shape: a smooth pill (SmoothSurface, an SVG of Lisse's smoothed
+   corners) once mounted; till then, and without JS, the same look in CSS
+   on round corners (background, box-shadow, ::before). Both read the
+   variables below, set per state. */
 
 .lent-button {
-  background-color: var(--color-brand);
-  color: var(--color-bg);
-  box-shadow: 0 1px 2px rgb(52 18 0 / 0.14), 0 6px 14px -6px rgb(52 18 0 / 0.4);
-  transition: background-color 150ms ease, box-shadow 150ms ease, transform 100ms ease-out, opacity 150ms ease;
+  --lent-button-fill: var(--color-brand);
+  --lent-button-fill-hover: var(--color-brand-hover);
+  --lent-button-ink: var(--color-bg);
+  --lent-button-face: var(--lent-button-fill);
+  --lent-button-edge: color-mix(in oklab, var(--lent-button-fill), black 40%);
+  --lent-button-rim-top: 0.32;
+  --lent-button-rim-mid: 0.1;
+  --lent-button-rim-bottom: 0.02;
+  --lent-button-rim-opacity: 1;
+  --lent-button-press: rgb(0 0 0 / 0);
+  --lent-button-press-surface: rgb(0 0 0 / 0);
+  --lent-button-near: 0 1px 1px rgb(52 18 0 / 0.22);
+  --lent-button-far: 0 2px 3px -1px rgb(52 18 0 / 0.22);
+  --lent-button-drop: drop-shadow(0 1px 0.5px rgb(52 18 0 / 0.22)) drop-shadow(0 2px 1.5px rgb(52 18 0 / 0.16));
+  /* What SmoothSurface draws. */
+  --surface-face: var(--lent-button-face);
+  --surface-edge: var(--lent-button-edge);
+  --surface-shade-top: rgb(0 0 0 / 0);
+  --surface-press: var(--lent-button-press-surface);
+  --surface-shade-bottom: rgb(0 0 0 / 0);
+  --surface-rim-top: var(--lent-button-rim-top);
+  --surface-rim-mid: var(--lent-button-rim-mid);
+  --surface-rim-bottom: var(--lent-button-rim-bottom);
+  --surface-rim-opacity: var(--lent-button-rim-opacity);
+  --surface-drop: var(--lent-button-drop);
+  background-color: var(--lent-button-face);
+  color: var(--lent-button-ink);
+  /* Medium, a touch tight. Here rather than in utilities: index.css
+     gives every <button> `font: inherit`, outside the layers, which beats
+     a font-… or tracking-… class on it. */
+  font-weight: 500;
+  letter-spacing: -0.01em;
+  box-shadow: 0 0 0 1px var(--lent-button-edge), inset 0 2px 3px var(--lent-button-press), var(--lent-button-near), var(--lent-button-far);
+  transition:
+    background-color 150ms ease,
+    box-shadow 220ms ease,
+    transform 320ms cubic-bezier(0.34, 1.56, 0.64, 1),
+    opacity 150ms ease;
+}
+
+.lent-button::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  padding: 1px;
+  border-radius: inherit;
+  background: linear-gradient(180deg, rgb(255 255 255 / var(--lent-button-rim-top)) 0%, rgb(255 255 255 / var(--lent-button-rim-mid)) 42%, rgb(255 255 255 / var(--lent-button-rim-bottom)) 100%);
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask: linear-gradient(#000 0 0) content-box exclude, linear-gradient(#000 0 0);
+  opacity: var(--lent-button-rim-opacity);
+  pointer-events: none;
+  transition: opacity 220ms ease;
 }
 
 .lent-button:hover:not(:disabled) {
-  background-color: var(--color-brand-hover);
-  box-shadow: 0 1px 2px rgb(52 18 0 / 0.16), 0 10px 20px -8px rgb(52 18 0 / 0.45);
+  --lent-button-face: var(--lent-button-fill-hover);
+  --lent-button-near: 0 1px 1px rgb(52 18 0 / 0.24);
+  --lent-button-far: 0 3px 4px -1px rgb(52 18 0 / 0.26);
+  --lent-button-drop: drop-shadow(0 1px 0.5px rgb(52 18 0 / 0.24)) drop-shadow(0 3px 2px rgb(52 18 0 / 0.2));
+}
+
+/* The red is lighter than the brand: its rim a stronger white, or it
+   vanishes at rest. Doubled class: over the dark theme's .lent-button,
+   further down. */
+.lent-button.lent-button--danger {
+  --lent-button-fill: var(--red-600);
+  --lent-button-fill-hover: color-mix(in oklab, var(--red-600), black 10%);
+  --lent-button-ink: #ffffff;
+  --lent-button-rim-top: 0.6;
+  --lent-button-rim-mid: 0.22;
+  --lent-button-rim-bottom: 0.06;
+}
+
+:where([data-theme="dark"]) .lent-button.lent-button--danger {
+  --lent-button-fill: #e5443d;
+  --lent-button-fill-hover: color-mix(in oklab, #e5443d, white 10%);
+  --lent-button-rim-top: 0.5;
+  --lent-button-rim-mid: 0.18;
+  --lent-button-rim-bottom: 0.05;
+}
+
+.lent-button:disabled:not([aria-busy="true"]) {
+  --lent-button-near: 0 0 0 0 transparent;
+  --lent-button-far: 0 0 0 0 transparent;
+  --lent-button-drop: drop-shadow(0 0 0 transparent) drop-shadow(0 0 0 transparent);
+}
+
+@layer components {
+  /* Positioned for the rim (::before) and the surface: without it they
+     are drawn around the nearest positioned ancestor instead. A caller's
+     absolute or fixed (a utility) still wins. */
+  .lent-button {
+    position: relative;
+  }
+
+  .lent-button:disabled:not([aria-busy="true"]),
+  .lent-button[aria-disabled="true"] {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
 }
 
 .lent-button:active:not(:disabled) {
-  box-shadow: 0 1px 2px rgb(52 18 0 / 0.14);
+  --lent-button-press: rgb(0 0 0 / 0.32);
+  --lent-button-press-surface: rgb(0 0 0 / 0.18);
+  --lent-button-rim-opacity: 0;
+  --lent-button-near: 0 0 1px rgb(52 18 0 / 0.12);
+  --lent-button-far: 0 2px 4px -4px rgb(52 18 0 / 0);
+  --lent-button-drop: drop-shadow(0 0 0.5px rgb(52 18 0 / 0.12)) drop-shadow(0 0 0 rgb(52 18 0 / 0));
+  transform: translateY(1px) scale(0.975);
+  transition-duration: 150ms, 80ms, 80ms, 150ms;
+  transition-timing-function: ease, ease-out, ease-out, ease;
 }
 
+.lent-button:active:not(:disabled)::before {
+  transition-duration: 80ms;
+}
+
+/* The dark theme's button is light: its edge is a dark line against the
+   page, its rim a brighter white, its shadows black. */
 :where([data-theme="dark"]) .lent-button {
-  box-shadow: 0 1px 2px rgb(0 0 0 / 0.4), 0 6px 14px -6px rgb(0 0 0 / 0.6);
+  --lent-button-edge: rgb(0 0 0 / 0.7);
+  --lent-button-rim-top: 0.95;
+  --lent-button-rim-mid: 0.35;
+  --lent-button-rim-bottom: 0.1;
+  --lent-button-near: 0 1px 1px rgb(0 0 0 / 0.5);
+  --lent-button-far: 0 2px 3px -1px rgb(0 0 0 / 0.5);
+  --lent-button-drop: drop-shadow(0 1px 0.5px rgb(0 0 0 / 0.5)) drop-shadow(0 2px 1.5px rgb(0 0 0 / 0.4));
 }
 
 :where([data-theme="dark"]) .lent-button:hover:not(:disabled) {
-  box-shadow: 0 1px 2px rgb(0 0 0 / 0.45), 0 10px 20px -8px rgb(0 0 0 / 0.7);
+  --lent-button-near: 0 1px 1px rgb(0 0 0 / 0.55);
+  --lent-button-far: 0 3px 4px -1px rgb(0 0 0 / 0.55);
+  --lent-button-drop: drop-shadow(0 1px 0.5px rgb(0 0 0 / 0.55)) drop-shadow(0 3px 2px rgb(0 0 0 / 0.45));
+}
+
+:where([data-theme="dark"]) .lent-button:active:not(:disabled) {
+  --lent-button-press: rgb(0 0 0 / 0.22);
+  --lent-button-press-surface: rgb(0 0 0 / 0.14);
+  --lent-button-near: 0 0 1px rgb(0 0 0 / 0.3);
+  --lent-button-far: 0 2px 4px -4px rgb(0 0 0 / 0);
+  --lent-button-drop: drop-shadow(0 0 0.5px rgb(0 0 0 / 0.3)) drop-shadow(0 0 0 rgb(0 0 0 / 0));
+}
+
+/* A tag in the primary's texture (BetaTag, a grade's marker, the subject
+   lists' tags, the widgets' counts): not a button, so no hover, no press,
+   and its own letters: revert-layer hands the weight and spacing back to
+   its utilities (the class's medium and tight tracking are a button's). */
+.lent-button.lent-button--tag {
+  --lent-button-face: var(--lent-button-fill);
+  font-weight: revert-layer;
+  letter-spacing: revert-layer;
+  cursor: default;
+}
+
+.lent-button.lent-button--tag:hover {
+  --lent-button-face: var(--lent-button-fill);
+}
+
+.lent-button.lent-button--tag:active {
+  transform: none;
+}
+
+/* No sink or spring without motion: the shadows still say it's pressed. */
+@media (prefers-reduced-motion: reduce) {
+  .lent-button:active:not(:disabled) {
+    transform: none;
+  }
+}
+
+/* ── Switch (Switch) ──
+   Two styles, by the rule of the system: the strokes (a dark edge, a
+   white rim, a sharp shadow) only where the primary colour fills the
+   component; elsewhere the soft one (a fill, a faint hairline, a whisper
+   of shadow, no rim, no gradient).
+   On, the track is the ink and takes the strokes: a dark edge, a shade
+   inside its top edge, the light catching its bottom edge. Off, it's
+   soft: ink at 30 %, a faint hairline. The thumb is always soft: a white
+   knob, a faint hairline, a soft shadow. On the smooth pill once
+   SmoothSurface is in (till then the same in CSS). While its thumb is
+   dragged (Switch), the track shows the side it would settle on
+   (data-shown), not the value yet. */
+.switch {
+  --switch-fill: color-mix(in srgb, var(--color-text) 30%, transparent);
+  --switch-edge: color-mix(in srgb, var(--color-text) 10%, transparent);
+  --switch-well: rgb(0 0 0 / 0);
+  --surface-face: var(--switch-fill);
+  --surface-edge: var(--switch-edge);
+  --surface-shade-top: rgb(0 0 0 / 0);
+  --surface-shade-bottom: rgb(0 0 0 / 0);
+  --surface-press: var(--switch-well);
+  --surface-rim-top: 0;
+  --surface-rim-mid: 0.04;
+  --surface-rim-bottom: 0.16;
+  --surface-rim-opacity: 0;
+  --surface-drop: none;
+  background-color: var(--switch-fill);
+  box-shadow: 0 0 0 1px var(--switch-edge), inset 0 1px 2px var(--switch-well);
+  transition: background-color 150ms ease, box-shadow 150ms ease;
+}
+
+.switch:is([aria-checked="true"]:not([data-shown]), [data-shown="on"]) {
+  --switch-fill: var(--color-text);
+  --switch-edge: color-mix(in oklab, var(--color-text), black 40%);
+  --switch-well: rgb(0 0 0 / 0.3);
+  --surface-rim-opacity: 1;
+}
+
+.switch-thumb {
+  --switch-thumb-edge: color-mix(in srgb, var(--color-text) 10%, transparent);
+  background-color: var(--color-widget-bg);
+  box-shadow:
+    0 0 0 1px var(--switch-thumb-edge),
+    0 1px 1px rgb(52 18 0 / 0.12),
+    0 1px 3px rgb(52 18 0 / 0.12);
+}
+
+:where([data-theme="dark"]) .switch {
+  --switch-edge: rgb(255 255 255 / 0.08);
+}
+
+:where([data-theme="dark"]) .switch:is([aria-checked="true"]:not([data-shown]), [data-shown="on"]) {
+  --switch-edge: rgb(0 0 0 / 0.7);
+  --switch-well: rgb(0 0 0 / 0.25);
+  --surface-rim-bottom: 0.3;
+}
+
+:where([data-theme="dark"]) .switch-thumb {
+  --switch-thumb-edge: rgb(0 0 0 / 0.35);
+  box-shadow:
+    0 0 0 1px var(--switch-thumb-edge),
+    0 1px 1px rgb(0 0 0 / 0.35),
+    0 1px 3px rgb(0 0 0 / 0.3);
+}
+
+/* ── Field (.field) ──
+   The app's text fields, in the soft style (no primary colour in them):
+   a white fill (the card's: white in light, the dark card in dark), a
+   faint hairline and a thin, firmer stroke outside it (half a pixel,
+   --field-outer), a
+   breath of shade inside the top edge, no rim, no gradient. Hover firms the hairline; focus firms the
+   outer stroke (that's the focus indicator: no ring, no outline). On an <input> or <textarea>, or on a wrapper holding one
+   (the mail search: :focus-within). Red when aria-invalid. In the
+   components layer: a caller's utilities (a width, a red border) win. */
+@layer components {
+  .field {
+    --field-fill: var(--surface-card);
+    --field-edge: color-mix(in srgb, var(--color-text) 12%, transparent);
+    --field-inset: rgb(52 18 0 / 0.05);
+    --field-outer: color-mix(in srgb, var(--color-text) 22%, transparent);
+    border: 1px solid var(--field-edge);
+    background-color: var(--field-fill);
+    box-shadow: inset 0 1px 1px var(--field-inset), 0 0 0 0.5px var(--field-outer);
+    transition: border-color 150ms ease, box-shadow 150ms ease, background-color 150ms ease;
+  }
+
+  .field:hover:not(:disabled) {
+    --field-edge: color-mix(in srgb, var(--color-text) 20%, transparent);
+  }
+
+  .field:is(:focus, :focus-within) {
+    --field-outer: color-mix(in srgb, var(--color-text) 60%, transparent);
+    outline: none;
+  }
+
+  .field[aria-invalid="true"],
+  .field:has([aria-invalid="true"]) {
+    --field-edge: var(--danger);
+    --field-outer: var(--danger);
+  }
+
+  .field:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+  }
+
+  :where([data-theme="dark"]) .field {
+    --field-edge: rgb(255 255 255 / 0.1);
+    --field-inset: rgb(0 0 0 / 0.25);
+    --field-outer: rgb(0 0 0 / 0.7);
+  }
+
+  :where([data-theme="dark"]) .field:hover:not(:disabled) {
+    --field-edge: rgb(255 255 255 / 0.16);
+  }
+
+  :where([data-theme="dark"]) .field:is(:focus, :focus-within) {
+    --field-outer: rgb(255 255 255 / 0.5);
+  }
+}
+
+/* index.css outlines every focused input (unlayered): a field's focus is
+   its own darker hairline and ring. */
+:is(input, textarea).field:focus-visible {
+  outline: none;
+}
+
+/* ── A page's first load (PageLoading) ──
+   The line under the spinner: each new one springs in (from smaller, a
+   touch past its size), the last one shrinks away in the same place. */
+.page-loading-label {
+  display: grid;
+  font-family: var(--font-body);
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 1.3;
+  color: var(--color-text-muted);
+}
+
+.page-loading-label > span {
+  grid-area: 1 / 1;
+  justify-self: center;
+}
+
+.page-loading-in {
+  animation: page-loading-in 560ms cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+
+.page-loading-out {
+  animation: page-loading-out 260ms ease-in both;
+}
+
+@keyframes page-loading-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px) scale(0.7);
+  }
+}
+
+@keyframes page-loading-out {
+  to {
+    opacity: 0;
+    transform: translateY(-4px) scale(0.9);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .page-loading-in,
+  .page-loading-out {
+    animation: none;
+  }
+
+  .page-loading-out {
+    display: none;
+  }
+}
+
+/* ── Smooth surface (SmoothSurface) ──
+   The button's look drawn on Lisse's smoothed shape, under its content
+   (the button isolated, the SVG at z-index -1). Once it's mounted, the
+   button's own background, shadows and ::before rim make way. The SVG
+   reads --surface-* from the button: the face, its outer stroke (2px
+   masked to the outside of the shape: its outer 1px only, even over a
+   see-through face), the shade, the rim and, as a filter
+   on the whole shape, the drop shadow. */
+.smooth-surface-pending {
+  display: none;
+}
+
+.smooth-surface {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: -1;
+  overflow: visible;
+  pointer-events: none;
+  filter: var(--surface-drop, none);
+  transition: filter 220ms ease;
+}
+
+/* Transparent where a host sets no colours: never the SVG's black. */
+.smooth-surface-face {
+  fill: var(--surface-face, transparent);
+  transition: fill 150ms ease;
+}
+
+/* Its colour: a gradient in the SVG, --surface-edge-top to -bottom
+   (--surface-edge for both by default). */
+.smooth-surface-edge {
+  fill: none;
+  stroke-width: 2px;
+}
+
+.smooth-surface-rim {
+  opacity: var(--surface-rim-opacity, 0);
+  transition: opacity 220ms ease;
+}
+
+:active > .smooth-surface,
+:active > .smooth-surface .smooth-surface-rim {
+  transition-duration: 80ms;
+}
+
+:is(.lent-button, .material, .switch, .segmented, .segmented-thumb):has(> .smooth-surface) {
+  isolation: isolate;
+  border-color: transparent;
+  background: none;
+  box-shadow: none;
+}
+
+:is(.lent-button, .material):has(> .smooth-surface)::before {
+  display: none;
+}
+
+/* The rainbow's wash, in the same shape: over the border box, as the
+   surface (the material's border is 1px). */
+:has(> .smooth-surface) > .material-wash-frame {
+  inset: -1px;
+  clip-path: var(--smooth-clip, none);
 }
 
 /* ── Custom scrollbars ──
@@ -1556,11 +2108,15 @@
   top: 14px;
   right: 14px;
   z-index: 1;
-  border: 1px solid rgba(255, 255, 255, 0.75);
+  border: 1px solid;
+  border-color: var(--glass-edge);
+  outline: 1px solid var(--glass-outer);
+  outline-offset: 0;
   border-radius: 999px;
   padding: 5px 9px;
-  background: rgba(255, 255, 255, 0.72);
-  backdrop-filter: blur(10px);
+  background: var(--glass-fill-strong);
+  -webkit-backdrop-filter: var(--glass-blur);
+  backdrop-filter: var(--glass-blur);
   font-family: var(--font-body);
   font-size: 0.66rem;
   font-weight: 700;
@@ -1784,11 +2340,6 @@
     0 24px 48px -28px rgba(0, 0, 0, 0.88),
     0 12px 20px -12px rgba(0, 0, 0, 0.6),
     0 0 0 1px rgba(255, 255, 255, 0.1) inset;
-}
-
-:where([data-theme="dark"]) .onboarding-td-card__badge {
-  border-color: rgba(255, 255, 255, 0.14);
-  background: rgba(17, 17, 17, 0.66);
 }
 
 /* ── Login left panel edge strokes ── */
@@ -2487,6 +3038,15 @@
    (--tab-index of --tab-count, inside the bar's 6px padding and 4px gaps). */
 .landing-tabs-lens {
   --tab-width: calc((100% - 12px - (var(--tab-count) - 1) * 4px) / var(--tab-count));
+  /* The selected tab's solid glass (.mobile-tab-bar-item--selected): its
+     border and outer stroke need lines to colour, as a tab has (their
+     colours its own). */
+  border-width: 1px;
+  border-style: solid;
+  outline-width: 1px;
+  outline-style: solid;
+  outline-offset: 0;
+  box-sizing: border-box;
   top: 6px;
   bottom: 6px;
   left: calc(6px + var(--tab-index) * (var(--tab-width) + 4px));
@@ -2825,42 +3385,45 @@
 .landing-header[data-floating] .landing-header-bar {
   width: min(100%, 1040px);
   translate: 0 4px;
-  border-color: var(--landing-header-edge);
-  background-color: var(--landing-header-glass);
-  box-shadow:
-    0 2px 6px rgb(52 18 0 / 0.06),
-    0 16px 36px -16px rgb(52 18 0 / 0.3);
-  backdrop-filter: blur(18px) saturate(1.4);
-  -webkit-backdrop-filter: blur(18px) saturate(1.4);
+  border-color: var(--glass-edge);
+  background-color: var(--glass-fill-strong);
+  outline: 1px solid var(--glass-outer);
+  outline-offset: 0;
+  box-shadow: var(--glass-shadow);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
 }
 
 .landing-header-nav {
-  border-color: rgb(255 255 255 / 0.7);
-  background-color: rgb(255 255 255 / 0.45);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
+  border-color: var(--glass-edge);
+  background-color: var(--glass-fill);
+  outline: 1px solid var(--glass-outer);
+  outline-offset: 0;
+  box-shadow: var(--glass-shadow);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
   transition:
     background-color 400ms ease,
     border-color 400ms ease;
 }
 
-:where([data-theme="dark"]) .landing-header-nav {
-  border-color: rgb(255 255 255 / 0.1);
-  background-color: rgb(0 0 0 / 0.3);
-}
-
 .landing-header[data-floating] .landing-header-nav {
   border-color: transparent;
   background-color: transparent;
+  outline-color: transparent;
+  box-shadow: none;
   backdrop-filter: none;
   -webkit-backdrop-filter: none;
 }
 
 .landing-header-menu {
-  border-color: var(--landing-header-edge);
-  background-color: var(--landing-header-menu);
+  /* Solid glass (its tokens), a deeper drop: it hangs over the page. */
+  border-color: var(--glass-solid-edge);
+  background-color: var(--glass-solid-fill);
+  outline: 1px solid var(--glass-solid-outer);
+  outline-offset: 0;
   box-shadow:
-    0 2px 6px rgb(52 18 0 / 0.06),
+    var(--glass-solid-shadow),
     0 24px 48px -20px rgb(52 18 0 / 0.35);
   opacity: 0;
   translate: 0 -8px;
@@ -3891,22 +4454,36 @@
 /* ── UE ring ("UE validées" card) ──
    One segment per UE in ScoDoc's colour (--ue-color): filled once validated,
    grey with an outline below 10, filled but faded without an average yet.
-   Segments grow in one after the other. */
+   Textured as the buttons: an edge in a deeper shade of the UE's colour, a
+   white rim inside lit from the top of the ring (WidgetUes' gradient), a
+   close, sharp shadow under the ring. A pending segment (faded) stays
+   flat. Segments grow in one after the other. */
 
-.ue-ring-segment {
-  stroke-width: 2;
-  stroke-linejoin: round;
-  cursor: default;
-  outline: none;
+.ue-ring {
+  filter: drop-shadow(0 0.5px 0.5px rgb(0 0 0 / 0.1)) drop-shadow(0 1px 1.5px rgb(0 0 0 / 0.07));
+}
+
+:where([data-theme="dark"]) .ue-ring {
+  filter: drop-shadow(0 0.5px 0.5px rgb(0 0 0 / 0.4)) drop-shadow(0 1px 1.5px rgb(0 0 0 / 0.3));
+}
+
+.ue-ring-group {
   transform-box: view-box;
   transform-origin: 50% 50%;
   transition: opacity 150ms ease-out;
   animation: ue-ring-segment-in 520ms cubic-bezier(0.16, 1, 0.3, 1) backwards;
 }
 
+.ue-ring-segment {
+  stroke-width: 0.75;
+  stroke-linejoin: round;
+  cursor: default;
+  outline: none;
+}
+
 .ue-ring-segment--validated {
   fill: var(--ue-color);
-  stroke: var(--ue-color);
+  stroke: color-mix(in oklab, var(--ue-color), black 20%);
 }
 
 .ue-ring-segment--below {
@@ -3926,8 +4503,34 @@
   stroke: none;
 }
 
+/* The rim: 1.6 wide on the edge, clipped to the segment (its inner half). */
+.ue-ring-rim {
+  fill: none;
+  stroke-width: 1.6;
+  stroke-linejoin: round;
+  pointer-events: none;
+}
+
+.ue-ring-rim-top {
+  stop-color: #fff;
+  stop-opacity: 0.45;
+}
+
+.ue-ring-rim-bottom {
+  stop-color: #fff;
+  stop-opacity: 0.06;
+}
+
+:where([data-theme="dark"]) .ue-ring-rim-top {
+  stop-opacity: 0.28;
+}
+
+:where([data-theme="dark"]) .ue-ring-rim-bottom {
+  stop-opacity: 0.04;
+}
+
 /* Hovering or focusing a segment dims the others. */
-.ue-ring:has(.ue-ring-segment--active) .ue-ring-segment:not(.ue-ring-segment--active) {
+.ue-ring:has(.ue-ring-group.is-active) .ue-ring-group:not(.is-active) {
   opacity: 0.4;
 }
 
@@ -3939,7 +4542,7 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .ue-ring-segment {
+  .ue-ring-group {
     animation: none;
   }
 }
@@ -4220,16 +4823,11 @@
   }
 }
 
-/* The simulator's grade fields: one holding a grade typed in, and its
-   evaluation card, take the brand tint, so what's made up stands apart
-   from what's real. */
+/* The simulator's grade fields (.field: their focus its firmer stroke):
+   one holding a grade typed in, and its evaluation card, take the brand
+   tint, so what's made up stands apart from what's real. */
 .simulation-input {
   transition: border-color 150ms ease, background-color 150ms ease;
-}
-
-.simulation-input:focus-visible {
-  outline: 2px solid var(--color-brand);
-  outline-offset: 1px;
 }
 
 .simulation-input--set {
@@ -4250,13 +4848,22 @@
    edge and drifting slowly back and forth (--material-wash, set by
    Material; the brand's by default), so it reads as the way into something
    to play with. With a mouse, the wash also leans towards the pointer
-   (--material-shift, -1 to 1, set by Material). */
+   (--material-shift, -1 to 1, set by Material).
+   As a button or a link, it takes the primary button's edge (.lent-button)
+   and its smooth shape (SmoothSurface): below. --material-ring is that
+   edge's outer stroke, none on a field or a tile. The face and the lift
+   are variables, set per state, read by the CSS look and the smooth one
+   alike (--material-drop: the lift as a filter, for the smooth shape). */
 .material {
   --material-wash: linear-gradient(100deg, var(--color-brand), #e9b44c, var(--color-brand));
+  --material-ring: 0 0 0 0 transparent;
+  --material-face: #ffffff;
+  --material-near: 0 1px 1px rgb(52 18 0 / 0.05);
+  --material-far: 0 1px 3px rgb(52 18 0 / 0.07);
+  --material-drop: drop-shadow(0 1px 0.5px rgb(52 18 0 / 0.05)) drop-shadow(0 1px 1.5px rgb(52 18 0 / 0.07));
   border: 1px solid #ffffff;
-  background-color: #ffffff;
-  color: var(--color-text);
-  box-shadow: 0 1px 3px rgb(52 18 0 / 0.08), 0 8px 20px -10px rgb(52 18 0 / 0.28);
+  background-color: var(--material-face);
+  box-shadow: var(--material-ring), var(--material-near), var(--material-far);
   transition: box-shadow 150ms ease, transform 100ms ease-out;
 }
 
@@ -4304,7 +4911,9 @@
 
 @media (hover: hover) {
   .material:hover:not(:disabled) {
-    box-shadow: 0 1px 3px rgb(52 18 0 / 0.1), 0 12px 26px -12px rgb(52 18 0 / 0.34);
+    --material-near: 0 1px 1px rgb(52 18 0 / 0.07);
+    --material-far: 0 2px 4px rgb(52 18 0 / 0.09);
+    --material-drop: drop-shadow(0 1px 0.5px rgb(52 18 0 / 0.07)) drop-shadow(0 2px 2px rgb(52 18 0 / 0.09));
   }
 
   .material:hover .material-wash-frame {
@@ -4313,20 +4922,107 @@
 }
 
 :where([data-theme="dark"]) .material {
+  --material-face: #1c1c1c;
+  --material-near: 0 1px 1px rgb(0 0 0 / 0.3);
+  --material-far: 0 1px 3px rgb(0 0 0 / 0.3);
+  --material-drop: drop-shadow(0 1px 0.5px rgb(0 0 0 / 0.3)) drop-shadow(0 1px 1.5px rgb(0 0 0 / 0.3));
   border-color: rgb(255 255 255 / 0.08);
-  background-color: #1c1c1c;
-  box-shadow: 0 1px 3px rgb(0 0 0 / 0.4), 0 8px 20px -10px rgb(0 0 0 / 0.7);
+}
+
+/* A button or a link of the material: the primary button's edge. A 1px
+   dark stroke outside (--material-ring, in the shadow so it takes no room)
+   and a 1px white stroke inside over the border's place, bright at the top
+   and fading down (::before, a gradient masked to a ring). The face shades
+   a touch towards the bottom so the white rim reads on a white button.
+   Pressed, the rim dims. The stroke draws the edge: the white border goes.
+   --surface-*: what SmoothSurface draws, from the same values. */
+:is(button, a).material {
+  --material-button-edge: color-mix(in srgb, var(--color-text) 12%, transparent);
+  --material-rim-top: 1;
+  --material-rim-mid: 0.55;
+  --material-rim-bottom: 0.35;
+  --material-rim-opacity: 0;
+  --material-shade-top: rgb(255 255 255 / 0);
+  --material-shade-bottom: rgb(255 255 255 / 0);
+  --material-ring: 0 0 0 1px var(--material-button-edge);
+  --surface-face: var(--material-face);
+  --surface-edge: var(--material-button-edge);
+  --surface-shade-top: var(--material-shade-top);
+  --surface-shade-bottom: var(--material-shade-bottom);
+  --surface-rim-top: var(--material-rim-top);
+  --surface-rim-mid: var(--material-rim-mid);
+  --surface-rim-bottom: var(--material-rim-bottom);
+  --surface-rim-opacity: var(--material-rim-opacity);
+  --surface-drop: var(--material-drop);
+  border-color: transparent;
+  background-image: linear-gradient(180deg, var(--material-shade-top) 30%, var(--material-shade-bottom));
+}
+
+/* Positioned for the rim, in the components layer so a caller's absolute
+   or fixed (a utility) still wins. Disabled, it fades, keeps no lift and
+   doesn't press: the same layer, so a caller's disabled:… still wins. */
+@layer components {
+  /* The text colour too: a caller's text-… (text-brand, text-error) wins. */
+  .material {
+    color: var(--color-text);
+  }
+
+  :is(button, a).material {
+    position: relative;
+  }
+
+  .material:disabled,
+  .material[aria-disabled="true"] {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+}
+
+.material:disabled,
+.material[aria-disabled="true"] {
+  --material-near: 0 0 0 0 transparent;
+  --material-far: 0 0 0 0 transparent;
+  --material-drop: drop-shadow(0 0 0 transparent) drop-shadow(0 0 0 transparent);
+}
+
+:is(button, a).material::before {
+  content: '';
+  position: absolute;
+  inset: -1px;
+  padding: 1px;
+  border-radius: inherit;
+  background: linear-gradient(180deg, rgb(255 255 255 / var(--material-rim-top)) 0%, rgb(255 255 255 / var(--material-rim-mid)) 42%, rgb(255 255 255 / var(--material-rim-bottom)) 100%);
+  opacity: var(--material-rim-opacity);
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask: linear-gradient(#000 0 0) content-box exclude, linear-gradient(#000 0 0);
+  pointer-events: none;
+  transition: opacity 220ms ease;
+}
+
+:is(button, a).material:active:not(:disabled)::before {
+  transition-duration: 80ms;
+}
+
+/* Dark: the face is the card's colour, the edge outlines the button:
+   white at 22 %, subtle (about 2:1 on the dark surfaces). The label
+   names the button and keeps 4.5:1 or more, which is what WCAG asks of a
+   text button; 38 % would give its outline 3:1 too, should it ever need
+   to stand alone (an icon-only button). */
+:where([data-theme="dark"]) :is(button, a).material {
+  --material-button-edge: rgb(255 255 255 / 0.22);
 }
 
 /* In the mail reader's white panel the white edge would vanish: a hairline
-   instead, so its chips and buttons still read as lifted. */
-.mail-reader-panel .material,
-.side-panel .material {
+   instead, so its fields still read as lifted (its buttons have their
+   stroke). */
+.mail-reader-panel .material:not(button, a),
+.side-panel .material:not(button, a) {
   border-color: rgb(52 18 0 / 0.1);
 }
 
-:where([data-theme="dark"]) .mail-reader-panel .material,
-:where([data-theme="dark"]) .side-panel .material {
+:where([data-theme="dark"]) .mail-reader-panel .material:not(button, a),
+:where([data-theme="dark"]) .side-panel .material:not(button, a) {
   border-color: rgb(255 255 255 / 0.08);
 }
 
@@ -4335,12 +5031,31 @@
 }
 
 /* ── Segmented control (SegmentedControl) ──
-   A recessed track (a warm well, a faint inner shadow) and, over the
-   picked option, a raised thumb of the material above (white, a white edge,
-   a soft warm shadow) that slides and resizes to the new pick on the
-   panels' curve, and gives a little under the press as material does. The
-   options' text over it: the picked one full strength. */
+   In the soft style (no primary colour in it): the track a fill with a
+   faint hairline (--segmented-edge-top, -bottom), no rim, no gradient
+   (--segmented-well, kept at none). Over the picked option, a raised
+   white thumb: a faint hairline and a soft shadow, no rim, no gradient;
+   it slides and resizes to the new pick on
+   the panels' curve, and gives a little under the press as material does.
+   Both on the smooth pill (SmoothSurface, reading --surface-*) once
+   mounted; till then the same in CSS. The options' text over it: the
+   picked one full strength. */
 .segmented {
+  --segmented-fill: color-mix(in srgb, var(--ink) 6%, transparent);
+  --segmented-edge-top: color-mix(in srgb, var(--ink) 10%, transparent);
+  --segmented-edge-bottom: color-mix(in srgb, var(--ink) 10%, transparent);
+  --segmented-well: rgb(0 0 0 / 0);
+  --surface-face: var(--segmented-fill);
+  --surface-edge-top: var(--segmented-edge-top);
+  --surface-edge-bottom: var(--segmented-edge-bottom);
+  --surface-shade-top: rgb(0 0 0 / 0);
+  --surface-shade-bottom: rgb(0 0 0 / 0);
+  --surface-press: var(--segmented-well);
+  --surface-rim-top: 0;
+  --surface-rim-mid: 0.04;
+  --surface-rim-bottom: 0.3;
+  --surface-rim-opacity: 0;
+  --surface-drop: none;
   position: relative;
   isolation: isolate;
   display: inline-flex;
@@ -4348,10 +5063,18 @@
   gap: 2px;
   padding: 3px;
   border-radius: 9999px;
-  background-color: color-mix(in srgb, var(--ink) 5%, transparent);
+  background-color: var(--segmented-fill);
   box-shadow:
-    inset 0 1px 2px color-mix(in srgb, var(--ink) 8%, transparent),
-    inset 0 0 0 1px color-mix(in srgb, var(--ink) 5%, transparent);
+    0 -1px 0 var(--segmented-edge-top),
+    0 1px 0 var(--segmented-edge-bottom),
+    inset 0 1px 2px var(--segmented-well);
+}
+
+:where([data-theme="dark"]) .segmented {
+  --segmented-edge-top: rgb(255 255 255 / 0.08);
+  --segmented-edge-bottom: rgb(255 255 255 / 0.08);
+  --segmented-well: rgb(0 0 0 / 0);
+  --surface-rim-bottom: 0.08;
 }
 
 .segmented--stretch {
@@ -4369,12 +5092,33 @@
   width: var(--segmented-w);
   transform: translateX(var(--segmented-x));
   box-sizing: border-box;
+  --segmented-thumb-edge: color-mix(in srgb, var(--ink) 10%, transparent);
+  --surface-face: var(--surface-thumb);
+  --surface-edge: var(--segmented-thumb-edge);
+  /* Its own edge, one colour: not the track's carved one. */
+  --surface-edge-top: var(--segmented-thumb-edge);
+  --surface-edge-bottom: var(--segmented-thumb-edge);
+  --surface-shade-top: rgb(255 255 255 / 0);
+  --surface-shade-bottom: rgb(255 255 255 / 0);
+  --surface-press: rgb(0 0 0 / 0);
+  --surface-rim-opacity: 0;
+  --surface-drop: drop-shadow(0 1px 0.5px rgb(52 18 0 / 0.08)) drop-shadow(0 1px 2px rgb(52 18 0 / 0.1));
   border: 1px solid var(--surface-thumb);
   border-radius: 9999px;
   background-color: var(--surface-thumb);
   box-shadow:
-    0 1px 2px color-mix(in srgb, var(--ink) 10%, transparent),
-    0 4px 12px -4px color-mix(in srgb, var(--ink) 26%, transparent);
+    0 0 0 1px var(--segmented-thumb-edge),
+    0 1px 1px rgb(52 18 0 / 0.08),
+    0 1px 3px rgb(52 18 0 / 0.1);
+}
+
+:where([data-theme="dark"]) .segmented-thumb {
+  --segmented-thumb-edge: rgb(255 255 255 / 0.08);
+  --surface-drop: drop-shadow(0 1px 0.5px rgb(0 0 0 / 0.3)) drop-shadow(0 1px 2px rgb(0 0 0 / 0.3));
+  box-shadow:
+    0 0 0 1px var(--segmented-thumb-edge),
+    0 1px 1px rgb(0 0 0 / 0.3),
+    0 1px 3px rgb(0 0 0 / 0.3);
 }
 
 .segmented[data-ready] .segmented-thumb {
@@ -4525,8 +5269,16 @@
   padding: 0;
   border: 0;
   border-radius: 50%;
-  background: linear-gradient(rgb(255 255 255 / 0.16), rgb(255 255 255 / 0) 70%) var(--swatch);
-  box-shadow: inset 0 0 0 1px rgb(0 0 0 / 0.1);
+  /* A bead, as the graphs' dots: lit from above, shaded at its foot, a
+     hairline and a close shadow. */
+  background:
+    radial-gradient(circle at 50% 26%, rgb(255 255 255 / 0.4), rgb(255 255 255 / 0) 58%),
+    var(--swatch);
+  box-shadow:
+    inset 0 -1.5px 2px rgb(0 0 0 / 0.22),
+    inset 0 0 0 0.5px rgb(0 0 0 / 0.14),
+    0 1px 2px rgb(52 18 0 / 0.18),
+    0 2px 4px -1px rgb(52 18 0 / 0.14);
   color: var(--swatch-ink);
   cursor: pointer;
   transition: scale 260ms var(--palette-settle);
@@ -5131,15 +5883,11 @@
   outline-offset: 0;
 }
 
-.ue-card-news,
-.ue-full-close,
-.ue-also-link {
+.ue-card-news {
   transition: background-color 150ms ease, color 150ms ease;
 }
 
-.ue-card-news:hover,
-.ue-full-close:hover,
-.ue-also-link:hover {
+.ue-card-news:hover {
   background-color: color-mix(in srgb, var(--color-brand-subtle) 70%, transparent);
   color: var(--color-text);
 }
@@ -5355,20 +6103,28 @@
 
 .gx-stage {
   background: #f3f1eb;
+  /* Carved in (as .engraved): the schemas sit in a well. */
+  box-shadow:
+    inset 0 1px 3px rgb(52 18 0 / 0.12),
+    inset 0 0 0 1px color-mix(in srgb, var(--ink) 6%, transparent);
 }
 
 :where([data-theme="dark"]) .gx-stage {
   background: #141414;
+  box-shadow:
+    inset 0 1px 3px rgb(0 0 0 / 0.6),
+    inset 0 0 0 1px rgb(255 255 255 / 0.03);
 }
 
-/* The schemas' cards, on the stage's tint; a hairline in dark mode where
-   the widget grey is close to the stage. */
+/* The schemas' cards, on the stage's tint: solid glass (its tokens: the
+   lit edge, the outer stroke, the close shadow). */
 .gx-card {
-  border: 1px solid #ffffff;
-}
-
-:where([data-theme="dark"]) .gx-card {
-  border-color: var(--color-border);
+  border: 1px solid;
+  border-color: var(--glass-solid-edge);
+  background-color: var(--glass-solid-fill);
+  outline: 1px solid var(--glass-solid-outer);
+  outline-offset: 0;
+  box-shadow: var(--glass-solid-shadow);
 }
 
 /* Phosphor-like coin, as next to a UE's ECTS on the tiles. */
@@ -5633,38 +6389,23 @@
   opacity: 1;
 }
 
-.mail-unread-dot,
-.mail-unread-pill {
+.mail-unread-dot {
   background-color: #1a73e8;
 }
 
-.mail-unread-pill {
-  color: #ffffff;
-}
-
-:where([data-theme="dark"]) .mail-unread-dot,
-:where([data-theme="dark"]) .mail-unread-pill {
+:where([data-theme="dark"]) .mail-unread-dot {
   background-color: #5b9dff;
 }
 
-:where([data-theme="dark"]) .mail-unread-pill {
-  color: #0f0f0f;
+/* The unread count: a tag (.lent-button--tag) in the mail's blue. */
+.lent-button.mail-unread-pill {
+  --lent-button-fill: #1a73e8;
+  --lent-button-ink: #ffffff;
 }
 
-/* The mail page's count, raised like the UE tags (.ue-also-tag): a lit top
-   edge, a darker bottom one, a shadow tinted with the pill's deep shade. */
-.mail-unread-pill--raised {
-  box-shadow:
-    inset 0 1px 0 rgb(255 255 255 / 0.35),
-    inset 0 -1px 0 rgb(0 0 0 / 0.12),
-    -1px 2px 4px -1px color-mix(in srgb, #0b3d82 55%, transparent);
-}
-
-:where([data-theme="dark"]) .mail-unread-pill--raised {
-  box-shadow:
-    inset 0 1px 0 rgb(255 255 255 / 0.4),
-    inset 0 -1px 0 rgb(0 0 0 / 0.15),
-    -1px 2px 4px -1px rgb(0 0 0 / 0.6);
+:where([data-theme="dark"]) .lent-button.mail-unread-pill {
+  --lent-button-fill: #5b9dff;
+  --lent-button-ink: #0f0f0f;
 }
 
 /* ── Widget row layout with paired list cards ──
@@ -5867,15 +6608,16 @@
   opacity: 1;
 }
 
-/* Urgency palette: amber = due within 48 h, red = overdue. */
-.deadline-pill {
-  background-color: #f59e0b;
-  color: #2b1600;
+/* Urgency palette: amber = due within 48 h, red = overdue. The count is a
+   tag (.lent-button--tag) in those colours. */
+.lent-button.deadline-pill {
+  --lent-button-fill: #f59e0b;
+  --lent-button-ink: #2b1600;
 }
 
-.deadline-pill.deadline-pill-overdue {
-  background-color: #dc2626;
-  color: #ffffff;
+.lent-button.deadline-pill.deadline-pill-overdue {
+  --lent-button-fill: #dc2626;
+  --lent-button-ink: #ffffff;
 }
 
 .deadline-due-soon {
@@ -5891,14 +6633,14 @@
   opacity: 0.75;
 }
 
-:where([data-theme="dark"]) .deadline-pill {
-  background-color: #fbbf24;
-  color: #0f0f0f;
+:where([data-theme="dark"]) .lent-button.deadline-pill {
+  --lent-button-fill: #fbbf24;
+  --lent-button-ink: #0f0f0f;
 }
 
-:where([data-theme="dark"]) .deadline-pill.deadline-pill-overdue {
-  background-color: #f87171;
-  color: #0f0f0f;
+:where([data-theme="dark"]) .lent-button.deadline-pill.deadline-pill-overdue {
+  --lent-button-fill: #f87171;
+  --lent-button-ink: #0f0f0f;
 }
 
 :where([data-theme="dark"]) .deadline-due-soon {
@@ -5920,48 +6662,23 @@
     0 0 0 1px rgba(255, 255, 255, 0.06);
 }
 
-/* ── Header account button depth ── */
-
-.header-account-btn {
-  box-shadow:
-    0 1px 3px rgba(0, 0, 0, 0.06),
-    0 0 0 1px rgba(0, 0, 0, 0.04);
-}
-
-:where([data-theme="dark"]) .header-account-btn {
-  box-shadow:
-    0 1px 3px rgba(0, 0, 0, 0.2),
-    0 0 0 1px rgba(255, 255, 255, 0.06);
-}
-
-/* Phones: the header buttons float over the photo as frosted glass, like the
-   tab bar (same tint and sheen, with a softer white edge). */
+/* Phones: the header buttons float over the photo in the glass material,
+   like the tab bar. */
 @media (width < 1024px) {
   .header-account-btn,
   .header-logout-btn {
-    background-color: rgb(252 251 248 / 0.5);
-    background-image: linear-gradient(180deg, rgb(255 255 255 / 0.45), rgb(255 255 255 / 0.08));
-    border-color: rgb(255 255 255 / 0.3);
-    -webkit-backdrop-filter: blur(20px) saturate(1.8);
-    backdrop-filter: blur(20px) saturate(1.8);
-    box-shadow:
-      inset 0 1px 0 rgb(255 255 255 / 0.4),
-      0 6px 18px -8px rgb(52 18 0 / 0.3);
+    background-color: var(--glass-fill);
+    border-color: var(--glass-edge);
+    outline: 1px solid var(--glass-outer);
+    outline-offset: 0;
+    -webkit-backdrop-filter: var(--glass-blur);
+    backdrop-filter: var(--glass-blur);
+    box-shadow: var(--glass-shadow);
   }
 
   .header-account-btn:active:not(:disabled),
   .header-logout-btn:active:not(:disabled) {
     background-color: rgb(255 255 255 / 0.75);
-  }
-
-  :where([data-theme="dark"]) .header-account-btn,
-  :where([data-theme="dark"]) .header-logout-btn {
-    background-color: rgb(28 28 28 / 0.45);
-    background-image: linear-gradient(180deg, rgb(255 255 255 / 0.1), rgb(255 255 255 / 0.02));
-    border-color: rgb(255 255 255 / 0.12);
-    box-shadow:
-      inset 0 1px 0 rgb(255 255 255 / 0.14),
-      0 6px 18px -8px rgb(0 0 0 / 0.6);
   }
 
   :where([data-theme="dark"]) .header-account-btn:active:not(:disabled),
@@ -5971,23 +6688,20 @@
 }
 
 /* ── « Nouveautés » pill (src/components/ChangelogPill.jsx) ──
-   Quiet surface like the selected sidebar item; on phones it floats over
-   the photo as frosted glass, like the header buttons above it. The dot
+   Solid glass; on phones, floating over the photo, the glass itself, like
+   the header buttons above it. The dot
    uses the unread-mail blue: something new, nothing urgent. */
 
 .changelog-pill {
-  background-color: var(--color-widget-bg);
-  border-color: #ffffff;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+  background-color: var(--glass-solid-fill);
+  border-color: var(--glass-solid-edge);
+  outline: 1px solid var(--glass-solid-outer);
+  outline-offset: 0;
+  box-shadow: var(--glass-solid-shadow);
 }
 
 .changelog-pill:hover {
-  background-color: var(--color-bg-subtle);
-}
-
-:where([data-theme="dark"]) .changelog-pill {
-  border-color: rgba(255, 255, 255, 0.08);
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+  background-color: var(--glass-solid-fill-hover);
 }
 
 .changelog-new-dot {
@@ -6000,23 +6714,9 @@
 
 @media (width < 1024px) {
   .changelog-pill {
-    background-color: rgb(252 251 248 / 0.5);
-    background-image: linear-gradient(180deg, rgb(255 255 255 / 0.45), rgb(255 255 255 / 0.08));
-    border-color: rgb(255 255 255 / 0.3);
-    -webkit-backdrop-filter: blur(20px) saturate(1.8);
-    backdrop-filter: blur(20px) saturate(1.8);
-    box-shadow:
-      inset 0 1px 0 rgb(255 255 255 / 0.4),
-      0 6px 18px -8px rgb(52 18 0 / 0.3);
-  }
-
-  :where([data-theme="dark"]) .changelog-pill {
-    background-color: rgb(28 28 28 / 0.45);
-    background-image: linear-gradient(180deg, rgb(255 255 255 / 0.1), rgb(255 255 255 / 0.02));
-    border-color: rgb(255 255 255 / 0.12);
-    box-shadow:
-      inset 0 1px 0 rgb(255 255 255 / 0.14),
-      0 6px 18px -8px rgb(0 0 0 / 0.6);
+    background-color: var(--glass-fill);
+    -webkit-backdrop-filter: var(--glass-blur);
+    backdrop-filter: var(--glass-blur);
   }
 }
 
@@ -6452,7 +7152,13 @@
   font-size: 13px;
   font-weight: 600;
   line-height: 1;
-  box-shadow: 0 6px 16px -8px rgb(52 18 0 / 0.4);
+  /* The tags' material, in its tint: a thin edge in a deeper shade, a
+     soft highlight inside the top edge, a close, sharp shadow. */
+  box-shadow:
+    0 0 0 0.5px color-mix(in oklab, currentColor, black 30%),
+    inset 0 1px 0 rgb(255 255 255 / 0.22),
+    0 1px 1px rgb(52 18 0 / 0.2),
+    0 2px 3px -1px rgb(52 18 0 / 0.2);
 }
 
 /* Its text in the page's colour over the tint (white-ish on the light
@@ -6471,6 +7177,10 @@
   border: 0;
   border-radius: 9999px;
   background-color: color-mix(in srgb, var(--color-bg) 18%, transparent);
+  /* A small raised disc on the tint: a hairline, a lit top edge. */
+  box-shadow:
+    0 0 0 0.5px rgb(0 0 0 / 0.16),
+    inset 0 1px 0 rgb(255 255 255 / 0.28);
   cursor: pointer;
   transition: background-color 150ms ease;
 }
@@ -6512,7 +7222,12 @@
   padding: 4px;
   border-radius: 9999px;
   background-color: currentColor;
-  box-shadow: 0 6px 16px -8px rgb(52 18 0 / 0.4);
+  /* The tags' material in its tint, as the frame's tab. */
+  box-shadow:
+    0 0 0 0.5px color-mix(in oklab, currentColor, black 30%),
+    inset 0 1px 0 rgb(255 255 255 / 0.22),
+    0 1px 1px rgb(52 18 0 / 0.2),
+    0 2px 3px -1px rgb(52 18 0 / 0.2);
   animation: planning-viewed-in 240ms ease-out both;
 }
 
@@ -6581,14 +7296,27 @@
   flex-shrink: 0;
   align-items: center;
   padding: 2px;
-  border: 1px solid #ffffff;
+  /* Solid glass (its tokens). */
+  border: 1px solid;
+  border-color: var(--glass-solid-edge);
   border-radius: 9999px;
-  background-color: #ffffff;
-  box-shadow: 0 1px 3px rgb(52 18 0 / 0.08), 0 8px 20px -10px rgb(52 18 0 / 0.28);
+  background-color: var(--glass-solid-fill);
+  outline: 1px solid var(--glass-solid-outer);
+  outline-offset: 0;
+  box-shadow: var(--glass-solid-shadow);
 }
 
 .button-group:empty {
   display: none;
+}
+
+/* The mail reader's close button: the side panel's, wide screens only (a
+   phone's reader has its back button). Here, not as a utility: the group's
+   display above would win over `max-4xl:hidden`. */
+@media (max-width: 1023.98px) {
+  .mail-toolbar-close {
+    display: none;
+  }
 }
 
 .button-group > * + * {
@@ -6666,26 +7394,10 @@
   cursor: default;
 }
 
-/* On a white panel, sheet or composer the white edge vanishes: a hairline
-   instead (the dark theme's own after). */
-:is(.side-panel, .mail-reader-panel, .mail-composer) .button-group {
-  border-color: rgb(52 18 0 / 0.08);
-}
-
 @media (max-width: 1023px) {
   .button-group {
     padding: 1px;
   }
-}
-
-:where([data-theme="dark"]) .button-group {
-  border-color: rgb(255 255 255 / 0.08);
-  background-color: #1c1c1c;
-  box-shadow: 0 1px 3px rgb(0 0 0 / 0.4), 0 8px 20px -10px rgb(0 0 0 / 0.7);
-}
-
-:where([data-theme="dark"]) :is(.side-panel, .mail-reader-panel, .mail-composer) .button-group {
-  border-color: rgb(255 255 255 / 0.08);
 }
 
 :where([data-theme="dark"]) .button-group > * + *::before {
@@ -6806,24 +7518,41 @@
 
 /* ── Keyframes ── */
 
-@keyframes lent-button-bounce {
-  0%, 80%, 100% { transform: scale(0.6); opacity: 0.4; }
-  40% { transform: scale(1); opacity: 1; }
+/* The loading spinner (LoadingDots): the whole turns fast and steadily
+   (0.7 s a turn) while the arc, from a dot to three quarters of the ring,
+   grows and shrinks on its own beat (1.3 s). Its pathLength is 100, so the
+   dash is in hundredths of the ring: at the loop's end the arc has shrunk
+   back to a dot just before where it started, so it loops without a jump. */
+@keyframes loading-spinner-turn {
+  to { transform: rotate(360deg); }
 }
 
-.lent-button-dot {
-  animation: lent-button-bounce 1s ease-in-out infinite;
+@keyframes loading-spinner-arc {
+  0% { stroke-dasharray: 2 200; stroke-dashoffset: 0; }
+  50% { stroke-dasharray: 72 200; stroke-dashoffset: -26; }
+  100% { stroke-dasharray: 72 200; stroke-dashoffset: -98; }
 }
 
-/* Reduced motion: the dots still say "loading", by fading only. */
-@keyframes lent-button-fade {
-  0%, 80%, 100% { opacity: 0.4; }
-  40% { opacity: 1; }
+.loading-spinner {
+  animation: loading-spinner-turn 0.7s linear infinite;
 }
 
+.loading-spinner-arc {
+  transform: rotate(-90deg);
+  transform-origin: 50% 50%;
+  stroke-dasharray: 2 200;
+  animation: loading-spinner-arc 1.3s cubic-bezier(0.45, 0, 0.25, 1) infinite;
+}
+
+/* Reduced motion: a quarter arc turning slowly, still saying "loading". */
 @media (prefers-reduced-motion: reduce) {
-  .lent-button-dot {
-    animation-name: lent-button-fade;
+  .loading-spinner {
+    animation-duration: 1.6s;
+  }
+
+  .loading-spinner-arc {
+    animation: none;
+    stroke-dasharray: 28 200;
   }
 }
 
@@ -6906,6 +7635,14 @@
   background-color: var(--color-widget-bg);
   background-image: var(--grade-gradient, none);
   background-repeat: no-repeat;
+}
+
+/* Its strokes and shadow: solid glass's (the disabled one keeps its own). */
+.sidebar-grade-pocket:not(.grade-feature-disabled) {
+  border-color: var(--glass-solid-edge);
+  outline: 1px solid var(--glass-solid-outer);
+  outline-offset: 0;
+  box-shadow: var(--glass-solid-shadow);
 }
 
 .sidebar-grade-pocket:hover {
@@ -7297,6 +8034,15 @@
   }
 }
 
+/* The planning's sheets are centred dialogs from 600px, round at the foot
+   too: so is their clip, or a card scrolled down there (« Formations »)
+   pokes out of the corners. */
+@media (min-width: 600px) and (max-width: 1023.98px) {
+  .planning-sheet .gd-clip {
+    clip-path: inset(0 round calc(var(--modal-radius, 26px) - 1px));
+  }
+}
+
 /* The sticky header's progressive blur: five backdrop blurs doubling in
    strength, each masked to a shorter band from the top, so content passing
    under goes from sharp (below the header) to strongly blurred (at the
@@ -7308,11 +8054,19 @@
   position: absolute;
   inset: 0 0 -28px;
   pointer-events: none;
+}
+
+/* The fade on the layers themselves, not on this container: a translucent
+   ancestor becomes their blur's backdrop root and leaves it nothing to
+   blur until it's opaque again. */
+.gd-header-blur > span,
+.gd-header-blur::after {
   opacity: 0;
   transition: opacity 220ms ease;
 }
 
-.gd-header.is-stuck .gd-header-blur {
+.gd-header.is-stuck .gd-header-blur > span,
+.gd-header.is-stuck .gd-header-blur::after {
   opacity: 1;
 }
 
@@ -7320,6 +8074,13 @@
 .gd-header-blur::after {
   position: absolute;
   inset: 0;
+}
+
+/* The blur layers start 24px above the sheet's top: a backdrop blur has
+   nothing to sample past its top edge and repeats it there as a mosaic;
+   up there, that edge is clipped away (the masks keep their top solid). */
+.gd-header-blur > span {
+  top: -24px;
 }
 
 .gd-header-blur::after {
@@ -7367,6 +8128,41 @@
   mask-image: linear-gradient(to bottom, #000 0%, #000 10%, transparent 38%);
 }
 
+/* Where the browser ties an animation to scrolling: the blur builds up
+   with it instead of switching on. Over the first 48px scrolled, each
+   blur layer and the tint fade in (--gd-blur, 0 to 1, registered so it
+   eases). The layers keep their radii: a radius changing every frame is
+   redrawn at a lower resolution, as a mosaic. And the fade is on each
+   layer itself: a translucent ancestor would cut off what their blur sees
+   (it becomes their backdrop root), why .is-stuck's fade on the container
+   seemed to switch on. Hidden at the very top. */
+@property --gd-blur {
+  syntax: '<number>';
+  inherits: true;
+  initial-value: 0;
+}
+
+@keyframes gd-blur-build {
+  from { --gd-blur: 0; visibility: hidden; }
+  to { --gd-blur: 1; visibility: visible; }
+}
+
+@supports (animation-timeline: scroll()) {
+  .gd-header-blur {
+    opacity: 1;
+    transition: none;
+    animation: gd-blur-build linear both;
+    animation-timeline: scroll(nearest block);
+    animation-range: 0 48px;
+  }
+
+  :is(.gd-header, .gd-header.is-stuck) .gd-header-blur > span,
+  :is(.gd-header, .gd-header.is-stuck) .gd-header-blur::after {
+    opacity: var(--gd-blur);
+    transition: none;
+  }
+}
+
 @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
   .gd-header-blur::after {
     background: linear-gradient(
@@ -7391,6 +8187,10 @@
 .gd-header-grade-slot > span {
   min-width: 0;
   overflow: hidden;
+  /* Room for the pill's outer stroke and shadow, inside the clip: padded,
+     and the padding given back, so the layout doesn't move. */
+  padding: 4px;
+  margin: -4px;
 }
 
 .gd-header.is-hero-gone .gd-header-grade-slot {
@@ -7416,11 +8216,6 @@
   }
 }
 
-/* Cards a shade off the sheet in dark mode, where white borders vanish. */
-:where([data-theme="dark"]) .gd-card {
-  background-color: var(--color-bg-surface);
-}
-
 /* The promo's spread on the 0–20 rule, and the student's dot gliding in
    from 0 to its grade. */
 .gd-scale-band {
@@ -7439,12 +8234,14 @@
   }
 }
 
-.gd-scale-dot {
-  box-shadow: 0 0 0 3px var(--color-widget-bg);
-}
-
-:where([data-theme="dark"]) .gd-scale-dot {
-  box-shadow: 0 0 0 3px var(--color-bg-surface);
+/* The dot: the tags' material (.lent-button--tag), its dark edge then a
+   halo of the card's fill that parts it from the track. */
+.lent-button.gd-scale-dot {
+  box-shadow:
+    0 0 0 1px var(--lent-button-edge),
+    0 0 0 3px var(--glass-solid-fill),
+    var(--lent-button-near),
+    var(--lent-button-far);
 }
 
 /* The weights ring: the "UE validées" ring's segments, each filled from
@@ -7582,12 +8379,6 @@
   to { background-color: color-mix(in srgb, var(--color-text) 14%, transparent); }
 }
 
-@media (hover: hover) {
-  .gh-retry:hover {
-    background-color: var(--color-bg-subtle);
-  }
-}
-
 @media (prefers-reduced-motion: reduce) {
   .gd-dialog,
   .gd-rise,
@@ -7628,6 +8419,14 @@
 @media (width < 1024px) {
   .dashboard-no-wallpaper .app-column > :has(~ :not([hidden]) .page-top-band) {
     background: var(--page-top-band);
+  }
+}
+
+/* On a phone the update notice floats over the tab bar (its dock is fixed,
+   out of the column's flow): no band colour behind it. */
+@media (width < 48rem) {
+  .dashboard-no-wallpaper .app-column > .update-notice-dock:has(~ :not([hidden]) .page-top-band) {
+    background: none;
   }
 }
 
@@ -7711,10 +8510,14 @@
   width: 35px;
   height: 35px;
   padding: 0;
-  border: 1px solid var(--color-border);
+  /* Solid glass (its tokens); white under the pointer. */
+  border: 1px solid;
+  border-color: var(--glass-solid-edge);
   border-radius: 999px;
-  background: var(--color-widget-bg);
-  box-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+  background: var(--glass-solid-fill);
+  outline: 1px solid var(--glass-solid-outer);
+  outline-offset: 0;
+  box-shadow: var(--glass-solid-shadow);
   color: var(--color-text);
   font-family: var(--font-display);
   font-size: 16px;
@@ -7726,7 +8529,7 @@
 
 @media (hover: hover) {
   .planning-pill:not(.is-selected, .is-filled):hover {
-    background: var(--color-bg-subtle);
+    background: var(--surface-card);
   }
 }
 
@@ -7742,6 +8545,7 @@
 .planning-pill.is-selected {
   border-color: transparent;
   background: transparent;
+  outline-color: transparent;
   box-shadow: none;
   color: var(--color-bg);
 }
@@ -7757,10 +8561,6 @@
   margin-left: -2px;
   border-radius: 999px;
   background: currentColor;
-}
-
-.planning-pill.is-today:not(.is-selected) {
-  border-color: var(--color-border-input);
 }
 
 /* The week's days over their columns (wide screens): the weekday over the
@@ -7803,7 +8603,7 @@
 
 @media (hover: hover) {
   .planning-week-head:hover .planning-pill:not(.is-filled) {
-    background: var(--color-bg-subtle);
+    background: var(--surface-card);
   }
 
   .planning-week-head:hover .planning-week-weekday {
@@ -7815,11 +8615,11 @@
   transform: scale(0.96);
 }
 
-/* The selected day, filled as the strip's capsule. */
+/* The selected day, filled as the strip's capsule (the tags' material:
+   below). */
 .planning-pill.is-filled {
   border-color: transparent;
-  background: var(--color-brand);
-  box-shadow: 0 4px 12px -4px var(--color-shadow);
+  outline-color: transparent;
   color: var(--color-bg);
 }
 
@@ -7835,8 +8635,6 @@
   height: 35px;
   margin-left: 5px;
   border-radius: 999px;
-  background: var(--color-brand);
-  box-shadow: 0 4px 12px -4px var(--color-shadow);
   animation: planning-fade-in 250ms ease-out;
   transition: width 450ms cubic-bezier(0.34, 1.3, 0.64, 1);
 }
@@ -7905,8 +8703,51 @@
 }
 
 .planning-picker-day.is-selected {
-  background: var(--color-brand);
   color: var(--color-bg);
+}
+
+/* A day or an arrow under the pointer: white, outlined by a faint hairline
+   and a soft shadow, or it vanishes on the light page and menu. */
+@media (hover: hover) {
+  .planning-picker-day:not(.is-selected):hover,
+  .planning-picker-arrow:hover {
+    box-shadow:
+      0 0 0 1px color-mix(in srgb, var(--color-text) 9%, transparent),
+      0 1px 2px rgb(0 0 0 / 0.06);
+  }
+
+  :where([data-theme="dark"]) :is(.planning-picker-day:not(.is-selected):hover, .planning-picker-arrow:hover) {
+    box-shadow: 0 0 0 1px rgb(255 255 255 / 0.08);
+  }
+}
+
+/* The Planning's selections (the strip's capsule, the week heading's
+   filled day, the calendar's picked day): the tags' material
+   (.lent-button--tag), in their own CSS so they keep their letters and
+   behaviour. A dark edge (the brand deepened), a white highlight inside
+   the top edge (it follows the curve), a close, sharp shadow. */
+.planning-selection,
+.planning-pill.is-filled,
+.planning-picker-day.is-selected,
+.planning-now-mark {
+  --planning-tag-edge: color-mix(in oklab, var(--color-brand), black 30%);
+  --planning-tag-rim: rgb(255 255 255 / 0.22);
+  background: var(--color-brand);
+  box-shadow:
+    0 0 0 0.5px var(--planning-tag-edge),
+    inset 0 1px 0 var(--planning-tag-rim),
+    0 1px 1px rgb(52 18 0 / 0.22),
+    0 2px 3px -1px rgb(52 18 0 / 0.22);
+}
+
+:where([data-theme="dark"]) :is(.planning-selection, .planning-pill.is-filled, .planning-picker-day.is-selected, .planning-now-mark) {
+  --planning-tag-edge: rgb(0 0 0 / 0.6);
+  --planning-tag-rim: rgb(255 255 255 / 0.8);
+  box-shadow:
+    0 0 0 0.5px var(--planning-tag-edge),
+    inset 0 1px 0 var(--planning-tag-rim),
+    0 1px 1px rgb(0 0 0 / 0.5),
+    0 2px 3px -1px rgb(0 0 0 / 0.5);
 }
 
 /* Pages swiped sideways (SwipePager): the page and its neighbours in a row,
@@ -8011,8 +8852,8 @@ button.planning-block {
 }
 
 @media (hover: hover) {
-  button.planning-block:hover {
-    background-color: var(--color-bg-subtle);
+  .widget-card:is(button.planning-block):hover {
+    background-color: color-mix(in srgb, var(--accent) 13%, var(--color-widget-bg));
   }
 }
 
@@ -8036,6 +8877,28 @@ button.planning-block:active {
 
 :where([data-theme="dark"]) .planning-accent-fill {
   background: var(--accent-dark);
+}
+
+/* An event's bar: its colour vivid at the top (deepened, more saturated),
+   lightening the further down it runs. */
+.planning-bar.planning-accent-fill,
+.planning-list-bar.planning-accent-fill,
+.sidebar-next-class-bar.planning-accent-fill {
+  background: linear-gradient(
+    to bottom,
+    color-mix(in oklch, var(--accent), black 6%) 0%,
+    var(--accent) 35%,
+    color-mix(in oklch, var(--accent) 40%, white) 100%
+  );
+}
+
+:where([data-theme="dark"]) :is(.planning-bar, .planning-list-bar, .sidebar-next-class-bar).planning-accent-fill {
+  background: linear-gradient(
+    to bottom,
+    var(--accent-dark) 0%,
+    color-mix(in oklch, var(--accent-dark) 80%, white) 40%,
+    color-mix(in oklch, var(--accent-dark) 45%, white) 100%
+  );
 }
 
 .planning-bar {
@@ -8119,7 +8982,10 @@ button.planning-block:active {
 .planning-now-mark {
   position: absolute;
   top: 0;
-  left: 0;
+  /* 2px in from the edge: its edge and shadow would be cut by the week's
+     clip (the swipe pager); over the line's start. */
+  left: 2px;
+  z-index: 1;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -8171,7 +9037,10 @@ li + li > .planning-row .planning-row-text {
 
 @media (hover: hover) {
   .planning-row.is-link:hover {
-    background-color: var(--color-bg-subtle);
+    background-color: var(--surface-card);
+    box-shadow:
+      0 0 0 1px color-mix(in srgb, var(--color-text) 9%, transparent),
+      0 1px 2px rgb(0 0 0 / 0.06);
   }
 
   li:has(> .planning-row.is-link:hover) + li > .planning-row .planning-row-text,
@@ -8181,7 +9050,7 @@ li + li > .planning-row .planning-row-text {
 }
 
 .planning-row.is-link:active {
-  background-color: var(--color-bg-subtle);
+  background-color: var(--surface-card);
 }
 
 li:has(> .planning-row.is-link:active) + li > .planning-row .planning-row-text,
@@ -8283,7 +9152,10 @@ li:has(> .planning-row.is-link:active) + li > .planning-row .planning-row-text,
 
 @media (hover: hover) {
   .planning-note-link:hover {
-    background: var(--color-bg-subtle);
+    background: var(--surface-card);
+    box-shadow:
+      0 0 0 1px color-mix(in srgb, var(--color-text) 9%, transparent),
+      0 1px 2px rgb(0 0 0 / 0.06);
   }
 }
 
@@ -8348,8 +9220,8 @@ li:has(> .planning-row.is-link:active) + li > .planning-row .planning-row-text,
 }
 
 @media (hover: hover) {
-  .planning-list-card:hover {
-    background-color: var(--color-bg-subtle);
+  .widget-card.planning-list-card:hover {
+    background-color: color-mix(in srgb, var(--accent) 13%, var(--color-widget-bg));
   }
 }
 
@@ -8406,21 +9278,10 @@ li:has(> .planning-row.is-link:active) + li > .planning-row .planning-row-text,
 .planning-sheet .widget-card,
 .mail-reader-panel .widget-card,
 .side-panel .widget-card {
-  --color-widget-bg: var(--material-solid);
-  --color-bg-subtle: var(--material-solid-hover);
-  border-color: var(--line);
+  --color-widget-bg: var(--glass-solid-fill);
+  --color-bg-subtle: var(--glass-solid-fill-hover);
   -webkit-backdrop-filter: none;
   backdrop-filter: none;
-  box-shadow: 0 1px 3px rgb(52 18 0 / 0.06), 0 10px 28px -14px rgb(52 18 0 / 0.16);
-}
-
-:where([data-theme="dark"]) .planning-sheet .widget-card,
-:where([data-theme="dark"]) .mail-reader-panel .widget-card,
-:where([data-theme="dark"]) .side-panel .widget-card {
-  --color-widget-bg: var(--material-solid);
-  --color-bg-subtle: var(--material-solid-hover);
-  border-color: var(--material-solid-edge);
-  box-shadow: 0 1px 3px rgb(0 0 0 / 0.3);
 }
 
 /* The sheet already wears the course's wash: its block stays plain. */
@@ -8549,51 +9410,78 @@ li:has(> .planning-row.is-link:active) + li > .planning-row .planning-row-text,
   --color-bg-muted: #363636;
 }
 
+/* The format bar's groups (colour, B I U S, lists): wells carved into the
+   composer, not raised on it: a faint ink fill, an inner shadow under the
+   top edge, a light lip below. A pressed button rises out of it. */
+.format-well {
+  background-color: color-mix(in srgb, var(--ink) 5%, transparent);
+  box-shadow:
+    inset 0 1px 2px rgb(52 18 0 / 0.12),
+    inset 0 0 0 1px color-mix(in srgb, var(--ink) 6%, transparent),
+    0 1px 0 rgb(255 255 255 / 0.85);
+}
+
+:where([data-theme="dark"]) .format-well {
+  background-color: rgb(0 0 0 / 0.22);
+  box-shadow:
+    inset 0 1px 2px rgb(0 0 0 / 0.55),
+    inset 0 0 0 1px rgb(255 255 255 / 0.03),
+    0 1px 0 rgb(255 255 255 / 0.06);
+}
+
+/* A pressed format button (bold on…): a white chip with a hairline, as a
+   menu's row under the pointer. */
+.mail-composer [role="toolbar"] button[aria-pressed="true"] {
+  background-color: var(--surface-card);
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--color-text) 9%, transparent),
+    0 1px 2px rgb(0 0 0 / 0.06);
+}
+
 :where([data-theme="dark"]) .mail-composer [role="toolbar"] button[aria-pressed="true"] {
   background-color: #444444;
-  box-shadow: 0 1px 2px rgb(0 0 0 / 0.4);
+  box-shadow: 0 0 0 1px rgb(255 255 255 / 0.08), 0 1px 2px rgb(0 0 0 / 0.4);
 }
 
-/* The mail search's field is .material, but a field, not a button: no
-   press-in when the text is clicked, no lift on hover. And a tighter,
-   lighter shadow than a button's: spread under a field this wide, the
-   material's warm one read as an orange smudge on the tinted band. */
-.mail-search-field.material,
-.mail-search-field.material:hover {
-  box-shadow: 0 1px 2px rgb(52 18 0 / 0.06), 0 3px 10px -4px rgb(52 18 0 / 0.12);
+/* The mail page's folder pills: the one shown in solid glass, not the
+   primary dark fill, too loud for a mere folder. An outline and an inset
+   rim, no border, so the pill keeps its size as it grows. */
+/* Each folder's colour (data-tint): the shown folder's pill filled with
+   it, white on it, in the tags' material (a darker hairline, a lit top
+   edge, a tight shadow); the others plain. */
+.mail-folder-pill {
+  --folder-tint: #8a6a5c;
 }
 
-.mail-search-field.material:active {
-  transform: none;
-}
+.mail-folder-pill[data-tint="inbox"] { --folder-tint: #2f6fdb; }
+.mail-folder-pill[data-tint="sent"] { --folder-tint: #2e9a5a; }
+.mail-folder-pill[data-tint="drafts"] { --folder-tint: #c48a00; }
+.mail-folder-pill[data-tint="junk"] { --folder-tint: #e0702a; }
+.mail-folder-pill[data-tint="trash"] { --folder-tint: #d1342f; }
+.mail-folder-pill[data-tint="folder"] { --folder-tint: #8a5cd6; }
 
-:where([data-theme="dark"]) .mail-search-field.material,
-:where([data-theme="dark"]) .mail-search-field.material:hover {
-  box-shadow: 0 1px 2px rgb(0 0 0 / 0.35), 0 3px 10px -4px rgb(0 0 0 / 0.5);
-}
-
-/* The mail page's folder pills: the one shown in the app's secondary look
-   (the material's white surface and soft shadow, as the search beside),
-   not the primary dark fill, too loud for a mere folder. Shadows only (no
-   border), so the pill keeps its size as it grows. */
 .mail-folder-pill--current {
-  background-color: #ffffff;
-  box-shadow: 0 1px 3px rgb(52 18 0 / 0.08), 0 8px 20px -10px rgb(52 18 0 / 0.28);
+  background-color: var(--folder-tint);
+  outline: none;
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.28),
+    0 0 0 0.5px color-mix(in oklab, var(--folder-tint), black 30%),
+    0 1px 1px rgb(52 18 0 / 0.14),
+    0 2px 4px -1px rgb(52 18 0 / 0.18);
+  color: #ffffff;
 }
 
 :where([data-theme="dark"]) .mail-folder-pill--current {
-  background-color: #262626;
-  box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.08), 0 1px 3px rgb(0 0 0 / 0.4), 0 8px 20px -10px rgb(0 0 0 / 0.7);
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.2),
+    0 0 0 0.5px color-mix(in oklab, var(--folder-tint), black 40%),
+    0 1px 2px rgb(0 0 0 / 0.5);
 }
 
 /* The unread dot on the shown folder's pill: ringed in the pill's own
    colour, so it reads as cut out of it. */
 .mail-unread-dot--on-pill {
-  --tw-ring-color: #ffffff;
-}
-
-:where([data-theme="dark"]) .mail-unread-dot--on-pill {
-  --tw-ring-color: #262626;
+  --tw-ring-color: var(--folder-tint);
 }
 
 /* After .page-top-band's own rule (position: relative), which it beats. */
@@ -8654,8 +9542,18 @@ li:has(> .planning-row.is-link:active) + li > .planning-row .planning-row-text,
   translate: -50% 0;
   border: 0;
   border-radius: 999px;
-  background: var(--color-text-muted);
-  box-shadow: 0 0 0 2px var(--color-widget-bg);
+  color: var(--color-text-muted);
+  /* A bead (as the graph's .chart-dot): lit from above, shaded below, on
+     a ring of the card's colour with a hairline and a close shadow. */
+  background:
+    radial-gradient(circle at 50% 28%, rgb(255 255 255 / 0.38), transparent 62%),
+    currentColor;
+  --mark-ring:
+    inset 0 -1px 1px rgb(0 0 0 / 0.25),
+    0 0 0 2px var(--color-widget-bg),
+    0 0 0 2.5px rgb(52 18 0 / 0.12),
+    0 1px 2px 2px rgb(52 18 0 / 0.12);
+  box-shadow: var(--mark-ring);
   /* The line picks the nearest mark (SemesterLine). */
   pointer-events: none;
   transition: scale 160ms ease, box-shadow 160ms ease;
@@ -8664,12 +9562,32 @@ li:has(> .planning-row.is-link:active) + li > .planning-row .planning-row-text,
 }
 
 .assiduity-mark.is-unjustified {
-  background: var(--color-error);
+  color: var(--color-error);
 }
 
 .assiduity-mark.is-late {
   background: var(--color-widget-bg);
-  box-shadow: inset 0 0 0 2px var(--color-text-muted), 0 0 0 2px var(--color-widget-bg);
+  --mark-ring:
+    inset 0 0 0 2px var(--color-text-muted),
+    0 0 0 2px var(--color-widget-bg),
+    0 0 0 2.5px rgb(52 18 0 / 0.12),
+    0 1px 2px 2px rgb(52 18 0 / 0.12);
+}
+
+:where([data-theme="dark"]) .assiduity-mark {
+  --mark-ring:
+    inset 0 -1px 1px rgb(0 0 0 / 0.3),
+    0 0 0 2px var(--color-widget-bg),
+    0 0 0 2.5px rgb(255 255 255 / 0.1),
+    0 1px 2px 2px rgb(0 0 0 / 0.45);
+}
+
+:where([data-theme="dark"]) .assiduity-mark.is-late {
+  --mark-ring:
+    inset 0 0 0 2px var(--color-text-muted),
+    0 0 0 2px var(--color-widget-bg),
+    0 0 0 2.5px rgb(255 255 255 / 0.1),
+    0 1px 2px 2px rgb(0 0 0 / 0.45);
 }
 
 .assiduity-mark:focus-visible {
@@ -8679,11 +9597,103 @@ li:has(> .planning-row.is-link:active) + li > .planning-row .planning-row-text,
 
 .assiduity-mark.is-active {
   scale: 1.35;
-  box-shadow: 0 0 0 2px var(--color-widget-bg), 0 0 0 5px color-mix(in srgb, var(--color-brand) 22%, transparent);
+  box-shadow: var(--mark-ring), 0 0 0 5px color-mix(in srgb, var(--color-brand) 22%, transparent);
 }
 
-.assiduity-mark.is-late.is-active {
-  box-shadow: inset 0 0 0 2px var(--color-text-muted), 0 0 0 2px var(--color-widget-bg), 0 0 0 5px color-mix(in srgb, var(--color-brand) 22%, transparent);
+/* The bars' and the semester line's tracks: grooves carved into the card
+   (an ink fill, an inner shadow under the top edge, a light lip below);
+   what fills them is raised (a lit top, a shaded foot). */
+.assiduity-track {
+  background-color: color-mix(in srgb, var(--ink) 6%, transparent);
+  box-shadow:
+    inset 0 1px 1.5px rgb(52 18 0 / 0.16),
+    inset 0 0 0 0.5px color-mix(in srgb, var(--ink) 8%, transparent),
+    0 1px 0 rgb(255 255 255 / 0.8);
+}
+
+:where([data-theme="dark"]) .assiduity-track {
+  background-color: rgb(0 0 0 / 0.3);
+  box-shadow:
+    inset 0 1px 1.5px rgb(0 0 0 / 0.6),
+    inset 0 0 0 0.5px rgb(255 255 255 / 0.03),
+    0 1px 0 rgb(255 255 255 / 0.06);
+}
+
+.assiduity-fill {
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.35),
+    inset 0 -0.5px 0 rgb(0 0 0 / 0.18);
+}
+
+/* The semester gone, in the groove: light, so the marks on it read. */
+.assiduity-elapsed {
+  background-color: color-mix(in srgb, var(--ink) 13%, var(--color-widget-bg));
+}
+
+/* Today on the semester line: a small raised tag in the brand colour. */
+.assiduity-today {
+  display: block;
+  background-color: var(--color-brand);
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.25),
+    0 0 0 0.5px color-mix(in oklab, var(--color-brand), black 30%),
+    0 0 0 2px var(--color-widget-bg),
+    0 1px 2px 2px rgb(52 18 0 / 0.12);
+}
+
+:where([data-theme="dark"]) .assiduity-today {
+  box-shadow:
+    inset 0 -1px 0 rgb(0 0 0 / 0.2),
+    0 0 0 2px var(--color-widget-bg),
+    0 1px 2px 2px rgb(0 0 0 / 0.45);
+}
+
+/* An absence's status (and the widget's « … pour justifier »): engraved
+   tags, pressed into the card (a tinted fill, an inner shadow under the
+   top edge, an inner hairline, a light lip below); not justified in red,
+   a lateness's edge dashed. */
+.status-tag {
+  border: 0;
+}
+
+.status-tag--error {
+  background-color: var(--color-error-bg);
+  box-shadow:
+    inset 0 1px 2px color-mix(in srgb, var(--color-error) 30%, transparent),
+    inset 0 0 0 1px color-mix(in srgb, var(--color-error) 14%, transparent),
+    0 1px 0 rgb(255 255 255 / 0.85);
+}
+
+:where([data-theme="dark"]) .status-tag--error {
+  box-shadow:
+    inset 0 1px 2px rgb(0 0 0 / 0.55),
+    inset 0 0 0 1px color-mix(in srgb, var(--color-error) 18%, transparent),
+    0 1px 0 rgb(255 255 255 / 0.06);
+}
+
+.status-tag--dashed {
+  outline: 1px dashed color-mix(in srgb, var(--ink) 22%, transparent);
+  outline-offset: -3px;
+}
+
+:where([data-theme="dark"]) .status-tag--dashed {
+  outline-color: rgb(255 255 255 / 0.2);
+}
+
+.status-tag--carved {
+  background-color: color-mix(in srgb, var(--ink) 4%, transparent);
+  box-shadow:
+    inset 0 1px 2px rgb(52 18 0 / 0.12),
+    inset 0 0 0 1px color-mix(in srgb, var(--ink) 6%, transparent),
+    0 1px 0 rgb(255 255 255 / 0.85);
+}
+
+:where([data-theme="dark"]) .status-tag--carved {
+  background-color: rgb(0 0 0 / 0.22);
+  box-shadow:
+    inset 0 1px 2px rgb(0 0 0 / 0.55),
+    inset 0 0 0 1px rgb(255 255 255 / 0.03),
+    0 1px 0 rgb(255 255 255 / 0.06);
 }
 
 @keyframes assiduity-mark-in {
@@ -8784,27 +9794,552 @@ li:has(> .planning-row.is-link:active) + li > .planning-row .planning-row-text,
   }
 }
 
-.justify-button {
-  transition: background-color 160ms ease, scale 120ms ease;
-}
-
-.justify-button:active {
-  scale: 0.96;
-}
-
-@media (hover: hover) {
-  .justify-button:hover {
-    background-color: var(--color-brand-hover);
-  }
-}
-
 @media (prefers-reduced-motion: reduce) {
   .justify-reason,
   .justify-reason[aria-checked="true"] {
     animation: none;
   }
+}
 
-  .justify-button {
+/* Planning's hovers in the dark theme: a light veil (the card's colour
+   is the page's there), a light hairline on the transparent rows. */
+@media (hover: hover) {
+  :where([data-theme="dark"]) :is(.planning-pill:not(.is-selected, .is-filled):hover, .planning-week-head:hover .planning-pill:not(.is-filled)) {
+    background-color: color-mix(in srgb, var(--glass-solid-fill), white 8%);
+  }
+
+  :where([data-theme="dark"]) :is(.planning-row.is-link:hover, .planning-note-link:hover) {
+    background-color: rgb(255 255 255 / 0.08);
+    box-shadow: 0 0 0 1px rgb(255 255 255 / 0.06);
+  }
+}
+
+/* A graph's dot (AverageSparkline: the latest grade, the one under the
+   pointer): a raised bead in the line's colour, lit from above and
+   shaded below, set on a ring of the card's colour with a hairline
+   round it and a close shadow, as the app's other raised pieces. */
+.chart-dot {
+  background:
+    radial-gradient(circle at 50% 28%, color-mix(in srgb, currentColor, white 38%), transparent 62%),
+    currentColor;
+  box-shadow:
+    inset 0 -1px 1.5px rgb(0 0 0 / 0.3),
+    inset 0 1px 0 rgb(255 255 255 / 0.35),
+    0 0 0 2.5px var(--color-widget-bg),
+    0 0 0 3px rgb(52 18 0 / 0.14),
+    0 1.5px 3px 2.5px rgb(52 18 0 / 0.16);
+}
+
+:where([data-theme="dark"]) .chart-dot {
+  background:
+    radial-gradient(circle at 50% 28%, rgb(255 255 255 / 0.9), transparent 62%),
+    currentColor;
+  box-shadow:
+    inset 0 -1px 1.5px rgb(0 0 0 / 0.35),
+    0 0 0 2.5px var(--color-widget-bg),
+    0 0 0 3px rgb(255 255 255 / 0.12),
+    0 1.5px 3px 2.5px rgb(0 0 0 / 0.5);
+}
+
+/* A list's separator (Assiduité's history: under a month, between two
+   absences): engraved, a dark hairline over a light one, inset from both
+   sides of the card instead of running edge to edge; dashed under a month
+   (--dashed). None under a list's last row. */
+.inset-separator {
+  position: relative;
+}
+
+.inset-separator::after {
+  content: "";
+  position: absolute;
+  right: 12px;
+  bottom: 0;
+  left: 12px;
+  height: 2px;
+  --separator-dark: color-mix(in srgb, var(--ink) 9%, transparent);
+  --separator-light: rgb(255 255 255 / 0.85);
+  background: linear-gradient(to bottom, var(--separator-dark) 50%, var(--separator-light) 50%);
+  pointer-events: none;
+}
+
+.inset-separator--dashed::after {
+  --separator-dark: color-mix(in srgb, var(--ink) 14%, transparent);
+  --separator-light: rgb(255 255 255 / 0.9);
+  background:
+    repeating-linear-gradient(to right, var(--separator-dark) 0 4px, transparent 4px 8px) top / 100% 1px no-repeat,
+    repeating-linear-gradient(to right, var(--separator-light) 0 4px, transparent 4px 8px) bottom / 100% 1px no-repeat;
+}
+
+:where([data-theme="dark"]) .inset-separator::after {
+  --separator-dark: rgb(0 0 0 / 0.55);
+  --separator-light: rgb(255 255 255 / 0.05);
+}
+
+:where([data-theme="dark"]) .inset-separator--dashed::after {
+  --separator-dark: rgb(0 0 0 / 0.6);
+  --separator-light: rgb(255 255 255 / 0.07);
+}
+
+li.inset-separator:last-child::after {
+  display: none;
+}
+
+/* Engraved: carved into the surface (a value's or a preview's well, an
+   empty slot: the signature's preview, À propos' header, a hidden card of
+   the home): a faint ink fill, an inner shadow under the top edge, an
+   inner hairline, a light lip below. The opposite of .glass-solid,
+   raised. */
+.engraved {
+  background-color: color-mix(in srgb, var(--ink) 4%, transparent);
+  box-shadow:
+    inset 0 1px 2px rgb(52 18 0 / 0.12),
+    inset 0 0 0 1px color-mix(in srgb, var(--ink) 6%, transparent),
+    0 1px 0 rgb(255 255 255 / 0.85);
+}
+
+:where([data-theme="dark"]) .engraved {
+  background-color: rgb(0 0 0 / 0.22);
+  box-shadow:
+    inset 0 1px 2px rgb(0 0 0 / 0.55),
+    inset 0 0 0 1px rgb(255 255 255 / 0.03),
+    0 1px 0 rgb(255 255 255 / 0.06);
+}
+
+/* Réglages: a group's rows split by engraved hairlines (a dark one over a
+   light one), inset 16px from both sides, as the rows' text. */
+.settings-rows > * + * {
+  position: relative;
+}
+
+.settings-rows > * + *::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  right: 16px;
+  left: 16px;
+  height: 2px;
+  background: linear-gradient(to bottom, color-mix(in srgb, var(--ink) 9%, transparent) 50%, rgb(255 255 255 / 0.85) 50%);
+  pointer-events: none;
+}
+
+:where([data-theme="dark"]) .settings-rows > * + *::before {
+  background: linear-gradient(to bottom, rgb(0 0 0 / 0.55) 50%, rgb(255 255 255 / 0.05) 50%);
+}
+
+/* Réglages' sections: under the pointer, white with a hairline (as a
+   menu's row); the one shown in solid glass. */
+.settings-tab {
+  transition: background-color 150ms ease, box-shadow 150ms ease, border-color 150ms ease;
+}
+
+@media (hover: hover) {
+  .settings-tab:not(.glass-solid):hover {
+    background-color: var(--surface-card);
+    box-shadow:
+      0 0 0 1px color-mix(in srgb, var(--color-text) 9%, transparent),
+      0 1px 2px rgb(0 0 0 / 0.06);
+  }
+
+  :where([data-theme="dark"]) .settings-tab:not(.glass-solid):hover {
+    background-color: rgb(255 255 255 / 0.08);
+    box-shadow: 0 0 0 1px rgb(255 255 255 / 0.06);
+  }
+}
+
+/* A modal's window (Réglages, the sheets, the dialogs: .modal-surface),
+   light mode: the sidebar's solid colour rather than a card's white, so
+   the cards, chips and buttons on it (white, solid glass) stand out. The
+   page colour inside follows (--color-bg: a sheet header's blur tint, a
+   footer's fill), so nothing shows as a band. */
+:where(:root:not([data-theme="dark"])) .modal-surface.glass-solid {
+  --color-bg: var(--material-sidebar-solid);
+  background-color: var(--material-sidebar-solid);
+}
+
+/* A raised bit of the brand colour (the « Justifier » sheet's steps done,
+   the reason picked's disc): a lit top edge, a darker hairline, a close
+   shadow. */
+.step-dot {
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.25),
+    0 0 0 0.5px color-mix(in oklab, var(--color-brand), black 30%),
+    0 1px 2px rgb(52 18 0 / 0.18);
+}
+
+:where([data-theme="dark"]) .step-dot {
+  box-shadow:
+    inset 0 -1px 0 rgb(0 0 0 / 0.18),
+    0 1px 2px rgb(0 0 0 / 0.45);
+}
+
+/* The drop zone, carved in: darker under the pointer or a file dragged
+   over. */
+@media (hover: hover) {
+  .justify-drop.engraved:hover {
+    background-color: color-mix(in srgb, var(--ink) 7%, transparent);
+  }
+}
+
+/* The university's outage notice (ServiceNotice): solid glass tinted
+   amber: its lit edges, an amber outer stroke, the material's shadow. */
+.service-notice {
+  border: 1px solid;
+  border-color: rgb(255 255 255 / 0.8) rgb(255 255 255 / 0.4) rgb(255 255 255 / 0.2);
+  background-color: #fff5e1;
+  outline: 1px solid rgb(183 110 0 / 0.28);
+  outline-offset: 0;
+  box-shadow: var(--glass-solid-shadow);
+}
+
+:where([data-theme="dark"]) .service-notice {
+  border-color: rgb(255 255 255 / 0.1) rgb(255 255 255 / 0.05) rgb(255 255 255 / 0.02);
+  background-color: #2f2410;
+  outline-color: rgb(255 190 80 / 0.25);
+}
+
+/* Onboarding's step under way: its solid glass ringed in the brand
+   colour (the outer stroke, thicker). */
+.glass-solid.is-current {
+  outline: 2px solid var(--color-brand);
+}
+
+/* A positive status, engraved as the others (« Détecté sur ADE »). */
+.status-tag--success {
+  background-color: var(--color-success-bg);
+  box-shadow:
+    inset 0 1px 2px color-mix(in srgb, var(--color-success-text) 25%, transparent),
+    inset 0 0 0 1px color-mix(in srgb, var(--color-success-text) 14%, transparent),
+    0 1px 0 rgb(255 255 255 / 0.85);
+}
+
+:where([data-theme="dark"]) .status-tag--success {
+  box-shadow:
+    inset 0 1px 2px rgb(0 0 0 / 0.55),
+    inset 0 0 0 1px color-mix(in srgb, var(--color-success-text) 18%, transparent),
+    0 1px 0 rgb(255 255 255 / 0.06);
+}
+
+/* « Justifier »'s last step: the ticket, printed out of the slot above
+   it (its clip). White paper, its foot torn in a zigzag (the mask; the
+   drop shadow follows the teeth), fed out in jerks, a pause between each,
+   then a small settle. Its tear: a dashed line across. */
+.justify-ticket {
+  --tooth: 7px;
+  background-color: var(--surface-card);
+  mask: conic-gradient(from -45deg at bottom, #0000, #000 1deg 89deg, #0000 90deg) 50% / calc(2 * var(--tooth)) 100%;
+  animation: justify-ticket-print 1700ms linear both;
+  animation-delay: 150ms;
+}
+
+:where([data-theme="dark"]) .justify-ticket {
+  background-color: #262626;
+}
+
+/* The mask cuts the paper's own shadow: its clip casts it. */
+div:has(> .justify-ticket) {
+  filter: drop-shadow(0 1px 1px rgb(52 18 0 / 0.1)) drop-shadow(0 4px 8px rgb(52 18 0 / 0.1));
+}
+
+:where([data-theme="dark"]) div:has(> .justify-ticket) {
+  filter: drop-shadow(0 1px 1px rgb(0 0 0 / 0.5)) drop-shadow(0 4px 8px rgb(0 0 0 / 0.4));
+}
+
+.justify-ticket-tear {
+  background: repeating-linear-gradient(to right, color-mix(in srgb, var(--ink) 22%, transparent) 0 5px, transparent 5px 10px) top / 100% 1px no-repeat;
+}
+
+:where([data-theme="dark"]) .justify-ticket-tear {
+  background-image: repeating-linear-gradient(to right, rgb(255 255 255 / 0.2) 0 5px, transparent 5px 10px);
+}
+
+@keyframes justify-ticket-print {
+  0% { transform: translateY(-100%); animation-timing-function: cubic-bezier(0.3, 0, 0.4, 1); }
+  14% { transform: translateY(-76%); }
+  22% { transform: translateY(-76%); animation-timing-function: cubic-bezier(0.3, 0, 0.4, 1); }
+  36% { transform: translateY(-52%); }
+  44% { transform: translateY(-52%); animation-timing-function: cubic-bezier(0.3, 0, 0.4, 1); }
+  58% { transform: translateY(-28%); }
+  66% { transform: translateY(-28%); animation-timing-function: cubic-bezier(0.2, 0, 0.2, 1); }
+  88% { transform: translateY(1.5%); animation-timing-function: ease-out; }
+  100% { transform: translateY(0); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .justify-ticket {
+    animation: none;
+  }
+}
+
+:where([data-theme="dark"]) .widget-card:is(.planning-block, .planning-list-card) {
+  background-color: color-mix(in srgb, var(--accent-dark) 10%, var(--color-widget-bg));
+}
+
+@media (hover: hover) {
+  :where([data-theme="dark"]) .widget-card:is(.planning-list-card, button.planning-block):hover {
+    background-color: color-mix(in srgb, var(--accent-dark) 16%, var(--color-widget-bg));
+  }
+}
+
+/* A class's sheet: the occurrences' section eases to its content's height
+   as they come in (PlanningEventSheet), the list rising in, row after
+   row. Still for reduced motion. */
+.planning-occurrences-frame {
+  transition: height 380ms cubic-bezier(0.32, 0.72, 0, 1);
+}
+
+.planning-occurrences-in {
+  animation: planning-occurrences-in 320ms cubic-bezier(0.16, 1, 0.3, 1) backwards;
+}
+
+.planning-occurrences-in > * {
+  animation: planning-occurrences-in 360ms cubic-bezier(0.16, 1, 0.3, 1) backwards;
+}
+
+.planning-occurrences-in > :nth-child(2) { animation-delay: 40ms; }
+.planning-occurrences-in > :nth-child(3) { animation-delay: 80ms; }
+.planning-occurrences-in > :nth-child(4) { animation-delay: 120ms; }
+.planning-occurrences-in > :nth-child(5) { animation-delay: 160ms; }
+.planning-occurrences-in > :nth-child(n + 6) { animation-delay: 200ms; }
+
+@keyframes planning-occurrences-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .planning-occurrences-frame {
     transition: none;
+  }
+
+  .planning-occurrences-in,
+  .planning-occurrences-in > * {
+    animation: none;
+  }
+}
+
+/* The hover bubbles (Tooltip, the sidebar's pockets, the next class): a
+   dark tag (white in dark mode) in the tags' material: a lit top edge, a
+   hairline, a tight shadow. */
+.tooltip-bubble {
+  border: 0;
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.16),
+    0 0 0 0.5px rgb(0 0 0 / 0.6),
+    0 1px 2px rgb(0 0 0 / 0.18),
+    0 6px 14px -4px rgb(0 0 0 / 0.22);
+}
+
+:where([data-theme="dark"]) .tooltip-bubble {
+  box-shadow:
+    inset 0 -1px 0 rgb(0 0 0 / 0.12),
+    0 0 0 0.5px rgb(255 255 255 / 0.4),
+    0 2px 8px -2px rgb(0 0 0 / 0.6);
+}
+
+/* « Ajouter une note » (the simulator): an engraved slot, darker under
+   the pointer. */
+@media (hover: hover) {
+  .subject-add-grade.engraved:hover {
+    background-color: color-mix(in srgb, var(--ink) 7%, transparent);
+  }
+}
+
+/* Floating over a phone's tab bar: it rises in, and holds a deeper shadow
+   (it sits over the page). An open mail's actions float there too (the
+   reader's toolbar, .mail-toolbar-veil): it goes up above them. */
+@media (width < 48rem) {
+  .update-notice-dock {
+    transition: bottom 320ms cubic-bezier(0.32, 0.72, 0, 1);
+  }
+
+  :root:has(.mail-toolbar-veil) .update-notice-dock {
+    bottom: calc(env(safe-area-inset-bottom) + 152px);
+  }
+
+  .update-notice-float {
+    box-shadow: var(--glass-solid-shadow), 0 10px 24px -8px rgb(52 18 0 / 0.28);
+    animation: weather-modal-card-in 320ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  }
+}
+
+/* An engraved slot to press (Réglages' « add a wallpaper »): its dashed
+   edge a little further in than a tag's, darker under the pointer. */
+.engraved-slot.status-tag--dashed {
+  outline-offset: -5px;
+}
+
+@media (hover: hover) {
+  .engraved-slot.engraved:hover:not(:disabled) {
+    background-color: color-mix(in srgb, var(--ink) 7%, transparent);
+  }
+}
+
+/* The composer's « drop your files here »: an engraved well over the
+   window (frosted, nearly opaque), its edge dashed inside. */
+.mail-drop-overlay {
+  background-color: color-mix(in srgb, var(--color-widget-bg) 85%, transparent);
+  box-shadow:
+    inset 0 1px 3px rgb(52 18 0 / 0.14),
+    inset 0 0 0 1px color-mix(in srgb, var(--ink) 8%, transparent);
+  outline: 1.5px dashed color-mix(in srgb, var(--ink) 25%, transparent);
+  outline-offset: -8px;
+}
+
+:where([data-theme="dark"]) .mail-drop-overlay {
+  box-shadow:
+    inset 0 1px 3px rgb(0 0 0 / 0.6),
+    inset 0 0 0 1px rgb(255 255 255 / 0.04);
+  outline-color: rgb(255 255 255 / 0.22);
+}
+
+/* The landing's questions: solid glass, lighter under the pointer and
+   while open. */
+.landing-faq-item {
+  transition: background-color 200ms ease;
+}
+
+.landing-faq-item[open] {
+  background-color: var(--glass-solid-fill-hover);
+}
+
+@media (hover: hover) {
+  .landing-faq-item:hover {
+    background-color: var(--glass-solid-fill-hover);
+  }
+}
+
+/* ── Skeletons (skullet: everything that loads, measured from what it
+   will show: « Accueil »'s cards, the mail list and reader, the composer's
+   pickers, Planning's directory, the favourites) ──
+   In the app's shimmer colours, its lines of text as pills; dark follows
+   from the colour tokens. Held up from the debug panel (« Simuler le
+   chargement ») or `?skeletons` (skeletonSamples.js). */
+:root {
+  --skullet-base: var(--color-bg-muted);
+  --skullet-highlight: var(--color-bg-subtle);
+  --skullet-radius: 999px;
+}
+
+/* The sidebar's « Prochain cours » (SidebarNextClass): tinted all over
+   with its course's colour, as the events, deeper under the pointer. */
+.sidebar-next-class.glass-solid {
+  background-color: color-mix(in srgb, var(--accent) 8%, var(--glass-solid-fill));
+}
+
+:where([data-theme="dark"]) .sidebar-next-class.glass-solid {
+  background-color: color-mix(in srgb, var(--accent-dark) 10%, var(--glass-solid-fill));
+}
+
+@media (hover: hover) {
+  .sidebar-next-class.glass-solid:hover:not(:disabled) {
+    background-color: color-mix(in srgb, var(--accent) 13%, var(--glass-solid-fill));
+  }
+
+  :where([data-theme="dark"]) .sidebar-next-class.glass-solid:hover:not(:disabled) {
+    background-color: color-mix(in srgb, var(--accent-dark) 16%, var(--glass-solid-fill));
+  }
+}
+
+/* It comes in (leaving « Accueil », or room found): a fade, a short rise. */
+.sidebar-next-class-in {
+  animation: sidebar-next-class-in 360ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+@keyframes sidebar-next-class-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.98);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sidebar-next-class-in {
+    animation: none;
+  }
+}
+
+/* The favourites' tiles (the sidebar's, « Accueil »'s « Applications »):
+   each rises in, a beat after the one before (--i), over the skeleton
+   they replace. Still for reduced motion (the rule above). */
+.favorites-strip-item {
+  animation: app-card-enter 360ms cubic-bezier(0.16, 1, 0.3, 1) backwards;
+  animation-delay: calc(min(var(--i, 0), 8) * 35ms);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .favorites-strip-item {
+    animation: none;
+  }
+}
+
+
+/* ── Réglages › Fond d’écran: the section in motion ──
+   The preview's caption (WallpaperCaption) eases to its new width, the old
+   words leaving upwards, blurred, as the new ones rise in. A tile picked:
+   its ring springs out from its edge, its check pops in, and a tile gives
+   a little under the finger. Still without motion. */
+.wallpaper-caption[data-settled] {
+  transition: width 420ms cubic-bezier(0.32, 0.72, 0, 1);
+}
+
+.wallpaper-caption-in {
+  animation: wallpaper-caption-in 340ms cubic-bezier(0.2, 0.8, 0.2, 1) 60ms both;
+}
+
+.wallpaper-caption-out {
+  animation: wallpaper-caption-out 200ms ease-in both;
+}
+
+@keyframes wallpaper-caption-in {
+  from { opacity: 0; filter: blur(4px); transform: translateY(6px); }
+  to { opacity: 1; filter: blur(0); transform: none; }
+}
+
+@keyframes wallpaper-caption-out {
+  to { opacity: 0; filter: blur(4px); transform: translateY(-6px); }
+}
+
+.wallpaper-tile {
+  outline-offset: 0;
+  transition: outline-color 200ms ease, outline-offset 320ms cubic-bezier(0.34, 1.56, 0.64, 1), filter 150ms ease, transform 160ms ease-out;
+}
+
+.wallpaper-tile[aria-checked="true"] {
+  outline-offset: 2px;
+}
+
+.wallpaper-tile:active {
+  transform: scale(0.96);
+}
+
+.wallpaper-tile-check {
+  animation: wallpaper-tile-check 380ms cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+
+@keyframes wallpaper-tile-check {
+  from { opacity: 0; transform: scale(0.3) rotate(-35deg); }
+  to { opacity: 1; transform: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .wallpaper-caption[data-settled],
+  .wallpaper-tile {
+    transition: none;
+  }
+
+  .wallpaper-caption-in,
+  .wallpaper-caption-out,
+  .wallpaper-tile-check {
+    animation: none;
+  }
+
+  .wallpaper-caption-out {
+    display: none;
+  }
+
+  .wallpaper-tile:active {
+    transform: none;
   }
 }

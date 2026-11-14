@@ -233,7 +233,7 @@ function layout(context, { report, module, evaluation }, draw) {
 // → { blob (image/png, 2×), width, height (its size in CSS pixels, as the
 // mail shows it) }.
 export async function renderGradeCardImage({ report, module, evaluation }) {
-  await loadCardFonts(['700 64px "SN Pro"', '700 22px "SN Pro"', '600 12px "SN Pro"', '500 13px "Inter Variable"', '600 14px "Inter Variable"'])
+  await loadCardFonts(['700 64px "SN Pro"', '700 22px "SN Pro"', '600 12px "SN Pro"', '500 13px "Collab Sans"', '600 14px "Collab Sans"'])
   return renderCardPng({
     layout: (context, draw) => layout(context, { report, module, evaluation }, draw),
     wash: (context, width, height) => drawWash(context, readUes(report, evaluation), width, height),

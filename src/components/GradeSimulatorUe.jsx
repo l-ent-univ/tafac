@@ -63,7 +63,7 @@ function CoefField({ id, label, value, onChange, onInvalidChange }) {
         onKeyDown={(event) => {
           if (event.key === 'Enter') event.currentTarget.blur()
         }}
-        className={`simulation-input h-7 w-[38px] corners-[8px] border px-[2px] text-center font-body text-[13px] font-semibold leading-none text-text ${invalid ? 'border-error' : 'border-border-input bg-bg-input'}`}
+        className={`field simulation-input h-7 w-[38px] corners-[8px] px-[2px] text-center font-body text-[13px] font-semibold leading-none text-text ${invalid ? 'border-error' : ''}`}
       />
     </label>
   )
@@ -130,7 +130,7 @@ function GradeField({ evaluation, value, onChange, onInvalidChange }) {
         onKeyDown={(event) => {
           if (event.key === 'Enter') event.currentTarget.blur()
         }}
-        className={`simulation-input h-9 w-[50px] corners-[10px] border px-[2px] text-center font-display text-[17px] font-bold leading-none text-text placeholder:font-semibold placeholder:text-text-50 ${invalid ? 'border-error' : value != null ? 'simulation-input--set' : 'border-border-input bg-bg-input'}`}
+        className={`field simulation-input h-9 w-[50px] corners-[10px] px-[2px] text-center font-display text-[17px] font-bold leading-none text-text placeholder:font-semibold placeholder:text-text-50 ${invalid ? 'border-error' : value != null ? 'simulation-input--set' : ''}`}
       />
       <span className="font-body text-[13px] font-medium leading-none text-text-muted" aria-hidden="true">/20</span>
     </span>
@@ -192,7 +192,7 @@ function SubjectRow({ subject, icon, overrides, onOverride, customs, onAddCustom
         onClick={onToggle}
         className="subject-row-toggle flex w-full min-w-0 cursor-pointer items-center gap-3 modal-nested-corners border-0 bg-transparent px-2 py-2 text-left text-text max-md:gap-[10px]"
       >
-        <span className="inline-flex size-10 shrink-0 items-center justify-center corners-[12px] bg-brand-subtle max-md:size-9 max-md:corners-[11px]" aria-hidden="true">
+        <span className="glass-solid inline-flex size-10 shrink-0 items-center justify-center corners-[12px] max-md:size-9 max-md:corners-[11px]" aria-hidden="true">
           {icon ? <Icon icon={icon} className="size-5 text-text max-md:size-[18px]" /> : null}
         </span>
         <span className="grid min-w-0 flex-1 gap-[3px]">
@@ -232,7 +232,7 @@ function SubjectRow({ subject, icon, overrides, onOverride, customs, onAddCustom
             ) : null}
             <button
               type="button"
-              className="subject-add-grade inline-flex min-h-[42px] w-full items-center justify-center gap-[6px] corners-[14px] border border-dashed border-border-input bg-transparent px-3 font-body text-[14px] font-semibold text-text-secondary cursor-pointer transition-colors hover:bg-bg-subtle hover:text-text"
+              className="subject-add-grade engraved status-tag--dashed inline-flex min-h-[42px] w-full items-center justify-center gap-[6px] corners-[14px] border-0 px-3 font-body text-[14px] font-semibold text-text-secondary cursor-pointer transition-colors hover:text-text"
               onClick={onAddCustom}
             >
               <Icon icon="ph:plus" className="size-4" aria-hidden="true" />

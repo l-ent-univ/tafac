@@ -1,15 +1,16 @@
 import { Switch } from '../AccountModal'
-import { MUTED_FILL_CLASSES } from '../../settingsStyles'
+import { MUTED_FILL_CLASSES, WELL_CLASSES } from '../../settingsStyles'
+import SmoothSurface from '../SmoothSurface'
 
 // The debug menu's building blocks, in the Réglages look: titled cards split
 // by hairlines, a label and a short helper on the left, the control on the
 // right. Denser than Réglages, as the menu packs a lot.
 
 const BUTTON_TONES = {
-  default: `${MUTED_FILL_CLASSES} text-text hover:not-disabled:bg-bg-muted`,
+  default: 'material text-text',
   // The last call's button, or the action the form leads to.
-  active: 'bg-text text-bg',
-  danger: 'bg-error-bg text-error hover:not-disabled:brightness-95',
+  active: 'lent-button',
+  danger: 'material text-error',
 }
 
 export function DebugButton({ tone = 'default', className = '', type = 'button', children, ...props }) {
@@ -19,6 +20,7 @@ export function DebugButton({ tone = 'default', className = '', type = 'button',
       className={`inline-flex h-9 shrink-0 items-center justify-center gap-[6px] rounded-full border-0 px-[14px] font-body text-[14px] font-medium leading-none whitespace-nowrap transition-[background-color,filter,opacity] duration-[120ms] cursor-pointer disabled:cursor-not-allowed disabled:opacity-45 ${BUTTON_TONES[tone]} ${className}`}
       {...props}
     >
+      <SmoothSurface />
       {children}
     </button>
   )
@@ -29,7 +31,7 @@ export function DebugField({ label, mono = false, ...props }) {
     <label className="flex min-w-0 flex-1 flex-col gap-[5px]">
       <span className="px-1 font-body text-[12px] font-semibold leading-none text-text-60">{label}</span>
       <input
-        className={`box-border h-10 w-full min-w-0 rounded-full border border-border-input bg-bg px-4 text-text transition-[border-color] duration-150 hover:border-text-30 focus-visible:border-text-60 ${mono ? 'font-mono text-[13px]' : 'font-body text-[14px]'}`}
+        className={`field box-border h-10 w-full min-w-0 rounded-full px-4 text-text ${mono ? 'font-mono text-[13px]' : 'font-body text-[14px]'}`}
         {...props}
       />
     </label>
@@ -41,7 +43,7 @@ export function DebugSection({ id, title, children }) {
   return (
     <section id={id} className="flex scroll-mt-1 flex-col gap-[7px]" aria-label={title}>
       <h2 className="m-0 px-1 font-body text-[13px] font-semibold leading-none text-text-60">{title}</h2>
-      <div className="card-corners-sm overflow-hidden border border-border bg-widget-bg divide-y divide-border">
+      <div className="glass-solid glass--quiet card-corners-sm overflow-hidden border divide-y divide-border">
         {children}
       </div>
     </section>
@@ -81,7 +83,7 @@ export function DebugSwitchRow({ label, hint, checked, onChange }) {
 // One pressed among a few: the theme, the output's tabs.
 export function DebugSegmented({ label, options, value, onChange }) {
   return (
-    <div role="group" aria-label={label} className={`inline-flex shrink-0 items-center gap-[2px] rounded-full p-[3px] ${MUTED_FILL_CLASSES}`}>
+    <div role="group" aria-label={label} className={`inline-flex shrink-0 items-center gap-[2px] rounded-full p-[3px] ${WELL_CLASSES}`}>
       {options.map(([optionValue, optionLabel]) => (
         <button
           key={optionValue}

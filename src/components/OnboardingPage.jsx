@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import LoadingDots from './LoadingDots'
 import { r } from '../register.js'
+import SmoothSurface from './SmoothSurface'
 
 const STEP_CONFIG = {
   year: {
@@ -220,7 +221,7 @@ function OnboardingPage({
             <div className="flex w-full items-start justify-between gap-3">
               <span className="text-[1.15rem] font-semibold leading-[1.1] text-text max-sm:text-base">{stepOption.label}</span>
               {isDetected ? (
-                <span className="shrink-0 rounded-full bg-success-bg px-3 py-1 text-[0.75rem] font-semibold text-success-text">
+                <span className="status-tag status-tag--success shrink-0 rounded-full px-3 py-1 text-[0.75rem] font-semibold text-success-text">
                   Détecté sur ADE
                 </span>
               ) : null}
@@ -228,12 +229,12 @@ function OnboardingPage({
 
             <div className="flex flex-wrap gap-2">
               {stepOption.parentLabel ? (
-                <span className="rounded-full bg-bg px-3 py-1 text-xs font-semibold text-text-muted">
+                <span className="status-tag status-tag--carved rounded-full px-3 py-1 text-xs font-semibold text-text-muted">
                   {stepOption.parentLabel}
                 </span>
               ) : null}
               {stepOption.contextLabel && stepOption.contextLabel !== stepOption.parentLabel ? (
-                <span className="rounded-full bg-bg px-3 py-1 text-xs font-semibold text-text-muted">
+                <span className="status-tag status-tag--carved rounded-full px-3 py-1 text-xs font-semibold text-text-muted">
                   {stepOption.contextLabel}
                 </span>
               ) : null}
@@ -284,12 +285,12 @@ function OnboardingPage({
             <div className="flex w-full max-w-[920px] flex-col items-center gap-3">
               <div className="flex w-full flex-wrap items-center justify-center gap-3">
                 {selectedYear ? (
-                  <span className="rounded-full border border-[color:var(--color-border)] bg-widget-bg px-4 py-2 text-sm font-semibold text-text shadow-[0_8px_20px_-16px_rgba(17,24,39,0.35)]">
+                  <span className="glass-solid rounded-full border px-4 py-2 text-sm font-semibold text-text">
                     Année : {selectedYear.label}
                   </span>
                 ) : null}
                 {isTpStep && selectedTd ? (
-                  <span className="rounded-full border border-[color:var(--color-border)] bg-widget-bg px-4 py-2 text-sm font-semibold text-text shadow-[0_8px_20px_-16px_rgba(17,24,39,0.35)]">
+                  <span className="glass-solid rounded-full border px-4 py-2 text-sm font-semibold text-text">
                     TD : {selectedTd.label}
                   </span>
                 ) : null}
@@ -326,7 +327,7 @@ function OnboardingPage({
                 return (
                   <div
                     key={stepKey}
-                    className={`corners-[22px] border p-4 transition-colors duration-300 ${isCurrent ? 'border-brand bg-widget-bg' : 'border-[color:var(--color-border)] bg-widget-bg'}`}
+                    className={`glass-solid corners-[22px] border p-4 transition-[outline-color] duration-300 ${isCurrent ? 'is-current' : ''}`}
                   >
                     <p className="m-0 text-xs font-bold uppercase tracking-[0.08em] text-text-muted font-body">
                       Étape {index + 1}
@@ -346,12 +347,12 @@ function OnboardingPage({
 
             <div className="flex flex-wrap gap-2">
               {selectedYear ? (
-                <span className="rounded-full bg-widget-bg px-3 py-2 text-sm font-semibold text-text">
+                <span className="glass-solid rounded-full px-3 py-2 text-sm font-semibold text-text">
                   Année : {selectedYear.label}
                 </span>
               ) : null}
               {selectedTd ? (
-                <span className="rounded-full bg-widget-bg px-3 py-2 text-sm font-semibold text-text">
+                <span className="glass-solid rounded-full px-3 py-2 text-sm font-semibold text-text">
                   TD : {selectedTd.label}
                 </span>
               ) : null}
@@ -365,10 +366,11 @@ function OnboardingPage({
       {isTpStep && hasBack ? (
                 <button
                   type="button"
-                  className="inline-flex items-center justify-center corners-[14px] border border-[color:var(--color-border)] bg-bg px-4 py-3 text-sm font-semibold text-text transition-transform duration-150 ease-in-out hover:scale-[1.01] active:scale-[0.99] focus-visible:outline-2 focus-visible:outline-brand focus-visible:outline-offset-2"
+                  className="material inline-flex items-center justify-center corners-[14px] px-4 py-3 text-sm font-semibold text-text focus-visible:outline-2 focus-visible:outline-brand focus-visible:outline-offset-2"
                   onClick={onBack}
                   disabled={isLoading}
                 >
+                  <SmoothSurface />
                   Retour
                 </button>
               ) : null}
@@ -377,16 +379,17 @@ function OnboardingPage({
         )}
 
         {errorMessage ? (
-          <div className={`corners-[22px] border border-[color:var(--color-border)] bg-widget-bg p-5 ${isGroupCircleStep ? 'w-full max-w-[720px]' : ''}`}>
+          <div className={`glass-solid glass--quiet corners-[22px] border p-5 ${isGroupCircleStep ? 'w-full max-w-[720px]' : ''}`}>
             <p className="m-0 text-base font-semibold text-text">Impossible de récupérer ce niveau de groupe pour le moment</p>
             <p className="m-0 mt-2 text-sm text-text-muted font-body">{errorMessage}</p>
             {hasRetry ? (
               <button
                 type="button"
-                className="mt-4 inline-flex items-center justify-center corners-[14px] border border-[color:var(--color-border)] bg-bg px-4 py-3 text-sm font-semibold text-text transition-transform duration-150 ease-in-out hover:scale-[1.01] active:scale-[0.99] focus-visible:outline-2 focus-visible:outline-brand focus-visible:outline-offset-2"
+                className="mt-4 material inline-flex items-center justify-center corners-[14px] px-4 py-3 text-sm font-semibold text-text focus-visible:outline-2 focus-visible:outline-brand focus-visible:outline-offset-2"
                 onClick={onRetry}
                 disabled={isLoading}
               >
+                <SmoothSurface />
                 Réessayer
               </button>
             ) : null}
@@ -428,7 +431,7 @@ function OnboardingPage({
             <LoadingDots label={loadingMessage || 'Chargement'} className="text-text-muted" />
           </div>
         ) : (
-          <div className={`corners-[22px] border border-[color:var(--color-border)] bg-widget-bg p-5 ${isGroupCircleStep ? 'w-full max-w-[720px] text-center' : ''}`}>
+          <div className={`engraved corners-[22px] p-5 ${isGroupCircleStep ? 'w-full max-w-[720px] text-center' : ''}`}>
             <p className="m-0 text-base font-semibold text-text">{emptyStateTitle || "Aucun choix n'a encore été trouvé pour cette étape"}</p>
             <div className="mt-3 min-h-[20px]">
               {isLoading ? (
@@ -439,10 +442,11 @@ function OnboardingPage({
                   {hasRetry ? (
                     <button
                       type="button"
-                      className="inline-flex items-center justify-center corners-[14px] border border-[color:var(--color-border)] bg-bg px-4 py-3 text-sm font-semibold text-text transition-transform duration-150 ease-in-out hover:scale-[1.01] active:scale-[0.99] focus-visible:outline-2 focus-visible:outline-brand focus-visible:outline-offset-2"
+                      className="material inline-flex items-center justify-center corners-[14px] px-4 py-3 text-sm font-semibold text-text focus-visible:outline-2 focus-visible:outline-brand focus-visible:outline-offset-2"
                       onClick={onRetry}
                       disabled={isLoading}
                     >
+                      <SmoothSurface />
                       {emptyStateActionLabel || 'Réessayer'}
                     </button>
                   ) : null}

@@ -8,7 +8,7 @@ export const TOOLBAR_BUTTON_CLASSES = 'button-group-item group max-sm:w-9'
 
 // The app's primary button (dark fill, as the composer's send): « Nouveau
 // message » over the list (MailPage).
-export const PRIMARY_COMPOSE_CLASSES = 'group relative inline-flex shrink-0 items-center justify-center gap-2 rounded-full border-0 bg-text text-bg cursor-pointer shadow-[0_1px_2px_rgb(52_18_0/0.12),0_6px_16px_-8px_rgb(52_18_0/0.45)] transition-[transform,filter] duration-100 ease-out hover:brightness-110 active:scale-[0.96] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-text'
+export const PRIMARY_COMPOSE_CLASSES = 'lent-button group inline-flex shrink-0 items-center justify-center gap-2 rounded-full cursor-pointer focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-text'
 
 function ToolbarButton({ label, icon, iconClassName = '', onClick, disabled = false, pressed, tooltipSide = 'bottom' }) {
   return (
@@ -103,7 +103,7 @@ function MailToolbar({ message, multiple = false, folderKind = 'inbox', onReply,
         </div>
       ))}
       {onClose ? (
-        <div className="pointer-events-auto button-group ml-auto max-4xl:hidden">
+        <div className="mail-toolbar-close pointer-events-auto button-group ml-auto">
           <ToolbarButton label="Fermer" icon="ph:x" onClick={onClose} tooltipSide="bottom-end" />
         </div>
       ) : null}

@@ -63,7 +63,7 @@ function SidebarStatPocket({
       {hasTooltip ? (
         <span
           role="tooltip"
-          className="pointer-events-none absolute left-1/2 bottom-full z-20 mb-2 flex flex-col items-center gap-[2px] w-max max-w-[260px] -translate-x-1/2 translate-y-1 scale-95 whitespace-normal text-center corners-[14px] border border-white/70 bg-[rgba(17,24,39,0.92)] px-3 py-[6px] text-[12px] font-medium leading-tight text-white opacity-0 shadow-[0_12px_32px_rgba(17,24,39,0.18)] transition-[opacity,transform] duration-180 ease-out invisible group-hover:visible group-hover:translate-y-0 group-hover:scale-100 group-hover:opacity-100 group-focus-visible:visible group-focus-visible:translate-y-0 group-focus-visible:scale-100 group-focus-visible:opacity-100"
+          className="pointer-events-none absolute left-1/2 bottom-full z-20 mb-2 flex flex-col items-center gap-[2px] w-max max-w-[260px] -translate-x-1/2 translate-y-1 scale-95 whitespace-normal text-center corners-[14px] tooltip-bubble bg-black px-3 py-[6px] text-[12px] font-medium leading-tight text-white opacity-0 transition-[opacity,transform] duration-180 ease-out invisible group-hover:visible group-hover:translate-y-0 group-hover:scale-100 group-hover:opacity-100 group-focus-visible:visible group-focus-visible:translate-y-0 group-focus-visible:scale-100 group-focus-visible:opacity-100"
         >
           {tooltipPrimary ? <span className="block font-semibold">{tooltipPrimary}</span> : null}
           {tooltipSecondary ? (

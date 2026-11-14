@@ -437,6 +437,16 @@ test('setting_changed takes the mail signature on/off and its kind, nothing else
   assert.equal(keep({ setting: 'theme', value: 'custom' }), null)
 })
 
+test('setting_changed takes the wallpaper picked as folder and kind, never the photo', () => {
+  const opts = { hasSession: true }
+  const keep = (properties) => sanitizeAnalyticsEvent({ event: 'setting_changed', properties }, opts)?.properties ?? null
+  for (const value of ['university_daily', 'university_photo', 'tafac_daily', 'tafac_photo', 'custom']) {
+    assert.deepEqual(keep({ setting: 'wallpaper_choice', value, image: '/hero/a.webp' }), { setting: 'wallpaper_choice', value })
+  }
+  assert.equal(keep({ setting: 'wallpaper_choice', value: 'on' }), null)
+  assert.equal(keep({ setting: 'wallpaper', value: 'tafac_daily' }), null)
+})
+
 test('« Assiduité »: its page, its load, its actions and « Justifier », never what the absences are', () => {
   const opts = { hasSession: true }
   const keep = (event, properties) => sanitizeAnalyticsEvent({ event, properties }, opts)?.properties ?? null

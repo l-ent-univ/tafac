@@ -37,6 +37,7 @@ import {
   getStoredLogoSource,
   getStoredShowUniversityLogo,
   getStoredShowWallpaper,
+  getStoredWallpaperChoice,
   getStoredTpSelection,
   persistAnonymousAnalytics,
   persistEstablishment,
@@ -47,6 +48,7 @@ import {
   persistLogoSource,
   persistShowUniversityLogo,
   persistShowWallpaper,
+  persistWallpaperChoice,
   persistTpSelection,
 } from './profileStorage'
 import { getStoredSidebarCompact, persistSidebarCompact } from './sidebarWidth'
@@ -57,13 +59,16 @@ import MailPage from './components/MailPage'
 import AssiduityPage from './components/AssiduityPage'
 import HomeDraftPage from './components/HomeDraftPage'
 import LoadingDots from './components/LoadingDots'
-import { resolveHeroImage } from './heroImage'
+import PageLoading from './components/PageLoading'
+import { listWallpaperFolderImages, resolveHeroImage } from './heroImage'
+import { WALLPAPER_FOLDERS, effectiveWallpaperChoice, wallpaperChoiceAnalyticsValue } from './wallpaperChoice'
 import { useWallpaperTint } from './useWallpaperTint'
 import { getStoredPalette, getStoredTheme, persistPalette, persistTheme, watchTheme } from './theme'
 import MobileTabBar from './components/MobileTabBar'
 import { getMobileTabItems } from './navItems'
 import { getHomeWidgets } from './dashboardWidgets'
 import { bindHistorySession, readHistoryNav, writeHistoryNav } from './appHistory'
+import { forgetShapes } from 'skullet'
 import { clearMailReadCache } from './mailReadCache'
 import { clearMailSignatures } from './mailSignatureStore'
 import { clearMailSends, flushMailSends } from './useMailSend'
@@ -115,6 +120,9 @@ function clearLegacySensitiveClientCaches() {
 
   clearGradesCache()
   clearAdeTimetableCache()
+  // The shapes of « Accueil »'s skeletons (layout only, no text, but
+  // shaped by this student's mails and classes).
+  forgetShapes()
 }
 
 // What the mail page keeps at the module's level for the signed-in student:
@@ -932,6 +940,7 @@ function App() {
   const [hiddenWidgets, setHiddenWidgets] = useState(() => getStoredHiddenWidgets())
   const [customBackground, setCustomBackground] = useState(() => getStoredCustomBackground())
   const [showWallpaper, setShowWallpaper] = useState(() => getStoredShowWallpaper())
+  const [wallpaperChoice, setWallpaperChoice] = useState(() => getStoredWallpaperChoice())
   const [showUniversityLogo, setShowUniversityLogo] = useState(() => getStoredShowUniversityLogo())
   const [logoSource, setLogoSource] = useState(() => getStoredLogoSource())
   // Page shown next to the sidebar: 'home' (« Accueil »), 'grades',
@@ -1298,6 +1307,7 @@ function App() {
     setCustomBackground(getStoredCustomBackground(sessionState.user))
     setCustomProfilePhoto(getStoredCustomProfilePhoto(sessionState.user))
     setShowWallpaper(getStoredShowWallpaper(sessionState.user))
+    setWallpaperChoice(getStoredWallpaperChoice(sessionState.user))
     setShowUniversityLogo(getStoredShowUniversityLogo(sessionState.user))
     setLogoSource(getStoredLogoSource(sessionState.user))
     setShowAppDescriptions(getStoredShowAppDescriptions(sessionState.user))
@@ -1863,11 +1873,25 @@ function App() {
     }))
   }, [accountModalPlanningState, selectedTp, sessionState.user])
 
-  const heroImage = useMemo(() => (
-    customBackground
-      ? { src: customBackground, position: null, credit: null }
-      : resolveHeroImage(establishment, new Date(), heroOffset)
-  ), [customBackground, establishment, heroOffset])
+  // The wallpaper's folders (Réglages › Apparence): each one's photos and
+  // its photo of the day. A university without photos has no folder.
+  const wallpaperFolders = useMemo(() => WALLPAPER_FOLDERS.map((id) => ({
+    id,
+    label: id === 'tafac' ? 'Tafac' : (universityConfig.establishments?.byId?.[establishment]?.heroImages?.length
+      ? universityConfig.establishments.byId[establishment].label
+      : universityConfig.university?.shortName || 'Université'),
+    images: listWallpaperFolderImages(id, establishment),
+    today: resolveHeroImage(establishment, new Date(), heroOffset, id),
+  })).filter((folder) => folder.images.length > 0), [establishment, heroOffset])
+  const activeWallpaper = useMemo(() => effectiveWallpaperChoice(wallpaperChoice, {
+    hasCustom: Boolean(customBackground),
+    folderImages: (id) => wallpaperFolders.find((folder) => folder.id === id)?.images ?? [],
+  }), [customBackground, wallpaperChoice, wallpaperFolders])
+  const heroImage = useMemo(() => {
+    if (activeWallpaper.folder === 'custom') return { src: customBackground, position: null, credit: null }
+    const folder = wallpaperFolders.find((entry) => entry.id === activeWallpaper.folder)
+    return (activeWallpaper.image && folder.images.find((image) => image.src === activeWallpaper.image)) || folder.today
+  }, [activeWallpaper, customBackground, wallpaperFolders])
   // BUT-only features ("Mes notes", the grade card) hide for a student whose
   // relevé is another formation's; unknown keeps them (no flicker for BUT).
   const gradesFormation = useGradesFormation({
@@ -1960,6 +1984,9 @@ function App() {
   const handleCustomBackgroundChange = useCallback(async (file) => {
     const dataUrl = await saveCustomBackground(file, sessionState.user)
     setCustomBackground(dataUrl)
+    // The image just added is the one shown.
+    persistWallpaperChoice({ folder: 'custom', image: null }, sessionState.user)
+    setWallpaperChoice({ folder: 'custom', image: null })
     track('setting_changed', { setting: 'custom_background', value: 'on' })
   }, [sessionState.user])
 
@@ -1976,11 +2003,17 @@ function App() {
     track('setting_changed', { setting: 'profile_photo', value: 'off' })
   }, [])
 
+  // Removing their image while it shows brings the default back (the
+  // university's photo of the day, else Tafac's); another tile picked stays.
   const handleCustomBackgroundReset = useCallback(() => {
     clearStoredCustomBackground()
     setCustomBackground(null)
+    if (activeWallpaper.folder === 'custom') {
+      persistWallpaperChoice(null, sessionState.user)
+      setWallpaperChoice(null)
+    }
     track('setting_changed', { setting: 'custom_background', value: 'off' })
-  }, [])
+  }, [activeWallpaper.folder, sessionState.user])
 
   useEffect(() => watchTheme(theme, palette), [theme, palette])
 
@@ -2000,6 +2033,15 @@ function App() {
       ...(nextPalette.id === 'custom' ? { hue: nextPalette.hue, tint: nextPalette.tint } : {}),
     })
   }, [])
+
+  // A tile of the gallery: a folder's photo of the day, one of its photos,
+  // or the student's own image (kept when they pick another tile).
+  const handleWallpaperChoiceChange = useCallback((choice) => {
+    persistWallpaperChoice(choice, sessionState.user)
+    setWallpaperChoice(choice)
+    setHeroOffset(0)
+    track('setting_changed', { setting: 'wallpaper_choice', value: wallpaperChoiceAnalyticsValue(choice) })
+  }, [sessionState.user])
 
   const handleShowWallpaperChange = useCallback((show) => {
     persistShowWallpaper(show, sessionState.user)
@@ -2727,7 +2769,7 @@ function App() {
     sessionState.user,
     sessionState.givenName,
   )
-  const simpleLoadingDots = <LoadingDots className="text-text-muted" />
+  const simpleLoadingDots = <PageLoading />
   // The composer's « De : » (MailPage): the account's name and address,
   // and its automatic signature's lines: the name, the group picked for the
   // planning (its year and TP, or TD, when there's one), the establishment
@@ -2868,6 +2910,9 @@ function App() {
             gradesSupported={gradesSupported}
             activePage={shownPage}
             onNavigatePage={handleNavigatePage}
+            nextClassSelection={hasPlanningPage ? selectedTp : null}
+            sessionUser={sessionState.user}
+            onOpenPlanningDay={hasPlanningPage ? handleOpenPlanningDay : null}
             onOpenLatestGrade={universityConfig.features?.sidebarLatestGrade === true && sessionState.authenticated && hasGradesPage ? handleOpenSidebarGrade : null}
             compact={sidebarCompact || isSidebarAutoCompact}
             canPeek={isSidebarAutoCompact}
@@ -2890,9 +2935,13 @@ function App() {
                 onAccountAction={handleOpenAccountModal}
               />
             </div>
+            {/* « Nouvelle version » without the sidebar: under the top bar
+                on a tablet; on a phone a pill floating over the tab bar, as
+                « Accueil »'s band runs up behind the top bar and would cover
+                it there (and the other pages have no top bar). */}
             {hasPendingUpdate ? (
-              <div className="4xl:hidden px-6 pt-3 max-md:px-3">
-                <UpdateNotice onUpdateClick={handleApplyUpdate} />
+              <div className="update-notice-dock 4xl:hidden px-6 pt-3 max-md:pointer-events-none max-md:fixed max-md:inset-x-0 max-md:bottom-[calc(env(safe-area-inset-bottom)+96px)] max-md:z-30 max-md:flex max-md:justify-center max-md:px-4 max-md:pt-0">
+                <UpdateNotice onUpdateClick={handleApplyUpdate} className="update-notice-float max-md:pointer-events-auto max-md:w-auto max-md:max-w-[360px] md:max-w-[360px]" />
               </div>
             ) : null}
             {showChangelogPill ? (
@@ -3005,8 +3054,13 @@ function App() {
         widgetToggles={widgetToggles}
         onWidgetVisibilityChange={handleWidgetVisibilityChange}
         backgroundPreviewSrc={heroImage.src}
+        backgroundPreviewPosition={heroImage.position}
         showWallpaper={showWallpaper}
         onShowWallpaperChange={handleShowWallpaperChange}
+        wallpaperFolders={wallpaperFolders}
+        wallpaperChoice={activeWallpaper}
+        onWallpaperChoiceChange={handleWallpaperChoiceChange}
+        customBackgroundSrc={customBackground}
         showUniversityLogo={showUniversityLogo}
         onShowUniversityLogoChange={handleShowUniversityLogoChange}
         establishmentLogoLabel={universityConfig.establishments?.byId?.[establishment]?.logo ? universityConfig.establishments.byId[establishment].label : null}
@@ -3016,7 +3070,6 @@ function App() {
         onThemeChange={handleThemeChange}
         palette={palette}
         onPaletteChange={handlePaletteChange}
-        hasCustomBackground={Boolean(customBackground)}
         onCustomBackgroundChange={handleCustomBackgroundChange}
         onCustomBackgroundReset={handleCustomBackgroundReset}
         hasCustomProfilePhoto={hasCustomProfilePhoto}
@@ -3077,7 +3130,8 @@ function App() {
             onThemeChange={setTheme}
             establishment={establishment}
             heroImage={heroImage}
-            hasCustomBackground={Boolean(customBackground)}
+            wallpaperFolder={activeWallpaper.folder}
+            hasCustomBackground={activeWallpaper.folder === 'custom' || Boolean(activeWallpaper.image)}
             onHeroShift={(step) => setHeroOffset((current) => current + step)}
             debugNextClass={debugNextClass}
             onDebugNextClassChange={setDebugNextClass}

@@ -11,6 +11,7 @@ import PlanningExportButton from './PlanningExportButton'
 import PlanningShareButton from './PlanningShareButton'
 import SegmentedControl from './SegmentedControl'
 import SwipePager from './SwipePager'
+import SmoothSurface from './SmoothSurface'
 
 const compareDays = (left, right) => daysBetween(right, left)
 const stepWeeks = (monday, count) => addDays(monday, 7 * count)
@@ -64,7 +65,7 @@ function PlanningMonthPicker({ selectedDay, todayKey, onPick, onClose }) {
   return (
     <div
       ref={panelRef}
-      className="favorites-context-menu absolute top-[calc(100%+8px)] left-0 z-30 w-[min(320px,calc(100vw-24px))] p-[10px] border border-border corners-[18px] bg-context-bg shadow-[0_18px_40px_var(--color-shadow)] backdrop-blur-[12px] animate-context-menu-in"
+      className="favorites-context-menu glass glass--menu absolute top-[calc(100%+8px)] left-0 z-30 w-[min(320px,calc(100vw-24px))] p-[10px] border corners-[18px] animate-context-menu-in"
       role="dialog"
       aria-label="Choisir un jour"
     >
@@ -279,6 +280,7 @@ function PlanningHeader({ titleId, selectedDay, todayKey, view, isWide, columnsF
                 aria-label={label}
                 title={label}
               >
+                <SmoothSurface />
                 <Icon icon={icon} className="size-4" aria-hidden="true" />
               </button>
             ))}
@@ -322,6 +324,7 @@ function PlanningHeader({ titleId, selectedDay, todayKey, view, isWide, columnsF
           {/* Only away from today (in the week, from today's week). */}
           {(wholeWeek ? monday !== startOfWeek(todayKey) : selectedDay !== todayKey) ? (
             <button type="button" className={`${SECONDARY_BUTTON} cursor-pointer max-md:h-10 max-md:py-0 max-md:shadow-xs`} onClick={onToday}>
+              <SmoothSurface />
               Aujourd’hui
             </button>
           ) : null}

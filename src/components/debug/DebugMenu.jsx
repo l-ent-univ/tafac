@@ -3,9 +3,10 @@ import { Icon } from '@iconify/react'
 import universityConfig from '@university'
 import { getPapillonUrl, PAPILLON_DEBUG_KEY, readPapillonDebugOverride } from '../../papillon'
 import { isServiceNoticeHiddenByDebug, SERVICE_NOTICE_DEBUG_KEY } from '../../serviceNoticeDebug'
+import { setLoadingSimulated, useLoadingSimulated } from '../../loadingDebug'
 import { getLoadedUniversityId, writeUniversityChoice } from '../../universityRuntime'
 import { replayChangelogEntry } from '../../changelogStore'
-import { listHeroImages } from '../../heroImage'
+import { listHeroImages, listWallpaperFolderImages } from '../../heroImage'
 import { persistTheme } from '../../theme'
 import { findProfilePhotoCandidate } from '../../profilePhoto'
 import { MUTED_FILL_CLASSES } from '../../settingsStyles'
@@ -94,6 +95,7 @@ export default function DebugMenu({
   onThemeChange,
   establishment,
   heroImage,
+  wallpaperFolder = 'university',
   hasCustomBackground,
   onHeroShift,
   debugNextClass,
@@ -109,6 +111,7 @@ export default function DebugMenu({
   selectedTp,
 }) {
   const [outputTab, setOutputTab] = useState('api')
+  const simulateLoading = useLoadingSimulated()
   const [imagePreview, setImagePreview] = useState(null)
   const [requestPath, setRequestPath] = useState(DEFAULT_REQUEST_PATH)
   const [adeSearchQuery, setAdeSearchQuery] = useState('')
@@ -256,10 +259,10 @@ export default function DebugMenu({
         : 'Connecté'
       : 'Déconnecté'
 
-  const heroImages = listHeroImages(establishment)
+  const heroImages = wallpaperFolder === 'tafac' ? listWallpaperFolderImages('tafac') : listHeroImages(establishment)
   const heroImageIndex = heroImages.findIndex((image) => image.src === heroImage.src)
   const heroStatus = hasCustomBackground
-    ? 'Fond personnalisé actif : la rotation est ignorée'
+    ? 'Fond fixe choisi dans Réglages : la rotation est ignorée'
     : heroImages.length > 1
       ? `${heroImageIndex + 1} / ${heroImages.length}${heroImage.credit?.author ? ` · ${heroImage.credit.author}` : ''}`
       : heroImages.length === 1 ? 'Une seule photo configurée' : 'Aucune photo : image générique'
@@ -301,7 +304,7 @@ export default function DebugMenu({
     // Above the landing header (z-40); the sheets and prompts it opens
     // (z-50) still come on top.
     <aside
-      className="card-corners fixed top-3 right-3 bottom-3 z-[45] flex w-[min(560px,calc(100vw-24px))] flex-col overflow-hidden border border-border bg-bg text-text font-body shadow-[0_24px_80px_var(--color-shadow)] xl:w-[min(1160px,calc(100vw-24px))] max-md:inset-2 max-md:w-auto"
+      className="glass-solid glass--quiet card-corners fixed top-3 right-3 bottom-3 z-[45] flex select-text w-[min(560px,calc(100vw-24px))] flex-col overflow-hidden border text-text font-body xl:w-[min(1160px,calc(100vw-24px))] max-md:inset-2 max-md:w-auto"
       role="dialog"
       aria-modal="false"
       aria-label="Menu debug"
@@ -329,7 +332,7 @@ export default function DebugMenu({
             <button
               key={id}
               type="button"
-              className={`h-8 shrink-0 rounded-full border border-border bg-widget-bg px-3 text-[13px] font-medium text-text cursor-pointer transition-colors duration-[120ms] hover:bg-bg-subtle ${id === 'debug-output' ? 'xl:hidden' : ''}`}
+              className={`glass-solid h-8 shrink-0 rounded-full border px-3 text-[13px] font-medium text-text cursor-pointer transition-colors duration-[120ms] ${id === 'debug-output' ? 'xl:hidden' : ''}`}
               onClick={() => document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
             >
               {label}
@@ -509,6 +512,15 @@ export default function DebugMenu({
           </DebugSection>
 
           <DebugSection id="debug-display" title="Affichage">
+            <DebugRow label="Design system" hint="Chaque token et composant, sur /dev/design">
+              <DebugButton onClick={() => window.open('/dev/design', '_blank', 'noopener')}>Ouvrir</DebugButton>
+            </DebugRow>
+            <DebugSwitchRow
+              label="Simuler le chargement"
+              hint="Mes notes et Assiduité restent sur leur chargement"
+              checked={simulateLoading}
+              onChange={setLoadingSimulated}
+            />
             <DebugSwitchRow
               label="Prochain cours fictif"
               hint="Carte « Prochain cours » de démo, rien n’est chargé"

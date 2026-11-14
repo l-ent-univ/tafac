@@ -55,7 +55,7 @@ export default function DebugOutput({ id, debugState, tab, onTabChange, imagePre
   return (
     <section id={id} className="flex min-h-0 min-w-0 flex-1 scroll-mt-1 flex-col gap-[7px]" aria-label="Sortie">
       <h2 className="m-0 px-1 font-body text-[13px] font-semibold leading-none text-text-60 xl:hidden">Sortie</h2>
-      <div className="card-corners-sm flex min-h-[440px] flex-1 flex-col overflow-hidden border border-border bg-widget-bg xl:min-h-0">
+      <div className="glass-solid glass--quiet card-corners-sm flex min-h-[440px] flex-1 flex-col overflow-hidden border xl:min-h-0">
         <div className="flex flex-wrap items-center justify-between gap-2 px-4 pt-3 max-md:px-3">
           <DebugSegmented label="Sortie" options={OUTPUT_TABS} value={tab} onChange={onTabChange} />
           <div className="flex items-center gap-2">
@@ -75,7 +75,7 @@ export default function DebugOutput({ id, debugState, tab, onTabChange, imagePre
           <p className="mx-3 mt-0 mb-3 corners-[14px] bg-error-bg px-3 py-2 font-body text-[13px] font-medium text-error break-words">{debugState.error}</p>
         ) : null}
         {!isStorage && imagePreview ? (
-          <div className="mx-3 mb-3 flex items-center gap-3 corners-[16px] border border-border bg-bg p-3">
+          <div className="glass-solid mx-3 mb-3 flex items-center gap-3 corners-[16px] border p-3">
             <img
               src={imagePreview.src}
               alt="Photo de profil"
@@ -89,7 +89,7 @@ export default function DebugOutput({ id, debugState, tab, onTabChange, imagePre
           </div>
         ) : null}
 
-        <pre className="mx-3 mt-0 mb-3 min-h-0 flex-1 overflow-auto corners-[16px] border border-border bg-bg p-3 font-mono text-[12px] leading-[1.5] text-text whitespace-pre-wrap [overflow-wrap:anywhere]">{output}</pre>
+        <pre className="glass-solid mx-3 mt-0 mb-3 min-h-0 flex-1 overflow-auto corners-[16px] border p-3 font-mono text-[12px] leading-[1.5] text-text whitespace-pre-wrap [overflow-wrap:anywhere]">{output}</pre>
       </div>
     </section>
   )

@@ -1,17 +1,26 @@
+import SmoothSurface from './SmoothSurface'
+
 // « Bêta », beside Tafac's logo or name (landing header, login, À propos).
-// In the brand colours, so it holds in dark mode; `onSky`: translucent white
-// instead, on the login page's sky. `size`: 'sm' (next to a header-sized logo
-// or a line of text) or 'lg' (by the login page's big logo).
+// In the brand colours with the primary button's texture (.lent-button: a
+// dark edge, a white rim, a sharp shadow, on the smooth pill), so it holds
+// in dark mode; `onSky`: the glass material instead, on the login page's
+// sky. `size`: 'sm' (next to a header-sized logo or a line of text) or 'lg'
+// (by the login page's big logo). The same padding on every side.
 const SIZES = {
-  sm: 'px-2 py-0.5 text-[11px]',
-  lg: 'px-2.5 py-1 text-[13px]',
+  sm: 'p-[5px] text-[11px]',
+  lg: 'p-[7px] text-[13px]',
 }
 
 function BetaTag({ size = 'sm', onSky = false, className = '' }) {
-  const colors = onSky ? 'bg-white/20 text-white ring-1 ring-inset ring-white/45' : 'bg-brand text-bg'
+  // On the sky: the glass material (.glass), its fill the clear white
+  // tint the white letters need.
+  const colors = onSky
+    ? 'glass rounded-full text-white [--glass-fill:rgb(255_255_255/0.2)]'
+    : 'lent-button lent-button--tag rounded-full'
 
   return (
-    <span className={`inline-block shrink-0 rounded-full font-bold uppercase leading-[1.3] tracking-[0.06em] ${colors} ${SIZES[size] ?? SIZES.sm} ${className}`}>
+    <span className={`inline-block shrink-0 font-bold uppercase leading-none tracking-[0.06em] ${colors} ${SIZES[size] ?? SIZES.sm} ${className}`}>
+      {onSky ? null : <SmoothSurface />}
       Bêta
     </span>
   )

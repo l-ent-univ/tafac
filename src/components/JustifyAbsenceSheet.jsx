@@ -2,10 +2,8 @@ import { useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from 're
 import { createPortal } from 'react-dom'
 import { Icon } from '@iconify/react'
 import {
+  ABSENCE_REASONS,
   absenceTeacher,
-  buildAbsenceSummaryRows,
-  buildJustificationLines,
-  buildJustificationSubject,
   listAbsenceReasons,
   prepareJustificationMail,
 } from '../absenceMail'
@@ -30,7 +28,7 @@ const PROOF_ACCEPT = 'image/*,application/pdf'
 
 const QUESTION = 'm-0 outline-none text-balance font-display text-[24px] font-bold leading-[1.15] text-text max-sm:text-[22px]'
 const HINT = 'm-0 text-balance font-body text-[15px] font-medium leading-[1.4] text-text-secondary'
-const TEXT_LINK = 'inline-flex cursor-pointer items-center gap-1.5 rounded-full border-0 bg-transparent px-3 py-2 text-text-secondary transition-colors hover:bg-bg-subtle hover:text-text'
+const TEXT_LINK = 'inline-flex cursor-pointer items-center gap-1.5 rounded-full border-0 bg-transparent px-3 py-2 text-text-secondary transition-[background-color,box-shadow,color] duration-150 hover:bg-card hover:text-text hover:shadow-[0_0_0_1px_color-mix(in_srgb,var(--color-text)_9%,transparent),0_1px_2px_rgb(0_0_0/0.06)] dark:hover:bg-white/8 dark:hover:shadow-[0_0_0_1px_rgb(255_255_255/0.06)]'
 
 function formatSize(bytes) {
   if (!(bytes > 0)) return ''
@@ -45,7 +43,7 @@ function StepDots({ index }) {
       {STEPS.map((step, position) => (
         <span
           key={step}
-          className={`h-[6px] rounded-full transition-all duration-300 ${position === index ? 'w-5 bg-brand' : position < index ? 'w-[6px] bg-brand' : 'w-[6px] bg-text-30'}`}
+          className={`h-[6px] rounded-full transition-all duration-300 ${position === index ? 'step-dot w-5 bg-brand' : position < index ? 'step-dot w-[6px] bg-brand' : 'engraved w-[6px]'}`}
         />
       ))}
     </span>
@@ -75,9 +73,9 @@ function ReasonStep({ entry, extraReasons, reason, details, onReason, onDetails,
               aria-checked={selected}
               onClick={() => onReason(option.id)}
               style={{ '--reveal-order': index }}
-              className={`justify-reason flex min-h-[58px] cursor-pointer items-center gap-3 rounded-[18px] border p-2.5 text-left transition-colors ${selected ? 'border-brand bg-brand-subtle' : 'border-border bg-widget-bg hover:bg-bg-subtle'}`}
+              className={`justify-reason flex min-h-[58px] cursor-pointer items-center gap-3 rounded-[18px] border p-2.5 text-left transition-[background-color,box-shadow] duration-150 ${selected ? 'engraved border-transparent' : 'glass-solid'}`}
             >
-              <span className={`inline-flex size-9 shrink-0 items-center justify-center rounded-full ${selected ? 'bg-brand text-bg' : 'bg-brand-subtle text-text'}`} aria-hidden="true">
+              <span className={`inline-flex size-9 shrink-0 items-center justify-center rounded-full ${selected ? 'step-dot bg-brand text-bg' : 'glass-solid text-text'}`} aria-hidden="true">
                 <Icon icon={option.icon} className="size-[18px]" />
               </span>
               <span className="min-w-0 font-body text-[15px] font-semibold leading-[1.2] text-text">{option.label}</span>
@@ -96,7 +94,7 @@ function ReasonStep({ entry, extraReasons, reason, details, onReason, onDetails,
             onChange={(event) => onDetails(event.target.value)}
             rows={3}
             placeholder={r('Ce qui t’a empêché de venir', 'Ce qui vous a empêché de venir')}
-            className="w-full resize-none rounded-[16px] border border-border-input bg-bg-input px-3.5 py-3 font-body text-[15px] leading-[1.4] text-text outline-none focus:border-brand"
+            className="field w-full resize-none rounded-[16px] px-3.5 py-3 font-body text-[15px] leading-[1.4] text-text"
           />
           <div className="flex justify-end">
             <LentButton disabled={!details.trim()} onClick={onNext}>
@@ -139,11 +137,11 @@ function ProofStep({ file, onFile, onChoose, onNext }) {
         }}
       />
       {file ? (
-        <div className="semester-fade flex items-center gap-3 rounded-[18px] border border-border bg-widget-bg p-2.5">
+        <div className="glass-solid semester-fade flex items-center gap-3 rounded-[18px] border p-2.5">
           {preview ? (
             <img src={preview} alt="" className="size-14 shrink-0 rounded-[12px] object-cover" />
           ) : (
-            <span className="inline-flex size-14 shrink-0 items-center justify-center rounded-[12px] bg-brand-subtle text-text" aria-hidden="true">
+            <span className="glass-solid inline-flex size-14 shrink-0 items-center justify-center rounded-[12px] text-text" aria-hidden="true">
               <Icon icon="ph:file-pdf" className="size-6" />
             </span>
           )}
@@ -157,9 +155,9 @@ function ProofStep({ file, onFile, onChoose, onNext }) {
         <button
           type="button"
           onClick={() => inputRef.current?.click()}
-          className="justify-drop flex cursor-pointer flex-col items-center gap-2 rounded-[22px] border-2 border-dashed border-border-input bg-widget-bg px-5 py-7 text-text transition-colors hover:border-brand hover:bg-bg-subtle"
+          className="justify-drop engraved status-tag--dashed flex cursor-pointer flex-col items-center gap-2 rounded-[22px] border-0 px-5 py-7 text-text"
         >
-          <span className="inline-flex size-12 items-center justify-center rounded-full bg-brand-subtle" aria-hidden="true">
+          <span className="glass-solid inline-flex size-12 items-center justify-center rounded-full" aria-hidden="true">
             <Icon icon="ph:camera" className="size-6" />
           </span>
           <span className="font-body text-[16px] font-semibold leading-[1.2]">Ajouter une photo ou un PDF</span>
@@ -193,64 +191,60 @@ function ProofStep({ file, onFile, onChoose, onNext }) {
 // found in the planning, which the student can leave out), its subject,
 // its text, the summary box and the justificatif; « Écrire le mail » opens
 // it in the composer.
+// « Ton mail est prêt »: a ticket printed out of a slot, the little that
+// matters on it (what, when, why; the teacher in copy, the file joined):
+// the mail itself is read in the composer. The ticket feeds out in jerks,
+// as a receipt printer's (.justify-ticket in overrides.css), still for
+// reduced motion.
 function ReviewStep({ entry, answers, file, toTeacher, onToTeacher, findsClassTeacher, onCompose }) {
   const teacher = absenceTeacher(entry)
   const ccLabel = teacher ? teacher.name || teacher.email : findsClassTeacher ? 'Enseignant du cours' : null
-  const lines = buildJustificationLines(entry, answers)
-  const rows = buildAbsenceSummaryRows(entry)
+  const day = parseDay(entry?.date)
+  const reason = ABSENCE_REASONS.find((option) => option.id === answers.reason)?.label
+  const when = [entry?.start && entry?.end ? `${entry.start} – ${entry.end}` : null, reason].filter(Boolean).join(' · ')
   return (
     <div className="grid gap-5">
       <div className="grid gap-2 text-center">
         <h3 tabIndex={-1} className={QUESTION}>{r('Ton mail est prêt', 'Votre mail est prêt')}</h3>
-        <p className={HINT}>{r('Ajoute l’adresse du secrétariat de ton département dans le mail, puis envoie-le', 'Ajoutez l’adresse du secrétariat de votre département dans le mail, puis envoyez-le')}</p>
+        <p className={HINT}>{r('Ajoute l’adresse du secrétariat, puis envoie-le', 'Ajoutez l’adresse du secrétariat, puis envoyez-le')}</p>
       </div>
-      <article className="justify-letter grid gap-3 rounded-[20px] border border-border bg-widget-bg p-4 text-left shadow-md max-sm:p-3.5">
-        <div className="grid gap-2 border-b border-border pb-3">
-          <div className="flex min-w-0 flex-wrap items-center gap-2">
-            <span className="w-[52px] shrink-0 font-body text-[13px] font-medium leading-none text-text-muted">À</span>
-            <span className="font-body text-[13px] font-semibold leading-none text-text">Secrétariat du département</span>
-            <span className="font-body text-[13px] font-medium leading-none text-text-muted">à ajouter</span>
-          </div>
-          {ccLabel ? (
-            <div className="flex min-w-0 flex-wrap items-center gap-2">
-              <span className="w-[52px] shrink-0 font-body text-[13px] font-medium leading-none text-text-muted">Cc</span>
-              <button
-                type="button"
-                aria-pressed={toTeacher}
-                onClick={() => onToTeacher(!toTeacher)}
-                title={teacher?.email}
-                className={`inline-flex min-w-0 cursor-pointer items-center gap-1.5 rounded-full border px-2.5 py-[5px] transition-colors ${toTeacher ? 'border-transparent bg-brand-subtle text-text' : 'border-dashed border-border-input bg-transparent text-text-muted line-through'}`}
-              >
-                <Icon icon={toTeacher ? 'ph:check-bold' : 'ph:plus-bold'} className="size-[12px] shrink-0" aria-hidden="true" />
-                <span className="truncate font-body text-[13px] font-semibold leading-none">{ccLabel}</span>
-              </button>
-              {!teacher && toTeacher ? <span className="font-body text-[13px] font-medium leading-none text-text-muted">{r('cherché dans ton planning', 'cherché dans votre planning')}</span> : null}
+      <div className="grid">
+        <span className="engraved relative z-10 h-3 rounded-full" aria-hidden="true" />
+        <div className="-mt-1.5 overflow-hidden px-5 pb-4">
+          <article className="justify-ticket grid gap-3 px-5 pt-6 pb-7 text-left">
+            <div className="flex items-baseline justify-between gap-3 font-mono text-[11px] font-medium uppercase leading-none tracking-[0.08em] text-text-muted">
+              <span>{entry?.status === 'late' ? 'Retard' : 'Absence'}</span>
+              {day ? <span>{DAY_SHORT.format(day).replace('.', '')}</span> : null}
             </div>
-          ) : null}
-          <div className="flex min-w-0 items-baseline gap-2">
-            <span className="w-[52px] shrink-0 font-body text-[13px] font-medium leading-none text-text-muted">Objet</span>
-            <span className="min-w-0 font-body text-[14px] font-semibold leading-[1.3] text-text">{buildJustificationSubject(entry, answers)}</span>
-          </div>
-        </div>
-        <div className="grid max-h-[32dvh] gap-2 overflow-y-auto overscroll-contain font-body text-[14px] font-medium leading-[1.45] text-text">
-          {lines.map((line, index) => <p key={index} className="m-0 whitespace-pre-line">{line}</p>)}
-          <dl className="m-0 grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 rounded-[12px] bg-bg-subtle px-3 py-2 text-[13px]">
-            {rows.map((row) => (
-              <div key={row.label} className="contents">
-                <dt className="font-semibold text-text-muted">{row.label}</dt>
-                <dd className="m-0 min-w-0 text-text">{row.value}</dd>
+            <div className="grid gap-1.5">
+              <p className="m-0 text-balance font-display text-[22px] font-bold leading-[1.15] text-text">{entry?.subjectTitle ?? entry?.subject ?? 'Absence'}</p>
+              {when ? <p className="m-0 font-body text-[14px] font-medium leading-[1.3] text-text-secondary">{when}</p> : null}
+            </div>
+            {ccLabel || file ? (
+              <div className="justify-ticket-tear flex min-w-0 flex-wrap items-center gap-2 pt-3">
+                {ccLabel ? (
+                  <button
+                    type="button"
+                    aria-pressed={toTeacher}
+                    onClick={() => onToTeacher(!toTeacher)}
+                    title={teacher?.email}
+                    className={`inline-flex min-w-0 cursor-pointer items-center gap-1.5 rounded-full px-2.5 py-[5px] transition-colors ${toTeacher ? 'glass-solid text-text' : 'status-tag status-tag--carved status-tag--dashed text-text-muted line-through'}`}
+                  >
+                    <Icon icon={toTeacher ? 'ph:check-bold' : 'ph:plus-bold'} className="size-[12px] shrink-0" aria-hidden="true" />
+                    <span className="truncate font-body text-[13px] font-semibold leading-none">Cc {ccLabel}</span>
+                  </button>
+                ) : null}
+                {file ? (
+                  <span className="inline-flex min-w-0 items-center gap-1 text-text-muted">
+                    <Icon icon="ph:paperclip" className="size-[14px] shrink-0" aria-hidden="true" />
+                    <span className="truncate font-body text-[13px] font-medium leading-none">{file.name}</span>
+                  </span>
+                ) : null}
               </div>
-            ))}
-          </dl>
-          <p className="m-0">Bien cordialement,</p>
+            ) : null}
+          </article>
         </div>
-        {file ? (
-          <span className="inline-flex min-w-0 items-center gap-1.5 justify-self-start rounded-full border border-border px-2.5 py-[5px] text-text-secondary">
-            <Icon icon="ph:paperclip" className="size-[14px] shrink-0" aria-hidden="true" />
-            <span className="truncate font-body text-[13px] font-semibold leading-none">{file.name}</span>
-          </span>
-        ) : null}
-      </article>
+      </div>
       <div className="grid justify-items-center gap-2">
         <LentButton onClick={onCompose}>
           <Icon icon="ph:pencil-simple-line" className="size-4" aria-hidden="true" />
@@ -386,7 +380,7 @@ function JustifyAbsenceSheet({ entry, extraReasons = [], findsClassTeacher = fal
       <div className="weather-modal-backdrop absolute inset-0 bg-backdrop animate-modal-backdrop-in" onClick={dismiss} aria-hidden="true" />
       <section
         ref={dialogRef}
-        className="gd-dialog relative isolate flex max-h-[min(860px,calc(100dvh-40px))] w-[min(560px,100%)] flex-col overflow-hidden modal-corners [--modal-inset:24px] [--modal-inner-radius:20px] max-sm:[--modal-inset:16px] max-sm:[--modal-inner-radius:18px] border border-border bg-bg text-text shadow-[0_24px_80px_var(--color-shadow)] outline-none max-sm:max-h-[calc(100dvh-16px)] max-sm:rounded-b-none max-sm:border-b-0"
+        className="glass-solid glass--quiet modal-surface gd-dialog relative isolate flex max-h-[min(860px,calc(100dvh-40px))] w-[min(560px,100%)] flex-col overflow-hidden modal-corners [--modal-inset:24px] [--modal-inner-radius:20px] max-sm:[--modal-inset:16px] max-sm:[--modal-inner-radius:18px] border text-text outline-none max-sm:max-h-[calc(100dvh-16px)] max-sm:rounded-b-none max-sm:border-b-0"
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}
@@ -400,7 +394,7 @@ function JustifyAbsenceSheet({ entry, extraReasons = [], findsClassTeacher = fal
                 type="button"
                 onClick={() => goTo(STEPS[stepIndex - 1])}
                 aria-label="Étape précédente"
-                className="inline-flex size-[34px] shrink-0 cursor-pointer items-center justify-center rounded-full border-0 bg-brand-subtle p-0 text-text transition-colors hover:bg-bg-muted"
+                className="glass-solid inline-flex size-[34px] shrink-0 cursor-pointer items-center justify-center rounded-full p-0 text-text"
               >
                 <Icon icon="ph:arrow-left-bold" className="size-[15px]" aria-hidden="true" />
               </button>

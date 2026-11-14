@@ -8,6 +8,7 @@ import { buildSegmentPath, pointAt } from '../ueRingGeometry'
 import LentButton from './LentButton'
 import UeBadge from './UeBadge'
 import { r } from '../register.js'
+import SmoothSurface from './SmoothSurface'
 
 const CARD_CLASSES = 'widget-card widget-card-visible shadow-md border border-white card-corners bg-widget-bg text-text p-2 min-w-0'
 
@@ -211,7 +212,7 @@ function DeltaChip({ move }) {
   if (move.delta == null) return null
   const up = move.delta > 0
   return (
-    <span className={`inline-flex shrink-0 items-center gap-[3px] rounded-full font-display font-bold leading-none px-[7px] py-[4px] text-[12.5px] ${up ? 'bg-success-bg text-success-text' : 'bg-bg-subtle text-text-secondary'}`}>
+    <span className={`inline-flex shrink-0 items-center gap-[3px] rounded-full font-display font-bold leading-none px-[7px] py-[4px] text-[12.5px] ${up ? 'status-tag status-tag--success text-success-text' : 'glass-solid text-text-secondary'}`}>
       <Icon icon={up ? 'ph:arrow-up' : 'ph:arrow-down'} className="size-[12px]" aria-hidden="true" />
       {formatDelta(move.delta).slice(1)}
     </span>
@@ -531,7 +532,7 @@ function GradeSimulatorReveal({ ue, ues, releve, overrides, flyFrom = null, onEd
                 {general.value != null ? (
                   <MoveRow
                     badge={(
-                      <span className="inline-flex size-9 shrink-0 items-center justify-center corners-[11px] bg-brand-subtle">
+                      <span className="glass-solid inline-flex size-9 shrink-0 items-center justify-center corners-[11px]">
                         <Icon icon="ph:chart-line" className="size-[18px] text-text" />
                       </span>
                     )}
@@ -559,9 +560,10 @@ function GradeSimulatorReveal({ ue, ues, releve, overrides, flyFrom = null, onEd
       <footer className="ue-reveal-footer relative z-10 flex items-center gap-3 rounded-b-[25px] border-t border-border bg-bg px-6 py-3 max-sm:rounded-b-none max-sm:px-4 max-sm:pb-[max(12px,env(safe-area-inset-bottom))]">
         <button
           type="button"
-          className="inline-flex min-h-[44px] items-center justify-center gap-2 whitespace-nowrap corners-[32px] border border-border-input bg-transparent px-5 font-body text-[16px] font-semibold text-text transition-colors duration-150 hover:bg-bg-subtle max-sm:flex-1 max-sm:px-4"
+          className="material inline-flex min-h-[44px] items-center justify-center gap-2 whitespace-nowrap corners-[32px] px-5 font-body text-[16px] font-semibold text-text max-sm:flex-1 max-sm:px-4"
           onClick={() => onEdit(badgeRef.current?.getBoundingClientRect() ?? null)}
         >
+          <SmoothSurface />
           <Icon icon="ph:arrow-left" className="size-[18px]" aria-hidden="true" />
           Modifier mes notes
         </button>

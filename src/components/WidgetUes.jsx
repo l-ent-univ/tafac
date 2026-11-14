@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useId, useMemo, useRef, useState } from 'react'
 import { readSemesterUes } from '../semesterUes'
 import { useUeColor } from '../useUeColor'
 import { RING_SIZE as SIZE, buildRingSegmentPath, buildRingSegments, readSegmentIndexAt } from '../ueRingGeometry'
@@ -66,6 +66,10 @@ function WidgetUes({ releve = null, config = null, visible = false, icon = null 
   // `growRef`: how far each segment has grown (0 to 1), anew with new
   // segments (their paths drawn thin again).
   const pathRefs = useRef([])
+  // Each segment's rim and the clip that keeps it inside: the same path.
+  const rimRefs = useRef([])
+  const clipRefs = useRef([])
+  const ringId = useId().replace(/:/g, '')
   const growRef = useRef({ segments: null, values: [] })
   useEffect(() => {
     if (growRef.current.segments !== segments) growRef.current = { segments, values: [] }
@@ -83,7 +87,8 @@ function WidgetUes({ releve = null, config = null, visible = false, icon = null 
         if (current === target) return
         const next = current < target ? Math.min(target, current + step) : Math.max(target, current - step)
         values[index] = next
-        pathRefs.current[index]?.setAttribute('d', buildRingSegmentPath(segment.start, segment.end, segments.length, GROW * easeOutCubic(next)))
+        const d = buildRingSegmentPath(segment.start, segment.end, segments.length, GROW * easeOutCubic(next))
+        for (const refs of [pathRefs, rimRefs, clipRefs]) refs.current[index]?.setAttribute('d', d)
         if (next !== target) moving = true
       })
       if (moving) frame = requestAnimationFrame(tick)
@@ -138,17 +143,46 @@ function WidgetUes({ releve = null, config = null, visible = false, icon = null 
             if (isTouchRef.current) setActiveIndex(readSegmentIndex(event))
           }}
         >
+          {/* The segments' texture, the buttons' strokes: an edge in a
+              deeper shade of the UE's colour (.ue-ring-segment) and a white
+              rim inside it, lit from the top of the ring (the gradient
+              spans the whole ring), clipped to the segment. */}
+          <defs>
+            <linearGradient id={`${ringId}-rim`} gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="0" y2={SIZE}>
+              <stop offset="0" className="ue-ring-rim-top" />
+              <stop offset="1" className="ue-ring-rim-bottom" />
+            </linearGradient>
+            {segments.map((segment, index) => (
+              <clipPath key={segment.code} id={`${ringId}-clip-${index}`}>
+                <path ref={(element) => { clipRefs.current[index] = element }} d={segment.path} />
+              </clipPath>
+            ))}
+          </defs>
           {segments.map((segment, index) => (
-            <path
+            <g
               key={segment.code}
-              ref={(element) => { pathRefs.current[index] = element }}
-              d={segment.path}
-              className={`ue-ring-segment ue-ring-segment--${segment.state} ${activeIndex === index ? 'ue-ring-segment--active' : ''}`}
-              style={{ '--ue-color': segment.color, animationDelay: `${index * 70}ms` }}
-              tabIndex={0}
-              onFocus={() => setActiveIndex(index)}
-              onBlur={() => setActiveIndex(null)}
-            />
+              className={`ue-ring-group ${activeIndex === index ? 'is-active' : ''}`}
+              style={{ animationDelay: `${index * 70}ms` }}
+            >
+              <path
+                ref={(element) => { pathRefs.current[index] = element }}
+                d={segment.path}
+                className={`ue-ring-segment ue-ring-segment--${segment.state} ${activeIndex === index ? 'ue-ring-segment--active' : ''}`}
+                style={{ '--ue-color': segment.color }}
+                tabIndex={0}
+                onFocus={() => setActiveIndex(index)}
+                onBlur={() => setActiveIndex(null)}
+              />
+              {segment.state === 'pending' ? null : (
+                <path
+                  ref={(element) => { rimRefs.current[index] = element }}
+                  d={segment.path}
+                  className="ue-ring-rim"
+                  stroke={`url(#${ringId}-rim)`}
+                  clipPath={`url(#${ringId}-clip-${index})`}
+                />
+              )}
+            </g>
           ))}
         </svg>
         <div className="absolute inset-0 flex flex-col items-center justify-center text-center pointer-events-none">

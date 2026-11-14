@@ -21,14 +21,15 @@ export function RowText({ icon, media = null, label, description }) {
   )
 }
 
-// Titled white card; its rows are split by hairlines.
+// Titled card of solid glass; its rows split by engraved hairlines, inset
+// from both sides (.settings-rows).
 export default function SettingsGroup({ title, footer, children }) {
   return (
     <div className="flex flex-col gap-[7px]">
       {title ? (
         <h4 className="m-0 px-1 font-body text-[13px] font-semibold leading-none text-text-60">{title}</h4>
       ) : null}
-      <div className={`${CARD_CLASSES} divide-y divide-[var(--color-border)]`}>
+      <div className={`${CARD_CLASSES} settings-rows`}>
         {children}
       </div>
       {footer ? (

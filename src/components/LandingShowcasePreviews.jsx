@@ -173,7 +173,7 @@ function MailPreview() {
         <p className="m-0 flex items-center gap-2 pb-1 font-body text-[15px] font-semibold text-text">
           <Icon icon="ph:envelope-simple" className="size-[17px]" aria-hidden="true" />
           Réception
-          <span className="mail-unread-pill inline-flex h-[18px] min-w-[18px] items-center justify-center rounded-full px-[6px] text-[11px] font-semibold leading-none tabular-nums">{mail.unreadCount}</span>
+          <span className="lent-button lent-button--tag mail-unread-pill inline-flex h-[18px] min-w-[18px] items-center justify-center rounded-full px-[6px] text-[11px] font-semibold leading-none tabular-nums">{mail.unreadCount}</span>
         </p>
         <ul className="m-0 list-none p-0">
           {mail.messages.map((message) => (

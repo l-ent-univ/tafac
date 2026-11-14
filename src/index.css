@@ -98,8 +98,8 @@
   --color-context-bg: var(--color-context-bg);
   --color-context-hover: var(--color-context-hover);
 
-  --font-display: 'SN Pro', 'Inter Variable', system-ui, sans-serif;
-  --font-body: 'Inter Variable', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --font-display: 'SN Pro', 'Collab Sans', system-ui, sans-serif;
+  --font-body: 'Collab Sans', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
 
   --breakpoint-xs: 520px;
   --breakpoint-sm: 600px;
@@ -194,11 +194,54 @@
   unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
 }
 
+/* Collab Sans, the body face (OFL-1.1, github.com/yugalone/collab-sans,
+   CollabSans-OFL.txt): the weights the app uses, and the regular italic.
+   A browser downloads only the ones a page renders. */
 @font-face {
-  font-family: 'Inter Variable';
-  src: url('./assets/fonts/InterVariable.woff2') format('woff2');
+  font-family: 'Collab Sans';
+  src: url('./assets/fonts/CollabSans-Regular.woff2') format('woff2');
   font-style: normal;
-  font-weight: 100 900;
+  font-weight: 400;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Collab Sans';
+  src: url('./assets/fonts/CollabSans-Medium.woff2') format('woff2');
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Collab Sans';
+  src: url('./assets/fonts/CollabSans-SemiBold.woff2') format('woff2');
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Collab Sans';
+  src: url('./assets/fonts/CollabSans-Bold.woff2') format('woff2');
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Collab Sans';
+  src: url('./assets/fonts/CollabSans-ExtraBold.woff2') format('woff2');
+  font-style: normal;
+  font-weight: 800;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Collab Sans';
+  src: url('./assets/fonts/CollabSans-Italic.woff2') format('woff2');
+  font-style: italic;
+  font-weight: 400;
   font-display: swap;
 }
 
@@ -208,8 +251,8 @@ img {
 }
 
 :root {
-  --font-display: 'SN Pro', 'Inter Variable', system-ui, sans-serif;
-  --font-body: 'Inter Variable', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --font-display: 'SN Pro', 'Collab Sans', system-ui, sans-serif;
+  --font-body: 'Collab Sans', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   font-family: var(--font-body);
   line-height: 1.5;
   font-weight: 400;
@@ -245,8 +288,29 @@ body {
   background: var(--color-bg);
 }
 
+/* An app, not a page: no text selection by default, so a tap, a drag or a
+   double click never paints labels, buttons or cards blue. Fields, the
+   composer and error messages keep it; text worth copying opts in with
+   `select-text` (a mail's subject, an event's details, the FAQ answers, the
+   debug menu). A mail's body is its own document (an iframe) and keeps it.
+   In the base layer so a `select-none` on a field still wins. */
+@layer base {
+  body {
+    -webkit-user-select: none;
+    user-select: none;
+  }
+
+  input,
+  textarea,
+  [contenteditable]:not([contenteditable="false"]),
+  [role="alert"] {
+    -webkit-user-select: text;
+    user-select: text;
+  }
+}
+
 /* SN Pro is the display face: page, card and modal titles, big numbers.
-   Everything smaller stays in Inter so the two never compete. Kept in the
+   Everything smaller stays in Collab Sans so the two never compete. Kept in the
    base layer so a heading can opt out with `font-body`. */
 @layer base {
   h1,

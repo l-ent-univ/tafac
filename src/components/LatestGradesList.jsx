@@ -31,7 +31,8 @@ export function LatestGradeCardBody({ moduleTitle, moduleCode, day, title, value
   const dayLabel = day ? <span className={`ml-auto shrink-0 font-body text-[13px] font-medium leading-[1.4] text-text-muted ${heading ? 'max-md:text-[12px]' : ''}`}>{day}</span> : null
   return (
     <>
-      {wash ? <span className="latest-grade-wash" style={{ background: wash }} aria-hidden="true" /> : null}
+      {/* skullet-ignore: no bone for the wash in « Accueil »'s skeletons. */}
+      {wash ? <span skullet-ignore="" className="latest-grade-wash" style={{ background: wash }} aria-hidden="true" /> : null}
       {heading ? (
         <div className="flex items-center gap-[6px] min-w-0">
           <span className="m-0 min-w-0 truncate text-base font-medium leading-[1.06] text-text-muted max-md:text-[15px]">{heading}</span>
@@ -66,7 +67,7 @@ export function LatestGradeCardBody({ moduleTitle, moduleCode, day, title, value
         // the pill's padding is even above and below the number. The page's
         // text scale: the subject rows' sizes and their grade pill's.
         <span className="flex items-center gap-[6px] self-start">
-          <span className="inline-flex items-end gap-[2px] rounded-full border border-border bg-bg-subtle px-[9px] py-[8px] text-text">
+          <span className="glass-solid inline-flex items-end gap-[2px] rounded-full border px-[9px] py-[8px] text-text">
             <span className="font-display text-[17px] font-bold leading-none [text-box:trim-both_cap_alphabetic]">{value}</span>
             {scale ? <span className="font-body text-[13px] font-medium leading-none text-text-muted [text-box:trim-both_cap_alphabetic]">{scale}</span> : null}
           </span>

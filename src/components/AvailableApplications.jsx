@@ -13,6 +13,9 @@ import { getMailOrigins, opensMailPageInApp } from '../mailPortalApp'
 import ContextMenu from './ContextMenu'
 import LoadingDots from './LoadingDots'
 import MailAttachDrawer, { ATTACH_CARD_CLASS, AttachDrawerNote } from './MailAttachDrawer'
+import SmoothSurface from './SmoothSurface'
+import { Skeleton } from 'skullet/react'
+import { useSkeletonsForced } from '../skeletonSamples'
 import {
   ENT_AUTH_PREFIX,
   ENT_ORIGIN,
@@ -31,7 +34,7 @@ const DEFAULT_ERROR_MESSAGE = 'Impossible de charger les applications pour le mo
 const CLOSED_CONTEXT_MENU = { open: false, x: 0, y: 0, application: null, source: 'favorite' }
 const FAVORITE_REMOVAL_ANIMATION_MS = 220
 // The sidebar only fits a few favorites; the rest stay starred in the full list.
-const SIDEBAR_FAVORITES_LIMIT = 4
+const SIDEBAR_FAVORITES_LIMIT = 3
 // The « Accueil » page's « Applications »: after the favourites, up to this
 // many other apps of the list, as many of them as fit on the row.
 const HOME_EXTRA_APPS = 12
@@ -976,6 +979,7 @@ function AvailableApplications({
   onOpenPlanningPage = null,
   onOpenMailPage = null,
 }) {
+  const skeletonsForced = useSkeletonsForced()
   const [viewState, setViewState] = useState({
     status: 'loading',
     source: 'none',
@@ -1900,7 +1904,6 @@ function AvailableApplications({
     setReloadKey((current) => current + 1)
   }
 
-  const shimmerClassName = 'bg-[linear-gradient(90deg,var(--color-bg-muted)_0%,var(--color-bg-subtle)_50%,var(--color-bg-muted)_100%)] bg-[length:200%_100%] animate-shimmer'
   // One app of the full list: its icon, name (and description), a star to
   // add or remove it from the favourites. Also the « Accueil » page's
   // drawer (`inDrawer`: the star always shows, the arrows move through).
@@ -1969,6 +1972,8 @@ function AvailableApplications({
   // row of tiles (the dashboard without the sidebar, and the « Accueil »
   // page's « Applications », `home`: its own title, no reordering by drag,
   // which follows the dashboard's row).
+  // Loading, or held so from the debug panel (« Simuler le chargement »).
+  const appsLoading = viewState.status === 'loading' || skeletonsForced
   const renderFavoritesSection = ({ sidebar = false, home = false } = {}) => {
     const isSidebarFavorites = sidebar
     const displayedFavorites = isSidebarFavorites
@@ -1990,7 +1995,7 @@ function AvailableApplications({
       ? 'flex flex-col gap-0.5 min-w-0'
       : home
         ? 'flex min-w-0 flex-1 flex-wrap gap-1.5 overflow-hidden max-md:gap-1'
-        : 'flex flex-wrap gap-1.5 max-md:flex-nowrap max-md:gap-1 max-md:overflow-x-auto max-md:overflow-y-hidden max-md:-mx-3 max-md:px-3 favorites-scroll-hide'
+        : 'flex flex-wrap gap-1.5 max-md:flex-nowrap max-md:gap-1 max-md:overflow-x-auto max-md:overflow-y-hidden max-md:-mx-3 max-md:-my-2 max-md:px-3 max-md:py-2 favorites-scroll-hide'
     // The « Accueil » row on a phone: compact tiles (a 38px icon, its
     // name on one line under it), concentric as the others.
     const favoriteItemClassName = isSidebarFavorites
@@ -2033,16 +2038,6 @@ function AvailableApplications({
           </div>
         )}
 
-        {viewState.status === 'loading' ? (
-          <div className={favoriteListClassName} role="status" aria-live="polite" aria-label="Chargement des favoris">
-            {Array.from({ length: 4 }).map((_, index) => (
-              <div key={`loading-favorite-${index}`} className={favoriteItemClassName} aria-hidden="true">
-                <span className={`badge-placeholder shrink-0 ${favoriteIconClassName} ${shimmerClassName}`} />
-                <span className={`text-placeholder-shimmer h-3 rounded-full ${isSidebarFavorites ? 'w-[55%]' : 'w-[80px] max-md:w-[48px] max-md:h-2.5'} ${shimmerClassName}`} />
-              </div>
-            ))}
-          </div>
-        ) : null}
 
         {viewState.status === 'error' ? (
           <div className="flex items-center gap-3 flex-wrap">
@@ -2051,13 +2046,28 @@ function AvailableApplications({
               <p className="m-0 text-sm font-medium leading-[1.3] text-text-secondary font-body">{viewState.error}</p>
             </div>
 
-            <button type="button" className="min-h-[34px] px-[14px] border border-border rounded-full bg-bg text-brand font-inherit text-sm font-semibold hover:bg-bg-subtle" onClick={handleRetry}>
+            <button type="button" className="material min-h-[34px] px-[14px] rounded-full text-brand font-inherit text-sm font-semibold" onClick={handleRetry}>
+              <SmoothSurface />
               Réessayer
             </button>
           </div>
         ) : null}
 
-        {showRow ? (
+        {/* Loading, sample tiles measured into a skeleton (skullet); once
+            the apps are in, the same <Skeleton> reveals the row over it
+            (and each tile rises in, .favorites-strip-item). */}
+        {appsLoading || showRow ? (
+          <Skeleton loading={appsLoading} label="Chargement des favoris">
+            {appsLoading ? (
+              <div className={favoriteListClassName}>
+                {['Application', 'Annuaire', 'Documentation', 'Assistance'].slice(0, isSidebarFavorites ? SIDEBAR_FAVORITES_LIMIT : 4).map((name) => (
+                  <div key={name} className={favoriteItemClassName}>
+                    <span skullet-block="" className={`shrink-0 ${favoriteIconClassName}`} />
+                    <span className={favoriteTitleClassName}>{name}</span>
+                  </div>
+                ))}
+              </div>
+            ) : (
           <div className={home ? 'flex min-w-0 items-start gap-1.5 max-md:gap-1' : 'contents'}>
             <div className={`${favoriteListClassName} ${isDragging && !home ? 'is-dragging' : ''}`} ref={home ? homeAppsRowRef : favoritesRowRef}>
               {displayedFavorites.map((application, index) => {
@@ -2080,6 +2090,7 @@ function AvailableApplications({
                   <a
                     key={application.id}
                     data-app-id={application.id}
+                    style={{ '--i': index }}
                     className={`favorites-strip-item app-card group relative border text-inherit no-underline min-w-0 cursor-pointer focus-visible:outline-none ${favoriteItemClassName} ${isLaunching ? 'pointer-events-none cursor-progress' : ''} ${(isRemovingFavorite || isExitingFavorite) ? 'pointer-events-none opacity-70' : ''} ${isExitingFavorite ? 'animate-favorite-remove' : ''} ${isContextOpen ? 'app-card--active' : ''} ${isSearchHighlighted ? 'favorite-search-highlight' : ''}`}
                     href={href}
                     target={target || undefined}
@@ -2108,7 +2119,7 @@ function AvailableApplications({
                           className={favoriteIconClassName}
                           letterClassName="text-sm max-md:text-base"
                         />
-                        <span className="absolute -top-1 -right-1 inline-flex size-[15px] items-center justify-center rounded-full bg-widget-bg text-brand shadow-[0_1px_3px_rgba(0,0,0,0.18)]" title="Favori">
+                        <span className="glass-solid absolute -top-1 -right-1 inline-flex size-[15px] items-center justify-center rounded-full text-brand" title="Favori">
                           <Icon icon="ph:star-fill" className="size-[9px]" aria-hidden="true" />
                           <span className="sr-only">Favori</span>
                         </span>
@@ -2163,6 +2174,8 @@ function AvailableApplications({
               </button>
             ) : null}
           </div>
+            )}
+          </Skeleton>
         ) : null}
 
         {favoriteActionState.error ? (
@@ -2214,15 +2227,15 @@ function AvailableApplications({
                 placeholder="Rechercher..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="app-search-input w-[180px] h-[36px] pl-8 pr-3 border border-border rounded-full bg-widget-bg text-text text-sm font-body leading-none placeholder:text-text-muted transition-[width,border-color] duration-200 focus:w-[240px] focus:border-text-muted max-sm:w-[140px] max-sm:focus:w-[180px]"
+                className="field app-search-input w-[180px] h-[36px] pl-8 pr-3 rounded-full text-text text-sm font-body leading-none placeholder:text-text-muted transition-[width,border-color,box-shadow] duration-200 focus:w-[240px] max-sm:w-[140px] max-sm:focus:w-[180px]"
               />
             </div>
           </div>
           {SHOW_CATEGORY_FILTERS && categories.length > 1 ? (
-            <div className="flex items-center gap-2 flex-wrap max-md:flex-nowrap max-md:overflow-x-auto max-md:-mx-3 max-md:px-3 favorites-scroll-hide">
+            <div className="flex items-center gap-2 flex-wrap max-md:flex-nowrap max-md:overflow-x-auto max-md:-mx-3 max-md:-my-2 max-md:px-3 max-md:py-2 favorites-scroll-hide">
               <button
                 type="button"
-                className={`min-h-[34px] px-[14px] border rounded-full font-inherit text-sm font-semibold transition-[background-color,border-color,color] duration-[120ms] ${selectedCategory === null ? 'border-brand bg-brand text-bg' : 'border-border bg-bg text-brand hover:bg-bg-subtle'}`}
+                className={`min-h-[34px] px-[14px] border rounded-full font-inherit text-sm font-semibold transition-[background-color,border-color,color] duration-[120ms] ${selectedCategory === null ? 'lent-button' : 'glass-solid text-brand'}`}
                 onClick={() => setSelectedCategory(null)}
               >
                 Tout
@@ -2231,7 +2244,7 @@ function AvailableApplications({
                 <button
                   key={category}
                   type="button"
-                  className={`min-h-[34px] px-[14px] border rounded-full font-inherit text-sm font-semibold whitespace-nowrap transition-[background-color,border-color,color] duration-[120ms] ${selectedCategory === category ? 'border-brand bg-brand text-bg' : 'border-border bg-bg text-brand hover:bg-bg-subtle'}`}
+                  className={`min-h-[34px] px-[14px] border rounded-full font-inherit text-sm font-semibold whitespace-nowrap transition-[background-color,border-color,color] duration-[120ms] ${selectedCategory === category ? 'lent-button' : 'glass-solid text-brand'}`}
                   onClick={() => setSelectedCategory(category)}
                 >
                   {category}

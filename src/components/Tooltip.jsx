@@ -14,7 +14,7 @@ function Tooltip({ title, detail = null, side = 'right', className = '' }) {
   return (
     <span
       aria-hidden="true"
-      className={`pointer-events-none absolute z-40 flex flex-col gap-[2px] w-max max-w-[240px] scale-95 whitespace-normal text-left corners-[12px] border border-black/10 bg-black px-[10px] py-[6px] text-[12px] font-medium leading-tight text-white opacity-0 invisible shadow-[0_12px_32px_rgba(0,0,0,0.18)] transition-[opacity,transform] duration-180 ease-out group-hover:visible group-hover:scale-100 group-hover:opacity-100 group-focus-visible:visible group-focus-visible:scale-100 group-focus-visible:opacity-100 dark:border-white/15 dark:bg-white dark:text-black ${SIDE_CLASSES[side]} ${className}`}
+      className={`pointer-events-none absolute z-40 flex flex-col gap-[2px] w-max max-w-[240px] scale-95 whitespace-normal text-left corners-[12px] tooltip-bubble bg-black px-[10px] py-[6px] text-[12px] font-medium leading-tight text-white opacity-0 invisible transition-[opacity,transform] duration-180 ease-out group-hover:visible group-hover:scale-100 group-hover:opacity-100 group-focus-visible:visible group-focus-visible:scale-100 group-focus-visible:opacity-100 dark:bg-white dark:text-black ${SIDE_CLASSES[side]} ${className}`}
     >
       <span className="block font-semibold">{title}</span>
       {detail ? <span className="block text-[11px] text-white/70 dark:text-black/60">{detail}</span> : null}

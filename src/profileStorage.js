@@ -1,3 +1,5 @@
+import { normalizeWallpaperChoice } from './wallpaperChoice.js'
+
 export const ESTABLISHMENT_KEY = 'l-ent:establishment'
 export const STUDENT_TP_KEY = 'l-ent:student-tp'
 // No longer read: the next-class lookahead is fixed (NEXT_CLASS_LOOKAHEAD_DAYS).
@@ -8,6 +10,7 @@ export const APP_DESCRIPTIONS_KEY = 'l-ent:show-app-descriptions'
 export const PLANNING_WEEKEND_KEY = 'l-ent:planning-weekend'
 export const TABBAR_ASSIDUITY_KEY = 'l-ent:tabbar-assiduity'
 export const WALLPAPER_KEY = 'l-ent:show-wallpaper'
+export const WALLPAPER_CHOICE_KEY = 'l-ent:wallpaper-choice'
 export const UNIVERSITY_LOGO_KEY = 'l-ent:show-university-logo'
 export const LOGO_SOURCE_KEY = 'l-ent:logo-source'
 export const ANONYMOUS_ANALYTICS_KEY = 'l-ent:anonymous-analytics'
@@ -222,6 +225,23 @@ export function persistShowWallpaper(show, userId = null) {
     localStorage.setItem(WALLPAPER_KEY, JSON.stringify({
       user: userId || null,
       value: Boolean(show),
+    }))
+  } catch {
+    // Storage unavailable
+  }
+}
+
+// The wallpaper this user picked (Réglages › Apparence, src/wallpaperChoice.js),
+// null when never picked.
+export function getStoredWallpaperChoice(userId = null) {
+  return normalizeWallpaperChoice(readScopedStorageValue(WALLPAPER_CHOICE_KEY, userId))
+}
+
+export function persistWallpaperChoice(choice, userId = null) {
+  try {
+    localStorage.setItem(WALLPAPER_CHOICE_KEY, JSON.stringify({
+      user: userId || null,
+      value: normalizeWallpaperChoice(choice),
     }))
   } catch {
     // Storage unavailable

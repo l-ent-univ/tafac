@@ -37,7 +37,7 @@ function ShareTile({ icon, label, onClick, disabled }) {
       disabled={disabled}
       className="group flex w-[76px] cursor-pointer flex-col items-center gap-2 border-0 bg-transparent p-0 text-text disabled:cursor-default disabled:opacity-50 focus-visible:outline-none"
     >
-      <span className="inline-flex size-[58px] items-center justify-center corners-[16px] border border-border bg-widget-bg shadow-xs transition-transform duration-150 group-enabled:group-active:scale-95 group-focus-visible:outline-2 group-focus-visible:outline-offset-2 group-focus-visible:outline-brand">
+      <span className="glass-solid inline-flex size-[58px] items-center justify-center corners-[16px] border transition-transform duration-150 group-enabled:group-active:scale-95 group-focus-visible:outline-2 group-focus-visible:outline-offset-2 group-focus-visible:outline-brand">
         <Icon icon={icon} className="size-[26px]" aria-hidden="true" />
       </span>
       <span className="font-body text-[12.5px] font-medium leading-none text-text-secondary">{label}</span>
@@ -155,7 +155,7 @@ function PlanningShareSheet({ monday, days, events, status, accentFor, group = '
       <div className="weather-modal-backdrop absolute inset-0 bg-backdrop animate-modal-backdrop-in" onClick={dismiss} aria-hidden="true" />
       <section
         ref={dialogRef}
-        className="gd-dialog planning-sheet relative isolate flex max-h-[min(820px,calc(100dvh-40px))] w-[min(560px,100%)] flex-col modal-corners [--modal-inset:24px] [--modal-inner-radius:20px] max-sm:[--modal-inset:16px] max-sm:[--modal-inner-radius:18px] border border-border bg-bg text-text shadow-[0_24px_80px_var(--color-shadow)] outline-none max-sm:max-h-[calc(100dvh-16px)] max-sm:rounded-b-none max-sm:border-b-0"
+        className="glass-solid glass--quiet modal-surface gd-dialog planning-sheet relative isolate flex max-h-[min(820px,calc(100dvh-40px))] w-[min(560px,100%)] flex-col modal-corners [--modal-inset:24px] [--modal-inner-radius:20px] max-sm:[--modal-inset:16px] max-sm:[--modal-inner-radius:18px] border text-text outline-none max-sm:max-h-[calc(100dvh-16px)] max-sm:rounded-b-none max-sm:border-b-0"
         role="dialog"
         aria-modal="true"
         aria-labelledby="planning-share-title"
@@ -176,7 +176,7 @@ function PlanningShareSheet({ monday, days, events, status, accentFor, group = '
 
             <div className="grid min-w-0 grid-cols-[minmax(0,1fr)] gap-5 px-6 pt-1 pb-6 max-sm:px-4 max-sm:pb-[max(20px,env(safe-area-inset-bottom))]">
               {/* The image as it'll be sent. */}
-              <div className="flex min-h-[180px] items-center justify-center overflow-hidden corners-[14px] border border-border bg-widget-bg">
+              <div className="glass-solid glass--quiet flex min-h-[180px] items-center justify-center overflow-hidden corners-[14px] border">
                 {drawn ? (
                   <img
                     src={drawn.url}

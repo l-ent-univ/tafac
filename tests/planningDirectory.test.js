@@ -4,6 +4,7 @@ import { buildPortalDirectory } from '../planningPortalApi.js'
 import {
   cleanFolderName,
   entryPlace,
+  groupCollections,
   prepareDirectory,
   roomCapacity,
   roomKind,
@@ -159,13 +160,19 @@ test('a room keeps its own layout', () => {
   }
 })
 
-test('the site’s groups are in sections by formation and year, the student’s own formation first', () => {
+test('the site’s groups are collections by formation, year and TD, the student’s own formation first', () => {
   const groups = siteEntries(entries, 'group', 'IUT Lannion')
   assert.deepEqual(groups.map(({ id }) => id).sort(), ['11667', '3309', '5101', '879'])
-  const sections = sectionEntries(groups, 'group', { first: 'BUT MMI' })
-  assert.deepEqual(sections.map(({ title }) => title), ['BUT MMI · MMI A1', 'BUT MMI · MMI A2', 'BUT INFO · INFO A1'])
-  assert.deepEqual(sections[1].entries.map(({ name, detail }) => `${name} | ${detail}`), ['2A1 MMI | 2A MMI', '2A2 MMI | 2A MMI'])
-  assert.deepEqual(sectionEntries(groups, 'group').map(({ title }) => title), ['BUT INFO · INFO A1', 'BUT MMI · MMI A1', 'BUT MMI · MMI A2'])
+  const collections = groupCollections(groups, { ownId: '3309' })
+  assert.deepEqual(collections.map(({ label, own }) => `${label} | ${own}`), ['BUT MMI | true', 'BUT INFO | false'])
+  const [mmi, info] = collections
+  assert.deepEqual(mmi.years.map(({ label }) => label), ['1re année', '2e année'])
+  assert.deepEqual(info.years.map(({ label }) => label), ['1re année'])
+  // A TD named as its groups start has no label of its own.
+  assert.deepEqual(mmi.years[1].tds.map(({ name, label }) => `${name} | ${label}`), ['2A MMI | '])
+  assert.deepEqual(mmi.years[1].tds[0].groups.map(({ entry, label }) => `${entry.name} | ${label}`), ['2A1 MMI | 2A1', '2A2 MMI | 2A2'])
+  // Without the student's group among them: no formation first, in order.
+  assert.deepEqual(groupCollections(groups).map(({ label, own }) => `${label} | ${own}`), ['BUT INFO | false', 'BUT MMI | false'])
 })
 
 test('a group found by a search says its site and formation', () => {
@@ -173,4 +180,51 @@ test('a group found by a search says its site and formation', () => {
   assert.equal(found.id, '3309')
   assert.equal(entryPlace(found), 'IUT Lannion · BUT MMI · 2A MMI')
   assert.deepEqual(searchDirectory(entries, 'group', 'droit contrats').map(({ id }) => id), ['7095'])
+})
+
+const collectionsOf = (formations, options) => groupCollections(
+  prepareDirectory(buildPortalDirectory(folder('-100', 'Ressources', [folder('-1', 'Etudiants', [folder('1', 'IUT Lannion', formations)])]))),
+  options,
+)
+
+test('a group’s name keeps what its formation and the others don’t say', () => {
+  const [info, infoCom, web] = collectionsOf([
+    folder('2', 'BUT Info-Com', [folder('3', 'Info-Com 3', [folder('4', 'TD A', [leaf('11', 'TP 1')]), folder('5', 'TD B', [leaf('12', 'TP 3')])])]),
+    // Every group ends with « I », the formation's initial.
+    folder('6', 'BUT INFO', [folder('7', 'INFO A2', [folder('8', '2A I', [leaf('13', '2A1 I'), leaf('14', '2A2 I')])])]),
+    // Groups right under their formation: no year, no TD.
+    folder('9', 'LP Web', [leaf('15', 'LP Web alternants'), leaf('16', 'LP Web initiaux')]),
+  ])
+  assert.equal(infoCom.years[0].label, '3e année')
+  // « TP 1 » doesn't say its TD: the TD keeps its label.
+  assert.deepEqual(infoCom.years[0].tds.map(({ label, groups }) => `${label} | ${groups.map((group) => group.label).join(', ')}`), ['TD A | TP 1', 'TD B | TP 3'])
+  assert.equal(info.years[0].label, '2e année')
+  assert.deepEqual(info.years[0].tds.map(({ name, label, groups }) => `${name} | ${label} | ${groups.map((group) => group.label).join(', ')}`), ['2A I |  | 2A1, 2A2'])
+  assert.deepEqual(web.years.map(({ id, label }) => `${id} | ${label}`), [' | '])
+  assert.deepEqual(web.years[0].tds[0].groups.map(({ entry, label }) => `${entry.name} | ${label}`), ['LP Web alternants | alternants', 'LP Web initiaux | initiaux'])
+})
+
+test('a folder under a TD doesn’t part its groups', () => {
+  const [mmi] = collectionsOf([
+    folder('2', 'BUT MMI', [folder('3', 'MMI A2', [folder('4', '2B MMI', [
+      leaf('11', '2B1 MMI'),
+      folder('5', '2B2 MMI', [leaf('12', '2B2-StratUX MMI'), leaf('13', '2B2-DWeb MMI')]),
+    ])])]),
+  ])
+  assert.deepEqual(mmi.years[0].tds.map(({ label, groups }) => `${label} | ${groups.map((group) => group.label).join(', ')}`), [' | 2B1, 2B2-DWeb, 2B2-StratUX'])
+})
+
+test('the student’s own formation is their group’s, else the one named as theirs', () => {
+  const formations = [
+    folder('2', 'BUT INFO', [leaf('11', 'INFO alternants')]),
+    folder('3', 'BUT Info-Com', [leaf('12', 'Info-Com alternants')]),
+    folder('4', 'BUT MMI', [leaf('13', 'MMI alternants')]),
+  ]
+  const owns = (options) => collectionsOf(formations, options).map(({ label, own }) => `${label} | ${own}`)
+  assert.deepEqual(owns({ ownId: '12', first: 'BUT MMI' }), ['BUT Info-Com | true', 'BUT INFO | false', 'BUT MMI | false'])
+  // A TD or a year chosen (not among the groups): by the formation's name.
+  assert.deepEqual(owns({ ownId: '999', first: 'BUT INFO' }), ['BUT INFO | true', 'BUT Info-Com | false', 'BUT MMI | false'])
+  assert.deepEqual(owns({ first: 'but mmi' }), ['BUT MMI | true', 'BUT INFO | false', 'BUT Info-Com | false'])
+  // A lone name is kept whole.
+  assert.equal(collectionsOf(formations)[0].years[0].tds[0].groups[0].label, 'alternants')
 })
