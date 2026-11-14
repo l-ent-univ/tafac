@@ -18,7 +18,7 @@ import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { shutdownAllAnalytics } from './server/analytics.js'
 import { fillBrandingPlaceholders, fillPagePath, fillPublicOrigin } from './server/appShell.js'
-import { createDesktopUpdateRouter } from './server/desktopUpdate/index.ts'
+import { createDesktopUpdateRouter, followReleases } from './server/desktopUpdate/index.ts'
 import { baselineSecurityHeaders, buildPagePolicy } from './server/securityHeaders/index.ts'
 import { createUniversitiesApp } from './server/universitiesApp.js'
 import { branding as neutralBranding } from './universities/neutral.js'
@@ -123,6 +123,9 @@ app.get('/.well-known/apple-app-site-association', (req, res) => {
 // (/desktop/latest.json, from DESKTOP_LATEST_FILE or DESKTOP_LATEST_JSON) and
 // its installers' address (server/desktopUpdate, docs/DESKTOP.md).
 app.use(createDesktopUpdateRouter())
+// Published by itself: the newest GitHub release's manifest, once its
+// desktop build is done (server/desktopUpdate/follow.ts).
+followReleases()
 
 app.get('/sitemap.xml', (req, res) => {
   const origin = getSafePublicOrigin(req)

@@ -218,14 +218,22 @@ no app to replace there, and the install is refused.
    and signature (`scripts/desktop-updater-archive.mjs`) and the disk image
    (`scripts/desktop-dmg.mjs`), and adds them to the GitHub release with
    `latest.json` (`scripts/desktop-latest.mjs`).
-3. **Publish**: put the release's `latest.json` where tafac.fr reads it
-   (`DESKTOP_LATEST_FILE`). That is what releases the update: until then a
-   build can sit on GitHub without reaching anyone, and putting the previous
-   file back withdraws it (apps that haven't installed it yet drop it).
+3. **Publish**: by itself. tafac.fr reads the newest release's
+   `latest.json` every 10 minutes and, when it changed and checks, writes it
+   to `DESKTOP_LATEST_FILE`, where it serves it from
+   (`server/desktopUpdate/follow.ts`). CI uploads it only once the build is
+   signed and notarized, so a release whose desktop build failed, or is
+   still running, has none, and what is served stays as it is.
+   - **Withdrawing an update**: delete its GitHub release. The previous one is
+     the newest again and its manifest comes back; apps never go back a
+     version, those that hadn't installed it drop it.
+   - **By hand**: `DESKTOP_LATEST_PIN=1` stops following; the file stays as
+     it is, to edit (hold an update back, raise `minimum`).
+     `DESKTOP_LATEST_FROM` reads another address than the newest release.
 
 **Locking old versions out**: set `"minimum"` in the published file to the
 oldest version that still works (CI's `latest.json` keeps tafac.fr's current
-one; run the workflow by hand with `minimum`, or edit the file). Only when
+one; run the workflow by hand with `minimum`, or pin and edit the file). Only when
 older versions really can't sign in any more: they stop at « Mise à jour
 nécessaire » until updated.
 

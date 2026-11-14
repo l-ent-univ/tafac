@@ -5,10 +5,10 @@
 //   GET /desktop/download/<platform>   to that platform's installer
 //                                      (darwin-aarch64, darwin-x86_64…)
 //
-// Publishing an update is a deploy, not a code change. The manifest comes
-// from the environment:
+// The manifest comes from the environment:
 //   DESKTOP_LATEST_FILE  a path to it, read again whenever the file changes
-//                        (no restart), or
+//                        (no restart). tafac.fr fills it by itself from the
+//                        newest GitHub release (follow.ts), or
 //   DESKTOP_LATEST_JSON  the JSON itself.
 // Neither set, a file that isn't there, a manifest that doesn't check: 404.
 // The apps take it as no answer and go on as they are; nothing here can
@@ -20,6 +20,7 @@ import { parseDesktopManifest } from './manifest.ts'
 import type { DesktopManifest } from './manifest.ts'
 
 export { compareVersions, parseDesktopManifest } from './manifest.ts'
+export { followOnce, followReleases } from './follow.ts'
 export type { DesktopManifest } from './manifest.ts'
 
 export interface DesktopUpdateEnv {
