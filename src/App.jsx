@@ -69,6 +69,7 @@ import { getMobileTabItems } from './navItems'
 import { getHomeWidgets } from './dashboardWidgets'
 import { bindHistorySession, readHistoryNav, writeHistoryNav } from './appHistory'
 import { forgetShapes } from 'skullet'
+import { clearNextClassCache } from './upcomingClasses'
 import { clearMailReadCache } from './mailReadCache'
 import { clearMailSignatures } from './mailSignatureStore'
 import { clearMailSends, flushMailSends } from './useMailSend'
@@ -123,6 +124,14 @@ function clearLegacySensitiveClientCaches() {
   // The shapes of « Accueil »'s skeletons (layout only, no text, but
   // shaped by this student's mails and classes).
   forgetShapes()
+}
+
+// Signed out (a logout, a session the server no longer knows): what the
+// browser kept for the student's next visit goes too. Not on a failed
+// session check, which may only be the network.
+function clearSignedOutClientCaches() {
+  clearLegacySensitiveClientCaches()
+  clearNextClassCache()
 }
 
 // What the mail page keeps at the module's level for the signed-in student:
@@ -1098,7 +1107,7 @@ function App() {
         } catch {
           // Signed out here all the same: the next check tries again.
         }
-        clearLegacySensitiveClientCaches()
+        clearSignedOutClientCaches()
         forgetMailAccount()
         bindHistorySession(null)
         setActivePage('home')
@@ -1151,7 +1160,7 @@ function App() {
       })
 
       if (!authenticated) {
-        clearLegacySensitiveClientCaches()
+        clearSignedOutClientCaches()
       }
 
       if (exposeOutput) {
@@ -2689,7 +2698,7 @@ function App() {
 
     try {
       const result = await logoutFromEnt()
-      clearLegacySensitiveClientCaches()
+      clearSignedOutClientCaches()
       // No reload follows: the mails read, the signatures, any send and the
       // history's mail entries must not carry over to whoever signs in
       // next in this tab.

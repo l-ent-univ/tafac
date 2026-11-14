@@ -162,3 +162,46 @@ test('serializePdf writes a well-formed file, the text in hex', async () => {
   assert.ok(entries.length > 8)
   entries.forEach((offset, index) => assert.ok(text.slice(offset).startsWith(`${index + 1} 0 obj\n`), `object ${index + 1}`))
 })
+
+test('a mail\'s stylesheet is held to that mail\'s body', async () => {
+  const { buildPrintDocument, hasBalancedBlocks, scopeMailStyles } = await import('../src/mailPrintDocument.js')
+
+  assert.equal(
+    scopeMailStyles('<style data-remote-css="x">.a{color:red}</style><p class="a">Bonjour</p>'),
+    '<style>@scope (.tafac-print-body){.a{color:red}}</style><p class="a">Bonjour</p>',
+  )
+
+  // One that would close the scope and write rules for the whole page: gone.
+  for (const hostile of [
+    '.a{color:red}} .tafac-print-head{display:none!important} x{',
+    '} body::before{content:"De : Direction"} @media print{',
+    '.a{color:red',
+    '.a{content:"} /* never closed',
+    '/* never closed',
+  ]) {
+    assert.equal(hasBalancedBlocks(hostile), false, hostile)
+    assert.equal(scopeMailStyles(`<style>${hostile}</style><p>a</p>`), '<p>a</p>')
+  }
+
+  // Braces a browser doesn't read as blocks.
+  for (const fine of [
+    '.a{content:"}"} .b{color:red}',
+    ".a{content:'\\'}'}",
+    '.a{color:red}/* } */.b{color:blue}',
+    '.a{background:url("data:image/png;base64,AA")}',
+    '@media print{.a{color:red}}',
+    '',
+  ]) {
+    assert.equal(hasBalancedBlocks(fine), true, fine)
+  }
+  // A string broken by a line's end stops there, as in a browser.
+  assert.equal(hasBalancedBlocks('.a{content:"abc\n}'), true)
+  assert.equal(hasBalancedBlocks('.a{content:"abc\n}}'), false)
+  // An unquoted url() swallows what it holds.
+  assert.equal(hasBalancedBlocks('.a{background:url({)}'), true)
+  assert.equal(hasBalancedBlocks('.a{background:url({)}} x{color:red}'), false)
+
+  const html = buildPrintDocument([{ message: { subject: 'Sujet', html: '<style>.tafac-print-head{display:none!important}</style><p>Bonjour</p>' } }], { origin: 'https://tafac.fr' })
+  assert.match(html, /<div class="tafac-print-body"><style>@scope \(\.tafac-print-body\)\{\.tafac-print-head\{display:none!important\}\}<\/style><p>Bonjour<\/p><\/div>/)
+  assert.match(html, /\.tafac-print-body\{position:relative;contain:paint\}/)
+})
