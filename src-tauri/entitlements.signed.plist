@@ -2,7 +2,7 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <!-- Signed builds only (npm run desktop:build:signed, tauri.signed.conf.json):
      an unsigned app carrying associated-domains is killed at launch.
-     TEAM_ID: the Apple developer team's ID, to fill in with the account. -->
+     Team 7RXNP6V83P. -->
 <plist version="1.0">
 <dict>
   <!-- The passwords saved for tafac.fr (src/passwords.rs); tafac.fr names
@@ -12,9 +12,9 @@
     <string>webcredentials:tafac.fr</string>
   </array>
   <key>com.apple.application-identifier</key>
-  <string>TEAM_ID.fr.tafac.desktop</string>
+  <string>7RXNP6V83P.fr.tafac.desktop</string>
   <key>com.apple.developer.team-identifier</key>
-  <string>TEAM_ID</string>
+  <string>7RXNP6V83P</string>
   <!-- Node (the local server) compiles JavaScript as it runs. -->
   <key>com.apple.security.cs.allow-jit</key>
   <true/>
