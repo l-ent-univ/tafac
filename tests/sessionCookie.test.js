@@ -4,7 +4,6 @@ import { createHmac } from 'node:crypto'
 import test from 'node:test'
 import {
   HOST_PREFIXED_SESSION_COOKIE_NAME,
-  LEGACY_SESSION_COOKIE_NAME,
   MAX_SESSION_COOKIE_VALUE_BYTES,
   SESSION_ABSOLUTE_TTL_MS,
   SESSION_COOKIE_NAME,
@@ -69,7 +68,7 @@ function sessionData() {
   }
 }
 
-// The format this codec replaces: base64url(JSON) + "." + HMAC-SHA256.
+// The format this codec replaced: base64url(JSON) + "." + HMAC-SHA256.
 function legacyCookieValue(data, secret) {
   const payload = Buffer.from(JSON.stringify(data)).toString('base64url')
   const signature = createHmac('sha256', secret).update(payload).digest('base64url')
@@ -140,38 +139,20 @@ test('rotation: previous secrets decrypt, the current one re-issues', () => {
   assert.equal(createSessionCookieCodec({ secret: SECRET_B }).decode(oldCodec.encode(data)), null)
 })
 
-test('legacy signed cookie is accepted once and flagged for re-issue', () => {
-  const codec = createSessionCookieCodec({ secret: SECRET_A })
-  const legacyData = {
-    ...sessionData(),
-    jar: [[`${ENT_HOST}|/|JSESSIONID`, cookie('JSESSIONID', token(32), ENT_HOST)]],
-  }
-
-  const decoded = codec.decode(legacyCookieValue(legacyData, SECRET_A))
-  assert.deepEqual(decoded, { data: legacyData, format: 'legacy', needsReissue: true })
-
-  // Legacy jar entries ([key, cookie] pairs) restore like the compact tuples.
-  assert.deepEqual(unpackJarCookies(decoded.data.jar), legacyData.jar)
-
-  // Upgraded: the re-issued cookie is encrypted and reads back without a flag.
-  const upgraded = codec.encode({ ...decoded.data, jar: packJarCookies([legacyData.jar[0][1]]) })
-  assert.ok(upgraded.startsWith('v1.'))
-  assert.equal(codec.decode(upgraded).needsReissue, false)
-})
-
-test('legacy cookie with a bad or foreign signature is rejected', () => {
+test('the signed format from before the encryption is no longer read', () => {
   const codec = createSessionCookieCodec({ secret: SECRET_A, previousSecrets: [SECRET_B] })
   const data = { ...sessionData(), jar: [] }
-  const valid = legacyCookieValue(data, SECRET_A)
-  const [payload, signature] = valid.split('.')
 
-  assert.equal(codec.decode(`${payload}.${signature.slice(0, -1)}${signature.at(-1) === 'A' ? 'B' : 'A'}`), null)
-  assert.equal(codec.decode(`${payload}.${signature.slice(1)}`), null)
-  assert.equal(codec.decode(`${payload}A.${signature}`), null)
-  assert.equal(codec.decode(legacyCookieValue(data, 'c'.repeat(44))), null)
-  assert.equal(codec.decode(payload), null)
-  // A previous secret counts for the legacy format too (rotation + migration).
-  assert.equal(codec.decode(legacyCookieValue(data, SECRET_B))?.format, 'legacy')
+  // Rightly signed with the current secret, or a previous one: not a session.
+  assert.equal(codec.decode(legacyCookieValue(data, SECRET_A)), null)
+  assert.equal(codec.decode(legacyCookieValue(data, SECRET_B)), null)
+  assert.equal(codec.decode(Buffer.from(JSON.stringify(data)).toString('base64url')), null)
+})
+
+test('jar entries stored as [key, cookie] pairs restore like the compact tuples', () => {
+  const pairs = [[`${ENT_HOST}|/|JSESSIONID`, cookie('JSESSIONID', token(32), ENT_HOST)]]
+  assert.deepEqual(unpackJarCookies(pairs), pairs)
+  assert.deepEqual(unpackJarCookies(packJarCookies([pairs[0][1]])), pairs)
 })
 
 test('production refuses a missing or short SESSION_SECRET', () => {
@@ -295,7 +276,6 @@ test('absolute cap: sessions older than 30 days are expired', () => {
 test('cookie name and attributes follow the environment', () => {
   assert.equal(getSessionCookieName(true), '__Host-lent_session')
   assert.equal(getSessionCookieName(false), SESSION_COOKIE_NAME)
-  assert.notEqual(SESSION_COOKIE_NAME, LEGACY_SESSION_COOKIE_NAME)
 
   const production = buildSessionCookieOptions(true)
   assert.deepEqual(production, {

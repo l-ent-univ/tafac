@@ -195,7 +195,7 @@ Pour améliorer les choix, ajoutez des mots-clés dans `APP_ICON_RULES` (`server
 
 ## Checklist de validation
 
-1. `npm run lint && npm test && npm run build` — tout doit passer.
+1. `npm run lint && npm run typecheck && npm test && npm run build` — tout doit passer.
 2. `npm run dev`, puis `/<slug>` et son bouton « Se connecter à mon ENT » — page de connexion : logo, textes, liens d'aide corrects ; votre université figure dans la liste de `/universites`.
 3. Connexion démo (`demo@tafac.fr` / `tafac-demo`) si `features.demo` — dashboard, grille d'applications.
 4. **Connexion réelle** avec un compte étudiant — c'est le seul test qui exerce CAS, le proxy ENT et les services activés.

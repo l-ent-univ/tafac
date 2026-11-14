@@ -97,6 +97,7 @@ Les liens `/rennes`, `/rennes2` et `/exemple` ouvrent la page d’accueil de l�
 | --- | --- |
 | `npm run dev` | Vite avec rechargement à chaud et backend intégré. |
 | `npm run lint` | Vérification ESLint. |
+| `npm run typecheck` | Vérification des types des modules TypeScript du serveur (`server/**/*.ts`), sans compilation. |
 | `npm test` | Tests avec le runner natif de Node.js. Certains ouvrent des serveurs HTTP locaux temporaires. |
 | `npm run build` | Compilation de l’interface et génération du service worker dans `dist/`. |
 | `npm run build:all` | Même compilation que `npm run build`. |
@@ -105,13 +106,13 @@ Les liens `/rennes`, `/rennes2` et `/exemple` ouvrent la page d’accueil de l�
 
 ## Architecture
 
-L’interface utilise **React 19**, **Vite 7**, **Tailwind CSS 4** et **Iconify**. Le backend repose sur **Express 5**, les API natives de Node.js et des adaptateurs pour les services universitaires. Le code applicatif est écrit en JavaScript avec des modules ES.
+L’interface utilise **React 19**, **Vite 7**, **Tailwind CSS 4** et **Iconify**. Le backend repose sur **Express 5**, les API natives de Node.js et des adaptateurs pour les services universitaires. Le code applicatif est écrit en JavaScript avec des modules ES ; les nouveaux modules du serveur sont en TypeScript, que Node.js exécute tel quel (les types sont retirés au chargement, rien n’est compilé).
 
 ```text
 Navigateur : React / PWA
     │
     ├── /__ent_auth/*    Connexion, session et services intégrés
-    └── /__ent_proxy/*   Requêtes vers le portail ENT
+    └── /__ent_proxy/*   Requêtes de la page vers le portail ENT (liste fermée)
               │
        Serveur Express
               │
@@ -133,6 +134,11 @@ Au démarrage, le navigateur consulte `/__ent_auth/universities`, puis charge le
 | `src/profileStorage.js`, `src/universityStorage.js` | Préférences locales et séparation des réglages entre universités. |
 | `server.js` | Entrée de production : API, fichiers compilés et page HTML avec métadonnées. |
 | `server/universitiesApp.js` | Registre public et routage des requêtes entre universités. |
+| `server/entProxy/` | Relais vers le portail ENT : session exigée, requêtes connues de la page seulement, réponses rendues inertes. |
+| `server/cookieJar/` | Cookies d’une session auprès des services universitaires, rangés et renvoyés comme le ferait un navigateur. |
+| `server/casLogin/`, `server/loginRateLimit/` | Contrôle de la destination du mot de passe (le CAS uniquement) et limites des tentatives de connexion. |
+| `server/securityHeaders/` | En-têtes de sécurité du serveur de production et politique de contenu (CSP) de la page. |
+| `server/launchRelay/`, `server/routeErrors/` | Relais de lancement (requêtes venues d’un autre site, tickets CAS) et réponses d’erreur sans détail interne en production. |
 | `server/entAuthApp.js` | Connexion CAS, sessions, proxy ENT et intégrations des services. |
 | `server/sessionCookie.js` | Chiffrement, durée de vie et rotation des cookies de session. |
 | `planningPortalApi.js` | Adaptateur du portail planning REST, utilisé pour Rennes. |
@@ -258,6 +264,7 @@ Avant de proposer une modification :
 
 ```sh
 npm run lint
+npm run typecheck
 npm test
 npm run build
 ```

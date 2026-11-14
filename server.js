@@ -18,6 +18,7 @@ import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { shutdownAllAnalytics } from './server/analytics.js'
 import { fillBrandingPlaceholders, fillPagePath, fillPublicOrigin } from './server/appShell.js'
+import { baselineSecurityHeaders, buildPagePolicy } from './server/securityHeaders/index.ts'
 import { createUniversitiesApp } from './server/universitiesApp.js'
 import { branding as neutralBranding } from './universities/neutral.js'
 import {
@@ -83,10 +84,16 @@ const universitiesApp = await createUniversitiesApp({
 })
 
 const app = express()
+// Every answer: no sniffing, no framing by another site, HTTPS only
+// (server/securityHeaders/). The page adds its Content-Security-Policy.
+app.use(baselineSecurityHeaders())
 app.use(universitiesApp)
 
+// Both name this server's address, which comes from the request
+// (X-Forwarded-Host): only one that reads as an address is written into
+// them (getSafePublicOrigin). Without one, no sitemap.
 app.get('/robots.txt', (req, res) => {
-  const origin = getPublicOrigin(req)
+  const origin = getSafePublicOrigin(req)
 
   res.type('text/plain')
   res.send([
@@ -94,12 +101,16 @@ app.get('/robots.txt', (req, res) => {
     'Allow: /',
     'Disallow: /__ent_auth/',
     'Disallow: /__ent_proxy/',
-    `Sitemap: ${origin}/sitemap.xml`,
+    ...(origin ? [`Sitemap: ${origin}/sitemap.xml`] : []),
   ].join('\n'))
 })
 
 app.get('/sitemap.xml', (req, res) => {
-  const origin = getPublicOrigin(req)
+  const origin = getSafePublicOrigin(req)
+  if (!origin) {
+    res.status(404).end()
+    return
+  }
 
   res.type('application/xml')
   res.send(`<?xml version="1.0" encoding="UTF-8"?>
@@ -142,9 +153,8 @@ function withPrerenderedLanding(shell, landing) {
     .replace('</head>', () => `${structuredData}</head>`)
 }
 
-// A session cookie (current or legacy name): a signed-in student, who gets
-// the app, not the landing.
-const SESSION_COOKIE_PATTERN = /(?:^|;\s*)(?:__Host-)?(?:lent_session|ent_front_session)=/
+// A session cookie: a signed-in student, who gets the app, not the landing.
+const SESSION_COOKIE_PATTERN = /(?:^|;\s*)(?:__Host-)?lent_session=/
 
 // The page's own addresses (src/universityRuntime.js, App.jsx): the home
 // page, the login page, the picker and a university's /<slug>. Any other
@@ -162,6 +172,13 @@ function isClientPath(pathname) {
 // request's address, so link previews, which don't run the app, get absolute
 // URLs on every address. Signed out, the home page and each university's
 // page come with their landing in them.
+// The page, with what it may load and run (its inline scripts go by their
+// hash, read from the page as it is sent).
+function sendPage(res, html) {
+  res.setHeader('Content-Security-Policy', buildPagePolicy(html))
+  res.type('html').send(html)
+}
+
 let shells = null
 function readShells() {
   const template = readFileSync(path.join(DIST_DIR, 'index.html'), 'utf8')
@@ -213,7 +230,7 @@ function sendAppShell(req, res, next) {
   // Signed out or in, one address with two pages.
   if (isHome || universityPage) res.setHeader('Vary', 'Cookie')
   if (origin) res.setHeader('Link', `<${origin}${shownPage?.path ?? '/'}>; rel="canonical"`)
-  res.type('html').send(fillPublicOrigin(shell, origin))
+  sendPage(res, fillPublicOrigin(shell, origin))
 }
 
 app.get('/', sendAppShell)
@@ -233,7 +250,7 @@ app.get('/index.html', (req, res, next) => {
   const origin = getSafePublicOrigin(req)
   res.setHeader('X-Robots-Tag', 'noindex')
   if (origin) res.setHeader('Link', `<${origin}/>; rel="canonical"`)
-  res.type('html').send(fillPublicOrigin(shells.app, origin))
+  sendPage(res, fillPublicOrigin(shells.app, origin))
 })
 
 // Serve the built static files
