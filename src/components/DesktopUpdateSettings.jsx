@@ -117,7 +117,7 @@ function CheckRow({ update }) {
   const lastCheck = describeChecked(update.checked, now)
   const description = busy
     ? 'Recherche…'
-    : describeUpdateNote(note) ?? (lastCheck ? `Dernière vérification ${lastCheck}` : 'Toutes les 6 heures et au lancement')
+    : describeUpdateNote(note) ?? (lastCheck ? `Dernière vérification ${lastCheck}` : null)
 
   return (
     <button

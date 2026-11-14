@@ -89,6 +89,12 @@ pub fn spawn(app: &AppHandle, endpoint: &str, secret: &str, data_dir: &Path) -> 
         .env("DATA_DIR", data_dir.join("server"))
         .env("NODE_ENV", "production")
         .env("MULTI_UNIVERSITY", "1")
+        // Anonymous statistics, as tafac.fr's (server/analytics.js): only in
+        // the builds CI makes (TAFAC_POSTHOG_PROJECT_KEY at build time, the
+        // project's public key); a local build sends nothing. Sent from this
+        // computer to PostHog, not through tafac.fr, and only while the
+        // student leaves « Statistiques anonymes » on.
+        .envs(option_env!("TAFAC_POSTHOG_PROJECT_KEY").filter(|key| !key.is_empty()).map(|key| ("POSTHOG_PROJECT_KEY", key)))
         // Kept open: closing it (the app quits or crashes) stops the server.
         .stdin(Stdio::piped())
         .spawn()?;

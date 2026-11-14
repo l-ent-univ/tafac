@@ -164,6 +164,9 @@ jobs:
       - name: Build and sign the app
         env:
           APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+          # Anonymous statistics (src-tauri/src/sidecar.rs): PostHog's public
+          # project key, as tafac.fr's. Unset, the app sends nothing.
+          TAFAC_POSTHOG_PROJECT_KEY: ${{ secrets.POSTHOG_PROJECT_KEY }}
         run: |
           npx tauri build \
             --config src-tauri/tauri.bundle.conf.json \

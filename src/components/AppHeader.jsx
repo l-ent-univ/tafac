@@ -2,7 +2,15 @@ import { Icon } from '@iconify/react'
 import LentButton from './LentButton'
 import UniversityLockup from './UniversityLockup'
 
-function AppHeader({ authenticated, checking, establishment = null, showUniversityLogo = true, logoSource = 'establishment', onPrimaryAction, onAccountAction }) {
+// The logo: back to « Accueil » in place (onNavigatePage), no reload;
+// ⌘-click, a middle click or Shift still open "/" as a link does.
+function AppHeader({ authenticated, checking, establishment = null, showUniversityLogo = true, logoSource = 'establishment', onPrimaryAction, onAccountAction, onNavigatePage }) {
+  const handleLogoClick = (event) => {
+    if (!onNavigatePage || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return
+    event.preventDefault()
+    onNavigatePage('home', 'logo')
+  }
+
   const actionLabel = checking
     ? 'Chargement...'
     : authenticated
@@ -14,7 +22,7 @@ function AppHeader({ authenticated, checking, establishment = null, showUniversi
     // buttons' soft shadow otherwise, cut in a straight line under them.
     <header className="relative z-[1] w-full pt-5 px-6 max-xl:pt-4 max-md:pt-3 max-md:px-3">
       <div className="w-full flex items-center justify-between gap-6 max-xl:gap-[0.9rem] max-md:items-start max-md:gap-3">
-        <a className="inline-flex items-center no-underline min-w-0 max-md:self-start" href="/" aria-label="Retour">
+        <a className="inline-flex items-center no-underline min-w-0 max-md:self-start" href="/" onClick={handleLogoClick} aria-label="Retour">
           <UniversityLockup variant="header" establishment={establishment} showLogo={showUniversityLogo} logoSource={logoSource} />
         </a>
 

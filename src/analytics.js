@@ -10,6 +10,8 @@ import { ENT_AUTH_PREFIX } from './entApi'
 import { getStoredAnonymousAnalytics } from './profileStorage'
 import { toFormationSlug } from './formationSlug'
 import { createNavigationReporter } from './planningAnalytics'
+import { isDesktopApp } from './desktopApp'
+import { getDesktopUpdate } from './desktopUpdate'
 
 const ANALYTICS_ENDPOINT = `${ENT_AUTH_PREFIX}/analytics`
 const FLUSH_DELAY_MS = 2000
@@ -94,14 +96,31 @@ function isStandalone() {
   }
 }
 
+// Where Tafac runs: the desktop app (src-tauri), the installed PWA, or a
+// browser tab.
+function getClient() {
+  if (isDesktopApp()) return 'desktop'
+  return isStandalone() ? 'pwa' : 'web'
+}
+
+// The desktop app's version (x.y.z, src/desktopUpdate.js), once it said;
+// not a local 0.0.0 build's.
+function getAppVersion() {
+  const version = getDesktopUpdate()?.current
+  return typeof version === 'string' && /^\d+\.\d+\.\d+$/.test(version) && version !== '0.0.0' ? version : null
+}
+
 // Coarse context only. `university` and `demo` are added by the server.
 function getContext() {
   const lang = String(navigator.language || '').slice(0, 2).toLowerCase()
+  const appVersion = getAppVersion()
 
   return {
     device: getDevice(),
     browser: getBrowser(),
     standalone: isStandalone(),
+    client: getClient(),
+    ...(appVersion ? { app_version: appVersion } : null),
     ...(/^[a-z]{2}$/.test(lang) ? { lang } : null),
     ...(establishment ? { establishment } : null),
     ...(formation ? { formation } : null),

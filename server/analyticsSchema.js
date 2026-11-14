@@ -123,6 +123,10 @@ export const CONTEXT_PROPERTIES = {
   device: oneOf('mobile', 'tablet', 'desktop'),
   browser: oneOf('chromium', 'firefox', 'safari', 'other'),
   standalone: boolean,
+  // Where Tafac runs: a browser tab, the installed PWA, the desktop app.
+  client: oneOf('web', 'pwa', 'desktop'),
+  // The desktop app's version (x.y.z).
+  app_version: (value) => (typeof value === 'string' && /^\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(value) ? value : undefined),
   lang: (value) => (typeof value === 'string' && /^[a-z]{2}$/.test(value) ? value : undefined),
   // Establishment id from the university config (e.g. "iutlan"): large groups.
   establishment: slug(16),
