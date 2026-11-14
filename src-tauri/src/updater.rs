@@ -3,7 +3,7 @@
 // for the install through the app's own routes (desktop.rs,
 // src/desktopUpdate.js).
 //
-// - Checked at launch, every 6 hours while the app runs, after the computer
+// - Checked at launch, every hour while the app runs, after the computer
 //   wakes, and from the menu (« Rechercher les mises à jour… »). The answer
 //   is https://tafac.fr/desktop/latest.json: Tauri's static format, plus one
 //   field of ours, `minimum`.
@@ -34,7 +34,7 @@ use tauri::{AppHandle, Manager, WebviewWindow};
 use tauri_plugin_updater::{Update, UpdaterExt};
 use tokio::sync::watch;
 
-const CHECK_EVERY: Duration = Duration::from_secs(6 * 60 * 60);
+const CHECK_EVERY: Duration = Duration::from_secs(60 * 60);
 // After a check that got no answer.
 const RETRY_AFTER: Duration = Duration::from_secs(15 * 60);
 // The clock is read this often. A timer doesn't run while the computer

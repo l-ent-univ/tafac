@@ -116,7 +116,7 @@ state and asks for the install through `/__desktop/update/*`
 
 - **The one file the app reads**: `https://tafac.fr/desktop/latest.json`,
   Tauri's static format plus two fields of ours (below). Checked at launch,
-  every 6 hours while the app runs, after the computer wakes (the clock is
+  every hour while the app runs, after the computer wakes (the clock is
   read every minute: a jump is a wake, a timer alone would stop with the
   computer), and from Tafac › Rechercher les mises à jour…, which answers
   with a short note (« Tafac est à jour · 0.25.0 »).
