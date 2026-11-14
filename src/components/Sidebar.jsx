@@ -8,6 +8,7 @@ import SidebarGradePocket from './SidebarGradePocket'
 import { track } from '../analytics'
 import { useChangelog } from '../changelogStore'
 import UpdateNotice from './UpdateNotice'
+import DesktopUpdateRow, { CompactDesktopUpdateButton } from './DesktopUpdateRow'
 import SidebarNextClass from './SidebarNextClass'
 import { SIDEBAR_NEXT_CLASS_ENABLED, useSidebarNextClassShown } from '../sidebarNextClassPref'
 import Tooltip from './Tooltip'
@@ -451,6 +452,8 @@ function Sidebar({
         ) : null}
         {hasPendingUpdate ? <UpdateNotice onUpdateClick={onUpdateClick} /> : null}
         {showChangelogPill ? <ChangelogPill className="flex" /> : null}
+        {/* Desktop app: an update is ready (nothing elsewhere). */}
+        <DesktopUpdateRow />
         {authenticated ? (
           <div aria-hidden="true" className="h-px w-full bg-border/70" />
         ) : null}
@@ -508,6 +511,7 @@ function Sidebar({
         <aside
           className="sidebar-panel sidebar-panel--compact hidden 4xl:flex flex-col items-start justify-between px-4 py-5 w-[var(--sidebar-width,72px)] fixed top-3 left-3 bottom-3 z-30 card-corners border overflow-visible"
           aria-label="Navigation principale"
+          data-tauri-drag-region=""
           onPointerEnter={handleFoldedPointer}
           onPointerMove={handleFoldedPointer}
           onPointerLeave={handlePeekLeave}
@@ -565,6 +569,7 @@ function Sidebar({
   
           <div className="flex flex-col items-center gap-3 w-10 sidebar-swap" data-sidebar-foot="">
             {hasPendingUpdate ? <CompactUpdateButton onUpdateClick={onUpdateClick} /> : null}
+            <CompactDesktopUpdateButton />
             {authenticated ? (
               <>
                 <div aria-hidden="true" className="h-px w-full bg-border/70" />
@@ -602,6 +607,7 @@ function Sidebar({
           <aside
             className={`sidebar-panel sidebar-peek hidden 4xl:flex flex-col justify-between p-5 fixed top-3 left-3 bottom-3 z-40 card-corners border overflow-y-auto overflow-x-hidden ${isPeekOpen ? 'is-open' : ''}`}
             aria-label="Navigation principale"
+            data-tauri-drag-region=""
             inert={!isPeekOpen}
             onPointerEnter={handlePeekEnter}
             onPointerLeave={handlePeekLeave}
@@ -619,6 +625,7 @@ function Sidebar({
       <aside
         className="sidebar-panel hidden 4xl:flex flex-col justify-between p-5 w-[var(--sidebar-width,280px)] fixed top-3 left-3 bottom-3 z-30 card-corners border overflow-y-auto overflow-x-hidden"
         aria-label="Navigation principale"
+        data-tauri-drag-region=""
       >
         {fullContent}
       </aside>

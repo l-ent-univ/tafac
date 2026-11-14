@@ -18,6 +18,7 @@ import PrivacyModal from './PrivacyModal'
 import SettingsGroup, { RowText } from './SettingsGroup'
 import CloseButton from './CloseButton'
 import { r } from '../register.js'
+import { useDesktopUpdate } from '../desktopUpdate'
 
 /* global __BUILD_HASH__ */
 
@@ -51,10 +52,12 @@ const ARROW = <Icon icon="ph:arrow-up-right" className="h-4 w-4 shrink-0 text-te
 // the one-line intro, and the build in the corner.
 function AboutHero() {
   const { appName } = universityConfig.branding
+  // Desktop app: its own version before the build (src/desktopUpdate.js).
+  const desktopVersion = useDesktopUpdate()?.current
   return (
     <div className="relative flex flex-col gap-[10px] overflow-hidden modal-inner-corners engraved px-[18px] pb-[18px] pt-[16px]">
       <span className="glass-solid absolute right-[14px] top-[14px] rounded-full px-[8px] py-[3px] font-mono text-[11px] leading-[1.3] text-text-50">
-        {BUILD_LABEL}
+        {desktopVersion ? `${desktopVersion} · ${BUILD_LABEL}` : BUILD_LABEL}
       </span>
       <div className="flex items-center gap-1.5" aria-hidden="true">
         {HERO_ICONS.map(({ src, rotate }, index) => (
@@ -227,13 +230,16 @@ function AboutPeople() {
 // rows on top of the links' card (Réglages' « Nouveautés »).
 // `onPrivacyClick`: Réglages jumps to its Confidentialité section instead
 // of opening the privacy modal on top.
-export function AboutPage({ leading = null, onPrivacyClick = null, demoLinkLabel = '', onDemoLinkClick = null }) {
+// `updates`: the desktop app's « Mises à jour » (DesktopUpdateSettings),
+// right under the hero.
+export function AboutPage({ updates = null, leading = null, onPrivacyClick = null, demoLinkLabel = '', onDemoLinkClick = null }) {
   const shouldShowDemoLink = typeof onDemoLinkClick === 'function' && demoLinkLabel.trim()
   const repoSlug = readRepoSlug(about.repoUrl)
   const hasLinks = Boolean(leading || about.repoUrl || papillonUrl || about.contactEmail)
   return (
     <div className="flex flex-col gap-[18px]">
       <AboutHero />
+      {updates}
       {hasLinks ? (
         <SettingsGroup>
           {leading}

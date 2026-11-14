@@ -2,6 +2,8 @@
 // device (like the theme) and exposed as --sidebar-width on <html>, which
 // both the sidebar and the dashboard column's left padding read.
 
+import { isMacDesktopApp } from './desktopApp'
+
 export const SIDEBAR_WIDTH_KEY = 'l-ent:sidebar-width'
 export const DEFAULT_SIDEBAR_WIDTH = 280
 // Narrow enough to give the dashboard room, wide enough for the logo lockup
@@ -42,9 +44,11 @@ export function applySidebarWidth(width) {
 
 // Compact sidebar: the nav's icons alone, in a narrow strip. Stored for the
 // device too; while on, --sidebar-width is this width (the dragged one comes
-// back on expanding).
+// back on expanding). In the desktop app on macOS, wide enough for the
+// window's buttons in its top corner (src-tauri/src/window.rs places them;
+// overrides.css centres the icons under them).
 export const SIDEBAR_COMPACT_KEY = 'l-ent:sidebar-compact'
-export const COMPACT_SIDEBAR_WIDTH = 72
+export const COMPACT_SIDEBAR_WIDTH = isMacDesktopApp() ? 84 : 72
 
 export function getStoredSidebarCompact() {
   try {

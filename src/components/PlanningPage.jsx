@@ -23,6 +23,7 @@ import PlanningShareSheet from './PlanningShareSheet'
 import SidePanelResizeHandle from './SidePanelResizeHandle'
 import SwipePager from './SwipePager'
 import { createSidePanelSizing, useSidePanelWidth } from '../sidePanelWidth'
+import { onDesktopCommand } from '../desktopMenu'
 
 // The view (one day, two side by side, or the week's list), kept in this
 // browser.
@@ -244,6 +245,18 @@ function PlanningPage({ selection = null, user = null, showWeekend = false, onOp
     })
     setViewedEntry(null)
   }, [])
+  // The desktop app's « Rechercher » (⌘F, src/desktopMenu.js): the panel,
+  // opened on its search field (or that field, already open).
+  useEffect(() => onDesktopCommand(({ command }) => {
+    if (command !== 'find' || !isWide) return
+    if (isDirectoryWanted) {
+      document.querySelector('.side-panel input')?.focus()
+      return
+    }
+    trackPlanningAction('directory_opened')
+    setIsDirectoryWanted(true)
+    setViewedEntry(null)
+  }), [isWide, isDirectoryWanted])
   const closeDirectory = useCallback(() => {
     setIsDirectoryWanted(false)
     setViewedEntry(null)

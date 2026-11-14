@@ -13,7 +13,12 @@
     "icons": "node scripts/build-icon-bundle.mjs",
     "test": "node --test tests/*.test.js tests/*.test.ts",
     "typecheck": "tsc --noEmit",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "desktop:dev": "tauri dev",
+    "desktop:prepare": "node scripts/desktop-prepare.mjs",
+    "desktop:build": "tauri build --config src-tauri/tauri.bundle.conf.json",
+    "desktop:build:signed": "tauri build --config src-tauri/tauri.bundle.conf.json --config src-tauri/tauri.signed.conf.json --bundles app && node scripts/desktop-sign.mjs",
+    "desktop:dmg": "node scripts/desktop-dmg.mjs"
   },
   "dependencies": {
     "@iconify/react": "^6.0.2",
@@ -35,11 +40,13 @@
   },
   "devDependencies": {
     "@eslint/js": "^9.39.1",
+    "@tauri-apps/cli": "^2.12.4",
     "@types/express": "^5.0.6",
     "@types/node": "^24.19.2",
     "@types/react": "^19.2.7",
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^5.1.1",
+    "esbuild": "^0.28.2",
     "eslint": "^9.39.1",
     "eslint-plugin-react-hooks": "^7.0.1",
     "eslint-plugin-react-refresh": "^0.4.24",

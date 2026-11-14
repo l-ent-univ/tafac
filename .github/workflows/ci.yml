@@ -1,5 +1,6 @@
 # CI on every pull request and push to main; on main it also publishes a
-# GitHub release and a Docker image (ghcr.io/l-ent-univ/l-ent).
+# GitHub release, a Docker image (ghcr.io/l-ent-univ/l-ent) and, once set up,
+# the desktop app (desktop.yml).
 #
 # Version bump from the commits since the last v* tag (conventional commits):
 #   "type!:" or "BREAKING CHANGE" → major (minor while still 0.x)
@@ -105,6 +106,22 @@ jobs:
             --title "v$VERSION" \
             --generate-notes \
             --notes "Image Docker : \`docker pull $IMAGE:$VERSION\` (voir docs/SELF_HOSTING.md)."
+
+  # The desktop app of the release (desktop.yml): built, signed, notarized
+  # and added to it. Called from here because the tag above is created with
+  # the workflow's token, which starts no other workflow. Off until the
+  # repository variable DESKTOP_RELEASE is "true": it needs Apple's
+  # certificate and keys in the secrets (docs/DESKTOP.md).
+  desktop:
+    name: Desktop app
+    needs: release
+    if: vars.DESKTOP_RELEASE == 'true'
+    permissions:
+      contents: write
+    uses: ./.github/workflows/desktop.yml
+    with:
+      tag: v${{ needs.release.outputs.version }}
+    secrets: inherit
 
   docker-publish:
     name: Docker image

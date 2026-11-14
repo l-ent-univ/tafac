@@ -10,6 +10,9 @@ import LogoBut1 from './LogoBut1'
 import AboutModal from './AboutModal'
 import PapillonBadge from './PapillonBadge'
 import ServiceNotice from './ServiceNotice'
+import DesktopPasswordNote from './DesktopPasswordNote'
+import { isDesktopApp } from '../desktopApp'
+import { pickSavedPassword } from '../desktopPasswords'
 import { APP_NAME } from '../seo'
 import { getListedUniversities, getLoadedUniversityId, writeUniversityChoice } from '../universityRuntime'
 import { r } from '../register.js'
@@ -20,6 +23,7 @@ const universityLogoAlt = universityConfig.branding.logoAlt ?? universityConfig.
 // A square badge (branding.logoShape) shows taller than a wordmark.
 const universityLogoSquare = universityConfig.branding.logoShape === 'square'
 const passwordNote = universityConfig.branding.loginPasswordNote ?? null
+const IS_DESKTOP_APP = isDesktopApp()
 const repoUrl = universityConfig.branding.about?.repoUrl ?? null
 const loginLinks = universityConfig.links ?? {}
 // "Mot de passe oublié" / "Activer mon compte" under the button, hidden for now.
@@ -224,6 +228,26 @@ function LoginPage({
     primeOtpSound()
     onSubmit(event)
   }
+
+  // Desktop app (macOS): the system's sheet of passwords saved for tafac.fr,
+  // once, as the form shows; a pick fills the form and signs in. Cancelled
+  // or empty, the form stays as it is.
+  const askedSavedPassword = useRef(false)
+  useEffect(() => {
+    if (!IS_DESKTOP_APP || isPicker || requireOTP || askedSavedPassword.current) return
+    askedSavedPassword.current = true
+    void pickSavedPassword().then((credential) => {
+      const form = formRef.current
+      const username = form?.elements.namedItem('username')
+      const password = form?.elements.namedItem('password')
+      if (!credential || !username || !password) return
+      username.value = credential.username
+      password.value = credential.password
+      onCredentialsChange('username', credential.username)
+      onCredentialsChange('password', credential.password)
+      form.requestSubmit()
+    })
+  }, [requireOTP, onCredentialsChange])
 
   // The step shown takes the focus, its fields were inert until now: the
   // code's on the way in and after a refused code, the username on the way
@@ -493,6 +517,13 @@ function LoginPage({
                   <LentButton type="submit" className="mt-3.5 min-h-[52px]! w-full text-[16px]!" loading={checking} disabled={requireOTP && !otpComplete}>
                     Se connecter
                   </LentButton>
+
+                  {/* Desktop app: the password doesn't go through Tafac. */}
+                  {IS_DESKTOP_APP ? (
+                    <FormStep open={!requireOTP}>
+                      <DesktopPasswordNote />
+                    </FormStep>
+                  ) : null}
 
                   {/* Back to the identifiers: another account, a typo. */}
                   <FormStep open={requireOTP}>

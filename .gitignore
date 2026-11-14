@@ -46,3 +46,15 @@ outputs/marketing-booklet/
 
 # Server data (automatic app icons, see docs/SELF_HOSTING.md)
 data/
+
+# Desktop app (Tauri): Rust build output and what scripts/desktop-prepare.mjs
+# assembles (server copy with its production node_modules, Node binary, the
+# disk image's background joined from its two PNGs)
+src-tauri/target/
+src-tauri/gen/
+src-tauri/binaries/
+src-tauri/dmg/background.tiff
+desktop-build/
+
+# Apple provisioning profile for signed desktop builds (not shared)
+src-tauri/*.provisionprofile

@@ -35,6 +35,8 @@ import {
 import { r } from '../register.js'
 import SmoothSurface from './SmoothSurface'
 import { Skeleton } from 'skullet/react'
+import { isMacDesktopApp } from '../desktopApp'
+import { onDesktopCommand } from '../desktopMenu'
 import { SAMPLE_MAIL_ROWS, useSkeletonsForced } from '../skeletonSamples'
 
 // The composer and its editor (Tiptap) load the first time one opens: most
@@ -56,12 +58,15 @@ const fullDateFormatter = new Intl.DateTimeFormat('fr-FR', { dateStyle: 'full', 
 
 // The reader beside the list (from 4xl) and its width: dragged from its
 // left edge and stored for the device, else a share of the window. The
-// list keeps 440px beside it (its 24px gutters included).
+// list keeps 440px beside it (its 24px gutters included). In the desktop
+// app on macOS the panel reaches the window's edge and its content is 28px
+// narrower than its width (src/overrides.css): no narrower than 448px
+// there, so its toolbar (about 414px) stays on one line.
 const READER_BESIDE_QUERY = '(min-width: 1024px)'
 const READER_SIZING = createSidePanelSizing({
   storageKey: 'l-ent:mail-reader-width',
-  defaultWidth: 'clamp(380px, 40vw, 640px)',
-  min: 360,
+  defaultWidth: isMacDesktopApp() ? 'clamp(448px, 40vw, 640px)' : 'clamp(380px, 40vw, 640px)',
+  min: isMacDesktopApp() ? 448 : 360,
   max: 960,
   contentMin: 440,
 })
@@ -1254,6 +1259,13 @@ function MailPage({ onReaderOpenChange, onSignInAgain, sender = null, composeReq
   useEffect(() => {
     if (!composeRequest || handledComposeRef.current === composeRequest) return
     handledComposeRef.current = composeRequest
+    // A blank one (the desktop app's « Nouveau message », ⌘N): as the
+    // page's own button.
+    if (composeRequest.kind === 'new') {
+      void startCompose('new')
+      onComposeRequestHandled()
+      return
+    }
     // About a class or a week (the Planning), an absence (« Assiduité »)
     // or a grade (« Mes notes »).
     trackMailAction('compose_opened', { kind: ['course', 'timetable', 'absence'].includes(composeRequest.kind) ? composeRequest.kind : 'grade' })
@@ -1261,6 +1273,17 @@ function MailPage({ onReaderOpenChange, onSignInAgain, sender = null, composeReq
     onComposeRequestHandled()
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [composeRequest])
+
+  // The desktop app's menu (src/desktopMenu.js): « Rechercher » (⌘F) in
+  // the list's search field, « Actualiser » (⌘R) as its button.
+  const searchInputRef = useRef(null)
+  useEffect(() => onDesktopCommand(({ command }) => {
+    if (command === 'find') {
+      searchInputRef.current?.focus()
+      searchInputRef.current?.select()
+    }
+    if (command === 'refresh') void refresh()
+  }), [refresh])
 
   // A draft (a row of Brouillons) opens in the composer, not the reader:
   // its fields, its text and its files as saved, saved over from there.
@@ -1957,7 +1980,7 @@ function MailPage({ onReaderOpenChange, onSignInAgain, sender = null, composeReq
         >
           Messagerie
         </h1>
-        <MailSearchField value={query} onChange={setQuery} label="Rechercher dans les mails" className="flex-1" />
+        <MailSearchField value={query} onChange={setQuery} label="Rechercher dans les mails" inputRef={searchInputRef} className="flex-1" />
         <button
           type="button"
           className="material group relative ml-2 inline-flex size-11 shrink-0 items-center justify-center rounded-full text-text-muted cursor-pointer transition-[color] duration-150 hover:text-text disabled:cursor-default focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-text/20"

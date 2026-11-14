@@ -21,8 +21,12 @@ import WelcomeFromLent from './components/WelcomeFromLent'
 import { settingsTransfer } from './settingsTransferBoot'
 import { appendPreviewToken, findProfilePhotoCandidate } from './profilePhoto'
 import { DEMO_CREDENTIALS, DEMO_SESSION_MODE, DEMO_SIGNATURE_LOGIN } from './demoAccount'
+import { isDesktopApp, isMacDesktopApp } from './desktopApp'
+import { syncWindowTheme } from './desktopWindowTheme'
+import { onDesktopCommand, syncDesktopMenu } from './desktopMenu'
 import { signatureLogin } from './mailSignatureChoice'
 import { storeBrowserPasswordCredential } from './browserCredentials'
+import { offerToSavePassword } from './desktopPasswords'
 import { syncRuntimeSeo } from './seo'
 import {
   ESTABLISHMENT_KEY,
@@ -65,7 +69,7 @@ import { WALLPAPER_FOLDERS, effectiveWallpaperChoice, wallpaperChoiceAnalyticsVa
 import { useWallpaperTint } from './useWallpaperTint'
 import { getStoredPalette, getStoredTheme, persistPalette, persistTheme, watchTheme } from './theme'
 import MobileTabBar from './components/MobileTabBar'
-import { getMobileTabItems } from './navItems'
+import { buildNavItems, getMobileTabItems } from './navItems'
 import { getHomeWidgets } from './dashboardWidgets'
 import { bindHistorySession, readHistoryNav, writeHistoryNav } from './appHistory'
 import { forgetShapes } from 'skullet'
@@ -891,9 +895,11 @@ function reportSettingsTransfer() {
 
 const LOGIN_PATH = '/login'
 
-// Installed app and arrivals from the old l'ent address skip the landing page.
+// Installed app (PWA or desktop) and arrivals from the old l'ent address skip
+// the landing page.
 function shouldOpenOnLogin() {
   return settingsTransfer.arrived
+    || isDesktopApp()
     || window.matchMedia('(display-mode: standalone)').matches
     || window.navigator.standalone === true
 }
@@ -1819,6 +1825,13 @@ function App() {
     setIsAccountModalOpen(true)
   }, [sessionState.authenticated, sessionState.checking])
 
+  // Desktop app: Tafac › Réglages… (⌘,) in the menu bar (src-tauri/src/menu.rs).
+  useEffect(() => {
+    if (!isDesktopApp()) return undefined
+    window.addEventListener('tafac:open-settings', handleOpenAccountModal)
+    return () => window.removeEventListener('tafac:open-settings', handleOpenAccountModal)
+  }, [handleOpenAccountModal])
+
   // Réglages › Planning (« Mon groupe »), from the planning's « Formations ».
   const handleOpenPlanningSettings = useCallback(() => {
     if (!sessionState.authenticated || sessionState.checking) {
@@ -2028,6 +2041,9 @@ function App() {
   }, [activeWallpaper.folder, sessionState.user])
 
   useEffect(() => watchTheme(theme, palette), [theme, palette])
+  useEffect(() => {
+    if (isMacDesktopApp()) syncWindowTheme(theme)
+  }, [theme])
 
   const handleThemeChange = useCallback((nextTheme) => {
     persistTheme(nextTheme)
@@ -2161,6 +2177,38 @@ function App() {
     handleNavigatePage('mail', ['course', 'timetable'].includes(request?.kind) ? 'planning' : request?.kind === 'absence' ? 'assiduity' : 'grades')
   }, [handleNavigatePage])
   const clearPendingMailCompose = useCallback(() => setPendingMailCompose(null), [])
+
+  // Desktop app on macOS, the menu bar (src/desktopMenu.js): « Aller » lists
+  // this university's pages (none signed out), the one in view ticked; « Nouveau
+  // message » needs the mail page; « Rechercher » applies to the Messagerie
+  // and the Planning, « Actualiser » to the Messagerie (those pages handle
+  // them).
+  const isSignedIn = sessionState.authenticated && !sessionState.checking
+  const desktopMenuPages = useMemo(
+    () => (isSignedIn ? buildNavItems(establishment, { gradesSupported }).filter((item) => item.page).map((item) => ({ id: item.page, label: item.label })) : []),
+    [isSignedIn, establishment, gradesSupported],
+  )
+  useEffect(() => {
+    if (!isMacDesktopApp()) return
+    syncDesktopMenu({
+      pages: desktopMenuPages,
+      current: isSignedIn ? shownPage : null,
+      compose: isSignedIn && hasMailPage,
+      find: isSignedIn && (shownPage === 'mail' || shownPage === 'planning'),
+      refresh: isSignedIn && shownPage === 'mail',
+    })
+  }, [desktopMenuPages, isSignedIn, shownPage, hasMailPage])
+  useEffect(() => {
+    if (!isMacDesktopApp()) return undefined
+    return onDesktopCommand(({ command, page }) => {
+      if (!isSignedIn) return
+      if (command === 'go' && desktopMenuPages.some((item) => item.id === page)) handleNavigatePage(page, 'menu')
+      if (command === 'new-message' && hasMailPage) {
+        setPendingMailCompose({ kind: 'new' })
+        handleNavigatePage('mail', 'menu')
+      }
+    })
+  }, [isSignedIn, desktopMenuPages, hasMailPage, handleNavigatePage])
   // The composer's « Un cours… »: the Planning's weeks, where it's in the app.
   const mailPlanning = useMemo(() => (hasPlanningPage ? { selection: selectedTp, user: sessionState.user } : null), [hasPlanningPage, selectedTp, sessionState.user])
 
@@ -2515,6 +2563,8 @@ function App() {
       // Credential Management API; others rely on the form submission).
       if (!isDemo) {
         storeBrowserPasswordCredential(submitted)
+        // Desktop app: to the passwords saved for tafac.fr instead.
+        offerToSavePassword(submitted)
       }
       setCredentials((current) => ({
         ...current,

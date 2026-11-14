@@ -1,5 +1,6 @@
 import { copyToClipboard, getContextMenuEntry } from './useContextMenu'
 import { describeLink, linkMenuItems, normalizeMenu, selectionMenuItems } from './contextMenuItems'
+import { isDesktopApp } from './desktopApp'
 
 // What ContextMenuHost opens for a press, worked out from the page (the
 // places registered with useContextMenu, the link or selection under the
@@ -100,6 +101,24 @@ export function resolveMenu({ target, host = target, selectionText = '', touch =
 
 export const hasEscapeModifier = (event) => event.shiftKey || event.altKey || event.metaKey
 
+// Desktop app only (src/desktopApp.js): the webview's own right-click menu
+// (Reload, Back…) has nothing for a student. It still opens on a field
+// (paste), on selected text (copy, look up), or with ⇧/⌥ held like
+// everywhere in the app (Inspect, while developing). The app's own menus
+// handle the event first and cancel it where they open. Returns the
+// unbinding.
+export function blockNativeContextMenu(target) {
+  const handleContextMenu = (event) => {
+    if (event.defaultPrevented || hasEscapeModifier(event)) return
+    if (event.target?.closest?.(EDITABLE_SELECTOR)) return
+    const doc = event.target?.ownerDocument ?? document
+    if (String(doc.getSelection?.() ?? '').trim()) return
+    event.preventDefault()
+  }
+  target.addEventListener('contextmenu', handleContextMenu)
+  return () => target.removeEventListener('contextmenu', handleContextMenu)
+}
+
 // A mail's body (MailReader's frame, same origin, no scripts of its own):
 // its links, addresses and selection get the app's menu too. Bound on each
 // load; returns the unbinding.
@@ -127,8 +146,10 @@ export function bindFrameContextMenu(frame) {
   }
   doc.addEventListener('pointerdown', handlePointerDown, true)
   doc.addEventListener('contextmenu', handleContextMenu)
+  const unblockNativeMenu = isDesktopApp() ? blockNativeContextMenu(doc) : () => {}
   return () => {
     doc.removeEventListener('pointerdown', handlePointerDown, true)
     doc.removeEventListener('contextmenu', handleContextMenu)
+    unblockNativeMenu()
   }
 }

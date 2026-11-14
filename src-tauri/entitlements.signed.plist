@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!-- Signed builds only (npm run desktop:build:signed, tauri.signed.conf.json):
+     an unsigned app carrying associated-domains is killed at launch.
+     Team P8XRQT7Z4K. -->
+<plist version="1.0">
+<dict>
+  <!-- The passwords saved for tafac.fr (src/passwords.rs); tafac.fr names
+       the app back in /.well-known/apple-app-site-association (server.js). -->
+  <key>com.apple.developer.associated-domains</key>
+  <array>
+    <string>webcredentials:tafac.fr</string>
+  </array>
+  <key>com.apple.application-identifier</key>
+  <string>P8XRQT7Z4K.fr.tafac.desktop</string>
+  <key>com.apple.developer.team-identifier</key>
+  <string>P8XRQT7Z4K</string>
+</dict>
+</plist>

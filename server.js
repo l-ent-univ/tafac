@@ -18,6 +18,7 @@ import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { shutdownAllAnalytics } from './server/analytics.js'
 import { fillBrandingPlaceholders, fillPagePath, fillPublicOrigin } from './server/appShell.js'
+import { createDesktopUpdateRouter } from './server/desktopUpdate/index.ts'
 import { baselineSecurityHeaders, buildPagePolicy } from './server/securityHeaders/index.ts'
 import { createUniversitiesApp } from './server/universitiesApp.js'
 import { branding as neutralBranding } from './universities/neutral.js'
@@ -117,6 +118,11 @@ app.get('/.well-known/apple-app-site-association', (req, res) => {
   }
   res.type('application/json').send(JSON.stringify({ webcredentials: { apps: APPLE_APP_IDS } }))
 })
+
+// The desktop app's updates: the manifest the installed apps read
+// (/desktop/latest.json, from DESKTOP_LATEST_FILE or DESKTOP_LATEST_JSON) and
+// its installers' address (server/desktopUpdate, docs/DESKTOP.md).
+app.use(createDesktopUpdateRouter())
 
 app.get('/sitemap.xml', (req, res) => {
   const origin = getSafePublicOrigin(req)
