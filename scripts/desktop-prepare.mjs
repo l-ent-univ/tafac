@@ -187,6 +187,10 @@ async function prepareServer() {
   for (const entry of [...SERVER_FILES, ...sourceFiles]) {
     cpSync(path.join(ROOT, entry), path.join(SERVER, entry), { recursive: true })
   }
+  // The landing pages rendered for search engines: the app has none (it
+  // opens on the login page), and without them server.js sends the bare
+  // page, so a reload signed out doesn't flash the landing.
+  rmSync(path.join(SERVER, 'dist', '.prerender'), { recursive: true, force: true })
 
   run('npm', ['ci', '--omit=dev', '--ignore-scripts', '--no-audit', '--no-fund'], { cwd: SERVER })
   pruneNodeModules(packages)

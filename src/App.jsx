@@ -21,6 +21,7 @@ import WelcomeFromLent from './components/WelcomeFromLent'
 import { settingsTransfer } from './settingsTransferBoot'
 import { appendPreviewToken, findProfilePhotoCandidate } from './profilePhoto'
 import { DEMO_CREDENTIALS, DEMO_SESSION_MODE, DEMO_SIGNATURE_LOGIN } from './demoAccount'
+import { isDesktopApp } from './desktopApp'
 import { signatureLogin } from './mailSignatureChoice'
 import { storeBrowserPasswordCredential } from './browserCredentials'
 import { syncRuntimeSeo } from './seo'
@@ -882,9 +883,11 @@ function reportSettingsTransfer() {
 
 const LOGIN_PATH = '/login'
 
-// Installed app and arrivals from the old l'ent address skip the landing page.
+// Installed app (PWA or desktop) and arrivals from the old l'ent address skip
+// the landing page.
 function shouldOpenOnLogin() {
   return settingsTransfer.arrived
+    || isDesktopApp()
     || window.matchMedia('(display-mode: standalone)').matches
     || window.navigator.standalone === true
 }

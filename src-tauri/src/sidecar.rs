@@ -47,12 +47,14 @@ pub fn endpoint() -> String {
 
 // The address the window opens: Tauri serves custom schemes as
 // <scheme>://localhost, except on Windows (WebView2) where it is
-// http://<scheme>.localhost.
+// http://<scheme>.localhost. On /login, not /: the server sends / with the
+// landing page in it while signed out (for search engines); the app goes
+// on to / by itself once signed in (src/desktopApp.js, App.jsx).
 pub fn app_url() -> &'static str {
     if cfg!(windows) {
-        "http://tafac.localhost/"
+        "http://tafac.localhost/login"
     } else {
-        "tafac://localhost/"
+        "tafac://localhost/login"
     }
 }
 
