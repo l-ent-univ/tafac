@@ -246,9 +246,20 @@ nécessaire » until updated.
 | `APPLE_SIGNING_IDENTITY` | Its name: `Developer ID Application: … (P8XRQT7Z4K)` |
 | `APPLE_PROVISIONING_PROFILE` | `src-tauri/embedded.provisionprofile` in base64 |
 | `APPLE_API_KEY_ID`, `APPLE_API_ISSUER`, `APPLE_API_PRIVATE_KEY` | An App Store Connect API key for the notarization (Users and Access › Integrations › Team Keys, access Developer): its ID, the issuer's ID, the content of `AuthKey_<id>.p8` |
+| `POSTHOG_PROJECT_KEY` | PostHog's public project key, as tafac.fr's: the app's anonymous statistics (below). Unset, the app sends none |
 
 Then the repository variable `DESKTOP_RELEASE` = `true`, and
 `DESKTOP_LATEST_FILE` on tafac.fr.
+
+## Statistics
+
+The app's own server sends the same anonymous statistics as tafac.fr
+(`docs/ANALYTICS.md`), from the student's computer to PostHog, never
+through tafac.fr, and only while « Statistiques anonymes » is on. Its
+events carry `client: desktop` and `app_version` (a browser tab says `web`,
+the installed PWA `pwa`). The key is built in by CI
+(`TAFAC_POSTHOG_PROJECT_KEY`, read by `src-tauri/src/sidecar.rs`): a local
+build sends nothing.
 
 ## The disk image
 

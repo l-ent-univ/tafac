@@ -61,6 +61,8 @@ test('allowlist drops unknown events, unknown properties and free text', () => {
       subject: 'Convocation examen',
       email: 'demo@tafac.fr',
       device: 'desktop',
+      client: 'desktop',
+      app_version: '0.26.0',
       browser: 'Mozilla/5.0',
       lang: 'fr-FR',
       establishment: 'Camille Martin',
@@ -73,8 +75,15 @@ test('allowlist drops unknown events, unknown properties and free text', () => {
 
   assert.deepEqual(event, {
     event: 'widget_loaded',
-    properties: { device: 'desktop', widget: 'mail', status: 'ok', duration_bucket: '<1s' },
+    properties: { device: 'desktop', client: 'desktop', app_version: '0.26.0', widget: 'mail', status: 'ok', duration_bucket: '<1s' },
   })
+  // Anything else is dropped.
+  const odd = sanitizeAnalyticsEvent({
+    event: 'widget_loaded',
+    properties: { widget: 'mail', status: 'ok', duration_bucket: '<1s', client: 'electron', app_version: '0.26.0-beta' },
+  }, { hasSession: true })
+  assert.equal(odd.properties.client, undefined)
+  assert.equal(odd.properties.app_version, undefined)
 })
 
 test('required and cross-property rules', () => {

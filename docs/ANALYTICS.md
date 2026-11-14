@@ -38,6 +38,8 @@ Contexte ajouté automatiquement à chaque événement :
 | `device` | `mobile` (< 768 px), `tablet` (< 1024 px), `desktop` | largeur de la fenêtre |
 | `browser` | `chromium`, `firefox`, `safari`, `other` | famille déduite du user-agent (le UA lui-même n'est pas envoyé) |
 | `standalone` | booléen | PWA installée (`display-mode: standalone`) |
+| `client` | `web`, `pwa`, `desktop` | où tourne Tafac : un onglet du navigateur, la PWA installée, l'appli de bureau |
+| `app_version` | `x.y.z` | version de l'appli de bureau (seulement là) |
 | `lang` | 2 lettres (`fr`, `en`…) | langue du navigateur |
 | `establishment` | id d'établissement de la config (`iutlan`, `ufrs`…) | établissement mémorisé (grands groupes) |
 | `formation` | identifiant court de la formation (`but-mmi`, `but-info`…, 32 caractères max) | niveau « formation » de la sélection ADE de l'étudiant, converti en slug. Jamais l'année, le TD ni le TP (groupes trop petits) |
