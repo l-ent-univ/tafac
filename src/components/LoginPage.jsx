@@ -497,6 +497,13 @@ function LoginPage({
                     Se connecter
                   </LentButton>
 
+                  {/* Desktop app: the password doesn't go through Tafac. */}
+                  {IS_DESKTOP_APP ? (
+                    <FormStep open={!requireOTP}>
+                      <DesktopPasswordNote />
+                    </FormStep>
+                  ) : null}
+
                   {/* Back to the identifiers: another account, a typo. */}
                   <FormStep open={requireOTP}>
                     <div className="flex justify-center pt-4 pb-1">
@@ -527,18 +534,12 @@ function LoginPage({
                   </div>
                 ) : null}
 
-                {/* What happens to the password; in the desktop app, also
-                    that it doesn't go through Tafac. */}
-                {passwordNote || IS_DESKTOP_APP ? (
-                  <div className="glass-solid mt-5 box-border flex w-full flex-col gap-1.5 corners-[16px] border px-4 py-3 text-[13px] font-medium leading-[1.4] text-text-muted font-body">
-                    {passwordNote ? (
-                      <p className="m-0">
-                        <Icon icon="ph:lock" className="mr-[6px] inline-block h-[14px] w-[14px] align-[-2px]" aria-hidden="true" />
-                        {passwordNote}
-                      </p>
-                    ) : null}
-                    {IS_DESKTOP_APP ? <DesktopPasswordNote afterNote={Boolean(passwordNote)} /> : null}
-                  </div>
+                {/* What happens to the password. */}
+                {passwordNote ? (
+                  <p className="glass-solid m-0 mt-5 box-border w-full corners-[16px] border px-4 py-3 text-[13px] font-medium leading-[1.4] text-text-muted font-body">
+                    <Icon icon="ph:lock" className="mr-[6px] inline-block h-[14px] w-[14px] align-[-2px]" aria-hidden="true" />
+                    {passwordNote}
+                  </p>
                 ) : null}
 
                 </>
