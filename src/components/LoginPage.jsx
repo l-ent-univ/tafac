@@ -10,6 +10,8 @@ import LogoBut1 from './LogoBut1'
 import AboutModal from './AboutModal'
 import PapillonBadge from './PapillonBadge'
 import ServiceNotice from './ServiceNotice'
+import DesktopPasswordNote from './DesktopPasswordNote'
+import { isDesktopApp } from '../desktopApp'
 import { APP_NAME } from '../seo'
 import { getListedUniversities, getLoadedUniversityId, writeUniversityChoice } from '../universityRuntime'
 import { r } from '../register.js'
@@ -20,6 +22,7 @@ const universityLogoAlt = universityConfig.branding.logoAlt ?? universityConfig.
 // A square badge (branding.logoShape) shows taller than a wordmark.
 const universityLogoSquare = universityConfig.branding.logoShape === 'square'
 const passwordNote = universityConfig.branding.loginPasswordNote ?? null
+const IS_DESKTOP_APP = isDesktopApp()
 const repoUrl = universityConfig.branding.about?.repoUrl ?? null
 const loginLinks = universityConfig.links ?? {}
 // "Mot de passe oublié" / "Activer mon compte" under the button, hidden for now.
@@ -524,12 +527,18 @@ function LoginPage({
                   </div>
                 ) : null}
 
-                {/* What happens to the password. */}
-                {passwordNote ? (
-                  <p className="glass-solid m-0 mt-5 box-border w-full corners-[16px] border px-4 py-3 text-[13px] font-medium leading-[1.4] text-text-muted font-body">
-                    <Icon icon="ph:lock" className="mr-[6px] inline-block h-[14px] w-[14px] align-[-2px]" aria-hidden="true" />
-                    {passwordNote}
-                  </p>
+                {/* What happens to the password; in the desktop app, also
+                    that it doesn't go through Tafac. */}
+                {passwordNote || IS_DESKTOP_APP ? (
+                  <div className="glass-solid mt-5 box-border flex w-full flex-col gap-1.5 corners-[16px] border px-4 py-3 text-[13px] font-medium leading-[1.4] text-text-muted font-body">
+                    {passwordNote ? (
+                      <p className="m-0">
+                        <Icon icon="ph:lock" className="mr-[6px] inline-block h-[14px] w-[14px] align-[-2px]" aria-hidden="true" />
+                        {passwordNote}
+                      </p>
+                    ) : null}
+                    {IS_DESKTOP_APP ? <DesktopPasswordNote afterNote={Boolean(passwordNote)} /> : null}
+                  </div>
                 ) : null}
 
                 </>
