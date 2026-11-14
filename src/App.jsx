@@ -2467,6 +2467,21 @@ function App() {
 
   async function handleLogin(event) {
     event.preventDefault()
+    // The identifiers as the form holds them: a password manager may have
+    // filled the fields without an input event, so the state can lag.
+    const fields = event?.currentTarget?.elements
+    const fieldValue = (name, fallback) => {
+      const value = fields?.namedItem?.(name)?.value
+      return typeof value === 'string' ? value : fallback
+    }
+    const submitted = {
+      ...credentials,
+      username: fieldValue('username', credentials.username),
+      password: fieldValue('password', credentials.password),
+    }
+    if (submitted.username !== credentials.username || submitted.password !== credentials.password) {
+      setCredentials((current) => ({ ...current, username: submitted.username, password: submitted.password }))
+    }
 
     setSessionState((current) => ({
       ...current,
@@ -2476,7 +2491,9 @@ function App() {
     startDebugState('Connexion')
 
     try {
-      const result = await loginToEnt(credentials)
+      // A code only goes with the code step: one filled in before it (a
+      // password manager's) would be checked in place of the password.
+      const result = await loginToEnt(sessionState.requireOTP ? submitted : { ...submitted, otp: '' })
       const isDemo = result?.sessionMode === DEMO_SESSION_MODE
       // The code went through: the code step's last sound.
       if (sessionState.requireOTP) playOtpSound('success')
@@ -2485,7 +2502,7 @@ function App() {
       // Offer the accepted login to the browser's password manager (Chrome's
       // Credential Management API; others rely on the form submission).
       if (!isDemo) {
-        storeBrowserPasswordCredential(credentials)
+        storeBrowserPasswordCredential(submitted)
       }
       setCredentials((current) => ({
         ...current,

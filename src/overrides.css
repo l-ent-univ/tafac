@@ -2373,6 +2373,30 @@
 
 /* ── Login: one-time code (OtpInput) ── */
 
+/* The real field over the boxes: there, but nothing of it shows (its text,
+   its caret, its selection, an autofill's tint). Not opacity: 0, which
+   password managers take for a hidden field and skip. */
+.otp-field {
+  color: transparent;
+  -webkit-text-fill-color: transparent;
+  caret-color: transparent;
+}
+
+/* The box the next digit goes to has the focus ring, not the whole row. */
+.otp-field:focus-visible {
+  outline: none;
+}
+
+.otp-field::selection {
+  background: transparent;
+}
+
+.otp-field:autofill,
+.otp-field:-webkit-autofill {
+  -webkit-text-fill-color: transparent;
+  transition: background-color 0s 600000s;
+}
+
 /* The caret of the box the next digit goes to: the real field is invisible,
    and its caret with it. */
 .otp-caret {

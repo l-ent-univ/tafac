@@ -13,8 +13,11 @@ const BOX_COLORS = ['#3b82ff', '#8b5cf6', '#ff5c93', '#ff8a1f', '#ffb81a', '#2fc
 // the last one. `busy` (the code is being checked) keeps the field and its
 // focus, so the keyboard stays up, and ignores what is typed. A digit
 // landing pops its box (a ring, a few sparks); the whole code, a wave
-// along the row (overrides.css, « Login: one-time code »).
-function OtpInput({ id = 'login-otp', label, value, onChange, inputRef, busy = false, invalid = false }) {
+// along the row (overrides.css, « Login: one-time code »). The field is
+// only there while `active` (its step shown): folded away, the boxes stay
+// for the step's animation, but the form holds the identifiers alone, which
+// password managers read as a login, and none of them fills a code into it.
+function OtpInput({ id = 'login-otp', label, value, onChange, inputRef, active: isActive = true, busy = false, invalid = false }) {
   const [focused, setFocused] = useState(false)
   const digits = String(value ?? '').slice(0, OTP_LENGTH)
   // The box the next digit goes to: the last one once the code is whole.
@@ -35,7 +38,7 @@ function OtpInput({ id = 'login-otp', label, value, onChange, inputRef, busy = f
         <div className={`flex gap-2 ${busy ? 'otp-wave' : ''}`} aria-hidden="true">
           {Array.from({ length: OTP_LENGTH }, (_, index) => {
             const digit = digits[index] ?? ''
-            const active = focused && !busy && index === activeIndex
+            const active = focused && isActive && !busy && index === activeIndex
             return (
               <span
                 key={index}
@@ -54,12 +57,12 @@ function OtpInput({ id = 'login-otp', label, value, onChange, inputRef, busy = f
             )
           })}
         </div>
-        <input
+        {isActive ? <input
           ref={inputRef}
           id={id}
           name="otp"
           // 16px: under it, iOS zooms the page on focus.
-          className="absolute inset-0 h-full w-full cursor-text border-0 bg-transparent p-0 text-base opacity-0"
+          className="otp-field absolute inset-0 h-full w-full cursor-text border-0 bg-transparent p-0 text-base"
           type="text"
           inputMode="numeric"
           pattern="[0-9]*"
@@ -85,7 +88,7 @@ function OtpInput({ id = 'login-otp', label, value, onChange, inputRef, busy = f
               event.preventDefault()
             }
           }}
-        />
+        /> : null}
       </div>
     </div>
   )
