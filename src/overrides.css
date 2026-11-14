@@ -8034,6 +8034,15 @@
   }
 }
 
+/* The planning's sheets are centred dialogs from 600px, round at the foot
+   too: so is their clip, or a card scrolled down there (« Formations »)
+   pokes out of the corners. */
+@media (min-width: 600px) and (max-width: 1023.98px) {
+  .planning-sheet .gd-clip {
+    clip-path: inset(0 round calc(var(--modal-radius, 26px) - 1px));
+  }
+}
+
 /* The sticky header's progressive blur: five backdrop blurs doubling in
    strength, each masked to a shorter band from the top, so content passing
    under goes from sharp (below the header) to strongly blurred (at the

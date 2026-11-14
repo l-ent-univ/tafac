@@ -12,6 +12,7 @@ import { Skeleton } from 'skullet/react'
 import { SAMPLE_DIRECTORY_ROWS } from '../skeletonSamples'
 import { r } from '../register.js'
 import SmoothSurface from './SmoothSurface'
+import PlanningGroupCollections from './PlanningGroupCollections'
 
 const TABS = [
   { id: 'room', label: 'Salles', placeholder: 'Salle, bâtiment…' },
@@ -165,23 +166,24 @@ function DirectoryNote({ children }) {
 // Personnels, Formations) held at the top in `stickyClassName`'s box under
 // the container's own `header` (its title and close button), the list
 // under them. The ADE tree's rooms and staff (usePlanningDirectory), asked
-// once it's first shown: the student's own site's by building or
-// department (`siteLabel`, their group's; among the groups, their own
-// formation first: `formationLabel`), any other by a search. A pick shows
-// that one's timetable in the planning (`onPick(entry)`); `shownId`: the
-// one shown. `tab` and `query` are the container's (PlanningPage's: they
-// outlast the panel and the sheet), changed with `onTabChange` and
-// `onQueryChange`. `inputRef`: the search field, for the panel to focus
-// it. `onOpenGroupSettings`: Réglages › Planning, offered once on
+// once it's first shown: the student's own site's (`siteLabel`, their
+// group's), any other by a search. Its rooms and staff in sections by
+// building or department; its groups (« Formations ») as collections, a
+// card per formation (PlanningGroupCollections), the student's own
+// formation first (their group's, `ownId`, else the one named
+// `formationLabel`). A pick shows that one's timetable in the planning
+// (`onPick(entry)`); `shownId`: the one shown, none for the student's own.
+// `tab` and `query` are the container's (PlanningPage's: they outlast the
+// panel and the sheet), changed with `onTabChange` and `onQueryChange`.
+// `inputRef`: the search field, for the panel to focus it.
+// `onOpenGroupSettings`: Réglages › Planning, offered once on
 // « Formations » (GroupSettingsNotice).
-function PlanningDirectoryContent({ header = null, stickyClassName = '', user = null, siteLabel = null, formationLabel = null, shownId = null, onPick, onOpenGroupSettings = null, tab, onTabChange, query, onQueryChange, inputRef = null }) {
+function PlanningDirectoryContent({ header = null, stickyClassName = '', user = null, siteLabel = null, formationLabel = null, ownId = null, shownId = null, onPick, onOpenGroupSettings = null, tab, onTabChange, query, onQueryChange, inputRef = null }) {
   const directory = usePlanningDirectory({ user, enabled: true })
   const { entries, status } = directory
   const results = useMemo(() => searchDirectory(entries, tab, query, { siteLabel }), [entries, tab, query, siteLabel])
-  const sections = useMemo(
-    () => sectionEntries(siteEntries(entries, tab, siteLabel), tab, { first: tab === 'group' ? formationLabel : null }),
-    [entries, tab, siteLabel, formationLabel],
-  )
+  const siteList = useMemo(() => siteEntries(entries, tab, siteLabel), [entries, tab, siteLabel])
+  const sections = useMemo(() => (tab === 'group' ? [] : sectionEntries(siteList, tab)), [siteList, tab])
 
   const tabInfo = TABS.find((choice) => choice.id === tab) ?? TABS[0]
   const isSearching = query.trim().length > 0
@@ -214,6 +216,8 @@ function PlanningDirectoryContent({ header = null, stickyClassName = '', user = 
         ))}
       </ul>
     ) : <DirectoryNote>{{ room: 'Aucune salle trouvée', person: 'Aucun nom trouvé', group: 'Aucun groupe trouvé' }[tab]}</DirectoryNote>
+  } else if (tab === 'group' && siteList.length) {
+    body = <PlanningGroupCollections entries={siteList} formationLabel={formationLabel} ownId={ownId} shownId={shownId} onPick={onPick} />
   } else if (sections.length) {
     body = (
       <div className="grid gap-5">
@@ -264,7 +268,10 @@ function PlanningDirectoryContent({ header = null, stickyClassName = '', user = 
           label="Annuaire"
         />
       </div>
-      <div role="tabpanel" aria-label={tabInfo.label}>
+      {/* A little room under the sticky top: the first card's outer stroke
+          would be painted over by it, the card looking cut off. */}
+      <div role="tabpanel" aria-label={tabInfo.label} className="pt-1">
+
         {tab === 'group' && onOpenGroupSettings && status === 'loaded' ? <GroupSettingsNotice onOpenSettings={onOpenGroupSettings} /> : null}
         {body}
       </div>
