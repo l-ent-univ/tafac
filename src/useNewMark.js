@@ -5,6 +5,10 @@ import { useCallback, useSyncExternalStore } from 'react'
 // student has opened it once: kept on this device, by `key` (a
 // localStorage key, never renamed). Every component reading the same key
 // sees it go at once. → [isNew, markSeen].
+export const NEW_MARK_DIRECTORY = 'l-ent:new-mark:directory'
+// Every key a dot is kept under: a new one is added here too.
+const NEW_MARK_KEYS = [NEW_MARK_DIRECTORY]
+
 const listeners = new Set()
 
 function readSeen(key) {
@@ -23,19 +27,28 @@ function subscribe(listener) {
 // Storage unavailable: seen for the visit.
 const seenThisVisit = new Set()
 
+function storeSeen(key) {
+  seenThisVisit.add(key)
+  try {
+    localStorage.setItem(key, '1')
+  } catch {
+    // Kept for the visit only.
+  }
+}
+
+// A device's first visit (changelogStore): every dot is seen, nothing was
+// added since a student who has just arrived.
+export function markNewMarksSeen() {
+  NEW_MARK_KEYS.forEach(storeSeen)
+  listeners.forEach((listener) => listener())
+}
+
 export function useNewMark(key) {
   const seen = useSyncExternalStore(subscribe, () => seenThisVisit.has(key) || readSeen(key), () => true)
   const markSeen = useCallback(() => {
     if (seenThisVisit.has(key) || readSeen(key)) return
-    seenThisVisit.add(key)
-    try {
-      localStorage.setItem(key, '1')
-    } catch {
-      // Kept for the visit only.
-    }
+    storeSeen(key)
     listeners.forEach((listener) => listener())
   }, [key])
   return [!seen, markSeen]
 }
-
-export const NEW_MARK_DIRECTORY = 'l-ent:new-mark:directory'

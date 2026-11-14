@@ -1933,13 +1933,16 @@ function App() {
   const hasConfirmedPlanningPage = hasPlanningPage && sessionState.authenticated
   // And those about the Messagerie, students signed in at a school with its page.
   const hasConfirmedMailPage = hasMailPage && sessionState.authenticated
+  // Once signed in: a device's first visit is settled there, with what the
+  // student has (changelogStore), not on the landing or the login page.
   useEffect(() => {
+    if (!sessionState.authenticated) return
     setChangelogAudience([
       ...(hasConfirmedGradesPage ? ['grades-page'] : []),
       ...(hasConfirmedPlanningPage ? ['planning-page'] : []),
       ...(hasConfirmedMailPage ? ['mail-page'] : []),
     ])
-  }, [hasConfirmedGradesPage, hasConfirmedPlanningPage, hasConfirmedMailPage])
+  }, [sessionState.authenticated, hasConfirmedGradesPage, hasConfirmedPlanningPage, hasConfirmedMailPage])
   // Falls back to « Accueil » if the grades item goes away (establishment
   // without grade widgets, feature switched off, a relevé that isn't BUT).
   const isGradesPage = useMemo(
