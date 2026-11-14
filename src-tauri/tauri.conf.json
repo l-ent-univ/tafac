@@ -1,7 +1,7 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "Tafac",
-  "version": "0.1.0",
+  "version": "0.0.0",
   "identifier": "fr.tafac.desktop",
   "build": {
     "frontendDist": "placeholder",
@@ -22,6 +22,21 @@
       "icons/128x128@2x.png",
       "icons/icon.icns",
       "icons/icon.ico"
-    ]
+    ],
+    "macOS": {
+      "dmg": {
+        "background": "dmg/background.tiff",
+        "windowSize": { "width": 660, "height": 428 },
+        "appPosition": { "x": 180, "y": 170 },
+        "applicationFolderPosition": { "x": 480, "y": 170 }
+      }
+    }
+  },
+  "plugins": {
+    "updater": {
+      "endpoints": ["https://tafac.fr/desktop/latest.json"],
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDA4NTFEMDBGM0RDMTA4MEUKUldRT0NNRTlEOUJSQ0VXRUJwdkJlVEh3eFVLT05mLy94VlJlKzVtVTlDMEtqSTQ2Tks4VTEybjIK",
+      "requireSignedVersion": true
+    }
   }
 }

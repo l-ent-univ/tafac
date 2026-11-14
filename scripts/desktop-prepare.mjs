@@ -8,6 +8,9 @@
 //                                            version as the Dockerfile,
 //                                            checked against nodejs.org's
 //                                            SHASUMS256.txt
+//   src-tauri/dmg/background.tiff            macOS: the disk image's
+//                                            background, its two PNGs joined
+//                                            (scripts/desktopBundle.mjs)
 //
 // Other platforms are built on their own machine (or CI runner): the Node
 // binary and node_modules are per platform.
@@ -17,6 +20,7 @@ import { chmodSync, copyFileSync, cpSync, existsSync, mkdirSync, readdirSync, re
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { build } from 'esbuild'
+import { buildDmgBackground } from './desktopBundle.mjs'
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 const OUT = path.join(ROOT, 'desktop-build')
@@ -199,3 +203,4 @@ async function prepareServer() {
 
 await prepareServer()
 await prepareNodeBinary()
+if (process.platform === 'darwin') buildDmgBackground()

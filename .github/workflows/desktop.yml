@@ -1,0 +1,271 @@
+# The desktop app (macOS, Apple Silicon and Intel) of a release: built at the
+# release's version, signed with the Developer ID certificate, notarized, and
+# added to the GitHub release with what the installed apps need to update
+# themselves. docs/DESKTOP.md says how updates work, what to set up first and
+# how to release one.
+#
+# For the tag vX.Y.Z, on its release:
+#   Tafac_X.Y.Z_aarch64.app.tar.gz, .sig   the update (Apple Silicon)
+#   Tafac_X.Y.Z_x64.app.tar.gz, .sig       the update (Intel)
+#   Tafac_X.Y.Z_aarch64.dmg, _x64.dmg      the first install
+#   Tafac_aarch64.dmg, Tafac_x64.dmg       the same, under a name that stays
+#                                          (…/releases/latest/download/…)
+#   latest.json                            what tafac.fr serves at
+#                                          /desktop/latest.json (an artifact
+#                                          of the run too)
+# Nothing reaches the installed apps until latest.json is published on
+# tafac.fr.
+#
+# It runs:
+# - called by ci.yml once it has created the release, when the repository
+#   variable DESKTOP_RELEASE is "true" (a tag created with the workflow's own
+#   token starts no other workflow, so the tag alone wouldn't);
+# - on a v* tag pushed by hand;
+# - by hand (Actions › Desktop app › Run workflow), for a tag that exists.
+#
+# Secrets:
+#   APPLE_CERTIFICATE            the Developer ID Application certificate and
+#                                its key, exported as .p12, in base64
+#   APPLE_CERTIFICATE_PASSWORD   the .p12's password
+#   APPLE_SIGNING_IDENTITY       its name: "Developer ID Application: … (TEAMID)"
+#   APPLE_PROVISIONING_PROFILE   the Developer ID provisioning profile with
+#                                Associated Domains (saved passwords), in base64
+#   APPLE_API_KEY_ID             an App Store Connect API key, for the
+#   APPLE_API_ISSUER             notarization: its ID, its issuer's ID and
+#   APPLE_API_PRIVATE_KEY        the content of its AuthKey_<id>.p8 file
+#   TAURI_SIGNING_PRIVATE_KEY    the updater's private key (the content of
+#                                ~/.tauri/tafac-updater.key)
+#   TAURI_SIGNING_PRIVATE_KEY_PASSWORD   its password, if it has one
+name: Desktop app
+
+on:
+  push:
+    tags: ['v*']
+  workflow_call:
+    inputs:
+      tag:
+        description: The release's tag (vX.Y.Z)
+        required: true
+        type: string
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: The release's tag (vX.Y.Z), already pushed
+        required: true
+        type: string
+      minimum:
+        description: "latest.json's minimum (x.y.z): only to lock older versions out. Empty: tafac.fr's current one"
+        required: false
+        type: string
+
+permissions:
+  contents: read
+
+env:
+  TAG: ${{ inputs.tag || github.ref_name }}
+
+jobs:
+  prepare:
+    name: Version and release
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          ref: ${{ env.TAG }}
+      # The app's version is the tag's: the same number as the web release.
+      - name: Version from the tag
+        id: version
+        run: |
+          if ! printf '%s' "$TAG" | grep -qE '^v[0-9]+\.[0-9]+\.[0-9]+$'; then
+            echo "::error::Not a release tag (vX.Y.Z): $TAG"
+            exit 1
+          fi
+          echo "version=${TAG#v}" >> "$GITHUB_OUTPUT"
+      # ci.yml has created it; a tag pushed by hand has none yet.
+      - name: The tag's release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release view "$TAG" > /dev/null 2>&1 \
+            || gh release create "$TAG" --verify-tag --title "$TAG" --generate-notes
+
+  build:
+    name: macOS (${{ matrix.name }})
+    needs: prepare
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # Each on its own processor: the Node the app ships and the server's
+          # packages are per architecture (scripts/desktop-prepare.mjs).
+          - name: Apple Silicon
+            runner: macos-15
+            platform: darwin-aarch64
+          - name: Intel
+            runner: macos-15-intel
+            platform: darwin-x86_64
+    runs-on: ${{ matrix.runner }}
+    # Apple's notarization usually answers in minutes, sometimes much later.
+    timeout-minutes: 90
+    permissions:
+      contents: write
+    env:
+      VERSION: ${{ needs.prepare.outputs.version }}
+      BUNDLE: src-tauri/target/release/bundle
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          ref: ${{ env.TAG }}
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 24
+          cache: npm
+      - name: Rust
+        run: |
+          rustup toolchain install stable --profile minimal --no-self-update
+          rustup default stable
+      - run: npm ci
+
+      # The Developer ID certificate in a keychain of this run only, and the
+      # provisioning profile where tauri.signed.conf.json takes it. Not
+      # through Tauri's own APPLE_CERTIFICATE: its keychain is gone when
+      # scripts/desktop-sign.mjs signs again.
+      - name: Signing certificate and provisioning profile
+        env:
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          APPLE_PROVISIONING_PROFILE: ${{ secrets.APPLE_PROVISIONING_PROFILE }}
+        run: |
+          if [ -z "$APPLE_CERTIFICATE" ] || [ -z "$APPLE_PROVISIONING_PROFILE" ]; then
+            echo "::error::APPLE_CERTIFICATE or APPLE_PROVISIONING_PROFILE is not set (docs/DESKTOP.md)"
+            exit 1
+          fi
+          KEYCHAIN="$RUNNER_TEMP/tafac-signing.keychain-db"
+          KEYCHAIN_PASSWORD="$(openssl rand -base64 24)"
+          security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN"
+          security set-keychain-settings -lut 21600 "$KEYCHAIN"
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN"
+          printf '%s' "$APPLE_CERTIFICATE" | base64 --decode > "$RUNNER_TEMP/certificate.p12"
+          security import "$RUNNER_TEMP/certificate.p12" -P "$APPLE_CERTIFICATE_PASSWORD" -A -t cert -f pkcs12 -k "$KEYCHAIN"
+          rm "$RUNNER_TEMP/certificate.p12"
+          security set-key-partition-list -S apple-tool:,apple: -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN" > /dev/null
+          security list-keychains -d user -s "$KEYCHAIN" login.keychain-db
+          printf '%s' "$APPLE_PROVISIONING_PROFILE" | base64 --decode > src-tauri/embedded.provisionprofile
+
+      # tauri.bundle.conf.json runs `npm run desktop:prepare` first (the
+      # frontend, the server's files, the Node binary). The app only: the
+      # update's archive and the disk image are made further down, once the
+      # app is signed as it ships. No notarization key here: Tauri would
+      # notarize what desktop-sign.mjs then signs again.
+      - name: Build and sign the app
+        env:
+          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+        run: |
+          npx tauri build \
+            --config src-tauri/tauri.bundle.conf.json \
+            --config src-tauri/tauri.signed.conf.json \
+            --config "{\"version\":\"$VERSION\"}" \
+            --bundles app
+          node scripts/desktop-sign.mjs
+
+      - name: App Store Connect API key
+        env:
+          APPLE_API_PRIVATE_KEY: ${{ secrets.APPLE_API_PRIVATE_KEY }}
+        run: |
+          if [ -z "$APPLE_API_PRIVATE_KEY" ]; then
+            echo "::error::APPLE_API_PRIVATE_KEY is not set (docs/DESKTOP.md)"
+            exit 1
+          fi
+          printf '%s\n' "$APPLE_API_PRIVATE_KEY" > "$RUNNER_TEMP/AuthKey.p8"
+          echo "APPLE_API_KEY_PATH=$RUNNER_TEMP/AuthKey.p8" >> "$GITHUB_ENV"
+
+      - name: Notarize the app
+        env:
+          APPLE_API_KEY: ${{ secrets.APPLE_API_KEY_ID }}
+          APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
+        run: |
+          node scripts/desktop-notarize.mjs
+          # Gatekeeper's own answer, as on a Mac that never saw the app.
+          spctl --assess --type execute --verbose=2 "$BUNDLE/macos/Tafac.app"
+
+      # The update first: it doesn't wait on the disk image.
+      - name: The update's archive and signature
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+          DESKTOP_DOWNLOAD_BASE: https://github.com/${{ github.repository }}/releases/download/${{ env.TAG }}
+        run: node scripts/desktop-updater-archive.mjs
+      - name: Add the update to the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release upload "$TAG" "$BUNDLE"/macos/Tafac_*.app.tar.gz "$BUNDLE"/macos/Tafac_*.app.tar.gz.sig --clobber
+
+      - name: Disk image, signed and notarized
+        env:
+          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+          APPLE_API_KEY: ${{ secrets.APPLE_API_KEY_ID }}
+          APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
+        run: |
+          node scripts/desktop-dmg.mjs
+          spctl --assess --type open --context context:primary-signature --verbose=2 "$BUNDLE"/dmg/Tafac_*.dmg
+      - name: Add the disk image to the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          image="$(ls "$BUNDLE"/dmg/Tafac_"$VERSION"_*.dmg)"
+          # The same file under a name without the version: its address on
+          # the latest release never changes.
+          lasting="$BUNDLE/dmg/$(basename "$image" | sed "s/_${VERSION}_/_/")"
+          cp "$image" "$lasting"
+          gh release upload "$TAG" "$image" "$lasting" --clobber
+
+      # What latest.json says of this architecture, for the last job.
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: latest-${{ matrix.platform }}
+          path: ${{ env.BUNDLE }}/latest-${{ matrix.platform }}.json
+          if-no-files-found: error
+
+      - name: Remove the keys
+        if: always()
+        run: |
+          security delete-keychain "$RUNNER_TEMP/tafac-signing.keychain-db" || true
+          rm -f "$RUNNER_TEMP/AuthKey.p8" src-tauri/embedded.provisionprofile
+
+  manifest:
+    name: latest.json
+    needs: [prepare, build]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          ref: ${{ env.TAG }}
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 24
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          pattern: latest-*
+          path: fragments
+          merge-multiple: true
+      # Its `minimum` is tafac.fr's current one unless the run was given
+      # another: a release doesn't lock anyone out by itself.
+      - name: Put latest.json together
+        env:
+          DESKTOP_MINIMUM: ${{ inputs.minimum }}
+        run: node scripts/desktop-latest.mjs fragments/latest-*.json --out latest.json && cat latest.json
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: latest.json
+          path: latest.json
+          if-no-files-found: error
+      - name: Add latest.json to the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release upload "$TAG" latest.json --clobber

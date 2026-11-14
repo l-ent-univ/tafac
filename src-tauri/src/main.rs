@@ -12,6 +12,7 @@ mod links;
 mod menu;
 mod passwords;
 mod sidecar;
+mod updater;
 mod window;
 
 use std::sync::Arc;
@@ -32,7 +33,8 @@ fn main() {
                 )
                 .with_filter(|label| label == "main")
                 .build(),
-        );
+        )
+        .plugin(updater::plugin());
     // macOS: the menu bar (menu.rs), and closing the main window doesn't
     // quit: it hides, the app (and its server) keeps running, a click on its
     // Dock icon shows it again (RunEvent::Reopen below). ⌘Q quits.
@@ -74,6 +76,10 @@ fn main() {
                 jar: jar::CookieJar::load(data_dir.join("cookies.json")),
             }));
 
+            // Before the window: its page asks for the update's state as it
+            // starts.
+            updater::start(app.handle())?;
+
             #[cfg(target_os = "macos")]
             window::enable_spell_checking();
 
@@ -104,6 +110,8 @@ fn main() {
             if let Some(sidecar) = handle.try_state::<sidecar::Sidecar>() {
                 sidecar.stop();
             }
+            // A downloaded update takes the app's place now that it has quit.
+            updater::install_on_exit(handle);
         }
         #[cfg(target_os = "macos")]
         RunEvent::Reopen { has_visible_windows: false, .. } => {

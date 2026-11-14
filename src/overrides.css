@@ -10527,7 +10527,7 @@ div:has(> .justify-ticket) {
     print-color-adjust: exact;
   }
 
-  :root[data-desktop-app] :is(.sidebar-panel, .side-panel, .mail-toolbar-veil, [role="separator"]),
+  :root[data-desktop-app] :is(.sidebar-panel, .side-panel, .mail-toolbar-veil, [role="separator"], .desktop-update-note),
   :root[data-desktop-app] :has(> [role="separator"]) {
     display: none !important;
   }

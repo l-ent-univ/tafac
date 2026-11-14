@@ -9,6 +9,13 @@
 //                                  saved for tafac.fr; 204
 //   POST /__desktop/menu           what the page has, for the menu bar
 //                                  (macOS, menu.rs): 204
+//   POST /__desktop/update/state   the app's version and its update, if any
+//                                  (updater.rs): 200 { current, phase,
+//                                  version, required, downloaded, total,
+//                                  failed, download }. Answers once the
+//                                  launch check has, a few seconds after
+//                                  launch at most
+//   POST /__desktop/update/install the update now, then the app again: 204
 
 use serde::{Deserialize, Serialize};
 use tauri::AppHandle;
@@ -55,6 +62,16 @@ pub async fn handle(app: &AppHandle, window_label: &str, request: http::Request<
             if let Ok(state) = serde_json::from_slice::<crate::menu::PageState>(request.body()) {
                 crate::menu::update(app, state);
             }
+            status(204)
+        }
+        "/__desktop/update/state" => http::Response::builder()
+            .status(200)
+            .header("content-type", "application/json")
+            .header("cache-control", "no-store")
+            .body(serde_json::to_vec(&crate::updater::page_state(app).await).unwrap_or_default())
+            .unwrap(),
+        "/__desktop/update/install" => {
+            crate::updater::install(app);
             status(204)
         }
         _ => status(404),

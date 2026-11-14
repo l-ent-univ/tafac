@@ -8,6 +8,7 @@ import SidebarGradePocket from './SidebarGradePocket'
 import { track } from '../analytics'
 import { useChangelog } from '../changelogStore'
 import UpdateNotice from './UpdateNotice'
+import DesktopUpdateRow, { CompactDesktopUpdateButton } from './DesktopUpdateRow'
 import SidebarNextClass from './SidebarNextClass'
 import { SIDEBAR_NEXT_CLASS_ENABLED, useSidebarNextClassShown } from '../sidebarNextClassPref'
 import Tooltip from './Tooltip'
@@ -451,6 +452,8 @@ function Sidebar({
         ) : null}
         {hasPendingUpdate ? <UpdateNotice onUpdateClick={onUpdateClick} /> : null}
         {showChangelogPill ? <ChangelogPill className="flex" /> : null}
+        {/* Desktop app: an update is ready (nothing elsewhere). */}
+        <DesktopUpdateRow />
         {authenticated ? (
           <div aria-hidden="true" className="h-px w-full bg-border/70" />
         ) : null}
@@ -566,6 +569,7 @@ function Sidebar({
   
           <div className="flex flex-col items-center gap-3 w-10 sidebar-swap" data-sidebar-foot="">
             {hasPendingUpdate ? <CompactUpdateButton onUpdateClick={onUpdateClick} /> : null}
+            <CompactDesktopUpdateButton />
             {authenticated ? (
               <>
                 <div aria-hidden="true" className="h-px w-full bg-border/70" />

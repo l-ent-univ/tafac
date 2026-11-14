@@ -5,7 +5,9 @@
 // as a `tafac:command` event: « Aller » (⌘1…), « Nouveau message » (⌘N),
 // « Rechercher » (⌘F), « Actualiser » (⌘R). « Réglages… » (⌘,) opens the
 // app's own Réglages (`tafac:open-settings`, src/App.jsx). « Imprimer… »
-// (⌘P) is the system's print panel for that window.
+// (⌘P) is the system's print panel for that window. « Rechercher les mises à
+// jour… » checks now (updater.rs), which answers with a note in that window;
+// greyed in a build that doesn't update (a local one).
 //
 // The page tells the menu what it has (POST /__desktop/menu, desktop.rs →
 // `update`): « Aller »'s pages (the university's, none signed out), the
@@ -19,6 +21,7 @@ use tauri::menu::{
 };
 use tauri::{AppHandle, Manager, Runtime, WebviewWindow};
 
+const CHECK_UPDATES: &str = "check-updates";
 const SETTINGS: &str = "settings";
 const NEW_MESSAGE: &str = "new-message";
 const FIND: &str = "find";
@@ -71,6 +74,13 @@ pub fn build<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
         true,
         &[
             &PredefinedMenuItem::about(app, Some("À propos de Tafac"), Some(about))?,
+            &MenuItem::with_id(
+                app,
+                CHECK_UPDATES,
+                "Rechercher les mises à jour…",
+                crate::updater::enabled(&app.package_info().version),
+                None::<&str>,
+            )?,
             &PredefinedMenuItem::separator(app)?,
             &MenuItem::with_id(app, SETTINGS, "Réglages…", true, Some("CmdOrCtrl+,"))?,
             &PredefinedMenuItem::separator(app)?,
@@ -183,8 +193,12 @@ fn item_ref<R: Runtime>(item: &MenuItemKind<R>) -> &dyn tauri::menu::IsMenuItem<
     }
 }
 
-pub fn handle<R: Runtime>(app: &AppHandle<R>, event: MenuEvent) {
+pub fn handle(app: &AppHandle, event: MenuEvent) {
     let id = event.id().as_ref();
+    if id == CHECK_UPDATES {
+        crate::updater::check_from_menu(app, front_window(app));
+        return;
+    }
     let Some(window) = front_window(app) else { return };
     let script = match id {
         SETTINGS => "window.dispatchEvent(new Event('tafac:open-settings'))".to_string(),

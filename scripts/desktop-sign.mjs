@@ -11,10 +11,8 @@
 // the keychain, as for `tauri build`.
 import { execFileSync } from 'node:child_process'
 import path from 'node:path'
-import { fileURLToPath } from 'node:url'
+import { APP, ROOT, requireApp } from './desktopBundle.mjs'
 
-const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
-const APP = path.join(ROOT, 'src-tauri', 'target', 'release', 'bundle', 'macos', 'Tafac.app')
 const NODE = path.join(APP, 'Contents', 'MacOS', 'node')
 const identity = process.env.APPLE_SIGNING_IDENTITY
 
@@ -22,6 +20,8 @@ if (!identity) {
   console.error('APPLE_SIGNING_IDENTITY is not set (the "Developer ID Application: …" certificate)')
   process.exit(1)
 }
+
+requireApp()
 
 function sign(target, entitlements) {
   execFileSync('codesign', [

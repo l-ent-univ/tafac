@@ -1,0 +1,27 @@
+{
+  // The server's TypeScript modules (server/**/*.ts, tests/*.test.ts): type
+  // checked here (`npm run typecheck`), never compiled. Node runs them as they
+  // are, removing the types as it loads them, so only syntax it can remove is
+  // allowed (erasableSyntaxOnly) and imports name the .ts file.
+  "compilerOptions": {
+    "target": "es2023",
+    "lib": ["es2023"],
+    "types": ["node"],
+    "module": "nodenext",
+    "moduleResolution": "nodenext",
+    "noEmit": true,
+    "allowImportingTsExtensions": true,
+    "erasableSyntaxOnly": true,
+    "verbatimModuleSyntax": true,
+    "strict": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "noImplicitReturns": true,
+    "noFallthroughCasesInSwitch": true,
+    // The JavaScript the .ts files import is read for its shapes, not checked.
+    "allowJs": true,
+    "checkJs": false,
+    "skipLibCheck": true
+  },
+  "include": ["server/**/*.ts", "tests/**/*.ts"]
+}
