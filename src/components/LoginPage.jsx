@@ -12,6 +12,7 @@ import PapillonBadge from './PapillonBadge'
 import ServiceNotice from './ServiceNotice'
 import DesktopPasswordNote from './DesktopPasswordNote'
 import { isDesktopApp } from '../desktopApp'
+import { pickSavedPassword } from '../desktopPasswords'
 import { APP_NAME } from '../seo'
 import { getListedUniversities, getLoadedUniversityId, writeUniversityChoice } from '../universityRuntime'
 import { r } from '../register.js'
@@ -227,6 +228,26 @@ function LoginPage({
     primeOtpSound()
     onSubmit(event)
   }
+
+  // Desktop app (macOS): the system's sheet of passwords saved for tafac.fr,
+  // once, as the form shows; a pick fills the form and signs in. Cancelled
+  // or empty, the form stays as it is.
+  const askedSavedPassword = useRef(false)
+  useEffect(() => {
+    if (!IS_DESKTOP_APP || isPicker || requireOTP || askedSavedPassword.current) return
+    askedSavedPassword.current = true
+    void pickSavedPassword().then((credential) => {
+      const form = formRef.current
+      const username = form?.elements.namedItem('username')
+      const password = form?.elements.namedItem('password')
+      if (!credential || !username || !password) return
+      username.value = credential.username
+      password.value = credential.password
+      onCredentialsChange('username', credential.username)
+      onCredentialsChange('password', credential.password)
+      form.requestSubmit()
+    })
+  }, [requireOTP, onCredentialsChange])
 
   // The step shown takes the focus, its fields were inert until now: the
   // code's on the way in and after a refused code, the username on the way

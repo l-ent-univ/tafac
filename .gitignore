@@ -53,3 +53,6 @@ src-tauri/target/
 src-tauri/gen/
 src-tauri/binaries/
 desktop-build/
+
+# Apple provisioning profile for signed desktop builds (not shared)
+src-tauri/*.provisionprofile

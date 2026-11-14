@@ -24,6 +24,7 @@ import { DEMO_CREDENTIALS, DEMO_SESSION_MODE, DEMO_SIGNATURE_LOGIN } from './dem
 import { isDesktopApp } from './desktopApp'
 import { signatureLogin } from './mailSignatureChoice'
 import { storeBrowserPasswordCredential } from './browserCredentials'
+import { offerToSavePassword } from './desktopPasswords'
 import { syncRuntimeSeo } from './seo'
 import {
   ESTABLISHMENT_KEY,
@@ -2506,6 +2507,8 @@ function App() {
       // Credential Management API; others rely on the form submission).
       if (!isDemo) {
         storeBrowserPasswordCredential(submitted)
+        // Desktop app: to the passwords saved for tafac.fr instead.
+        offerToSavePassword(submitted)
       }
       setCredentials((current) => ({
         ...current,

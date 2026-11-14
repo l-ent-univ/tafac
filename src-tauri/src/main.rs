@@ -5,8 +5,10 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 mod bridge;
+mod desktop;
 mod jar;
 mod links;
+mod passwords;
 mod sidecar;
 
 use std::sync::Arc;
@@ -16,9 +18,16 @@ use tauri::{Manager, RunEvent, WebviewUrl, WebviewWindowBuilder};
 fn main() {
     let app = tauri::Builder::default()
         .register_asynchronous_uri_scheme_protocol("tafac", |context, request, responder| {
-            let bridge = context.app_handle().state::<Arc<bridge::Bridge>>().inner().clone();
+            let app = context.app_handle().clone();
+            let window_label = context.webview_label().to_string();
             tauri::async_runtime::spawn(async move {
-                responder.respond(bridge::forward(&bridge, request).await);
+                let response = if request.uri().path().starts_with(desktop::PREFIX) {
+                    desktop::handle(&app, &window_label, request).await
+                } else {
+                    let bridge = app.state::<Arc<bridge::Bridge>>().inner().clone();
+                    bridge::forward(&bridge, request).await
+                };
+                responder.respond(response);
             });
         })
         .setup(|app| {
@@ -33,8 +42,15 @@ fn main() {
                 jar: jar::CookieJar::load(data_dir.join("cookies.json")),
             }));
 
+            let mut start_url: tauri::Url = sidecar::app_url().parse()?;
+            // Development: TAFAC_START_PATH=/rennes opens on that page.
+            #[cfg(debug_assertions)]
+            if let Ok(path) = std::env::var("TAFAC_START_PATH") {
+                start_url = start_url.join(&path)?;
+            }
+
             let handle = app.handle().clone();
-            WebviewWindowBuilder::new(app, "main", WebviewUrl::CustomProtocol(sidecar::app_url().parse()?))
+            WebviewWindowBuilder::new(app, "main", WebviewUrl::CustomProtocol(start_url))
                 .title("Tafac")
                 .inner_size(1280.0, 820.0)
                 .min_inner_size(380.0, 560.0)
