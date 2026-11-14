@@ -3005,6 +3005,7 @@ function App() {
                 band to know (--top-bar-height). */}
             <div ref={topBarRef} className={`${isHomePage ? 'max-md:relative max-md:z-10 max-md:!bg-transparent' : 'max-md:hidden'} 4xl:hidden`}>
               <AppHeader
+                onNavigatePage={sessionState.authenticated ? handleNavigatePage : undefined}
                 authenticated={sessionState.authenticated}
                 checking={sessionState.checking}
                 establishment={establishment}

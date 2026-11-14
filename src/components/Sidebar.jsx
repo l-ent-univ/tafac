@@ -335,6 +335,14 @@ function Sidebar({
     }
   }, [onNavigatePage, unseenIds])
 
+  // The logo: back to « Accueil » in place, no reload. ⌘-click, a middle
+  // click or Shift still open "/" as a link does.
+  const handleLogoClick = useCallback((event) => {
+    if (!onNavigatePage || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return
+    event.preventDefault()
+    onNavigatePage('home', 'logo')
+  }, [onNavigatePage])
+
   const initials = (userName || '?').trim().charAt(0).toUpperCase()
 
   // Same handle folded or not: kept mounted across the switch, so a drag
@@ -355,6 +363,7 @@ function Sidebar({
       <div className="flex flex-col gap-6 w-full min-w-[calc(var(--sidebar-full-width,280px)-40px)] sidebar-swap">
         <a
           href="/"
+          onClick={handleLogoClick}
           className="inline-flex items-center no-underline"
           aria-label="Retour"
         >
@@ -519,7 +528,7 @@ function Sidebar({
           {/* A 40px column at a fixed left: the icons stay put while the
               width eases. */}
           <div className="flex flex-col items-center gap-6 w-10 sidebar-swap">
-            <a href="/" className="inline-flex items-center justify-center h-10 no-underline" aria-label={`Retour, ${universityConfig.branding.appName}`}>
+            <a href="/" onClick={handleLogoClick} className="inline-flex items-center justify-center h-10 no-underline" aria-label={`Retour, ${universityConfig.branding.appName}`}>
               <img src={tafacMark} alt="" className="block h-10 w-auto" />
             </a>
   
