@@ -374,7 +374,10 @@ function LoginPage({
                 <>
                 {/* Real form with labelled username/current-password fields and a
                     submit button, so password managers recognize and offer to save
-                    the login. */}
+                    the login. The two fields keep what is in them (defaultValue,
+                    not value): some managers fill a field without an input event,
+                    and a controlled field would be put back to the empty state at
+                    the next render. The submit reads them from the form. */}
                 <form ref={formRef} className="mt-6 flex w-full flex-col" onSubmit={handleSubmit}>
                   <FormStep open={!requireOTP}>
                   <div className="flex flex-col gap-4 pb-1.5">
@@ -390,7 +393,7 @@ function LoginPage({
                         autoCorrect="off"
                         spellCheck={false}
                         type="text"
-                        value={credentials.username}
+                        defaultValue={credentials.username}
                         onChange={(event) => onCredentialsChange('username', event.target.value)}
                       />
                     </div>
@@ -404,7 +407,7 @@ function LoginPage({
                           className={`${FIELD_CLASS} pr-[52px]`}
                           autoComplete="current-password"
                           type={showPassword ? 'text' : 'password'}
-                          value={credentials.password}
+                          defaultValue={credentials.password}
                           onChange={(event) => onCredentialsChange('password', event.target.value)}
                         />
                         <button
@@ -438,6 +441,7 @@ function LoginPage({
                       />
                       <OtpInput
                         inputRef={otpRef}
+                        active={requireOTP}
                         label={otpLabel}
                         value={otp}
                         busy={checking}
