@@ -42,7 +42,7 @@ for tafac.fr, so Safari has it too (`src-tauri/src/passwords.rs`, through
 Apple only allows it when the app and tafac.fr name each other:
 
 1. **The app**: signed with the `webcredentials:tafac.fr` entitlement
-   (`src-tauri/entitlements.signed.plist`, team 7RXNP6V83P) and a
+   (`src-tauri/entitlements.signed.plist`, team P8XRQT7Z4K) and a
    Developer ID provisioning profile with Associated Domains, saved as
    `src-tauri/embedded.provisionprofile` (not committed). Built with
    `npm run desktop:build:signed`. An unsigned build carrying the
