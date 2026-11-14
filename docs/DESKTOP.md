@@ -45,15 +45,16 @@ Apple only allows it when the app and tafac.fr name each other:
    (`src-tauri/entitlements.signed.plist`, team P8XRQT7Z4K) and a
    Developer ID provisioning profile with Associated Domains, saved as
    `src-tauri/embedded.provisionprofile` (not committed). Built with
-   `npm run desktop:build:signed`. An unsigned build carrying the
-   entitlement would be killed at launch, so `desktop:build` leaves it out.
+   `APPLE_SIGNING_IDENTITY="Developer ID Application: Tom Heliere (P8XRQT7Z4K)" npm run desktop:build:signed`.
+   An unsigned build carrying the entitlement would be killed at launch, so
+   `desktop:build` leaves it out. The bundled Node is signed again on its own
+   (`scripts/desktop-sign.mjs`, `entitlements.node.plist`, JIT only): with
+   the app's entitlements macOS kills it, a helper has no profile.
 2. **tafac.fr**: `APPLE_APP_IDS=<team id>.fr.tafac.desktop` in the server's
    environment; `server.js` then serves
    `/.well-known/apple-app-site-association`.
 
 Without both, the sheet has nothing to offer and the form stays as it is.
-Unchecked until the first signed build: that the Node sidecar runs with the
-same entitlements (JIT allowed in `entitlements.signed.plist`).
 
 ## Commands
 
@@ -61,7 +62,7 @@ same entitlements (JIT allowed in `entitlements.signed.plist`).
 |---|---|
 | `npm run desktop:dev` | Builds `dist/`, then opens the app with the Node on the PATH and the repository's files (`TAFAC_START_PATH=/rennes` opens on that page) |
 | `npm run desktop:build` | Packaged app for this computer: runs `desktop:prepare`, then `tauri build` |
-| `npm run desktop:build:signed` | The same, with the entitlements and provisioning profile (saved passwords) |
+| `npm run desktop:build:signed` | The same, signed with the Developer ID certificate, entitlements and provisioning profile (saved passwords); not notarized yet |
 | `npm run desktop:prepare` | `desktop-build/server/` (the server's files and the npm packages it imports, found through esbuild's import graph) and `src-tauri/binaries/node-<triple>` (the official Node binary pinned in the Dockerfile, checksum checked) |
 
 Needs Rust (`rustup`). Frontend or server changes need no Rust work: the

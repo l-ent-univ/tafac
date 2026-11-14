@@ -15,10 +15,5 @@
   <string>P8XRQT7Z4K.fr.tafac.desktop</string>
   <key>com.apple.developer.team-identifier</key>
   <string>P8XRQT7Z4K</string>
-  <!-- Node (the local server) compiles JavaScript as it runs. -->
-  <key>com.apple.security.cs.allow-jit</key>
-  <true/>
-  <key>com.apple.security.cs.allow-unsigned-executable-memory</key>
-  <true/>
 </dict>
 </plist>

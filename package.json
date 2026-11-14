@@ -16,7 +16,7 @@
     "desktop:dev": "tauri dev",
     "desktop:prepare": "node scripts/desktop-prepare.mjs",
     "desktop:build": "tauri build --config src-tauri/tauri.bundle.conf.json",
-    "desktop:build:signed": "tauri build --config src-tauri/tauri.bundle.conf.json --config src-tauri/tauri.signed.conf.json"
+    "desktop:build:signed": "tauri build --config src-tauri/tauri.bundle.conf.json --config src-tauri/tauri.signed.conf.json --bundles app && node scripts/desktop-sign.mjs"
   },
   "dependencies": {
     "@iconify/react": "^6.0.2",

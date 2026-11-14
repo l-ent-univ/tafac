@@ -42,12 +42,13 @@ fn main() {
                 jar: jar::CookieJar::load(data_dir.join("cookies.json")),
             }));
 
-            let mut start_url: tauri::Url = sidecar::app_url().parse()?;
+            let start_url: tauri::Url = sidecar::app_url().parse()?;
             // Development: TAFAC_START_PATH=/rennes opens on that page.
             #[cfg(debug_assertions)]
-            if let Ok(path) = std::env::var("TAFAC_START_PATH") {
-                start_url = start_url.join(&path)?;
-            }
+            let start_url = match std::env::var("TAFAC_START_PATH") {
+                Ok(path) => start_url.join(&path)?,
+                Err(_) => start_url,
+            };
 
             let handle = app.handle().clone();
             WebviewWindowBuilder::new(app, "main", WebviewUrl::CustomProtocol(start_url))
