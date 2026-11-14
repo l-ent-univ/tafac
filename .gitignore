@@ -46,3 +46,10 @@ outputs/marketing-booklet/
 
 # Server data (automatic app icons, see docs/SELF_HOSTING.md)
 data/
+
+# Desktop app (Tauri): Rust build output and what scripts/desktop-prepare.mjs
+# assembles (server copy with its production node_modules, Node binary)
+src-tauri/target/
+src-tauri/gen/
+src-tauri/binaries/
+desktop-build/
