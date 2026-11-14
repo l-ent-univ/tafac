@@ -10,7 +10,6 @@
 // ============================================================================
 import express from 'express'
 import cookieParser from 'cookie-parser'
-import { createProxyMiddleware } from 'http-proxy-middleware'
 import { randomUUID } from 'node:crypto'
 import { readFileSync } from 'node:fs'
 import { Readable } from 'node:stream'
@@ -30,7 +29,6 @@ import {
 } from './appIcons.js'
 import { ANALYTICS_MAX_BODY_BYTES } from './analyticsSchema.js'
 import {
-  LEGACY_SESSION_COOKIE_NAME,
   MAX_PERSISTED_COOKIE_VALUE_LENGTH,
   buildSessionCookieOptions,
   createSessionCookieCodec,
@@ -43,6 +41,13 @@ import {
   unpackJarCookies,
 } from './sessionCookie.js'
 import { createLaunchTargetPolicy } from './launchTargets.js'
+import { isCredentialTarget } from './casLogin/credentialTarget.ts'
+import { CookieJar, cookieMatchesHost } from './cookieJar/index.ts'
+import { createEntProxy } from './entProxy/index.ts'
+import { isCrossSiteRequest } from './launchRelay/requestSite.ts'
+import { redactLaunchPreview } from './launchRelay/tickets.ts'
+import { createRouteErrorReporter, dropDebugFields } from './routeErrors/index.ts'
+import { createFailureWindow, createLoginRateLimiter } from './loginRateLimit/index.ts'
 import { fetchEsupOtpChannels, pickEsupOtpAutoTransport, readEsupOtpPage, sendEsupOtpCode } from './esupOtp.js'
 import {
   buildMailMessage,
@@ -56,6 +61,7 @@ import {
   readContentDispositionFilename,
   sanitizeMailHtml,
 } from './mailMessage.js'
+import { cleanReceivedName } from '../src/mailText.js'
 import { MailAuthError, forgetContextRequest, isZimbraSessionRefusal, readContextAttachmentLimits, runWithMailContext, shareContextRequest } from './mailContext.js'
 import { isEmptiableMailFolder, normalizeZimbraFolderTree, parseZimbraMarkReadPref } from './mailFolders.js'
 import { buildZimbraAutoCompleteRequest, normalizeZimbraAutoComplete, searchDemoMailContacts } from './mailAutocomplete.js'
@@ -394,6 +400,9 @@ const sessionCodec = createSessionCookieCodec({
   previousSecrets: sessionSecrets.previous,
 })
 const SESSION_COOKIE_NAME = getSessionCookieName(IS_PRODUCTION)
+// What a failed route answers: the details in production go to the log only
+// (server/routeErrors/).
+const routeError = createRouteErrorReporter({ production: IS_PRODUCTION })
 const SESSION_COOKIE_OPTIONS = buildSessionCookieOptions(IS_PRODUCTION)
 // Every session says which university it belongs to (`uni` in the payload);
 // this app only accepts its own, so one university's session never reaches
@@ -445,9 +454,19 @@ const runtimeMoodleDeadlinesCache = new Map()
 // sessionId → { createdAt, jar, sesskey }: signed-in Moodle context, runtime-only
 // for the same reason as runtimeMailContexts.
 const runtimeMoodleContexts = new Map()
-const loginRateLimitByIp = new Map()
-const loginRateLimitByUsername = new Map()
-const loginCodeSendsByUsername = new Map()
+// server/loginRateLimit/: failed logins per address and per login, and the
+// codes sent to one student.
+const loginRateLimiter = createLoginRateLimiter({
+  windowMs: LOGIN_RATE_LIMIT_WINDOW_MS,
+  blockMs: LOGIN_RATE_LIMIT_BLOCK_MS,
+  maxFailuresPerIp: LOGIN_RATE_LIMIT_MAX_ATTEMPTS_PER_IP,
+  maxFailuresPerUsername: LOGIN_RATE_LIMIT_MAX_ATTEMPTS_PER_USERNAME,
+})
+const loginCodeSends = createFailureWindow({
+  windowMs: LOGIN_RATE_LIMIT_WINDOW_MS,
+  blockMs: LOGIN_RATE_LIMIT_BLOCK_MS,
+  maxFailures: LOGIN_CODE_SEND_MAX_PER_USERNAME,
+})
 // sessionId → { tokens, updatedAt }: the mail routes' token buckets
 // (takeMailRateLimitToken).
 const mailRateLimitBuckets = new Map()
@@ -485,180 +504,6 @@ function escapeRegExp(value) {
   return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 }
 
-// Cookie Jar for session handling
-class CookieJar {
-  constructor() {
-    this.store = new Map()
-  }
-
-  setFromResponse(response, url) {
-    const setCookies = typeof response.headers.getSetCookie === 'function'
-      ? response.headers.getSetCookie()
-      : []
-
-    for (const rawCookie of setCookies) {
-      this.setCookie(rawCookie, url)
-    }
-  }
-
-  setCookie(rawCookie, url) {
-    const urlObject = new URL(url)
-    const [nameValue, ...attributePairs] = rawCookie.split(';').map((part) => part.trim())
-    const separatorIndex = nameValue.indexOf('=')
-
-    if (separatorIndex === -1) {
-      return
-    }
-
-    const name = nameValue.slice(0, separatorIndex)
-    const value = nameValue.slice(separatorIndex + 1)
-    let domain = urlObject.hostname
-    let hostOnly = true
-    let path = '/'
-    let secure = false
-    let expiresAt = null
-
-    for (const attributePair of attributePairs) {
-      const [rawKey, ...rawRest] = attributePair.split('=')
-      const key = rawKey.toLowerCase()
-      const attributeValue = rawRest.join('=')
-
-      if (key === 'domain' && attributeValue) {
-        domain = attributeValue.replace(/^\./, '').toLowerCase()
-        hostOnly = false
-      } else if (key === 'path' && attributeValue) {
-        path = attributeValue
-      } else if (key === 'secure') {
-        secure = true
-      } else if (key === 'max-age') {
-        const parsedValue = Number(attributeValue)
-        if (Number.isFinite(parsedValue)) {
-          expiresAt = Date.now() + parsedValue * 1000
-        }
-      } else if (key === 'expires') {
-        const parsedDate = Date.parse(attributeValue)
-        if (!Number.isNaN(parsedDate)) {
-          expiresAt = parsedDate
-        }
-      }
-    }
-
-    const cookieKey = `${domain}|${path}|${name}`
-
-    if (expiresAt !== null && expiresAt <= Date.now()) {
-      this.store.delete(cookieKey)
-      return
-    }
-
-    this.store.set(cookieKey, {
-      name,
-      value,
-      domain,
-      path,
-      hostOnly,
-      secure,
-      expiresAt,
-    })
-  }
-
-  setFromProxySetCookie(rawSetCookies, url) {
-    const setCookies = Array.isArray(rawSetCookies)
-      ? rawSetCookies
-      : rawSetCookies
-        ? [rawSetCookies]
-        : []
-
-    for (const rawCookie of setCookies) {
-      this.setCookie(rawCookie, url)
-    }
-  }
-
-  getCookieHeader(url) {
-    const urlObject = new URL(url)
-    const matchingCookies = []
-
-    for (const cookie of this.store.values()) {
-      if (cookie.expiresAt !== null && cookie.expiresAt <= Date.now()) {
-        continue
-      }
-
-      if (cookie.secure && urlObject.protocol !== 'https:') {
-        continue
-      }
-
-      const domainMatches = cookie.hostOnly
-        ? cookie.domain === urlObject.hostname
-        : urlObject.hostname === cookie.domain || urlObject.hostname.endsWith(`.${cookie.domain}`)
-
-      if (!domainMatches) {
-        continue
-      }
-
-      if (!urlObject.pathname.startsWith(cookie.path)) {
-        continue
-      }
-
-      matchingCookies.push(`${cookie.name}=${cookie.value}`)
-    }
-
-    return matchingCookies.join('; ')
-  }
-
-  getCookieNamesForHost(hostname) {
-    return Array.from(this.store.values())
-      .filter((cookie) => {
-        if (cookie.expiresAt !== null && cookie.expiresAt <= Date.now()) {
-          return false
-        }
-
-        return cookie.hostOnly
-          ? cookie.domain === hostname
-          : hostname === cookie.domain || hostname.endsWith(`.${cookie.domain}`)
-      })
-      .map((cookie) => cookie.name)
-      .sort((left, right) => left.localeCompare(right))
-  }
-
-  hasCookie(hostname, cookieName) {
-    return this.getCookieNamesForHost(hostname).includes(String(cookieName))
-  }
-
-  getCookieValue(hostname, cookieName) {
-    const cookie = Array.from(this.store.values()).find((entry) => (
-      entry.name === String(cookieName)
-      && (entry.expiresAt === null || entry.expiresAt > Date.now())
-      && (entry.hostOnly
-        ? entry.domain === hostname
-        : hostname === entry.domain || hostname.endsWith(`.${entry.domain}`))
-    ))
-    return cookie?.value ?? null
-  }
-
-  deleteCookiesForHost(hostname) {
-    for (const [key, cookie] of this.store.entries()) {
-      const matches = cookie.hostOnly
-        ? cookie.domain === hostname
-        : hostname === cookie.domain || hostname.endsWith(`.${cookie.domain}`)
-
-      if (matches) {
-        this.store.delete(key)
-      }
-    }
-  }
-
-  serialize() {
-    return Array.from(this.store.entries())
-  }
-
-  static fromSerialized(entries) {
-    const jar = new CookieJar()
-    for (const [key, cookie] of entries ?? []) {
-      jar.store.set(key, cookie)
-    }
-    return jar
-  }
-}
-
 function resolveUrl(location, currentUrl) {
   return new URL(location, currentUrl).toString()
 }
@@ -671,16 +516,6 @@ function resolveUrl(location, currentUrl) {
 // Moodle, webmail) can be signed in again without the password. Everything
 // else is a convenience that saves a round trip, ranked here most useful
 // first; the budget logic in setSessionCookie() drops from the end.
-function cookieMatchesHost(cookie, hostname) {
-  if (!hostname) {
-    return false
-  }
-
-  return cookie.hostOnly
-    ? cookie.domain === hostname
-    : hostname === cookie.domain || hostname.endsWith(`.${cookie.domain}`)
-}
-
 const PERSISTED_HOST_PRIORITY = [ENT_HOST, GRADES_ORIGIN ? new URL(GRADES_ORIGIN).hostname : null, PLANNING_HOST]
   .filter(Boolean)
 
@@ -745,7 +580,6 @@ function createDemoSession(overrides = {}) {
     createdAt: overrides.createdAt ?? Date.now(),
     lastSeenAt: Date.now(),
     sessionSource: overrides.sessionSource ?? null,
-    legacyCookie: Boolean(overrides.legacyCookie),
   }
 }
 
@@ -1056,18 +890,10 @@ function setSessionCookie(res, session) {
   }
 
   res.cookie(SESSION_COOKIE_NAME, sessionCodec.encode(payload), SESSION_COOKIE_OPTIONS)
-
-  // Migration: the request authenticated with the old signed cookie, which the
-  // encrypted one now replaces.
-  if (session.legacyCookie) {
-    session.legacyCookie = false
-    res.clearCookie(LEGACY_SESSION_COOKIE_NAME, { path: '/' })
-  }
 }
 
 function clearSessionCookies(res) {
   res.clearCookie(SESSION_COOKIE_NAME, SESSION_COOKIE_OPTIONS)
-  res.clearCookie(LEGACY_SESSION_COOKIE_NAME, { path: '/' })
 }
 
 function isRedirectStatus(statusCode) {
@@ -1305,6 +1131,10 @@ async function performEntLogin({ username, password, otp = '', sendCode = '', au
   }
 
   const actionUrl = extractFormAction(loginPageHtml, loginPageResult.finalUrl)
+  // The password goes to the CAS only (server/casLogin/credentialTarget.ts).
+  if (!isCredentialTarget(actionUrl, CAS_ORIGIN)) {
+    throw new Error('The login form is not the CAS\'s.')
+  }
   const eventId = extractHiddenInputValue(loginPageHtml, '_eventId') || 'submit'
   const geolocation = extractHiddenInputValue(loginPageHtml, 'geolocation')
   const submitCasForm = (fields) => fetchWithJar(actionUrl, jar, {
@@ -1565,8 +1395,16 @@ function fetchGradesDataOnce(session) {
   return promise
 }
 
+// A photo an <img> shows and that can't run anything: no SVG, which is a
+// document with scripts once opened on its own.
+const STUDENT_PICTURE_TYPES = new Set(['image/png', 'image/jpeg', 'image/gif', 'image/webp', 'image/avif', 'image/bmp'])
+
+function readPictureType(picture) {
+  return String(picture.contentType ?? '').split(';')[0].trim().toLowerCase()
+}
+
 function isGradesStudentPicture(picture) {
-  return picture.ok && /^image\//i.test(picture.contentType) && picture.size > 0
+  return picture.ok && STUDENT_PICTURE_TYPES.has(readPictureType(picture)) && picture.size > 0
 }
 
 async function requestGradesStudentPicture(jar) {
@@ -1602,11 +1440,6 @@ async function fetchGradesStudentPicture(jar) {
   return picture
 }
 
-function buildEntProxyTargetUrl(requestUrl) {
-  const rewrittenPath = (requestUrl || '/').replace(/^\/__ent_proxy/, '') || '/'
-  return new URL(rewrittenPath, ENT_ORIGIN).toString()
-}
-
 function getSessionLaunchCapabilities(session) {
   if (isDemoSession(session)) {
     return {
@@ -1625,8 +1458,6 @@ function getSessionLaunchCapabilities(session) {
   }
 }
 
-// The encrypted cookie wins; the legacy signed cookie is only consulted when
-// no readable encrypted one is present (first request after the switch).
 function readSessionCookie(req) {
   return readSessionCookies(req.cookies, { codec: sessionCodec, cookieName: SESSION_COOKIE_NAME })
 }
@@ -1649,7 +1480,6 @@ function getSessionFromRequest(req) {
   if (runtimeSession) {
     runtimeSession.sessionSource = 'runtime'
     runtimeSession.lastSeenAt = Date.now()
-    runtimeSession.legacyCookie = decoded.legacyCookie
     return runtimeSession
   }
 
@@ -1660,7 +1490,6 @@ function getSessionFromRequest(req) {
         demoState: data.demoState,
         createdAt: data.createdAt,
         sessionSource: 'cookie',
-        legacyCookie: decoded.legacyCookie,
       })
     : {
         id: data.id,
@@ -1669,7 +1498,6 @@ function getSessionFromRequest(req) {
         createdAt: data.createdAt,
         lastSeenAt: Date.now(),
         sessionSource: 'cookie',
-        legacyCookie: decoded.legacyCookie,
       }
 
   // Registered right away so concurrent requests restored from the same cookie
@@ -2065,13 +1893,13 @@ async function previewServerLaunch(targetUrl, session) {
       error: 'too-many-redirects',
       ...launchCapabilities,
     }
-  } catch (error) {
+  } catch {
     return {
       finalUrl: targetUrl,
       chain,
       useServerLaunch: false,
       reason: 'preview-error',
-      error: error instanceof Error ? error.message : String(error),
+      error: 'preview-error',
       ...launchCapabilities,
     }
   }
@@ -2150,83 +1978,6 @@ function getLoginRequesterIp(req) {
   return String(req.ip || req.socket?.remoteAddress || 'unknown')
 }
 
-function pruneLoginRateLimitStore(store) {
-  const now = Date.now()
-
-  for (const [key, entry] of store.entries()) {
-    if (!entry) {
-      store.delete(key)
-      continue
-    }
-
-    if (entry.blockedUntil && entry.blockedUntil > now) {
-      continue
-    }
-
-    if (!entry.firstFailureAt || now - entry.firstFailureAt > LOGIN_RATE_LIMIT_WINDOW_MS) {
-      store.delete(key)
-    }
-  }
-}
-
-function getRateLimitStatus(store, key) {
-  if (!key) {
-    return null
-  }
-
-  pruneLoginRateLimitStore(store)
-  const entry = store.get(key)
-
-  if (!entry?.blockedUntil) {
-    return null
-  }
-
-  const retryAfterMs = entry.blockedUntil - Date.now()
-  if (retryAfterMs <= 0) {
-    store.delete(key)
-    return null
-  }
-
-  return {
-    retryAfterMs,
-    retryAfterSeconds: Math.max(1, Math.ceil(retryAfterMs / 1000)),
-  }
-}
-
-function recordRateLimitFailure(store, key, maxAttempts) {
-  if (!key) {
-    return null
-  }
-
-  pruneLoginRateLimitStore(store)
-
-  const now = Date.now()
-  const currentEntry = store.get(key)
-  const resetWindow = !currentEntry?.firstFailureAt || now - currentEntry.firstFailureAt > LOGIN_RATE_LIMIT_WINDOW_MS
-  const nextEntry = resetWindow
-    ? { count: 1, firstFailureAt: now, blockedUntil: 0 }
-    : {
-        count: Number(currentEntry.count ?? 0) + 1,
-        firstFailureAt: currentEntry.firstFailureAt,
-        blockedUntil: currentEntry.blockedUntil ?? 0,
-      }
-
-  if (nextEntry.count >= maxAttempts) {
-    nextEntry.blockedUntil = now + LOGIN_RATE_LIMIT_BLOCK_MS
-  }
-
-  store.set(key, nextEntry)
-  return getRateLimitStatus(store, key)
-}
-
-function clearRateLimitEntry(store, key) {
-  if (!key) {
-    return
-  }
-
-  store.delete(key)
-}
-
 // One mail request for this session: 0 when it may go, otherwise the
 // seconds until a token is back (Retry-After). A bucket refills to full in
 // BURST / PER_SECOND seconds; one idle longer is the same as none, so those
@@ -2249,45 +2000,6 @@ function takeMailRateLimitToken(sessionId, now = Date.now()) {
   }
   mailRateLimitBuckets.set(sessionId, { tokens: tokens - 1, updatedAt: now })
   return 0
-}
-
-function getActiveLoginRateLimit(req, username) {
-  const ipKey = getLoginRequesterIp(req)
-  const usernameKey = normalizeLoginIdentifier(username)
-  const statuses = [
-    getRateLimitStatus(loginRateLimitByIp, ipKey),
-    getRateLimitStatus(loginRateLimitByUsername, usernameKey),
-  ].filter(Boolean)
-
-  if (statuses.length === 0) {
-    return null
-  }
-
-  return statuses.reduce((currentMax, status) => (
-    !currentMax || status.retryAfterMs > currentMax.retryAfterMs ? status : currentMax
-  ), null)
-}
-
-function recordLoginFailure(req, username) {
-  const ipKey = getLoginRequesterIp(req)
-  const usernameKey = normalizeLoginIdentifier(username)
-  const statuses = [
-    recordRateLimitFailure(loginRateLimitByIp, ipKey, LOGIN_RATE_LIMIT_MAX_ATTEMPTS_PER_IP),
-    recordRateLimitFailure(loginRateLimitByUsername, usernameKey, LOGIN_RATE_LIMIT_MAX_ATTEMPTS_PER_USERNAME),
-  ].filter(Boolean)
-
-  if (statuses.length === 0) {
-    return null
-  }
-
-  return statuses.reduce((currentMax, status) => (
-    !currentMax || status.retryAfterMs > currentMax.retryAfterMs ? status : currentMax
-  ), null)
-}
-
-function clearLoginRateLimit(req, username) {
-  clearRateLimitEntry(loginRateLimitByIp, getLoginRequesterIp(req))
-  clearRateLimitEntry(loginRateLimitByUsername, normalizeLoginIdentifier(username))
 }
 
 // ============================================================================
@@ -2487,6 +2199,10 @@ const {
 // Scoped to our own prefixes: this app is also mounted as middleware inside
 // the Vite dev server, where it must not touch other requests.
 app.use(['/__ent_auth', '/__ent_proxy'], cookieParser())
+// The routes' `debug` objects are for the development debug menu.
+if (IS_PRODUCTION) {
+  app.use(['/__ent_auth', '/__ent_proxy'], dropDebugFields())
+}
 
 // Anonymous audience measurement (see server/analytics.js, docs/ANALYTICS.md).
 // Registered before express.json() so it gets its own small body limit and
@@ -2843,7 +2559,7 @@ app.get('/__ent_auth/session', async (req, res) => {
     })
   } catch (error) {
     res.status(500).json({
-      error: error instanceof Error ? error.message : String(error),
+      error: routeError(req, error),
     })
   }
 })
@@ -2864,17 +2580,10 @@ app.post('/__ent_auth/login', async (req, res) => {
       })
     }
 
-    const activeRateLimit = getActiveLoginRateLimit(req, username)
-    if (activeRateLimit) {
-      res.setHeader('Retry-After', String(activeRateLimit.retryAfterSeconds))
-      return res.status(429).json({
-        error: 'Too many login attempts. Please try again later.',
-      })
-    }
-
+    // The demo account is public: nothing to guess, so no limit holds it
+    // back, and it counts for nothing in the limits of the real logins.
     if (FEATURES.demo !== false && isDemoCredentials(username, password)) {
       const session = createDemoSession()
-      clearLoginRateLimit(req, username)
       setSessionCookie(res, session)
 
       return res.status(200).json({
@@ -2885,13 +2594,21 @@ app.post('/__ent_auth/login', async (req, res) => {
       })
     }
 
+    const activeRateLimit = loginRateLimiter.blocked(getLoginRequesterIp(req), normalizeLoginIdentifier(username))
+    if (activeRateLimit) {
+      res.setHeader('Retry-After', String(activeRateLimit.retryAfterSeconds))
+      return res.status(429).json({
+        error: 'Too many login attempts. Please try again later.',
+      })
+    }
+
     if (otp && !/^\d{4,10}$/.test(otp)) {
       throw new CasMfaError('Invalid OTP.', 'mfa_invalid')
     }
 
     // Codes sent to this student lately, asked for or not: past the limit
     // none is sent unasked, and asking for one waits.
-    const sendLimit = getRateLimitStatus(loginCodeSendsByUsername, normalizeLoginIdentifier(username))
+    const sendLimit = loginCodeSends.status(normalizeLoginIdentifier(username))
     if (sendCode && sendLimit) {
       res.setHeader('Retry-After', String(sendLimit.retryAfterSeconds))
       return res.status(429).json({
@@ -2901,7 +2618,7 @@ app.post('/__ent_auth/login', async (req, res) => {
     }
 
     const result = await performEntLogin({ username, password, otp, sendCode, autoSend: !sendLimit })
-    clearLoginRateLimit(req, username)
+    loginRateLimiter.recordSuccess(getLoginRequesterIp(req), normalizeLoginIdentifier(username))
     // The password lives only in this request: the session keeps the CAS TGC,
     // which signs in to every service (ENT, ADE, Moodle, webmail…) on its own.
     const session = {
@@ -2937,12 +2654,12 @@ app.post('/__ent_auth/login', async (req, res) => {
     const mfa = error instanceof CasMfaError ? error.mfa : null
 
     if (mfa?.sent) {
-      recordRateLimitFailure(loginCodeSendsByUsername, normalizeLoginIdentifier(req.body?.username), LOGIN_CODE_SEND_MAX_PER_USERNAME)
+      loginCodeSends.record(normalizeLoginIdentifier(req.body?.username))
     }
 
     // A right password waiting for its code is not a failed attempt.
     if (code !== 'mfa_required' && code !== 'mfa_send_failed') {
-      const rateLimit = recordLoginFailure(req, req.body?.username)
+      const rateLimit = loginRateLimiter.recordFailure(getLoginRequesterIp(req), normalizeLoginIdentifier(req.body?.username))
       if (rateLimit) {
         res.setHeader('Retry-After', String(rateLimit.retryAfterSeconds))
         return res.status(429).json({
@@ -3041,7 +2758,7 @@ app.get('/__ent_auth/account', async (req, res) => {
     })
   } catch (error) {
     res.status(500).json({
-      error: error instanceof Error ? error.message : String(error),
+      error: routeError(req, error),
     })
   }
 })
@@ -3136,7 +2853,7 @@ app.get('/__ent_auth/planning', async (req, res) => {
     })
   } catch (error) {
     res.status(500).json({
-      error: error instanceof Error ? error.message : String(error),
+      error: routeError(req, error),
     })
   }
 })
@@ -3154,14 +2871,18 @@ app.get('/__ent_auth/launch-preview', async (req, res) => {
     })
   }
 
-  const session = getSessionFromRequest(req)
+  // Asked from another site: no request is made with the session
+  // (server/launchRelay/requestSite.ts). A service ticket's value stays here.
+  const session = isCrossSiteRequest(req.headers) ? null : getSessionFromRequest(req)
   const preview = await previewServerLaunch(targetUrl, session)
-  return res.status(200).json(preview)
+  return res.status(200).json(redactLaunchPreview(preview))
 })
 
 app.get('/__ent_auth/launch', async (req, res) => {
   const targetUrl = req.query.url
-  const debug = req.query.debug === '1'
+  // The chain as JSON instead of the redirect: development servers only (it
+  // holds the service tickets).
+  const debug = !IS_PRODUCTION && req.query.debug === '1'
 
   // Only this university's services, never an arbitrary address: no open
   // redirect from our domain, no server-side fetch of anything else.
@@ -3169,7 +2890,9 @@ app.get('/__ent_auth/launch', async (req, res) => {
     return res.redirect('/')
   }
 
-  const session = getSessionFromRequest(req)
+  // A link from another site is not the student asking: no sign-in on their
+  // behalf, the browser goes to the service itself, as when signed out.
+  const session = isCrossSiteRequest(req.headers) ? null : getSessionFromRequest(req)
   if (!session) {
     return res.redirect(targetUrl)
   }
@@ -3349,7 +3072,7 @@ app.get('/__ent_auth/grades', async (req, res) => {
     })
   } catch (error) {
     res.status(500).json({
-      error: error instanceof Error ? error.message : String(error),
+      error: routeError(req, error),
     })
   }
 })
@@ -3417,7 +3140,7 @@ app.get('/__ent_auth/grades/semester/:semesterId', async (req, res) => {
     })
   } catch (error) {
     res.status(500).json({
-      error: error instanceof Error ? error.message : String(error),
+      error: routeError(req, error),
     })
   }
 })
@@ -3456,7 +3179,7 @@ app.get('/__ent_auth/grades/department-message', async (req, res) => {
     })
   } catch (error) {
     res.status(500).json({
-      error: error instanceof Error ? error.message : String(error),
+      error: routeError(req, error),
     })
   }
 })
@@ -3548,7 +3271,7 @@ app.get('/__ent_auth/grades/evaluation-distribution', async (req, res) => {
     res.status(200).json({ authenticated: true, ...distribution })
   } catch (error) {
     res.status(500).json({
-      error: error instanceof Error ? error.message : String(error),
+      error: routeError(req, error),
     })
   }
 })
@@ -3621,7 +3344,7 @@ app.get('/__ent_auth/grades/report.pdf', async (req, res) => {
     res.status(200).send(pdf)
   } catch (error) {
     res.status(500).json({
-      error: error instanceof Error ? error.message : String(error),
+      error: routeError(req, error),
     })
   }
 })
@@ -3874,10 +3597,10 @@ function normalizeZimbraMessage(message) {
   return {
     id,
     from: {
-      name: sender?.p || sender?.d || email || '',
+      name: cleanReceivedName(sender?.p || sender?.d || email),
       email,
     },
-    to: recipient ? { name: recipient.p || recipient.d || recipientEmail || '', email: recipientEmail } : null,
+    to: recipient ? { name: cleanReceivedName(recipient.p || recipient.d || recipientEmail), email: recipientEmail } : null,
     subject: typeof message?.su === 'string' ? message.su : '',
     snippet: typeof message?.fr === 'string' ? message.fr.replace(/\s+/g, ' ').trim().slice(0, 280) : '',
     receivedAt: Number.isFinite(timestamp) && timestamp > 0 ? new Date(timestamp).toISOString() : null,
@@ -6026,7 +5749,7 @@ app.get('/__ent_auth/moodle/deadlines', async (req, res) => {
     // Messages are built from status codes, error codes and hostnames only —
     // never from cookies, the sesskey or upstream bodies.
     return res.status(500).json({
-      error: error instanceof Error ? error.message : String(error),
+      error: routeError(req, error),
     })
   }
 })
@@ -6094,18 +5817,22 @@ app.get('/__ent_auth/student-pic', async (req, res) => {
       })
     }
 
-    res.setHeader('Content-Type', picture.contentType)
+    // The type checked above, and nothing a browser could run if the address
+    // were opened as a page.
+    res.setHeader('Content-Type', readPictureType(picture))
+    res.setHeader('X-Content-Type-Options', 'nosniff')
+    res.setHeader('Content-Security-Policy', "default-src 'none'; sandbox")
     res.setHeader('Content-Length', String(picture.size))
     return res.status(200).end(picture.buffer)
   } catch (error) {
     if (req.query.meta === '1') {
       return res.status(500).json({
-        error: error instanceof Error ? error.message : String(error),
+        error: routeError(req, error),
       })
     }
 
     res.status(500).json({
-      error: error instanceof Error ? error.message : String(error),
+      error: routeError(req, error),
     })
   }
 })
@@ -6163,7 +5890,7 @@ app.post('/__ent_auth/app-icons', async (req, res) => {
   } catch (error) {
     return res.status(500).json({
       ok: false,
-      error: error instanceof Error ? error.message : String(error),
+      error: routeError(req, error),
     })
   }
 })
@@ -6323,7 +6050,7 @@ app.get('/__ent_auth/ade/status', async (req, res) => {
     const result = await fetchAdeApi('/timetable/getAdeStatus', null)
     res.status(200).json({ ok: result.ok, status: result.status, data: result.data })
   } catch (error) {
-    res.status(502).json({ ok: false, error: error instanceof Error ? error.message : String(error) })
+    res.status(502).json({ ok: false, error: routeError(req, error) })
   }
 })
 
@@ -6412,7 +6139,7 @@ app.get('/__ent_auth/ade/calendar', async (req, res) => {
       },
     })
   } catch (error) {
-    res.status(500).json({ error: error instanceof Error ? error.message : String(error) })
+    res.status(500).json({ error: routeError(req, error) })
   }
 })
 
@@ -6494,7 +6221,7 @@ app.get('/__ent_auth/ade/tree', async (req, res) => {
       },
     })
   } catch (error) {
-    res.status(500).json({ error: error instanceof Error ? error.message : String(error) })
+    res.status(500).json({ error: routeError(req, error) })
   }
 })
 
@@ -6539,7 +6266,7 @@ app.get('/__ent_auth/ade/directory', async (req, res) => {
       },
     })
   } catch (error) {
-    res.status(500).json({ error: error instanceof Error ? error.message : String(error) })
+    res.status(500).json({ error: routeError(req, error) })
   }
 })
 
@@ -6601,7 +6328,7 @@ app.get('/__ent_auth/ade/search', async (req, res) => {
       },
     })
   } catch (error) {
-    res.status(500).json({ error: error instanceof Error ? error.message : String(error) })
+    res.status(500).json({ error: routeError(req, error) })
   }
 })
 
@@ -6696,7 +6423,7 @@ app.get('/__ent_auth/ade/timetable', async (req, res) => {
       },
     })
   } catch (error) {
-    res.status(500).json({ error: error instanceof Error ? error.message : String(error) })
+    res.status(500).json({ error: routeError(req, error) })
   }
 })
 
@@ -6814,7 +6541,7 @@ app.post('/__ent_auth/ade/upcoming', async (req, res) => {
       },
     })
   } catch (error) {
-    res.status(500).json({ error: error instanceof Error ? error.message : String(error) })
+    res.status(500).json({ error: routeError(req, error) })
   }
 })
 
@@ -6873,7 +6600,7 @@ app.get('/__ent_auth/ade/alerts', async (req, res) => {
     setSessionCookie(res, entSession)
     res.status(200).json({ authenticated: true, sessionMode: entSession.mode ?? null, alerts: result.data, debug: { apiStatus: result.status, apiOk: result.ok, ...authResult } })
   } catch (error) {
-    res.status(500).json({ error: error instanceof Error ? error.message : String(error) })
+    res.status(500).json({ error: routeError(req, error) })
   }
 })
 
@@ -6951,7 +6678,7 @@ if (PORTAL_KIND === 'drupal') {
       setSessionCookie(res, session)
       res.json(buildDrupalLayout(parseDrupalToolCatalogue(html, ENT_ORIGIN), session.user ?? null))
     } catch (error) {
-      res.status(502).json({ error: error instanceof Error ? error.message : String(error) })
+      res.status(502).json({ error: routeError(req, error) })
     }
   })
 
@@ -6962,65 +6689,22 @@ if (PORTAL_KIND === 'drupal') {
 }
 
 // ============================================================================
-// PROXY MIDDLEWARE
+// PORTAL PROXY
 // ============================================================================
-app.use('/__ent_proxy', createProxyMiddleware({
-  target: ENT_ORIGIN,
-  changeOrigin: true,
-  secure: true,
-  pathRewrite: { '^/__ent_proxy': '' },
-  on: {
-    proxyReq: (proxyReq, req) => {
-      const manualCookie = req.headers['x-ent-cookie']
-      if (typeof manualCookie === 'string' && manualCookie.trim()) {
-        proxyReq.setHeader('cookie', manualCookie.trim())
-      } else {
-        const session = getSessionFromRequest(req)
-        if (session) {
-          const targetUrl = buildEntProxyTargetUrl(req.url)
-          const cookieHeader = session.jar.getCookieHeader(targetUrl)
-          if (cookieHeader) {
-            proxyReq.setHeader('cookie', cookieHeader)
-          }
-        }
-      }
-
-      const manualReferer = req.headers['x-ent-referer']
-      if (typeof manualReferer === 'string' && manualReferer.trim()) {
-        proxyReq.setHeader('referer', manualReferer.trim())
-      } else {
-        proxyReq.setHeader('referer', DEFAULT_REFERER)
-      }
-
-      const extraHeaders = req.headers['x-ent-extra-headers']
-      if (typeof extraHeaders === 'string' && extraHeaders.trim()) {
-        try {
-          const parsedHeaders = JSON.parse(extraHeaders)
-          for (const [name, value] of Object.entries(parsedHeaders)) {
-            if (value !== undefined && value !== null && value !== '') {
-              proxyReq.setHeader(name, String(value))
-            }
-          }
-        } catch {
-          proxyReq.setHeader('x-ent-extra-headers-error', 'invalid-json')
-        }
-      }
-
-      proxyReq.removeHeader('x-ent-cookie')
-      proxyReq.removeHeader('x-ent-referer')
-      proxyReq.removeHeader('x-ent-extra-headers')
-    },
-    proxyRes: (proxyRes, req, res) => {
-      const session = getSessionFromRequest(req)
-      if (session) {
-        const targetUrl = buildEntProxyTargetUrl(req.url)
-        session.jar.setFromProxySetCookie(proxyRes.headers['set-cookie'], targetUrl)
-        setSessionCookie(res, session)
-      }
-
-      delete proxyRes.headers['set-cookie']
-    }
-  }
+// The page's requests to the portal (applications grid, favourites, account
+// photo): server/entProxy/. Signed-in sessions only, the demo account never
+// reaches the university.
+app.use('/__ent_proxy', createEntProxy({
+  entOrigin: ENT_ORIGIN,
+  referer: DEFAULT_REFERER,
+  getSession: (req) => {
+    const session = getSessionFromRequest(req)
+    return session && !isDemoSession(session) ? session : null
+  },
+  fetchPortal: (url, session, init) => fetchWithJar(url, session.jar, init),
+  onPortalAnswer: (res, session) => setSessionCookie(res, session),
+  // The debug menu's portal explorer (development builds of the page only).
+  allowAnyGetPath: !IS_PRODUCTION,
 }))
 
 return app

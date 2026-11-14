@@ -84,7 +84,12 @@ function LandingPage({ onLogin }) {
   // An address to a page's panel (/#messagerie): that tab, scrolled to
   // once shown (a hidden panel can't be scrolled to by the browser).
   useEffect(() => {
-    const id = decodeURIComponent(window.location.hash.slice(1))
+    let id = ''
+    try {
+      id = decodeURIComponent(window.location.hash.slice(1))
+    } catch {
+      // Not an address of this page (/#%): no tab.
+    }
     const index = SHOWCASE_TABS.findIndex((tab) => tab.id === id)
     if (index < 0) return
     setShowcaseTabId(id)

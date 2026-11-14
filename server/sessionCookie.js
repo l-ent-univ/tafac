@@ -1,8 +1,7 @@
 // ============================================================================
 // Session cookie codec: encrypted payloads (AES-256-GCM), key derivation and
-// rotation, the legacy HMAC-signed format (read-only, for the migration), the
-// size budget that keeps the Set-Cookie header below what browsers accept,
-// and the cookie lifetime policy.
+// rotation, the size budget that keeps the Set-Cookie header below what
+// browsers accept, and the cookie lifetime policy.
 //
 // Free of Express and university config so tests can exercise it without
 // booting the app (tests/sessionCookie.test.js). Wired in by
@@ -12,20 +11,13 @@ import { Buffer } from 'node:buffer'
 import {
   createCipheriv,
   createDecipheriv,
-  createHmac,
   hkdfSync,
   randomBytes,
-  timingSafeEqual,
 } from 'node:crypto'
 
 // Bumped when the payload or the encryption scheme changes; old cookies then
 // simply stop decoding (the user signs in again).
 export const SESSION_COOKIE_FORMAT_VERSION = 'v1'
-// Name used before the encrypted format (HMAC-signed payload). Still read so
-// the switch doesn't sign everyone out, cleared once a new cookie is issued.
-// Remove along with the legacy branch in decode() once no such cookie can be
-// alive anymore (they expired after 8 hours).
-export const LEGACY_SESSION_COOKIE_NAME = 'ent_front_session'
 export const SESSION_COOKIE_NAME = 'lent_session'
 // `__Host-` makes the browser refuse the cookie unless it is Secure, Path=/
 // and has no Domain: it can only come from this exact host over HTTPS, so a
@@ -142,7 +134,9 @@ function parseJsonObject(buffer) {
 
 // encode(data) → cookie value; decode(value) → { data, format, needsReissue }
 // or null. `needsReissue` is true when the cookie was readable only with a
-// previous secret or in the legacy format: the caller re-issues it.
+// previous secret: the caller re-issues it. Only the encrypted format is
+// read: the signed, unencrypted one it replaced (`ent_front_session`, eight
+// hours' life) is long gone.
 export function createSessionCookieCodec({ secret, previousSecrets = [] } = {}) {
   if (typeof secret !== 'string' || !secret) {
     throw new TypeError('createSessionCookieCodec requires a non-empty secret.')
@@ -204,39 +198,12 @@ export function createSessionCookieCodec({ secret, previousSecrets = [] } = {}) 
     return null
   }
 
-  // Legacy format: base64url(JSON) + "." + base64url(HMAC-SHA256). Signed,
-  // not encrypted. Verified in constant time against every accepted secret.
-  function verifyLegacyFormat(value) {
-    const lastDot = value.lastIndexOf('.')
-    if (lastDot === -1) {
-      return null
-    }
-
-    const payload = value.slice(0, lastDot)
-    const signature = decodeBase64url(value.slice(lastDot + 1))
-    if (!signature || !/^[A-Za-z0-9_-]+$/.test(payload)) {
-      return null
-    }
-
-    for (const candidate of secrets) {
-      const expected = createHmac('sha256', candidate).update(payload).digest()
-      if (signature.length === expected.length && timingSafeEqual(signature, expected)) {
-        const data = parseJsonObject(Buffer.from(payload, 'base64url'))
-        return data ? { data, format: 'legacy', needsReissue: true } : null
-      }
-    }
-
-    return null
-  }
-
   function decode(value) {
     if (typeof value !== 'string' || !value) {
       return null
     }
 
-    return value.startsWith(`${SESSION_COOKIE_FORMAT_VERSION}.`)
-      ? decryptCurrentFormat(value)
-      : verifyLegacyFormat(value)
+    return value.startsWith(`${SESSION_COOKIE_FORMAT_VERSION}.`) ? decryptCurrentFormat(value) : null
   }
 
   return { encode, decode, encodedLength }
@@ -324,17 +291,10 @@ export function fitSessionPayload({
   return { payload, kept: kept.length, dropped, size, overBudget: size > budget }
 }
 
-// The session carried by a request's cookies (parsed by cookie-parser): the
-// encrypted cookie wins, the legacy signed one is only read when no readable
-// encrypted one is present. → { data, legacyCookie } or null.
+// The session carried by a request's cookies (parsed by cookie-parser).
+// → { data, format, needsReissue } or null.
 export function readSessionCookies(cookies, { codec, cookieName }) {
-  const current = codec.decode(cookies?.[cookieName])
-  if (current) {
-    return { ...current, legacyCookie: false }
-  }
-
-  const legacy = codec.decode(cookies?.[LEGACY_SESSION_COOKIE_NAME])
-  return legacy ? { ...legacy, legacyCookie: true } : null
+  return codec.decode(cookies?.[cookieName])
 }
 
 // University a session belongs to. Sessions issued before the field existed

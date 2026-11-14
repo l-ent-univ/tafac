@@ -7,16 +7,19 @@ import {
   getHeldLaunchIds,
   markAllSeen,
   markEntrySeen,
-  parseSeenValue,
   readSeenValue,
+  resolveAudienceVisit,
   resolveChangelogVisit,
-  serializeSeen,
   writeSeenValue,
 } from './changelogState'
+import { markNewMarksSeen } from './useNewMark'
 
 // « Nouveautés » state shared by the dashboard pill, the list and the
 // Réglages row: opening the list from anywhere hides the pill. Resolved once
-// per page load, on first use (a first visit is recorded as seen right then).
+// per page load, on first use. A first visit shows nothing as new, and is
+// recorded once the student is signed in (setChangelogAudience): the list is
+// mounted on the landing and login pages too, where neither the university
+// nor what the student has there is known yet.
 //
 // entries: what this university (and student) gets, newest first
 // unseenIds: ids not seen yet, emptied when the list opens. The pill is
@@ -43,9 +46,6 @@ function getState() {
   if (!state) {
     const entries = applicableEntries()
     const visit = resolveChangelogVisit({ entries, allEntries: CHANGELOG, rawSeen: readSeenValue() })
-    if (visit.nextSeen) {
-      writeSeenValue(visit.nextSeen)
-    }
     state = { entries, unseenIds: visit.unseenIds, open: false, highlightIds: [], heldLaunchIds: [], firstVisit: visit.firstVisit }
   }
   return state
@@ -65,28 +65,35 @@ export function useChangelog() {
   return useSyncExternalStore(subscribe, getState)
 }
 
-// What this student has (e.g. ['grades-page'] for a BUT student of a school
-// with "Mes notes", 'planning-page' where the Planning page is), set by
-// App.jsx once known. Entries it brings in are new
-// to the pill, unless this is the device's first visit: then, like
-// everything else on a first visit, they're recorded as seen.
+// What this signed-in student has (e.g. ['grades-page'] for a BUT student of
+// a school with "Mes notes", 'planning-page' where the Planning page is), set
+// by App.jsx once they are signed in, and again as more is known. Entries it
+// brings in are new to the pill, unless this is the device's first visit:
+// then everything that applies is recorded as seen (resolveAudienceVisit),
+// the blue « new » dots included (useNewMark): nothing is new to a student
+// who has just arrived.
+let studentKnown = false
+
 export function setChangelogAudience(nextAudience) {
   const next = [...new Set(nextAudience)].sort()
-  if (next.join() === audience.join()) return
+  if (studentKnown && next.join() === audience.join()) return
+  const firstCall = !studentKnown
+  studentKnown = true
   audience = next
+
   const current = getState()
   const entries = applicableEntries()
-  const known = new Set(current.entries.map((entry) => entry.id))
-  const added = entries.filter((entry) => !known.has(entry.id)).map((entry) => entry.id)
-  const rawSeen = readSeenValue()
-  const seen = parseSeenValue(rawSeen) ?? new Set()
-  const stillUnseen = new Set(current.unseenIds)
-  if (current.firstVisit) {
-    if (added.length) writeSeenValue(serializeSeen([...seen, ...added], CHANGELOG))
-  } else {
-    added.filter((id) => !seen.has(id)).forEach((id) => stillUnseen.add(id))
-  }
-  setState({ entries, unseenIds: entries.filter((entry) => stillUnseen.has(entry.id)).map((entry) => entry.id) })
+  const { unseenIds, nextSeen } = resolveAudienceVisit({
+    entries,
+    previousEntries: current.entries,
+    unseenIds: current.unseenIds,
+    firstVisit: current.firstVisit,
+    rawSeen: readSeenValue(),
+    allEntries: CHANGELOG,
+  })
+  if (nextSeen) writeSeenValue(nextSeen)
+  if (current.firstVisit && firstCall) markNewMarksSeen()
+  setState({ entries, unseenIds })
 }
 
 // Opens the list and marks everything in it as seen.

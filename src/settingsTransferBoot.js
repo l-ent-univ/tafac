@@ -1,7 +1,7 @@
 // Imported first by main.jsx: some modules read settings when they load
 // (analytics reads the opt-out), so transferred ones must already be there.
 // Don't import analytics.js here for the same reason.
-import { TRANSFERABLE_KEYS, TRANSFER_PREFIX, importTransferredSettings } from './settingsTransfer'
+import { TRANSFERABLE_KEYS, importTransferredSettings, isSettingsTransferArrival } from './settingsTransfer'
 
 function readMissingKeys() {
   try {
@@ -11,7 +11,8 @@ function readMissingKeys() {
   }
 }
 
-const arrivedFromLent = window.location.hash.startsWith(TRANSFER_PREFIX)
+// Read before the import, which takes the link off the address bar.
+const arrivedFromLent = isSettingsTransferArrival()
 const missingBefore = arrivedFromLent ? readMissingKeys() : []
 importTransferredSettings()
 const missingAfter = new Set(readMissingKeys())

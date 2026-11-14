@@ -121,3 +121,20 @@ test('launch-preview tells the app to open unknown targets directly', () => with
   assert.equal(payload.useServerLaunch, false)
   assert.equal(payload.reason, 'target-not-allowed')
 }))
+
+test('launch targets are reached over HTTPS only', async () => {
+  const { createLaunchTargetPolicy } = await import('../server/launchTargets.js')
+  const policy = createLaunchTargetPolicy({
+    origins: { ent: 'https://ent.example.fr', cas: 'https://cas.example.fr' },
+    launch: { allowedDomains: ['example.fr'] },
+  })
+  assert.equal(policy.isAllowed('https://moodle.example.fr/course/view.php?id=1'), true)
+  // The same hosts in clear: the session's cookies would travel unencrypted.
+  assert.equal(policy.isAllowed('http://moodle.example.fr/course/view.php?id=1'), false)
+  assert.equal(policy.isAllowed('http://ent.example.fr/'), false)
+
+  // A stand-in the config itself gives over http (development, tests).
+  const local = createLaunchTargetPolicy({ origins: { ent: 'http://127.0.0.1:8080', cas: 'https://cas.example.fr' } })
+  assert.equal(local.isAllowed('http://127.0.0.1:8080/f/accueil'), true)
+  assert.equal(local.isAllowed('http://cas.example.fr/login'), false)
+})

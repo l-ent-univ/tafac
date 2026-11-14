@@ -165,7 +165,9 @@ export default defineConfig(({ isSsrBuild }) => ({
     }),
   ].filter(Boolean),
   server: {
-    allowedHosts: true,
+    // localhost and IP addresses, plus the tunnel (dev.tafac.fr): another host
+    // name is another site reaching this server through a DNS it controls.
+    allowedHosts: ['.tafac.fr'],
     // /__ent_proxy is handled by the shared entAuthApp middleware above.
   },
 }))
