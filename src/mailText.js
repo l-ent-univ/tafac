@@ -7,6 +7,14 @@
 // ones, the line and paragraph separators. Global: for replace() only.
 export const CONTROL_CHARACTERS = /[\p{Cc}\p{Cf}\p{Co}\p{Cn}\u2028\u2029]/gu
 
+// A name as it came in a received mail (a sender, a file), safe to show:
+// without the control characters, nor the ones that change the direction of
+// what follows (« rapport‮fdp.exe » would read « rapportexe.pdf »). The
+// joiners of emoji and scripts stay, unlike with CONTROL_CHARACTERS.
+const DIRECTION_CHARACTERS = /[\p{Cc}\u061c\u200e\u200f\u202a-\u202e\u2066-\u2069\u2028\u2029]/gu
+
+export const cleanReceivedName = (name) => String(name ?? '').replace(DIRECTION_CHARACTERS, '').trim()
+
 // At most `max` characters, never cutting a surrogate pair in half.
 export const capLength = (text, max) => (text.length > max ? Array.from(text).slice(0, max).join('') : text)
 

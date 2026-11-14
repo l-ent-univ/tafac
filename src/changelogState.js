@@ -5,8 +5,10 @@
 // The device stores the ids it has seen: `{"ids":["resume-du-jour",…]}`.
 // Ids rather than a date, so an entry added later on the same day still
 // shows up. Nothing stored yet means a first visit: every entry that applies
-// right now is recorded as seen without showing the pill, so a new student
-// only hears about what comes after.
+// to the student is recorded as seen without showing the pill, so a new
+// student only hears about what comes after. That is settled once they are
+// signed in (resolveAudienceVisit), not on the pages before: which entries
+// apply depends on their university and on what they have there.
 
 // Per device, like the theme. Never rename: devices would see everything again.
 export const CHANGELOG_SEEN_KEY = 'l-ent:changelog-seen'
@@ -92,6 +94,33 @@ export function resolveChangelogVisit({ entries, allEntries = entries, rawSeen }
     unseenIds: entries.filter((entry) => !seen.has(entry.id)).map((entry) => entry.id),
     nextSeen: null,
   }
+}
+
+// What a signed-in student's audience changes (changelogStore's
+// setChangelogAudience), `entries` being what applies to them now and
+// `previousEntries` what applied before it was known.
+//   - a first visit: everything that applies is stored as seen, nothing is
+//     new. It lasts the page load: what comes in a moment later (a relevé
+//     that confirms « Mes notes ») is seen too;
+//   - otherwise: the entries the audience brings in are new, unless seen.
+// Returns the unseen ids and the value to write, or null when storage is
+// already right.
+export function resolveAudienceVisit({ entries, previousEntries = [], unseenIds = [], firstVisit, rawSeen, allEntries = entries }) {
+  const stored = parseSeenValue(rawSeen)
+  const seen = stored ?? new Set()
+
+  if (firstVisit) {
+    const ids = entries.map((entry) => entry.id)
+    const complete = stored && ids.every((id) => seen.has(id))
+    return { unseenIds: [], nextSeen: complete ? null : serializeSeen([...seen, ...ids], allEntries) }
+  }
+
+  const known = new Set(previousEntries.map((entry) => entry.id))
+  const unseen = new Set(unseenIds)
+  for (const entry of entries) {
+    if (!known.has(entry.id) && !seen.has(entry.id)) unseen.add(entry.id)
+  }
+  return { unseenIds: entries.filter((entry) => unseen.has(entry.id)).map((entry) => entry.id), nextSeen: null }
 }
 
 // Value to store with `id` no longer seen (the debug menu's replay), or

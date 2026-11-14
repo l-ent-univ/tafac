@@ -162,13 +162,20 @@ function compareTitles(left = '', right = '') {
   return String(left).localeCompare(String(right), 'fr', { sensitivity: 'base' })
 }
 
-function loadFavoritesOrder() {
+// A stored list of application keys, whatever the storage holds: a list of
+// strings or nothing (a value written by an older version, by hand or by an
+// import must never break the page).
+function loadStoredKeys(storageKey) {
   try {
-    const stored = localStorage.getItem(FAVORITES_ORDER_KEY)
-    return stored ? JSON.parse(stored) : null
+    const stored = JSON.parse(localStorage.getItem(storageKey) || 'null')
+    return Array.isArray(stored) ? stored.filter((key) => typeof key === 'string') : []
   } catch {
-    return null
+    return []
   }
+}
+
+function loadFavoritesOrder() {
+  return loadStoredKeys(FAVORITES_ORDER_KEY)
 }
 
 function saveFavoritesOrder(favorites) {
@@ -197,12 +204,7 @@ function applyStoredOrder(favorites) {
 const LOCAL_PINS_KEY = 'l-ent:local-pins'
 
 function loadLocalPins() {
-  try {
-    const stored = localStorage.getItem(LOCAL_PINS_KEY)
-    return stored ? JSON.parse(stored) : []
-  } catch {
-    return []
-  }
+  return loadStoredKeys(LOCAL_PINS_KEY)
 }
 
 function saveLocalPins(pins) {

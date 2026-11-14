@@ -268,3 +268,43 @@ test('dropOwnMailCopies without the header: only a sent copy beside a received o
   // A minute apart: not copies.
   assert.deepEqual(dropOwnMailCopies([sent, { ...received, receivedAt: '2026-10-28T17:28:00.000Z' }], '2').map((m) => m.id), ['10', '11'])
 })
+
+test('an @import goes however its name is spelled, and src() with it', () => {
+  for (const css of [
+    "@\\69mport 'https://evil.example/t.css';",
+    '@\\69 mport url(https://evil.example/t.css);',
+    '@im\\port "https://evil.example/t.css";',
+    '@\\000069MPORT \'https://evil.example/t.css\';',
+  ]) {
+    const { html, remoteImages } = sanitizeMailHtml(`<style>${css} p{color:red}</style><p>a</p>`)
+    assert.equal(html.includes('evil.example'), false, css)
+    assert.equal(html.includes('port'), false, css)
+    assert.match(html, /p\{color:red\}/)
+    assert.equal(remoteImages, 0)
+  }
+
+  const src = sanitizeMailHtml('<style>p{background-image:src("https://evil.example/a.png")}</style><p style="background:src(\'https://evil.example/b.png\')">a</p>')
+  assert.equal(src.html.includes('evil.example'), false)
+  // A font's own `src:` descriptor is not that function.
+  assert.match(sanitizeMailHtml('<style>@font-face{font-family:x;src:url(data:image/png;base64,AA)}</style>').html, /src:url\(/)
+  // Other at-rules stay.
+  assert.match(sanitizeMailHtml('<style>@media (max-width:600px){p{color:red}}</style>').html, /@media/)
+})
+
+test('names received in a mail lose what would turn them around', () => {
+  const message = buildMailMessage({
+    id: '12',
+    su: 'Rapport',
+    e: [{ t: 'f', a: 'boss@example.fr', p: 'Direction‮ rf.elpmaxe@ssob' }],
+    mp: [{ part: '1', ct: 'multipart/mixed', mp: [
+      { part: '1.1', ct: 'text/plain', body: true, content: 'Bonjour' },
+      { part: '1.2', ct: 'application/octet-stream', cd: 'attachment', filename: 'rapport‮fdp.exe', s: 10 },
+      { part: '1.3', ct: 'application/pdf', cd: 'attachment', filename: 'Famille 👨‍👩‍👧.pdf', s: 10 },
+    ] }],
+  }, '12')
+
+  assert.equal(message.from.name, 'Direction rf.elpmaxe@ssob')
+  assert.deepEqual(message.attachments.map((attachment) => attachment.name), ['rapportfdp.exe', 'Famille 👨‍👩‍👧.pdf'])
+  assert.equal(getMailPartDisposition({ contentType: 'application/pdf', filename: 'a‮fdp.exe\r\nX: y', download: true }).disposition.includes('‮'), false)
+  assert.match(getMailPartDisposition({ contentType: 'application/pdf', filename: 'a\r\nX: y', download: true }).disposition, /^attachment; filename="a__X: y"/)
+})

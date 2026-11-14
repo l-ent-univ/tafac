@@ -13,7 +13,7 @@
 //   any other URL in them goes (rewriteCssUrls);
 // - a plain text body becomes escaped HTML with its links clickable.
 import sanitizeHtml from 'sanitize-html'
-import { escapeHtml } from '../src/mailText.js'
+import { cleanReceivedName, escapeHtml } from '../src/mailText.js'
 
 const MAIL_PART_PATH = '/__ent_auth/mail/part'
 const PART_ID_PATTERN = /^\d+(?:\.\d+)*$/
@@ -91,14 +91,17 @@ export function isValidDemoMailMessageId(value) {
 //   the original kept aside for « Afficher », counted with the images);
 // - anything else (relative and absolute paths, other schemes): dropped.
 // A url( this can't read goes whole, a function name spelled with escapes
-// that isn't plain once decoded is broken; image-set() and image(), which
-// take bare strings as URLs, go whole too (`none`); @import goes (the CSP
-// blocks it anyway). What's written back is escaped: nothing can close the
+// that isn't plain once decoded is broken; image-set(), image() and src(),
+// which take bare strings as URLs, go whole too (`none`); @import goes,
+// however its name is spelled (the CSP blocks it anyway). What's written back is escaped: nothing can close the
 // <style> or the attribute it sits in.
 const CSS_ESCAPE = /\\(?:([0-9a-f]{1,6})[ \t\n\r\f]?|\r\n|([^]))/gi
 const CSS_ESCAPED_FUNCTION = /(?:[\w-]|\\[0-9a-f]{1,6}[ \t\n\r\f]?|\\[^\n\r\f0-9a-f])+(?=\()/gi
 const CSS_URL = /url\(\s*(?:"((?:[^"\\\n]|\\[^])*)"|'((?:[^'\\\n]|\\[^])*)'|([^"'()\s\\]*))\s*\)|url\([^)]*\)?/gi
-const CSS_STRING_URL_FUNCTION = /(?:-webkit-)?\b(?:image-set|image)\(/gi
+// image-set() and image() take bare strings as URLs, src() any string.
+const CSS_STRING_URL_FUNCTION = /(?:-webkit-)?\b(?:image-set|image|src)\(/gi
+// An at-rule's name may be spelled with escapes too (`@\\69mport`).
+const CSS_ESCAPED_AT_KEYWORD = /@(?:[\w-]|\\[0-9a-f]{1,6}[ \t\n\r\f]?|\\[^\n\r\f0-9a-f])+/gi
 const CSS_IMPORT = /@import\b[^;{}]*;?/gi
 // Inside a <style>: what htmlparser2 kept raw. sanitize-html writes the end
 // tag as </style>, and the raw text can't hold one.
@@ -147,6 +150,11 @@ function rewriteCssUrls(css, resolveCid) {
       if (!name.includes('\\')) return name
       const decoded = decodeCssEscapes(name)
       return /^[a-z-]+$/i.test(decoded) ? decoded : 'x-invalid'
+    })
+    .replace(CSS_ESCAPED_AT_KEYWORD, (rule) => {
+      if (!rule.includes('\\')) return rule
+      const decoded = decodeCssEscapes(rule.slice(1))
+      return /^[a-z-]+$/i.test(decoded) ? `@${decoded}` : '@x-invalid'
     })
     .replace(CSS_IMPORT, '')
   const normalized = dropCssFunctions(unescaped, CSS_STRING_URL_FUNCTION)
@@ -294,7 +302,8 @@ export function mailTextToHtml(text) {
 }
 
 function attachmentName(part) {
-  if (part.filename) return String(part.filename)
+  const filename = cleanReceivedName(part.filename)
+  if (filename) return filename
   if (part.ct === 'message/rfc822') return 'Message joint.eml'
   if (part.ct === 'text/calendar') return 'Invitation.ics'
   return 'Pièce jointe'
@@ -361,7 +370,7 @@ export function buildMailMessage(message, messageId) {
   const addresses = Array.isArray(message?.e) ? message.e : []
   const pick = (type) => addresses
     .filter((address) => address?.t === type)
-    .map((address) => ({ name: String(address.p || address.d || address.a || ''), email: address.a ? String(address.a) : null }))
+    .map((address) => ({ name: cleanReceivedName(address.p || address.d || address.a), email: address.a ? String(address.a) : null }))
   const timestamp = Number(message?.d)
 
   return {
@@ -391,7 +400,7 @@ export function buildMailMessage(message, messageId) {
 export function getMailPartDisposition({ contentType, filename, download }) {
   const type = String(contentType ?? '').split(';')[0].trim().toLowerCase()
   const inline = !download && INLINE_IMAGE_TYPES.has(type)
-  const name = String(filename ?? '').replace(/[\r\n"\\/]/g, '_').trim().slice(0, 200) || 'piece-jointe'
+  const name = cleanReceivedName(String(filename ?? '').replace(/[\r\n"\\/]/g, '_')).slice(0, 200) || 'piece-jointe'
   const asciiName = name.normalize('NFKD').replace(/[^\x20-\x7e]/g, '_')
   return {
     contentType: inline ? type : (type && /^[\w.+-]+\/[\w.+-]+$/.test(type) ? type : 'application/octet-stream'),

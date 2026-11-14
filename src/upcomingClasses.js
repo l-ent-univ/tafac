@@ -85,6 +85,15 @@ export function readNextClassCache(cacheKey) {
   }
 }
 
+// Signed out: the classes kept for the next visit go with the session.
+export function clearNextClassCache() {
+  try {
+    localStorage.removeItem(NEXT_CLASS_CACHE_KEY)
+  } catch {
+    // Storage unavailable
+  }
+}
+
 export function persistNextClassCache(cacheKey, result) {
   if (!cacheKey || !Array.isArray(result?.events)) {
     return

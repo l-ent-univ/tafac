@@ -66,8 +66,9 @@ export function buildPrintCsp(origin) {
 }
 
 // Light whatever the app's theme; each mail of a thread on a page of its
-// own. The header's rules are scoped and important: a mail's own <style>
-// (kept, its layout may need it) shouldn't restyle them.
+// own. A mail's own <style> is kept (its layout may need it) but held to
+// that mail's body (scopeMailStyles), and the body paints inside its own
+// box: neither can restyle, hide or cover a header, this mail's or another's.
 const PRINT_STYLE = [
   '@page{margin:16mm 15mm}',
   ':root{color-scheme:light}',
@@ -80,6 +81,7 @@ const PRINT_STYLE = [
   '.tafac-print-head table{border-collapse:collapse!important;width:auto!important;margin:0!important}',
   '.tafac-print-head th,.tafac-print-head td{padding:1pt 0!important;vertical-align:top!important;text-align:left!important;font:inherit!important;color:#1a1a1a!important;border:0!important}',
   '.tafac-print-head th{padding-right:10pt!important;font-weight:600!important;color:#666!important;white-space:nowrap!important}',
+  '.tafac-print-body{position:relative;contain:paint}',
   '.tafac-print-note{margin:12pt 0 0!important;color:#666!important;font:9pt/1.4 system-ui,-apple-system,sans-serif!important}',
   // The reader's base rules (buildFrameStyle), for the body.
   'img,video{max-width:100%!important;height:auto!important}',
@@ -93,6 +95,54 @@ const PRINT_STYLE = [
   '.tafac-mail-text{white-space:pre-wrap}',
 ].join('')
 
+// Whether a stylesheet closes exactly the blocks it opens, read as a browser
+// reads it (braces in strings, comments and url() don't count): one that
+// closes more would end the block scopeMailStyles wraps it in.
+export function hasBalancedBlocks(css) {
+  let depth = 0
+  for (let index = 0; index < css.length; index += 1) {
+    const char = css[index]
+    if (char === '\\') {
+      index += 1
+    } else if (char === '/' && css[index + 1] === '*') {
+      const end = css.indexOf('*/', index + 2)
+      if (end === -1) return false
+      index = end + 1
+    } else if (char === '"' || char === "'") {
+      // Up to its closing quote, or the line's end (a broken string).
+      let end = index + 1
+      for (; end < css.length; end += 1) {
+        if (css[end] === '\\') end += 1
+        else if (css[end] === char || /[\n\r\f]/.test(css[end])) break
+      }
+      if (end >= css.length) return false
+      index = end
+    } else if (char === '(' && /url$/i.test(css.slice(Math.max(0, index - 3), index)) && !/^\s*["']/.test(css.slice(index + 1))) {
+      const end = css.indexOf(')', index)
+      if (end === -1) return false
+      index = end
+    } else if (char === '{') {
+      depth += 1
+    } else if (char === '}') {
+      depth -= 1
+      if (depth < 0) return false
+    }
+  }
+  return depth === 0
+}
+
+const MAIL_STYLE = /<style\b[^>]*>([\s\S]*?)<\/style>/gi
+
+// A mail's <style> blocks, each held to the mail's body (CSS @scope: a rule
+// only applies to what is inside .tafac-print-body). A browser without
+// @scope drops the block, and the mail prints with its inline styles only;
+// a stylesheet that could close the scope early is dropped the same way.
+export function scopeMailStyles(html) {
+  return html.replace(MAIL_STYLE, (_match, css) => (
+    hasBalancedBlocks(css) ? `<style>@scope (.tafac-print-body){${css}}</style>` : ''
+  ))
+}
+
 // One mail as an <article>: its header, then its body.
 function buildPrintedMail(message, draft) {
   const { subject, rows, attachments } = describePrintedMail(message, { draft })
@@ -102,7 +152,7 @@ function buildPrintedMail(message, draft) {
     + (attachments.length ? row('Pièces jointes', attachments.map(escapeHtml).join('<br>')) : '')
   const note = message?.truncated ? '<p class="tafac-print-note">Mail trop long, la suite est dans le webmail</p>' : ''
   // The server's sanitized HTML, as the reader shows it (see the top).
-  const body = typeof message?.html === 'string' && message.html ? message.html : '<p>Ce mail n’a pas de texte</p>'
+  const body = typeof message?.html === 'string' && message.html ? scopeMailStyles(message.html) : '<p>Ce mail n’a pas de texte</p>'
   return `<article class="tafac-print-mail"><header class="tafac-print-head"><h1>${escapeHtml(subject)}</h1><table>${table}</table></header>`
     + `<div class="tafac-print-body">${body}</div>${note}</article>`
 }

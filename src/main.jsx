@@ -1,3 +1,5 @@
+// First: nothing personal goes into the skeletons' remembered shapes.
+import './skeletonPrivacy'
 import './settingsTransferBoot'
 // Iconify's icons, bundled: none waits on the network to show.
 import './iconBundle'
@@ -5,6 +7,7 @@ import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import './index.css'
 import './overrides.css'
+import AppErrorBoundary from './components/AppErrorBoundary.jsx'
 import { bootUniversity } from './universityBoot'
 
 // App and everything it imports (the landing and its copy too) read the
@@ -25,8 +28,10 @@ bootUniversity()
     const ContextMenuHost = hostModule.default
     createRoot(document.getElementById('root')).render(
       <StrictMode>
-        <App />
-        <ContextMenuHost />
+        <AppErrorBoundary>
+          <App />
+          <ContextMenuHost />
+        </AppErrorBoundary>
       </StrictMode>,
     )
   })

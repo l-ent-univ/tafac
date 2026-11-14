@@ -17,6 +17,7 @@ import {
   markEntrySeen,
   parseSeenValue,
   readSeenValue,
+  resolveAudienceVisit,
   resolveChangelogVisit,
   writeSeenValue,
 } from '../src/changelogState.js'
@@ -345,4 +346,57 @@ test('the entries’ texts follow the register: « vous » by default, « tu » 
   } finally {
     setRegister('vous')
   }
+})
+
+// What the pages before the sign-in see (no university chosen yet: the
+// neutral config), then the student once signed in at Rennes.
+const NEUTRAL = { id: 'tafac', features: {} }
+const NEEDS_GRADES_PAGE = { id: 'grades-page', date: '2026-10-16', title: 'Mes notes', body: '…', universities: ['univ-rennes'], audience: ['grades-page'], spotlight: true }
+
+test('a new student, once signed in, finds nothing marked as new', () => {
+  const all = [GLOBAL, NEEDS_MAIL, RENNES_ONLY, NEEDS_GRADES_PAGE]
+
+  // The landing and login pages resolve the visit, and store nothing.
+  const before = resolveChangelogVisit({ entries: getApplicableEntries(all, NEUTRAL), allEntries: all, rawSeen: null })
+  assert.equal(before.firstVisit, true)
+
+  // Signed in: the university's entries apply, all seen at once.
+  const signedIn = getApplicableEntries(all, RENNES)
+  const first = resolveAudienceVisit({ entries: signedIn, previousEntries: getApplicableEntries(all, NEUTRAL), firstVisit: true, rawSeen: null, allEntries: all })
+  assert.deepEqual(first.unseenIds, [])
+  assert.deepEqual([...parseSeenValue(first.nextSeen)].sort(), ['global', 'mail', 'rennes'])
+
+  // A moment later the relevé confirms « Mes notes »: seen too, no card.
+  const withGrades = getApplicableEntries(all, RENNES, ['grades-page'])
+  const later = resolveAudienceVisit({ entries: withGrades, previousEntries: signedIn, firstVisit: true, rawSeen: first.nextSeen, allEntries: all })
+  assert.deepEqual(later.unseenIds, [])
+  assert.deepEqual([...parseSeenValue(later.nextSeen)].sort(), ['global', 'grades-page', 'mail', 'rennes'])
+  assert.equal(getLaunchId(withGrades, later.unseenIds), null)
+
+  // Nothing more to write once it is all stored.
+  assert.equal(resolveAudienceVisit({ entries: withGrades, previousEntries: withGrades, firstVisit: true, rawSeen: later.nextSeen, allEntries: all }).nextSeen, null)
+
+  // The next visit: nothing new, until an entry is added.
+  assert.deepEqual(resolveChangelogVisit({ entries: withGrades, allEntries: all, rawSeen: later.nextSeen }).unseenIds, [])
+  const next = getApplicableEntries([NEW_GLOBAL, ...all], RENNES, ['grades-page'])
+  assert.deepEqual(resolveChangelogVisit({ entries: next, rawSeen: later.nextSeen }).unseenIds, ['new-global'])
+})
+
+test('a returning student hears of what their audience brings in', () => {
+  const all = [GLOBAL, RENNES_ONLY, NEEDS_GRADES_PAGE]
+  const rawSeen = JSON.stringify({ ids: ['global', 'rennes'] })
+  const before = getApplicableEntries(all, RENNES)
+  const after = getApplicableEntries(all, RENNES, ['grades-page'])
+
+  const visit = resolveAudienceVisit({ entries: after, previousEntries: before, unseenIds: [], firstVisit: false, rawSeen, allEntries: all })
+  assert.deepEqual(visit.unseenIds, ['grades-page'])
+  assert.equal(visit.nextSeen, null)
+
+  // Already seen on this device: not new again.
+  const seenBefore = resolveAudienceVisit({ entries: after, previousEntries: before, firstVisit: false, rawSeen: JSON.stringify({ ids: ['global', 'rennes', 'grades-page'] }), allEntries: all })
+  assert.deepEqual(seenBefore.unseenIds, [])
+
+  // What was unseen stays unseen, in the list's order.
+  const kept = resolveAudienceVisit({ entries: after, previousEntries: before, unseenIds: ['global'], firstVisit: false, rawSeen: JSON.stringify({ ids: ['rennes'] }), allEntries: all })
+  assert.deepEqual(kept.unseenIds, ['grades-page', 'global'])
 })
