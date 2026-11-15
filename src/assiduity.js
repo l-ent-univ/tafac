@@ -33,6 +33,31 @@ export function readJustificationWindow(notice) {
   return days ? Number(days[1]) * 24 || null : null
 }
 
+// Checks whether a day is a business day (Monday to Friday, excluding Saturday = 6 and Sunday = 0)
+function isBusinessDay(date) {
+  const day = date.getDay()
+  return day !== 0 && day !== 6
+}
+
+// Calculates the deadline by counting hours only during business days
+function calculateBusinessDeadline(startDate, windowHours) {
+  let current = new Date(startDate.getTime())
+  let hoursRemaining = windowHours
+  let safety = 0
+
+  while (hoursRemaining > 0 && safety < 1000) {
+    safety++
+    current.setTime(current.getTime() + 3600 * 1000)
+    
+    // If it's a business day, one hour of the deadline is consumed
+    if (isBusinessDay(current)) {
+      hoursRemaining -= 1
+    }
+    // Otherwise (e.g., Sunday), real time passes but the deadline doesn't drop
+  }
+  return current
+}
+
 // The unjustified absences still inside the department's window, soonest
 // deadline first: { entry, deadline (Date), hoursLeft, share (0–1 of the
 // window still left) }.
@@ -44,9 +69,11 @@ export function listOpenJustifications(entries, windowHours, now = new Date()) {
     .map((entry) => {
       const start = absenceStart(entry)
       if (!start) return null
-      const deadline = new Date(start.getTime() + windowHours * 3600 * 1000)
+      
+      // Use business days calculation instead of a raw addition
+      const deadline = calculateBusinessDeadline(start, windowHours)
+      
       const hoursLeft = (deadline.getTime() - nowMs) / 3600 / 1000
-      // Not yet begun (a clock off by a little): the whole window.
       const share = Math.min(1, hoursLeft / windowHours)
       return hoursLeft > 0 ? { entry, deadline, hoursLeft, share } : null
     })
