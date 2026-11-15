@@ -11,6 +11,7 @@ import AppErrorBoundary from './components/AppErrorBoundary.jsx'
 import { bootUniversity } from './universityBoot'
 import { isDesktopApp, isMacDesktopApp, markDesktopApp } from './desktopApp'
 import { enableWindowMoveBand } from './desktopWindowDrag'
+import { enableDesktopDownloads } from './desktopDownloads'
 import { blockNativeContextMenu } from './contextMenuEvents'
 import { getDesktopUpdate, loadDesktopUpdate, subscribeDesktopUpdate } from './desktopUpdate'
 
@@ -18,6 +19,7 @@ import { getDesktopUpdate, loadDesktopUpdate, subscribeDesktopUpdate } from './d
 // (the login page too).
 if (isDesktopApp()) blockNativeContextMenu(window)
 markDesktopApp()
+enableDesktopDownloads()
 if (isMacDesktopApp()) enableWindowMoveBand(window)
 
 // App and everything it imports (the landing and its copy too) read the
