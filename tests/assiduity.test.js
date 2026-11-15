@@ -86,6 +86,30 @@ test('the justification delay is read from the department notice, never guessed'
   assert.equal(readJustificationWindow(null), null)
 })
 
+test('open justifications: the delay runs on working days, a weekend skipped', () => {
+  // Friday 8h15 + 48 working hours: Tuesday 8h15, not Sunday.
+  const friday = [{ id: 'f', date: '2026-11-13', startHours: 8.25, status: 'unjustified' }]
+  const saturday = listOpenJustifications(friday, 48, new Date(2026, 10, 14, 12, 0))[0]
+  assert.equal(saturday.deadline.getDay(), 2)
+  assert.equal(saturday.deadline.getDate(), 17)
+  assert.equal(saturday.deadline.getHours(), 8)
+  assert.equal(saturday.deadline.getMinutes(), 15)
+  // On Saturday, 15h45 of Friday are gone: the rest of the window is left,
+  // and it doesn't shrink over the weekend.
+  const sunday = listOpenJustifications(friday, 48, new Date(2026, 10, 15, 20, 0))[0]
+  assert.equal(Math.round(saturday.share * 1000), Math.round(((48 - 15.75) / 48) * 1000))
+  assert.equal(sunday.share, saturday.share)
+  assert.ok(sunday.hoursLeft < saturday.hoursLeft)
+  // Gone by Tuesday 8h15.
+  assert.deepEqual(listOpenJustifications(friday, 48, new Date(2026, 10, 17, 8, 16)), [])
+  // An absence on a Saturday: the window opens on Monday.
+  const weekend = [{ id: 's', date: '2026-11-14', startHours: 9, status: 'unjustified' }]
+  const open = listOpenJustifications(weekend, 48, new Date(2026, 10, 14, 10, 0))[0]
+  assert.equal(open.deadline.getDay(), 3)
+  assert.equal(open.deadline.getHours(), 0)
+  assert.equal(open.share, 1)
+})
+
 test('open justifications: unjustified only, inside the delay, soonest first', () => {
   const entries = [
     { id: 'a', date: '2026-11-02', startHours: 8.25, status: 'unjustified' },
