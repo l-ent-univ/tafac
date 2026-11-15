@@ -158,7 +158,7 @@ function SidebarResizeHandle({ compact, onCompactChange, unfoldsInPlaceRef = nul
 
   return (
     <div
-      className="group hidden 4xl:block fixed top-6 bottom-6 z-30 w-3 -translate-x-1/2"
+      className="sidebar-handle group hidden 4xl:block fixed top-6 bottom-6 z-30 w-3 -translate-x-1/2"
       style={{ left: `calc(${SIDEBAR_LEFT_PX}px + var(--sidebar-width, ${DEFAULT_SIDEBAR_WIDTH}px))` }}
     >
       <div
@@ -467,12 +467,14 @@ function Sidebar({
           <div aria-hidden="true" className="h-px w-full bg-border/70" />
         ) : null}
         {authenticated ? (
-          <div className="flex items-center justify-between w-full h-10 gap-2">
+          <div className="flex items-center justify-between w-full h-10 gap-1">
+          {/* Its hover a rounded fill, as the nav items', reaching 4px past
+              the photo (the negative margin keeps the photo in place). */}
           <button
             type="button"
             onClick={onAccountClick}
             disabled={checking}
-            className="flex items-center gap-2 min-w-0 flex-1 bg-transparent border-0 p-0 text-left cursor-pointer disabled:opacity-40 disabled:cursor-wait"
+            className="flex items-center gap-2 min-w-0 flex-1 -m-1 p-1 pr-3 rounded-full bg-transparent border-0 text-left cursor-pointer transition-colors duration-150 ease-in-out hover:bg-brand-subtle disabled:opacity-40 disabled:cursor-wait disabled:hover:bg-transparent"
             aria-label="Mon compte"
           >
             <span className="glass-solid inline-flex shrink-0 size-9 rounded-full overflow-hidden items-center justify-center">
@@ -499,14 +501,27 @@ function Sidebar({
               ) : null}
             </span>
           </button>
+            {/* Réglages, as the account button opens them. */}
+            <button
+              type="button"
+              onClick={onAccountClick}
+              disabled={checking}
+              className="group relative inline-flex shrink-0 items-center justify-center size-8 rounded-full bg-transparent border-0 text-text-muted cursor-pointer disabled:opacity-40 disabled:cursor-wait"
+              aria-label="Réglages"
+            >
+              <Icon icon="ph:gear-six" className="w-4 h-4 transition-opacity duration-120 ease-in-out group-hover:opacity-70" aria-hidden="true" />
+              <Tooltip title="Réglages" side="top" />
+            </button>
             <button
               type="button"
               onClick={onLogout}
               disabled={checking}
-              className="inline-flex items-center justify-center size-8 rounded-full bg-transparent border-0 text-text-muted cursor-pointer transition-opacity duration-120 ease-in-out hover:opacity-70 disabled:opacity-40 disabled:cursor-wait"
+              className="group relative inline-flex shrink-0 items-center justify-center size-8 rounded-full bg-transparent border-0 text-text-muted cursor-pointer disabled:opacity-40 disabled:cursor-wait"
               aria-label="Se déconnecter"
             >
-              <Icon icon="ph:sign-out" className="w-4 h-4" aria-hidden="true" />
+              <Icon icon="ph:sign-out" className="w-4 h-4 transition-opacity duration-120 ease-in-out group-hover:opacity-70" aria-hidden="true" />
+              {/* Held to the button's end: the sidebar's edge is close. */}
+              <Tooltip title="Se déconnecter" side="top-end" />
             </button>
           </div>
         ) : null}

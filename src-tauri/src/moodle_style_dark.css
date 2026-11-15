@@ -1,0 +1,56 @@
+/* The dark theme's own lines, after moodle_style.css: its strokes and
+   shadows, as overrides.css draws them, and what a colour token can't say. */
+
+:root {
+  --tafac-glass-outer: rgb(0 0 0 / 0.4);
+  --tafac-glass-edge: rgb(255 255 255 / 0.15) rgb(255 255 255 / 0.07) rgb(255 255 255 / 0.03);
+  --tafac-glass-shadow: 0 1px 1px rgb(0 0 0 / 0.28), 0 2px 4px -1px rgb(0 0 0 / 0.32);
+  --tafac-card-shadow: 0 1px 2px rgb(0 0 0 / 0.25), 0 2px 6px -2px rgb(0 0 0 / 0.3);
+  --tafac-menu-shadow: 0 0 0 1px rgb(0 0 0 / 0.4), 0 12px 32px -8px rgb(0 0 0 / 0.6);
+  --tafac-field-edge: rgb(255 255 255 / 0.1);
+  --tafac-field-edge-hover: rgb(255 255 255 / 0.16);
+  --tafac-field-inset: rgb(0 0 0 / 0.25);
+  --tafac-field-outer: rgb(0 0 0 / 0.7);
+  --tafac-field-outer-focus: rgb(255 255 255 / 0.5);
+  --tafac-select-arrow: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath fill='none' stroke='%23e4e4e4' stroke-opacity='.7' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.6' d='m4.5 6.5 3.5 3.5 3.5-3.5'/%3E%3C/svg%3E");
+}
+
+/* The tick on the brand's fill, which is light here. */
+.custom-checkbox .custom-control-input:checked ~ .custom-control-label::after,
+.form-check-input:checked[type="checkbox"] {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 8 8'%3E%3Cpath fill='%23121212' d='M6.564.75l-3.59 3.612-1.538-1.55L0 4.26l2.974 2.99L8 2.193z'/%3E%3C/svg%3E");
+}
+
+/* Moodle's own grey pictures (not its icon font): light, as the text. */
+img.icon:not(.activityicon, [src*="/f/"]),
+img.icon[src*="/f/folder"],
+.courseindex-cmicon-icon,
+.navbar-toggler-icon {
+  filter: invert(0.88) hue-rotate(180deg);
+}
+
+/* What a teacher wrote with colours of its own (a label, a page, the
+   instructions): on white paper, as a mail written in HTML is in the app.
+   Its colours were picked for a white page; the app's light ink is no
+   longer right under them. Only the outermost of these, once. */
+:is(.no-overflow, .text_to_html, .summarytext, .activity-altcontent, .activity-description, .post-content-container, .book_content, .qtext):not(:is(.no-overflow, .text_to_html, .summarytext, .activity-altcontent, .activity-description, .post-content-container, .book_content, .qtext) *):has([style*="color"], [style*="background"], font[color], [bgcolor]) {
+  --tafac-ink: #1a1a1a;
+  --tafac-ink-secondary: rgb(26 26 26 / 0.7);
+  --tafac-ink-muted: rgb(26 26 26 / 0.55);
+  --tafac-line: rgb(26 26 26 / 0.12);
+  --tafac-line-strong: rgb(26 26 26 / 0.2);
+  --tafac-state-hover: rgb(26 26 26 / 0.04);
+  --tafac-state-press: rgb(26 26 26 / 0.08);
+  --tafac-surface-card: #ffffff;
+  --tafac-surface-sunken: #f3f3f3;
+  --tafac-surface-strong: #e6e6e6;
+  --tafac-brand: #0b57d0;
+  --tafac-brand-hover: #0842a0;
+  --tafac-brand-soft: rgb(11 87 208 / 0.1);
+  --tafac-on-brand: #ffffff;
+  color-scheme: light;
+  background-color: #ffffff;
+  color: #1a1a1a;
+  border-radius: var(--tafac-radius-field);
+  padding: 12px 16px;
+}

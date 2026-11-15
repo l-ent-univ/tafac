@@ -20,6 +20,7 @@ import { addressMenuItems, attachmentMenuItems } from '../contextMenuItems'
 import { copyToClipboard, useContextMenu } from '../useContextMenu'
 import { trackMailAction } from '../analytics'
 import { bindFrameContextMenu } from '../contextMenuEvents'
+import { downloadFile } from '../desktopDownloads'
 import SmoothSurface from './SmoothSurface'
 import { Skeleton } from 'skullet/react'
 
@@ -332,10 +333,7 @@ function AttachmentRows({ attachments }) {
     return attachmentMenuItems(attachment, {
       open: (href) => window.open(href, '_blank', 'noopener,noreferrer'),
       download: () => {
-        const link = document.createElement('a')
-        link.href = attachment.href
-        link.download = attachment.name
-        link.click()
+        downloadFile(attachment.href, attachment.name)
         trackMailAction('attachment_downloaded')
       },
     })

@@ -10,8 +10,14 @@ mod jar;
 mod links;
 #[cfg(target_os = "macos")]
 mod menu;
+mod moodle;
+mod moodle_style;
+#[cfg(target_os = "macos")]
+mod moodle_native;
 mod passwords;
+mod secret;
 mod sidecar;
+mod signin;
 mod updater;
 mod window;
 
@@ -54,6 +60,19 @@ fn main() {
         .register_asynchronous_uri_scheme_protocol("tafac", |context, request, responder| {
             let app = context.app_handle().clone();
             let window_label = context.webview_label().to_string();
+            // Moodle's view (moodle.rs) shows the university's pages, not
+            // the app's: nothing there may ask the app's server anything
+            // (it would be asked with the student's session).
+            if window_label == moodle::LABEL {
+                eprintln!("[tafac] a request from Moodle's view to the app was refused");
+                responder.respond(http::Response::builder().status(403).body(Vec::new()).unwrap());
+                return;
+            }
+            // Signing out, or in: Moodle's view goes with the session it
+            // was opened for, whatever in the page asked.
+            if matches!(request.uri().path(), "/__ent_auth/logout" | "/__ent_auth/login") {
+                moodle::close(&app);
+            }
             tauri::async_runtime::spawn(async move {
                 let response = if request.uri().path().starts_with(desktop::PREFIX) {
                     desktop::handle(&app, &window_label, request).await
@@ -68,13 +87,15 @@ fn main() {
             let data_dir = app.path().app_data_dir()?;
             std::fs::create_dir_all(&data_dir)?;
 
-            let endpoint = sidecar::endpoint();
-            let secret = sidecar::session_secret(&data_dir)?;
+            let endpoint = sidecar::endpoint(&data_dir)?;
+            let secret = secret::session_secret(&data_dir)?;
             app.manage(sidecar::spawn(app.handle(), &endpoint, &secret, &data_dir)?);
             app.manage(Arc::new(bridge::Bridge {
                 endpoint,
                 jar: jar::CookieJar::load(data_dir.join("cookies.json")),
+                signin: signin::SignIn::for_this_build(),
             }));
+            app.manage(Arc::new(moodle::Moodle::default()));
 
             // Before the window: its page asks for the update's state as it
             // starts.
@@ -96,8 +117,9 @@ fn main() {
                 .title("Tafac")
                 .inner_size(1280.0, 820.0)
                 .on_navigation(links::allow_navigation)
-                .on_new_window(move |url, _features| links::new_window(&handle, url))
+                .on_new_window(move |url, _features| links::new_window(&handle, "main", url))
                 .on_download(links::download)
+                .on_page_load(links::page_load)
                 .build()?;
             window::show(&main_window)?;
             Ok(())
@@ -113,9 +135,14 @@ fn main() {
             // A downloaded update takes the app's place now that it has quit.
             updater::install_on_exit(handle);
         }
+        // Moodle's view goes first: the main window is then Tauri's
+        // WebviewWindow again, as what saves its state on exit expects.
+        RunEvent::ExitRequested { .. } => moodle::close(handle),
+        // Not get_webview_window: with Moodle's view in it, Tauri no longer
+        // gives the main window as one (window.rs).
         #[cfg(target_os = "macos")]
         RunEvent::Reopen { has_visible_windows: false, .. } => {
-            if let Some(window) = handle.get_webview_window("main") {
+            if let Some(window) = handle.get_window("main") {
                 let _ = window.show();
                 let _ = window.set_focus();
             }

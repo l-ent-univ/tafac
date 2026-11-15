@@ -164,11 +164,40 @@ test('a code that is not one never reaches the CAS', () => withLogin({}, async (
   assert.equal(university.calls.length, 0)
 }))
 
-test('a wrong password is the CAS\'s own answer, without a code', () => withLogin({}, async (login) => {
+test('a wrong password is the CAS\'s own answer, said refused', () => withLogin({}, async (login) => {
   const { status, body } = await login({ password: 'wrong' })
   assert.equal(status, 401)
-  assert.deepEqual(body, { error: 'Identifiants incorrects' })
+  assert.deepEqual(body, { error: 'Identifiants incorrects', code: 'login_refused' })
 }))
+
+test('a CAS down or slowing logins is not a refusal', async () => {
+  for (const casStatus of [500, 503, 429]) {
+    const university = fakeUniversity()
+    const fetchUniversity = university.fetch
+    university.fetch = (input, options = {}) => (
+      options.method === 'POST' && String(input).startsWith(`${CAS}/login`)
+        ? Promise.resolve(html('<html>Service indisponible</html>', casStatus))
+        : fetchUniversity(input, options)
+    )
+    await withLogin({ university }, async (login) => {
+      const { status, body } = await login()
+      assert.equal(status, 401, String(casStatus))
+      assert.equal(body.code, undefined, String(casStatus))
+    })
+  }
+})
+
+test('no answer from the CAS is not a refusal', () => {
+  const university = fakeUniversity()
+  university.fetch = (input, options) => (
+    String(input).startsWith('http://127.0.0.1') ? realFetch(input, options) : Promise.reject(new TypeError('fetch failed'))
+  )
+  return withLogin({ university }, async (login) => {
+    const { status, body } = await login()
+    assert.equal(status, 401)
+    assert.equal(body.code, undefined)
+  })
+})
 
 test('a code asked by SMS is sent by the API, once', () => withLogin({}, async (login, university) => {
   const { status, body } = await login({ sendCode: 'sms' })
@@ -212,6 +241,17 @@ test('mail as the only way to a code: sent without asking, and said', () => {
     // Typing the code sends no other.
     assert.equal((await login({ otp: '123456' })).status, 200)
     assert.equal(sends(university).length, 1)
+  })
+})
+
+test('a quiet login (the desktop app signing in again) sends no code unasked', () => {
+  const university = fakeUniversity({ user: MAIL_ONLY_USER })
+  return withLogin({ university }, async (login) => {
+    const { status, body } = await login({ quiet: true })
+    assert.equal(status, 401)
+    assert.equal(body.code, 'mfa_required')
+    assert.equal(body.mfa.sent, null)
+    assert.equal(sends(university).length, 0)
   })
 })
 
@@ -268,7 +308,7 @@ test('without auth.mfa, a CAS that asks for a code is a failed login', () => {
   return withLogin({ universityConfig: { ...config, auth } }, async (login, university) => {
     const { status, body } = await login({ otp: '123456' })
     assert.equal(status, 401)
-    assert.deepEqual(body, { error: 'CAS login failed. Check your username and password.' })
+    assert.deepEqual(body, { error: 'CAS login failed. Check your username and password.', code: 'login_refused' })
     assert.equal(university.calls.some((call) => call.form.token || call.url.startsWith(API)), false)
   })
 })

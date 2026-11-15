@@ -5,6 +5,7 @@ import { isPostHogAvailable } from '../analytics'
 import lentLogo from '../assets/lent-logo.svg'
 import cloudsTexture from '../assets/privacy/clouds.webp'
 import busImage from '../assets/privacy/bus.webp'
+import tafacLake from '../assets/wallpapers/tafac/lake.webp'
 import treeImage from '../assets/privacy/tree.webp'
 import studentsImage from '../assets/privacy/students.webp'
 import flowerImage from '../assets/privacy/flower.webp'
@@ -15,6 +16,8 @@ import { APP_NAME } from '../seo'
 import CloseButton from './CloseButton'
 import LentButton from './LentButton'
 import { r } from '../register.js'
+import SettingsGroup, { RowText } from './SettingsGroup'
+import { CARD_CLASSES, MUTED_FILL_CLASSES, PRESSABLE_ROW_CLASSES, ROW_CLASSES } from '../settingsStyles'
 
 // "Tes données restent à toi": what the anonymous audience measurement does
 // and doesn't do, in the illustrated style of the Figma presentation screens
@@ -86,21 +89,25 @@ function getToolsSentence() {
 const getSections = (embedded) => [
   {
     emoji: '🕶️',
+    icon: 'ph:detective',
     title: 'Anonyme',
     body: () => 'Aucun nom, identifiant, note, mail ou devoir n\'est collecté, juste des compteurs de visites et les erreurs rencontrées',
   },
   {
     emoji: '🍪',
+    icon: 'ph:cookie',
     title: 'Sans cookie',
     body: () => r('Rien n’est déposé sur ton appareil pour te suivre, aucun suivi permanent.', 'Rien n’est déposé sur votre appareil pour vous suivre, aucun suivi permanent.'),
   },
   {
     emoji: '🇪🇺',
+    icon: 'ph:globe-hemisphere-east',
     title: 'Hébergé en Europe',
     body: getToolsSentence,
   },
   {
     emoji: '🎚️',
+    icon: 'ph:toggle-right',
     title: r('Tu gardes la main', 'Vous gardez la main'),
     body: () => (embedded
       ? r('Coupe « Statistiques anonymes » juste au-dessus et plus rien n’est envoyé', 'Coupez « Statistiques anonymes » juste au-dessus et plus rien n’est envoyé')
@@ -119,18 +126,107 @@ const getSections = (embedded) => [
 const HAS_MAIL_PAGE = Boolean(universityConfig.neutral)
   || (Boolean(universityConfig.features?.mail) && universityConfig.mail?.page !== false)
 
-// Built when shown: the lines address the student (src/register.js).
-const mailLines = () => [
-  r(`La Messagerie les lit et les envoie dans le webmail de ton université, en passant par le serveur de ${APP_NAME}`, `La Messagerie les lit et les envoie dans le webmail de votre université, en passant par le serveur de ${APP_NAME}`),
-  r('Rien n’est écrit sur disque\u202f: la connexion au webmail et la dernière liste de mails restent en mémoire, le temps de ta session, et s’effacent à la déconnexion', 'Rien n’est écrit sur disque\u202f: la connexion au webmail et la dernière liste de mails restent en mémoire, le temps de votre session, et s’effacent à la déconnexion'),
-  r('Brouillons et signature sont enregistrés dans ton compte de messagerie de l’université', 'Brouillons et signature sont enregistrés dans votre compte de messagerie de l’université'),
-  'Les statistiques ne contiennent jamais leur objet, leurs adresses ni leur contenu',
+// Built when shown: the rows address the student (src/register.js). A
+// title and the line under it, each saying what the server does.
+const mailRows = () => [
+  {
+    icon: 'ph:envelope-simple',
+    label: `Par le serveur de ${APP_NAME}`,
+    description: r('La Messagerie lit et envoie tes mails dans le webmail de ton université', 'La Messagerie lit et envoie vos mails dans le webmail de votre université'),
+  },
+  {
+    icon: 'ph:cpu',
+    label: 'Rien sur disque',
+    description: r('La connexion au webmail et la dernière liste de mails restent en mémoire, le temps de ta session, et s’effacent à la déconnexion', 'La connexion au webmail et la dernière liste de mails restent en mémoire, le temps de votre session, et s’effacent à la déconnexion'),
+  },
+  {
+    icon: 'ph:pencil-simple-line',
+    label: 'Brouillons et signature',
+    description: r('Enregistrés dans ton compte de messagerie de l’université', 'Enregistrés dans votre compte de messagerie de l’université'),
+  },
+  {
+    icon: 'ph:chart-line',
+    label: 'Hors des statistiques',
+    description: 'Ni leur objet, ni leurs adresses, ni leur contenu',
+  },
 ]
+
+// Réglages › Confidentialité, in the settings' look: the promise in a card
+// over the illustration, dimmed, the switch, the four points as small cards with an icon
+// (two by two when there's room), the mails as a settings group, the link
+// to the full list as a row. Same words as the modal (the mails' rows
+// aside, shared with it).
+function EmbeddedPrivacy({ control }) {
+  return (
+    <div className="@container flex flex-col gap-[18px]">
+      {/* The promise in a card over one of Tafac's wallpapers (the lake),
+          dimmed, fading into the card's colour under the text. */}
+      <div className={`${CARD_CLASSES} relative isolate`}>
+        <img
+          src={tafacLake}
+          alt=""
+          aria-hidden="true"
+          draggable="false"
+          className="pointer-events-none absolute inset-0 -z-10 size-full select-none object-cover opacity-45 [mask-image:linear-gradient(to_right,transparent_10%,#000_75%)] dark:opacity-30"
+        />
+        <div className="flex flex-col gap-1.5 px-5 py-6 @lg:max-w-[70%]">
+          <p role="heading" aria-level={4} className="m-0 font-display text-[22px] font-bold leading-[1.1] tracking-[-0.01em]">
+            {r('Tes données restent à toi', 'Vos données restent à vous')}
+          </p>
+          <p className="m-0 text-[14px] font-medium leading-[1.4] text-text-60">
+            {APP_NAME} compte ses visites pour savoir ce qui sert vraiment et réparer ce qui casse
+          </p>
+        </div>
+      </div>
+
+      {control}
+
+      <div className="grid grid-cols-1 gap-2 @md:grid-cols-2">
+        {getSections(true).map((section) => (
+          // One column: the icon beside the text; two: above it.
+          <div key={section.title} className={`${CARD_CLASSES} flex items-start gap-3 px-4 py-[14px] @md:flex-col @md:gap-2.5`}>
+            <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full ${MUTED_FILL_CLASSES}`} aria-hidden="true">
+              <Icon icon={section.icon} className="h-[17px] w-[17px] text-[var(--color-text)]" />
+            </span>
+            <div className="flex min-w-0 flex-col gap-1">
+              <p role="heading" aria-level={5} className="m-0 font-body text-[16px] font-semibold leading-[1.2] tracking-[-0.3px]">
+                {section.title}
+              </p>
+              <p className="m-0 font-body text-[13px] font-medium leading-[1.4] text-text-60">
+                {section.body()}
+              </p>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {HAS_MAIL_PAGE ? (
+        <SettingsGroup title={r('Tes mails', 'Vos mails')}>
+          {mailRows().map((row) => (
+            <div key={row.label} className={ROW_CLASSES}>
+              <RowText icon={row.icon} label={row.label} description={row.description} />
+            </div>
+          ))}
+        </SettingsGroup>
+      ) : null}
+
+      {ANALYTICS_DOC_URL ? (
+        <SettingsGroup>
+          <a href={ANALYTICS_DOC_URL} target="_blank" rel="noopener noreferrer" className={`${PRESSABLE_ROW_CLASSES} no-underline`}>
+            <RowText icon="ph:file-text" label="Voir le détail de ce qui est collecté" />
+            <Icon icon="ph:arrow-up-right" className="h-4 w-4 shrink-0 text-text-50" aria-hidden="true" />
+          </a>
+        </SettingsGroup>
+      ) : null}
+    </div>
+  )
+}
 
 // Illustration, promise and the four points, then the mails' part.
 // `control` (the analytics switch, when embedded) sits between the promise
 // and the points; `actions` sits above the link to the full list.
 export function PrivacyContent({ embedded = false, control = null, actions = null }) {
+  if (embedded) return <EmbeddedPrivacy control={control} />
   return (
     <>
       <div className={embedded ? 'mx-auto w-full max-w-[420px] shrink-0 overflow-hidden corners-[20px]' : ''}>
@@ -179,11 +275,14 @@ export function PrivacyContent({ embedded = false, control = null, actions = nul
               <span className="privacy-modal-emoji text-[28px] leading-none" aria-hidden="true">📬</span>
               {r('Tes mails', 'Vos mails')}
             </p>
-            <ul className="m-0 flex list-none flex-col gap-2 p-0">
-              {mailLines().map((line) => (
-                <li key={line} className="flex items-start gap-2 text-[14px] font-medium leading-[1.35] opacity-80">
-                  <Icon icon="ph:check" className="mt-[2px] size-[14px] shrink-0" aria-hidden="true" />
-                  <span>{line}</span>
+            <ul className="m-0 flex list-none flex-col gap-2.5 p-0">
+              {mailRows().map((row) => (
+                <li key={row.label} className="flex items-start gap-2 text-[14px] font-medium leading-[1.35]">
+                  <Icon icon="ph:check" className="mt-[2px] size-[14px] shrink-0 opacity-80" aria-hidden="true" />
+                  <span className="flex flex-col gap-0.5">
+                    <span className="font-semibold">{row.label}</span>
+                    <span className="opacity-80">{row.description}</span>
+                  </span>
                 </li>
               ))}
             </ul>

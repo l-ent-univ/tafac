@@ -122,9 +122,7 @@ mod macos {
         if BUSY.swap(true, Ordering::SeqCst) {
             return None;
         }
-        let window = app
-            .get_webview_window(window_label)
-            .or_else(|| app.get_webview_window("main"));
+        let window = app.get_window(window_label).or_else(|| app.get_window("main"));
         let Some(ns_window) = window.and_then(|window| window.ns_window().ok()) else {
             BUSY.store(false, Ordering::SeqCst);
             return None;

@@ -8,7 +8,7 @@ import homeworkIcon from '../assets/home-icons/homework.png'
 import mailIcon from '../assets/home-icons/mail.png'
 import menuIcon from '../assets/home-icons/menu.png'
 import papillonMark from '../assets/landing/papillon-mark.svg'
-import { useAnalyticsAvailable } from '../analytics'
+import { useAnalyticsShown } from '../analytics'
 import { getPapillonUrl, readPapillonDebugOverride } from '../papillon'
 import { CARD_CLASSES, MUTED_FILL_CLASSES, PRESSABLE_ROW_CLASSES } from '../settingsStyles'
 import useRepoContributors, { readRepoSlug } from '../useRepoContributors'
@@ -56,15 +56,19 @@ function AboutHero() {
   const desktopVersion = useDesktopUpdate()?.current
   return (
     <div className="relative flex flex-col gap-[10px] overflow-hidden modal-inner-corners engraved px-[18px] pb-[18px] pt-[16px]">
-      <span className="glass-solid absolute right-[14px] top-[14px] rounded-full px-[8px] py-[3px] font-mono text-[11px] leading-[1.3] text-text-50">
-        {desktopVersion ? `${desktopVersion} · ${BUILD_LABEL}` : BUILD_LABEL}
-      </span>
-      <div className="flex items-center gap-1.5" aria-hidden="true">
-        {HERO_ICONS.map(({ src, rotate }, index) => (
-          <span key={src} className="home-icon-deal relative shrink-0" style={{ '--i': index, '--r': `${rotate}deg`, transform: 'rotate(var(--r))' }}>
-            <img src={src} alt="" width="30" height="30" draggable="false" className="block size-[30px] select-none" />
-          </span>
-        ))}
+      {/* The icons, the build at the row's end: under them when the row
+          is too narrow for both, never over them. */}
+      <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
+        <div className="flex items-center gap-1.5" aria-hidden="true">
+          {HERO_ICONS.map(({ src, rotate }, index) => (
+            <span key={src} className="home-icon-deal relative shrink-0" style={{ '--i': index, '--r': `${rotate}deg`, transform: 'rotate(var(--r))' }}>
+              <img src={src} alt="" width="30" height="30" draggable="false" className="block size-[30px] select-none" />
+            </span>
+          ))}
+        </div>
+        <span className="glass-solid shrink-0 rounded-full px-[8px] py-[3px] font-mono text-[11px] leading-[1.3] text-text-50">
+          {desktopVersion ? `${desktopVersion} · ${BUILD_LABEL}` : BUILD_LABEL}
+        </span>
       </div>
       <div className="flex items-center gap-2">
         <h4 className="m-0 font-body text-[24px] font-bold leading-[1.1] tracking-[-0.02em]">{appName}</h4>
@@ -104,7 +108,7 @@ function LinkRow({ href, icon, media = null, label, description, external = true
 // « Tes données »: the disclaimer (who we are, what happens to the
 // identifiers) and the anonymous audience, which opens Confidentialité.
 function AboutData({ onPrivacyClick }) {
-  const isAnalyticsAvailable = useAnalyticsAvailable()
+  const isAnalyticsAvailable = useAnalyticsShown()
   const [isPrivacyOpen, setPrivacyOpen] = useState(false)
   if (!about.disclaimer && !isAnalyticsAvailable) return null
   return (
@@ -190,7 +194,7 @@ function TeamCard({ member }) {
 // the person's GitHub; each part hides when empty.
 function AboutPeople() {
   const team = about.team ?? []
-  const contributors = useRepoContributors(about.repoUrl, team.map((member) => member.login))
+  const { contributors, loading } = useRepoContributors(about.repoUrl, team.map((member) => member.login))
   return (
     <>
       {team.length ? (
@@ -201,10 +205,14 @@ function AboutPeople() {
           </div>
         </div>
       ) : null}
-      {contributors.length ? (
+      {contributors.length || loading ? (
         <div className="flex flex-col gap-[7px]">
           <h4 className="m-0 px-1 font-body text-[13px] font-semibold leading-none text-text-60">Contributeurs</h4>
-          <div className="flex flex-wrap gap-2">
+          <div className="flex flex-wrap gap-2" aria-busy={loading || undefined}>
+            {/* The very first time, while GitHub answers: two chips' room. */}
+            {loading ? [96, 120].map((width) => (
+              <span key={width} className={`h-[36px] rounded-full ${MUTED_FILL_CLASSES} animate-pulse motion-reduce:animate-none`} style={{ width }} aria-hidden="true" />
+            )) : null}
             {contributors.map((contributor) => (
               <a
                 key={contributor.login}
@@ -226,6 +234,22 @@ function AboutPeople() {
   )
 }
 
+// « Accéder à la démo »: a full-width pill in solid glass. Under the links
+// when there are two columns (the left one is the shorter), at the very end
+// in one.
+function DemoButton({ label, onClick, className = '' }) {
+  return (
+    <button
+      type="button"
+      className={`glass-solid min-h-[44px] w-full cursor-pointer items-center justify-center gap-2 rounded-full border px-5 font-body text-[15px] font-semibold leading-[1.1] text-[var(--color-text)] ${className}`}
+      onClick={onClick}
+    >
+      <Icon icon="ph:play-circle" className="h-[18px] w-[18px] shrink-0" aria-hidden="true" />
+      {label}
+    </button>
+  )
+}
+
 // À propos, in Réglages and in its own modal (login page, footer). `leading`:
 // rows on top of the links' card (Réglages' « Nouveautés »).
 // `onPrivacyClick`: Réglages jumps to its Confidentialité section instead
@@ -236,8 +260,13 @@ export function AboutPage({ updates = null, leading = null, onPrivacyClick = nul
   const shouldShowDemoLink = typeof onDemoLinkClick === 'function' && demoLinkLabel.trim()
   const repoSlug = readRepoSlug(about.repoUrl)
   const hasLinks = Boolean(leading || about.repoUrl || papillonUrl || about.contactEmail)
+  // Two columns when its own width allows (the modal beyond a phone): the
+  // intro and links, then the data and the people. One column otherwise (a
+  // phone, Réglages' panel), in the same order.
   return (
-    <div className="flex flex-col gap-[18px]">
+    <div className="@container">
+    <div className="grid grid-cols-1 items-start gap-[18px] @2xl:grid-cols-2">
+    <div className="flex min-w-0 flex-col gap-[18px]">
       <AboutHero />
       {updates}
       {hasLinks ? (
@@ -268,6 +297,9 @@ export function AboutPage({ updates = null, leading = null, onPrivacyClick = nul
           ) : null}
         </SettingsGroup>
       ) : null}
+      {shouldShowDemoLink ? <DemoButton label={demoLinkLabel} onClick={onDemoLinkClick} className="hidden @2xl:inline-flex" /> : null}
+    </div>
+    <div className="flex min-w-0 flex-col gap-[18px]">
       <AboutData onPrivacyClick={onPrivacyClick} />
       <AboutPeople />
       {about.authorLine ? (
@@ -277,15 +309,9 @@ export function AboutPage({ updates = null, leading = null, onPrivacyClick = nul
           ) : about.authorLine}
         </p>
       ) : null}
-      {shouldShowDemoLink ? (
-        <button
-          type="button"
-          className="self-start p-0 px-1 border-0 bg-transparent text-text-muted font-body text-[13px] font-medium leading-[1.35] underline underline-offset-2 cursor-pointer transition-colors duration-[120ms] hover:text-text"
-          onClick={onDemoLinkClick}
-        >
-          {demoLinkLabel}
-        </button>
-      ) : null}
+      {shouldShowDemoLink ? <DemoButton label={demoLinkLabel} onClick={onDemoLinkClick} className="inline-flex @2xl:hidden" /> : null}
+    </div>
+    </div>
     </div>
   )
 }
@@ -314,7 +340,7 @@ function AboutModal({
       role="presentation"
     >
       <section
-        className="glass-solid glass--quiet modal-surface w-[min(440px,100%)] max-h-[calc(100dvh-40px)] overflow-y-auto overscroll-contain modal-corners [--modal-inset:21px] [--modal-inner-radius:20px] border text-[var(--color-text)] animate-modal-card-in max-sm:max-h-[calc(100dvh-28px)]"
+        className="glass-solid glass--quiet modal-surface w-[min(440px,100%)] sm:w-[min(880px,100%)] max-h-[calc(100dvh-40px)] overflow-y-auto overscroll-contain modal-corners [--modal-inset:21px] [--modal-inner-radius:20px] border text-[var(--color-text)] animate-modal-card-in max-sm:max-h-[calc(100dvh-28px)]"
         role="dialog"
         aria-modal="true"
         aria-labelledby="about-modal-title"

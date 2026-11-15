@@ -9,6 +9,8 @@ import { buildUploadDisposition, normalizeAttachmentType, readAttachmentLimits, 
 import { isValidAddress, sanitizeDisplayName } from './mailCompose'
 import { readMailSignatures } from './mailSignatureChoice'
 import { r } from './register.js'
+import { createSessionSignal, logoutHeaders } from './sessionSignal'
+import { isDesktopApp } from './desktopApp'
 
 // Null on the neutral page (no university picked yet).
 export const ENT_ORIGIN = universityConfig.origins.ent
@@ -40,6 +42,23 @@ let currentSessionMode = null
 
 function setCurrentSessionMode(nextMode) {
   currentSessionMode = nextMode === DEMO_SESSION_MODE ? DEMO_SESSION_MODE : null
+}
+
+// Whether the session is still valid, as the server's answers say
+// (src/sessionSignal.js).
+const sessionSignal = createSessionSignal()
+
+export const onSessionExpired = sessionSignal.subscribe
+// The server said so to the desktop app (its Moodle view's 'expired').
+export const reportSessionExpired = () => sessionSignal.expire()
+
+// fetch() for this app's server, its answer checked for the session (also
+// for src/appIcons.js and the applications' launch preview).
+export async function serverFetch(url, init) {
+  const sentUnder = sessionSignal.current
+  const response = await fetch(url, init)
+  sessionSignal.note(sentUnder, (name) => response.headers.get(name))
+  return response
 }
 
 function setRecentLoginMarker() {
@@ -233,7 +252,7 @@ export async function requestEnt(path, options = {}) {
   const hasBody = body !== '' && body !== undefined && body !== null && !['GET', 'HEAD'].includes(upperMethod)
 
   if (currentSessionMode === DEMO_SESSION_MODE) {
-    const response = await fetch(
+    const response = await serverFetch(
       `${ENT_AUTH_PREFIX}/demo/request?path=${encodeURIComponent(normalizedPath)}`,
       {
         method: upperMethod,
@@ -246,7 +265,7 @@ export async function requestEnt(path, options = {}) {
     return parseResponse(response)
   }
 
-  const response = await fetch(`${ENT_PROXY_PREFIX}${normalizedPath}`, {
+  const response = await serverFetch(`${ENT_PROXY_PREFIX}${normalizedPath}`, {
     method: upperMethod,
     credentials: 'same-origin',
     headers: buildFetchHeaders(auth, headers),
@@ -257,13 +276,14 @@ export async function requestEnt(path, options = {}) {
 }
 
 export async function getAuthSession() {
-  const response = await fetch(`${ENT_AUTH_PREFIX}/session`, {
+  const response = await serverFetch(`${ENT_AUTH_PREFIX}/session`, {
     credentials: 'same-origin',
     headers: getUniversityRequestHeaders(),
   })
 
   const payload = await parseJsonPayload(response)
   setCurrentSessionMode(payload?.authenticated ? payload?.sessionMode : null)
+  sessionSignal.mark(Boolean(payload?.authenticated))
 
   if (!payload?.authenticated) {
     clearRecentLoginMarker()
@@ -282,7 +302,7 @@ export async function loginToEnt({ username, password, otp, sendCode }) {
   // Signed out, the server routes the login to the university picked on the
   // login page (none on the neutral page: the default one).
   const university = getLoadedUniversityId()
-  const response = await fetch(`${ENT_AUTH_PREFIX}/login`, {
+  const response = await serverFetch(`${ENT_AUTH_PREFIX}/login`, {
     method: 'POST',
     credentials: 'same-origin',
     headers: {
@@ -294,6 +314,7 @@ export async function loginToEnt({ username, password, otp, sendCode }) {
 
   const payload = await parseJsonPayload(response)
   setCurrentSessionMode(payload?.authenticated ? payload?.sessionMode : null)
+  sessionSignal.restart(Boolean(payload?.authenticated))
 
   if (payload?.authenticated) {
     setRecentLoginMarker()
@@ -304,16 +325,21 @@ export async function loginToEnt({ username, password, otp, sendCode }) {
   return payload
 }
 
-export async function logoutFromEnt() {
+// `expired`: signed out because the session expired, not by the student.
+// The desktop app forgets the login it keeps only on the student's own
+// sign-out (src-tauri/src/signin.rs).
+export async function logoutFromEnt({ expired = false } = {}) {
+  sessionSignal.mark(false)
   clearGradesCache()
   // Another account may sign in on this page.
   forgetSchoolCertificateStatus()
   localStorage.removeItem(ADE_TIMETABLE_CACHE_KEY)
   clearRecentLoginMarker()
 
-  const response = await fetch(`${ENT_AUTH_PREFIX}/logout`, {
+  const response = await serverFetch(`${ENT_AUTH_PREFIX}/logout`, {
     method: 'POST',
     credentials: 'same-origin',
+    headers: logoutHeaders({ expired, desktop: isDesktopApp() }),
   })
 
   const payload = await parseJsonPayload(response)
@@ -350,7 +376,7 @@ function unwrapSettledResult(result) {
 }
 
 export async function getPlanning() {
-  const response = await fetch(`${ENT_AUTH_PREFIX}/planning`, {
+  const response = await serverFetch(`${ENT_AUTH_PREFIX}/planning`, {
     credentials: 'same-origin',
   })
 
@@ -390,7 +416,7 @@ export function getSchoolCertificateStatus() {
 
   schoolCertificateRequest ??= (async () => {
     try {
-      const response = await fetch(`${ENT_AUTH_PREFIX}/documents/school-certificate/status`, { credentials: 'same-origin' })
+      const response = await serverFetch(`${ENT_AUTH_PREFIX}/documents/school-certificate/status`, { credentials: 'same-origin' })
       const payload = await response.json().catch(() => null)
       schoolCertificateStatus = response.ok && payload?.available
         ? { available: true, schoolYear: payload.schoolYear ?? null }
@@ -433,7 +459,7 @@ function getAttachmentFilename(contentDisposition, fallback) {
 // Saves the PDF under its real name. Throws an Error with a French,
 // user-facing message.
 export async function downloadSchoolCertificate() {
-  const response = await fetch(`${ENT_AUTH_PREFIX}/documents/school-certificate`, { credentials: 'same-origin' })
+  const response = await serverFetch(`${ENT_AUTH_PREFIX}/documents/school-certificate`, { credentials: 'same-origin' })
   if (!response.ok) {
     const payload = await response.json().catch(() => null)
     throw new Error(payload?.error || 'Certificat indisponible pour le moment.')
@@ -450,34 +476,12 @@ export async function downloadSchoolCertificate() {
   window.setTimeout(() => URL.revokeObjectURL(url), 10_000)
 }
 
-// The mail routes' answers when the session is gone: 401 (the app's own
-// session missing), the list's 200 { authenticated: false } (likewise), or
-// a 500 { error: 'mail_session_expired' } (the server's CAS sign-in behind
-// the webmail expired: sendMailRouteError). Each call below reports it
-// here, before it returns or throws, so the mail page can tell « Session
-// expirée » from an outage, its failure notices included (mailAction only
-// answers true or false).
-const mailSessionExpiredListeners = new Set()
-
-export function onMailSessionExpired(listener) {
-  mailSessionExpiredListeners.add(listener)
-  return () => mailSessionExpiredListeners.delete(listener)
-}
-
-function reportMailSessionExpired() {
-  for (const listener of mailSessionExpiredListeners) listener()
-}
-
-function isMailSessionExpired(response, payload) {
-  return response.status === 401 || payload?.error === 'mail_session_expired'
-}
-
-// For the calls that answer true or false: their failure's body read for
-// the reason, then reported if it's the session.
-async function checkMailSession(response) {
-  if (response.ok) return
-  const payload = await response.json().catch(() => null)
-  if (isMailSessionExpired(response, payload)) reportMailSessionExpired()
+// A mail route's answer to a request without a valid session (401: the
+// app's own session gone, or the CAS sign-in behind the webmail, found
+// expired by the server). The app signs out on it (serverFetch); the calls
+// below only tell it from a failure in what they answer.
+function isSessionRefused(response) {
+  return response.status === 401
 }
 
 // `query`: the mail page's search, the server's matches over the whole
@@ -498,7 +502,7 @@ export async function getRecentMail({ offset = 0, query = '', folder = null, fre
     if (folder) params.set('folder', folder)
     if (fresh) params.set('fresh', '1')
     const search = params.toString()
-    const response = await fetch(`${ENT_AUTH_PREFIX}/mail/recent${search ? `?${search}` : ''}`, {
+    const response = await serverFetch(`${ENT_AUTH_PREFIX}/mail/recent${search ? `?${search}` : ''}`, {
       credentials: 'same-origin',
       signal,
     })
@@ -508,8 +512,7 @@ export async function getRecentMail({ offset = 0, query = '', folder = null, fre
       return { status: 'disabled', unreadCount: null, webmailHref: null, messages: [] }
     }
 
-    if (isMailSessionExpired(response, payload) || (response.ok && payload && !payload.authenticated)) {
-      reportMailSessionExpired()
+    if (isSessionRefused(response) || (response.ok && payload && !payload.authenticated)) {
       return { status: 'unauthenticated', unreadCount: null, webmailHref: null, messages: [] }
     }
 
@@ -548,11 +551,10 @@ export async function getRecentMail({ offset = 0, query = '', folder = null, fre
 //   404 no such message, 401 no session, 500 { error }
 // Throws an Error with `status` on any failure.
 export async function getMailMessage(id) {
-  const response = await fetch(`${ENT_AUTH_PREFIX}/mail/message?id=${encodeURIComponent(id)}`, {
+  const response = await serverFetch(`${ENT_AUTH_PREFIX}/mail/message?id=${encodeURIComponent(id)}`, {
     credentials: 'same-origin',
   })
   const payload = await response.json().catch(() => null)
-  if (isMailSessionExpired(response, payload)) reportMailSessionExpired()
   if (!response.ok || !payload?.message) {
     throw createHttpError(payload?.error || `Message request failed (${response.status}).`, response.status)
   }
@@ -566,9 +568,8 @@ export async function getMailMessage(id) {
 export async function getMailThread(id, { folder = null } = {}) {
   const params = new URLSearchParams({ id })
   if (folder) params.set('folder', folder)
-  const response = await fetch(`${ENT_AUTH_PREFIX}/mail/thread?${params}`, { credentials: 'same-origin' })
+  const response = await serverFetch(`${ENT_AUTH_PREFIX}/mail/thread?${params}`, { credentials: 'same-origin' })
   const payload = await response.json().catch(() => null)
-  if (isMailSessionExpired(response, payload)) reportMailSessionExpired()
   if (!response.ok || !Array.isArray(payload?.messages)) {
     throw createHttpError(payload?.error || `Thread request failed (${response.status}).`, response.status)
   }
@@ -583,9 +584,8 @@ export async function getMailThread(id, { folder = null } = {}) {
 // when they can't be read.
 export async function getMailFolders() {
   try {
-    const response = await fetch(`${ENT_AUTH_PREFIX}/mail/folders`, { credentials: 'same-origin' })
+    const response = await serverFetch(`${ENT_AUTH_PREFIX}/mail/folders`, { credentials: 'same-origin' })
     const payload = await response.json().catch(() => null)
-    if (isMailSessionExpired(response, payload)) reportMailSessionExpired()
     return response.ok && Array.isArray(payload?.folders) ? payload.folders : null
   } catch {
     return null
@@ -598,13 +598,12 @@ export async function getMailFolders() {
 // other). Never throws: false when the webmail didn't take it.
 export async function mailFolderAction(folder, action) {
   try {
-    const response = await fetch(`${ENT_AUTH_PREFIX}/mail/folder-action`, {
+    const response = await serverFetch(`${ENT_AUTH_PREFIX}/mail/folder-action`, {
       method: 'POST',
       credentials: 'same-origin',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ folder, action }),
     })
-    await checkMailSession(response)
     return response.ok
   } catch {
     return false
@@ -618,7 +617,7 @@ export async function mailFolderAction(folder, action) {
 // default (at once) and the fallback limits when they can't be read.
 export async function getMailPrefs() {
   try {
-    const response = await fetch(`${ENT_AUTH_PREFIX}/mail/prefs`, { credentials: 'same-origin' })
+    const response = await serverFetch(`${ENT_AUTH_PREFIX}/mail/prefs`, { credentials: 'same-origin' })
     const payload = await response.json().catch(() => null)
     const markRead = Number(payload?.markRead)
     return {
@@ -647,10 +646,9 @@ function readMailIdentities(list) {
 // 'error' }.
 export async function getMailSignatures({ fresh = false } = {}) {
   try {
-    const response = await fetch(`${ENT_AUTH_PREFIX}/mail/signatures${fresh ? '?fresh=1' : ''}`, { credentials: 'same-origin' })
+    const response = await serverFetch(`${ENT_AUTH_PREFIX}/mail/signatures${fresh ? '?fresh=1' : ''}`, { credentials: 'same-origin' })
     const payload = await response.json().catch(() => null)
     if (!response.ok) {
-      if (isMailSessionExpired(response, payload)) reportMailSessionExpired()
       return { status: 'error' }
     }
     return { status: 'ok', data: readMailSignatures(payload) }
@@ -672,7 +670,7 @@ const MAIL_SIGNATURE_CODES = {
 
 export async function saveMailSignature(text) {
   try {
-    const response = await fetch(`${ENT_AUTH_PREFIX}/mail/signature`, {
+    const response = await serverFetch(`${ENT_AUTH_PREFIX}/mail/signature`, {
       method: 'POST',
       credentials: 'same-origin',
       headers: { 'Content-Type': 'application/json' },
@@ -680,8 +678,7 @@ export async function saveMailSignature(text) {
     })
     const payload = await response.json().catch(() => null)
     if (response.ok) return { status: 'ok', data: readMailSignatures(payload) }
-    if (isMailSessionExpired(response, payload)) {
-      reportMailSessionExpired()
+    if (isSessionRefused(response)) {
       return { status: 'error', code: 'expired' }
     }
     return { status: 'error', code: MAIL_SIGNATURE_CODES[payload?.error] ?? 'failed' }
@@ -707,7 +704,7 @@ const MAIL_SEND_CODES = {
 async function postMailCompose(path, body, { signal } = {}) {
   let response
   try {
-    response = await fetch(`${ENT_AUTH_PREFIX}/mail/${path}`, {
+    response = await serverFetch(`${ENT_AUTH_PREFIX}/mail/${path}`, {
       method: 'POST',
       credentials: 'same-origin',
       headers: { 'Content-Type': 'application/json' },
@@ -721,8 +718,7 @@ async function postMailCompose(path, body, { signal } = {}) {
   }
   const payload = await response.json().catch(() => null)
   if (response.ok) return { status: 'ok', payload }
-  if (isMailSessionExpired(response, payload)) {
-    reportMailSessionExpired()
+  if (isSessionRefused(response)) {
     return { status: 'error', code: 'expired' }
   }
   return {
@@ -776,9 +772,8 @@ export async function saveMailDraft(body, { signal } = {}) {
 // href }], droppedImages, identityId, origin: { kind, messageId } | null }.
 // Throws on a failure.
 export async function getMailDraft(id) {
-  const response = await fetch(`${ENT_AUTH_PREFIX}/mail/draft?id=${encodeURIComponent(id)}`, { credentials: 'same-origin' })
+  const response = await serverFetch(`${ENT_AUTH_PREFIX}/mail/draft?id=${encodeURIComponent(id)}`, { credentials: 'same-origin' })
   const payload = await response.json().catch(() => null)
-  if (isMailSessionExpired(response, payload)) reportMailSessionExpired()
   if (!response.ok || !payload?.draft) {
     throw createHttpError(payload?.error || `Draft request failed (${response.status}).`, response.status)
   }
@@ -796,6 +791,7 @@ export async function getMailDraft(id) {
 // 'expired', 'failed').
 export function uploadMailAttachment(file, { name, onProgress } = {}) {
   const xhr = new XMLHttpRequest()
+  const sentUnder = sessionSignal.current
   let settled = false
   const promise = new Promise((resolve) => {
     const finish = (result) => {
@@ -815,6 +811,7 @@ export function uploadMailAttachment(file, { name, onProgress } = {}) {
     xhr.addEventListener('error', () => finish({ status: 'error', code: 'failed' }))
     xhr.addEventListener('timeout', () => finish({ status: 'error', code: 'failed' }))
     xhr.addEventListener('load', () => {
+      sessionSignal.note(sentUnder, (name) => xhr.getResponseHeader(name))
       let payload = null
       try {
         payload = JSON.parse(xhr.responseText)
@@ -835,8 +832,7 @@ export function uploadMailAttachment(file, { name, onProgress } = {}) {
         })
         return
       }
-      if (isMailSessionExpired({ status }, payload)) {
-        reportMailSessionExpired()
+      if (isSessionRefused({ status })) {
         finish({ status: 'error', code: 'expired' })
         return
       }
@@ -867,12 +863,11 @@ export function uploadMailAttachment(file, { name, onProgress } = {}) {
 export async function getMailRecipientSuggestions(query, { signal } = {}) {
   if (!universityConfig.features?.mail) return { status: 'disabled', suggestions: [] }
   try {
-    const response = await fetch(`${ENT_AUTH_PREFIX}/mail/autocomplete?${new URLSearchParams({ q: query })}`, {
+    const response = await serverFetch(`${ENT_AUTH_PREFIX}/mail/autocomplete?${new URLSearchParams({ q: query })}`, {
       credentials: 'same-origin',
       signal,
     })
     const payload = await response.json().catch(() => null)
-    if (isMailSessionExpired(response, payload)) reportMailSessionExpired()
     if (signal?.aborted) return { status: 'aborted', suggestions: [] }
     if (!response.ok || !Array.isArray(payload?.suggestions)) return { status: 'error', suggestions: [] }
     return { status: 'ok', suggestions: payload.suggestions }
@@ -888,13 +883,12 @@ export async function getMailRecipientSuggestions(query, { signal } = {}) {
 // Never throws: false when the webmail didn't take it.
 export async function mailAction(ids, action, { folder = null } = {}) {
   try {
-    const response = await fetch(`${ENT_AUTH_PREFIX}/mail/action`, {
+    const response = await serverFetch(`${ENT_AUTH_PREFIX}/mail/action`, {
       method: 'POST',
       credentials: 'same-origin',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ ids: [].concat(ids), action, ...(folder ? { folder } : null) }),
     })
-    await checkMailSession(response)
     return response.ok
   } catch {
     return false
@@ -924,7 +918,7 @@ export async function getMoodleDeadlines() {
   }
 
   try {
-    const response = await fetch(`${ENT_AUTH_PREFIX}/moodle/deadlines`, {
+    const response = await serverFetch(`${ENT_AUTH_PREFIX}/moodle/deadlines`, {
       credentials: 'same-origin',
     })
     const payload = await response.json().catch(() => null)
@@ -1012,7 +1006,7 @@ async function requestGrades() {
   }
 
   try {
-    const response = await fetch(`${ENT_AUTH_PREFIX}/grades`, {
+    const response = await serverFetch(`${ENT_AUTH_PREFIX}/grades`, {
       credentials: 'same-origin',
     })
 
@@ -1028,7 +1022,7 @@ async function requestGrades() {
 }
 
 export async function getStudentProfilePictureMeta() {
-  const response = await fetch(`${ENT_AUTH_PREFIX}/student-pic?meta=1&ts=${Date.now()}`, {
+  const response = await serverFetch(`${ENT_AUTH_PREFIX}/student-pic?meta=1&ts=${Date.now()}`, {
     cache: 'no-store',
     credentials: 'same-origin',
   })
@@ -1052,7 +1046,7 @@ export function openGradesService() {
 }
 
 async function requestSemesterGrades(semesterId) {
-  const response = await fetch(`${ENT_AUTH_PREFIX}/grades/semester/${encodeURIComponent(semesterId)}`, {
+  const response = await serverFetch(`${ENT_AUTH_PREFIX}/grades/semester/${encodeURIComponent(semesterId)}`, {
     credentials: 'same-origin',
   })
 
@@ -1119,7 +1113,7 @@ export function prefetchGradesPage() {
 
 // { message: html | null }: the department notice ScoDoc shows above the relevé.
 export async function getGradesDepartmentMessage(department) {
-  const response = await fetch(`${ENT_AUTH_PREFIX}/grades/department-message?dep=${encodeURIComponent(department)}`, {
+  const response = await serverFetch(`${ENT_AUTH_PREFIX}/grades/department-message?dep=${encodeURIComponent(department)}`, {
     credentials: 'same-origin',
   })
 
@@ -1132,7 +1126,7 @@ const SCODOC_ID_PATTERN = /^\d{1,10}$/
 
 async function requestEvaluationDistribution(semesterId, evaluationId) {
   try {
-    const response = await fetch(
+    const response = await serverFetch(
       `${ENT_AUTH_PREFIX}/grades/evaluation-distribution?semestre=${semesterId}&eval=${evaluationId}`,
       { credentials: 'same-origin' },
     )
@@ -1198,7 +1192,7 @@ export function getGradesReportPdfHref(semesterId, type = 'BUT') {
 // Downloads ScoDoc's PDF relevé as `fileName`. Fetched first so a failure
 // (ScoDoc down, demo) throws instead of saving an error page as a ".pdf".
 export async function downloadGradesReportPdf(semesterId, type, fileName) {
-  const response = await fetch(getGradesReportPdfHref(semesterId, type), { credentials: 'same-origin' })
+  const response = await serverFetch(getGradesReportPdfHref(semesterId, type), { credentials: 'same-origin' })
   if (!response.ok || !String(response.headers.get('content-type')).includes('application/pdf')) {
     throw new Error(`PDF request failed (${response.status})`)
   }
@@ -1673,7 +1667,7 @@ const ADE_TIMETABLE_CACHE_KEY = 'l-ent:ade-timetable-cache'
 const ADE_TIMETABLE_CACHE_TTL_MS = 15 * 60 * 1000
 
 export async function getAdeStatus() {
-  const response = await fetch(`${ENT_AUTH_PREFIX}/ade/status`, {
+  const response = await serverFetch(`${ENT_AUTH_PREFIX}/ade/status`, {
     credentials: 'same-origin',
   })
 
@@ -1687,7 +1681,7 @@ export async function getAdeTree(etabsVets = '', { fallback = '' } = {}) {
   if (etabsVets) query.set('etabsVets', etabsVets)
   if (fallback) query.set('fallback', fallback)
   const params = query.size ? `?${query}` : ''
-  const response = await fetch(`${ENT_AUTH_PREFIX}/ade/tree${params}`, {
+  const response = await serverFetch(`${ENT_AUTH_PREFIX}/ade/tree${params}`, {
     credentials: 'same-origin',
   })
 
@@ -1697,7 +1691,7 @@ export async function getAdeTree(etabsVets = '', { fallback = '' } = {}) {
 // « Salles et personnels »: the ADE tree's rooms and staff
 // ({ groups, items }, planningPortalApi.js's buildPortalDirectory).
 export async function getAdeDirectory() {
-  const response = await fetch(`${ENT_AUTH_PREFIX}/ade/directory`, {
+  const response = await serverFetch(`${ENT_AUTH_PREFIX}/ade/directory`, {
     credentials: 'same-origin',
   })
 
@@ -1709,7 +1703,7 @@ export async function searchAde(query) {
     return { results: [] }
   }
 
-  const response = await fetch(
+  const response = await serverFetch(
     `${ENT_AUTH_PREFIX}/ade/search?q=${encodeURIComponent(query.trim())}`,
     { credentials: 'same-origin' },
   )
@@ -1735,7 +1729,7 @@ function buildAdeQueryString({ date, ...extra } = {}) {
 
 export async function getAdeCalendarMetadata({ date, ...extra } = {}) {
   const qs = buildAdeQueryString({ date, ...extra })
-  const response = await fetch(
+  const response = await serverFetch(
     `${ENT_AUTH_PREFIX}/ade/calendar${qs ? `?${qs}` : ''}`,
     { credentials: 'same-origin' },
   )
@@ -1750,7 +1744,7 @@ export async function getAdeUpcoming({
   preferPlanning = false,
   signal,
 } = {}) {
-  const response = await fetch(`${ENT_AUTH_PREFIX}/ade/upcoming`, {
+  const response = await serverFetch(`${ENT_AUTH_PREFIX}/ade/upcoming`, {
     method: 'POST',
     credentials: 'same-origin',
     headers: {
@@ -1800,7 +1794,7 @@ export async function getAdeTimetable({
 
   const qs = requestKey
 
-  const response = await fetch(
+  const response = await serverFetch(
     `${ENT_AUTH_PREFIX}/ade/timetable${qs ? `?${qs}` : ''}`,
     {
       credentials: 'same-origin',
@@ -1835,7 +1829,7 @@ export function clearAdeTimetableCache() {
 
 export async function getAdeAlerts(etabsVets = '') {
   const params = etabsVets ? `?etabsVets=${encodeURIComponent(etabsVets)}` : ''
-  const response = await fetch(`${ENT_AUTH_PREFIX}/ade/alerts${params}`, {
+  const response = await serverFetch(`${ENT_AUTH_PREFIX}/ade/alerts${params}`, {
     credentials: 'same-origin',
   })
 
@@ -1851,7 +1845,7 @@ export function getLayout(auth) {
 }
 
 export async function getAccountInfo() {
-  const response = await fetch(`${ENT_AUTH_PREFIX}/account`, {
+  const response = await serverFetch(`${ENT_AUTH_PREFIX}/account`, {
     credentials: 'same-origin',
   })
 
