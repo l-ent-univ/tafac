@@ -39,6 +39,9 @@ if (typeof window !== 'undefined') {
 // For App's logout: the mail waiting goes first (null), or its failure is
 // shown on the mail page instead of the mail being lost (src/mailSendQueue.js).
 export const flushMailSends = () => queue.flush()
+// The session expired (App): the sends taken back unsent (mailSendQueue's
+// takeBack).
+export const takeBackMailSends = () => queue.takeBack()
 // Logged out or another student signed in (App, as clearMailReadCache).
 export const clearMailSends = () => queue.clear()
 

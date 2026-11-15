@@ -6,7 +6,7 @@
 // same tiles right away while one request per page load refreshes them (an
 // admin may have edited the server's file).
 import universityConfig from '@university'
-import { ENT_AUTH_PREFIX } from './entApi'
+import { ENT_AUTH_PREFIX, serverFetch } from './entApi'
 
 const CACHE_KEY = `l-ent:app-icons:${universityConfig.id}`
 const EMPTY_ASSIGNMENTS = Object.freeze({ palette: {}, icons: {} })
@@ -73,7 +73,7 @@ export async function fetchAppIcons(applications) {
   }
 
   try {
-    const response = await fetch(`${ENT_AUTH_PREFIX}/app-icons`, {
+    const response = await serverFetch(`${ENT_AUTH_PREFIX}/app-icons`, {
       method: 'POST',
       credentials: 'same-origin',
       headers: { 'Content-Type': 'application/json' },

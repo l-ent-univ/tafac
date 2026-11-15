@@ -137,6 +137,27 @@ export function createMailSendQueue({ sendMail, createSendUid, onOutcome = null,
     return held ? held.result : null
   }
 
+  // The session expired: nothing can go any more. The mail waiting is
+  // taken back unsent, one already going is waited for (it may have gone),
+  // and one that failed is taken back. → the snapshots taken back, for the
+  // student to send once signed in again (src/mailHeldDraft.js).
+  async function takeBack() {
+    const taken = []
+    const entry = pending
+    if (entry?.phase === 'waiting') {
+      clearTimer(entry.timer)
+      pending = null
+      page?.notify(null)
+      taken.push(entry.snapshot)
+    } else if (entry) {
+      const result = await deliver(entry)
+      if (result.status !== 'ok') taken.push(entry.snapshot)
+    }
+    if (held && !taken.includes(held.snapshot)) taken.push(held.snapshot)
+    held = null
+    return taken
+  }
+
   // Logged out, or another student signed in: nothing of the previous one's
   // sends is kept, nor reported.
   function clear() {
@@ -151,6 +172,7 @@ export function createMailSendQueue({ sendMail, createSendUid, onOutcome = null,
     undo,
     attach,
     flush,
+    takeBack,
     clear,
     // A mail waiting or going (the tab's closing asks first).
     get busy() {

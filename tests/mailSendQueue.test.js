@@ -149,3 +149,29 @@ test('the notice once sent names the addresses refused', () => {
   assert.equal(sentNoticeText({ partial: true, invalid: ['a@u.fr', 'b@u.fr'] }), 'Envoyé, sauf à a@u.fr, b@u.fr (adresses refusées)')
   assert.equal(sentNoticeText({ partial: true, invalid: ['a@u.fr', 'b@u.fr', 'c@u.fr', 'd@u.fr', 'e@u.fr'] }), 'Envoyé, sauf à a@u.fr, b@u.fr, c@u.fr et 2 autres (adresses refusées)')
 })
+
+test('the session expired: the mail waiting is taken back unsent, one gone is not', async () => {
+  // Waiting: taken back, never sent.
+  const waiting = setup()
+  waiting.queue.attach(waiting.page)
+  waiting.queue.send(waiting.snapshot)
+  assert.deepEqual(await waiting.queue.takeBack(), [waiting.snapshot])
+  assert.equal(waiting.timers.size, 0)
+  assert.equal(waiting.requests.length, 0)
+  assert.equal(waiting.queue.busy, false)
+  assert.deepEqual(await waiting.queue.takeBack(), [])
+
+  // Going and refused (the session gone): taken back.
+  const refused = setup([{ status: 'error', code: 'expired' }])
+  refused.queue.send(refused.snapshot)
+  const timer = [...refused.timers.values()][0]
+  timer.fn()
+  assert.deepEqual(await refused.queue.takeBack(), [refused.snapshot])
+  assert.equal(refused.requests.length, 1)
+
+  // Going and sent: nothing to take back.
+  const sent = setup()
+  sent.queue.send(sent.snapshot)
+  ;[...sent.timers.values()][0].fn()
+  assert.deepEqual(await sent.queue.takeBack(), [])
+})

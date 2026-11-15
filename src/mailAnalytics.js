@@ -25,13 +25,12 @@ const ERROR_KINDS = ['http_4xx', 'http_5xx', 'network', 'timeout', 'other']
 
 // mail_loaded for the folder the page opens on, from the list's state
 // ({ status, messages }, MailPage's): null while it loads (or when the mail
-// is off), else { status, errorKind? }. `sessionExpired`: a mail route said
-// the session is gone, which is why a list failed.
-export function describeMailLoad({ status, messageCount = 0, errorKind = null, sessionExpired = false } = {}) {
+// is off), else { status, errorKind? }. 'unauthenticated': the session
+// expired (the app then signs out).
+export function describeMailLoad({ status, messageCount = 0, errorKind = null } = {}) {
   if (status === 'ok') return { status: messageCount > 0 ? 'ok' : 'empty' }
   if (status === 'unauthenticated') return { status: 'session_expired' }
   if (status === 'error') {
-    if (sessionExpired) return { status: 'session_expired' }
     return { status: 'error', errorKind: ERROR_KINDS.includes(errorKind) ? errorKind : 'other' }
   }
   return null

@@ -3,6 +3,7 @@ import type { AddressInfo } from 'node:net'
 import test from 'node:test'
 import type { Express } from 'express'
 import { isCredentialTarget } from '../server/casLogin/credentialTarget.ts'
+import { isCasRefusal } from '../server/casLogin/refusal.ts'
 import { createEntAuthApp } from '../server/entAuthApp.js'
 import { loadServerConfig } from '../universities/index.js'
 
@@ -80,4 +81,12 @@ test('a login page that isn\'t the CAS\'s never gets the password', async () => 
   const { status, calls } = await loginAgainst(() => ({ url: 'https://sso-cas.example.evil.example/login', html: form('login') }))
   assert.equal(status, 401)
   assert.equal(calls.some((call) => call.method === 'POST'), false)
+})
+
+test('only the CAS\'s own answer to the form is a refusal', () => {
+  // The form again (Apereo: 401, or 200), a page of its own (locked, a
+  // password to change).
+  for (const status of [200, 401, 403, 423]) assert.equal(isCasRefusal(status), true, String(status))
+  // A sign-in, an outage, the CAS slowing logins down.
+  for (const status of [302, 303, 429, 500, 502, 503]) assert.equal(isCasRefusal(status), false, String(status))
 })
