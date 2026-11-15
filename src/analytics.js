@@ -11,7 +11,7 @@ import { getStoredAnonymousAnalytics } from './profileStorage'
 import { toFormationSlug } from './formationSlug'
 import { createNavigationReporter } from './planningAnalytics'
 import { isDesktopApp } from './desktopApp'
-import { getDesktopUpdate } from './desktopUpdate'
+import { getDesktopUpdate, subscribeDesktopUpdate } from './desktopUpdate'
 
 const ANALYTICS_ENDPOINT = `${ENT_AUTH_PREFIX}/analytics`
 const FLUSH_DELAY_MS = 2000
@@ -71,6 +71,27 @@ export function isPostHogAvailable() {
 // Mon compte switch and the privacy modal).
 export function useAnalyticsAvailable() {
   return useSyncExternalStore(subscribe, () => serverEnabled, () => false)
+}
+
+// Whether « Confidentialité » and « Statistiques anonymes » show: where the
+// measurement is active, and in development builds too (Vite's dev server,
+// a local desktop build: 0.0.0), which have no key, so the section can be
+// seen and worked on. Nothing is sent there all the same (no key).
+function isDevelopmentBuild() {
+  return Boolean(import.meta.env?.DEV) || getDesktopUpdate()?.current === '0.0.0'
+}
+
+function subscribeShown(listener) {
+  const stopAnalytics = subscribe(listener)
+  const stopDesktop = subscribeDesktopUpdate(listener)
+  return () => {
+    stopAnalytics()
+    stopDesktop()
+  }
+}
+
+export function useAnalyticsShown() {
+  return useSyncExternalStore(subscribeShown, () => serverEnabled || isDevelopmentBuild(), () => false)
 }
 
 function getDevice() {

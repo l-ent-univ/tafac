@@ -1,13 +1,16 @@
 // What an icon button stands for, in a bubble beside it on hover or keyboard
 // focus: the compact sidebar's (to its right), the mail toolbar's (below).
 // The control names itself (aria-label), so the bubble is for the eyes only.
-// The button carries `group relative`. `side`: right, or bottom (centred,
-// or held to the button's start or end edge near the side of a panel).
+// The button carries `group relative`. `side`: right, bottom or top
+// (centred, or held to the button's start or end edge near the side of a
+// panel).
 const SIDE_CLASSES = {
   right: 'left-full top-1/2 ml-3 -translate-x-1 -translate-y-1/2 group-hover:translate-x-0 group-focus-visible:translate-x-0',
   bottom: 'left-1/2 top-full mt-2 -translate-x-1/2 -translate-y-1 group-hover:translate-y-0 group-focus-visible:translate-y-0',
   'bottom-start': 'left-0 top-full mt-2 -translate-y-1 group-hover:translate-y-0 group-focus-visible:translate-y-0',
   'bottom-end': 'right-0 top-full mt-2 -translate-y-1 group-hover:translate-y-0 group-focus-visible:translate-y-0',
+  top: 'left-1/2 bottom-full mb-2 -translate-x-1/2 translate-y-1 group-hover:translate-y-0 group-focus-visible:translate-y-0',
+  'top-end': 'right-0 bottom-full mb-2 translate-y-1 group-hover:translate-y-0 group-focus-visible:translate-y-0',
 }
 
 function Tooltip({ title, detail = null, side = 'right', className = '' }) {
