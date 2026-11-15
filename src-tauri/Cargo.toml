@@ -39,6 +39,24 @@ objc2-foundation = "0.3"
 objc2-app-kit = "0.3"
 objc2-authentication-services = "0.3"
 
+# The session secret in the system's credential store (src/secret.rs):
+# each system's own backend, nothing else of the crate. On Linux the Secret
+# Service over libdbus, which the window toolkit already links.
+[target.'cfg(target_os = "macos")'.dependencies.keyring]
+version = "3"
+default-features = false
+features = ["apple-native"]
+
+[target.'cfg(windows)'.dependencies.keyring]
+version = "3"
+default-features = false
+features = ["windows-native"]
+
+[target.'cfg(target_os = "linux")'.dependencies.keyring]
+version = "3"
+default-features = false
+features = ["sync-secret-service"]
+
 [profile.release]
 codegen-units = 1
 lto = true

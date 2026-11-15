@@ -23,11 +23,21 @@ the university (CAS, ADE, webmail…)
 
 - **Links** (`src-tauri/src/links.rs`): web addresses open in the browser.
   An app address opened in a new tab (the launch relay) opens where its
-  redirect points. Downloads go to the Downloads folder.
-- **Data** (macOS: `~/Library/Application Support/fr.tafac.desktop/`):
-  `session-secret` and `cookies.json` (the encrypted session cookie), both
-  readable by the student's account only. `server/` holds remembered app
-  icons (`DATA_DIR`).
+  redirect points. Downloads go to the Downloads folder. The window itself
+  only loads the app's pages: any other address (`file://`, another
+  program's scheme) is refused.
+- **Data** (macOS: `~/Library/Application Support/fr.tafac.desktop/`, closed
+  to other accounts): `cookies.json` (the encrypted session cookie) and
+  `server/`, the remembered app icons (`DATA_DIR`). The secret that
+  encrypts the cookie is not kept beside it: a packaged app puts it in the
+  system's credential store (macOS Keychain, Windows Credential Manager,
+  the Secret Service on Linux; `src-tauri/src/secret.rs`). Where there is
+  no store, or it refuses, and in development builds, it is the
+  `session-secret` file of that folder, readable by the student's account
+  only.
+- **Socket**: in a folder only the student's account can enter
+  (`$XDG_RUNTIME_DIR`, else the data folder), never the shared `/tmp`
+  (`src-tauri/src/sidecar.rs`).
 - The server stops with the app: its stdin is a pipe from the app, and when
   the pipe closes the server exits, even if the app crashed.
 
@@ -317,7 +327,6 @@ in `TAFAC_BUNDLE_DIR`.
   the sidebar, so a window at least 1024px wide).
 - A bad signature is not reported anywhere (PostHog): it only shows in the
   app's own log.
-- `SESSION_SECRET` in the Keychain instead of a file.
 - The service worker doesn't register on `tafac://`: harmless, the app
   ships its files.
 - Opening an app in a new tab from the context menu (`window.open` of

@@ -11,6 +11,7 @@ mod links;
 #[cfg(target_os = "macos")]
 mod menu;
 mod passwords;
+mod secret;
 mod sidecar;
 mod updater;
 mod window;
@@ -68,8 +69,8 @@ fn main() {
             let data_dir = app.path().app_data_dir()?;
             std::fs::create_dir_all(&data_dir)?;
 
-            let endpoint = sidecar::endpoint();
-            let secret = sidecar::session_secret(&data_dir)?;
+            let endpoint = sidecar::endpoint(&data_dir)?;
+            let secret = secret::session_secret(&data_dir)?;
             app.manage(sidecar::spawn(app.handle(), &endpoint, &secret, &data_dir)?);
             app.manage(Arc::new(bridge::Bridge {
                 endpoint,
