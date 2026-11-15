@@ -33,9 +33,51 @@ export function readJustificationWindow(notice) {
   return days ? Number(days[1]) * 24 || null : null
 }
 
+const HOUR_MS = 3600 * 1000
+
+// The delay runs on working days only, Monday to Friday: a weekend's hours
+// don't count (public holidays still do).
+function isBusinessDay(date) {
+  const day = date.getDay()
+  return day !== 0 && day !== 6
+}
+
+function nextMidnight(date) {
+  return new Date(date.getFullYear(), date.getMonth(), date.getDate() + 1)
+}
+
+// `start` plus `hours` of working days: a day at a time, a weekend skipped.
+function addBusinessHours(start, hours) {
+  const cursor = new Date(start.getTime())
+  let left = hours * HOUR_MS
+  for (let guard = 0; left > 0 && guard < 400; guard += 1) {
+    const midnight = nextMidnight(cursor)
+    if (!isBusinessDay(cursor)) {
+      cursor.setTime(midnight.getTime())
+      continue
+    }
+    const step = Math.min(left, midnight.getTime() - cursor.getTime())
+    cursor.setTime(cursor.getTime() + step)
+    left -= step
+  }
+  return cursor
+}
+
+// The working hours between two moments (0 when `to` is the earlier).
+function businessHoursBetween(from, to) {
+  const cursor = new Date(from.getTime())
+  let total = 0
+  for (let guard = 0; cursor < to && guard < 400; guard += 1) {
+    const end = Math.min(nextMidnight(cursor).getTime(), to.getTime())
+    if (isBusinessDay(cursor)) total += end - cursor.getTime()
+    cursor.setTime(end)
+  }
+  return total / HOUR_MS
+}
+
 // The unjustified absences still inside the department's window, soonest
-// deadline first: { entry, deadline (Date), hoursLeft, share (0–1 of the
-// window still left) }.
+// deadline first: { entry, deadline (Date), hoursLeft (real hours till the
+// deadline), share (0–1 of the window's working hours still left) }.
 export function listOpenJustifications(entries, windowHours, now = new Date()) {
   if (!(windowHours > 0)) return []
   const nowMs = now.getTime()
@@ -44,10 +86,11 @@ export function listOpenJustifications(entries, windowHours, now = new Date()) {
     .map((entry) => {
       const start = absenceStart(entry)
       if (!start) return null
-      const deadline = new Date(start.getTime() + windowHours * 3600 * 1000)
-      const hoursLeft = (deadline.getTime() - nowMs) / 3600 / 1000
-      // Not yet begun (a clock off by a little): the whole window.
-      const share = Math.min(1, hoursLeft / windowHours)
+      const deadline = addBusinessHours(start, windowHours)
+      const hoursLeft = (deadline.getTime() - nowMs) / HOUR_MS
+      // Over a weekend the window doesn't shrink. Not yet begun (a clock
+      // off by a little): the whole window.
+      const share = Math.min(1, businessHoursBetween(now, deadline) / windowHours)
       return hoursLeft > 0 ? { entry, deadline, hoursLeft, share } : null
     })
     .filter(Boolean)
