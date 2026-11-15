@@ -12,6 +12,9 @@
 // The page tells the menu what it has (POST /__desktop/menu, desktop.rs →
 // `update`): « Aller »'s pages (the university's, none signed out), the
 // one in view (ticked), and which commands apply there (the others greyed).
+// Where the university has Moodle in the app (moodle.rs), « Aller » starts
+// with « Précédent » (⌘[) and « Suivant » (⌘]), as Finder's: Moodle's own
+// history, greyed off its page. « Imprimer… » there prints Moodle's page.
 
 use std::sync::Mutex;
 
@@ -19,7 +22,9 @@ use serde::Deserialize;
 use tauri::menu::{
     AboutMetadata, CheckMenuItem, Menu, MenuEvent, MenuItem, MenuItemKind, PredefinedMenuItem, Submenu, WINDOW_SUBMENU_ID,
 };
-use tauri::{AppHandle, Manager, Runtime, WebviewWindow};
+use tauri::{AppHandle, Manager, Runtime};
+
+use crate::window::Page;
 
 const CHECK_UPDATES: &str = "check-updates";
 const SETTINGS: &str = "settings";
@@ -27,6 +32,8 @@ const NEW_MESSAGE: &str = "new-message";
 const FIND: &str = "find";
 const REFRESH: &str = "refresh";
 const PRINT: &str = "print";
+const BACK: &str = "back";
+const FORWARD: &str = "forward";
 const GO_PREFIX: &str = "go:";
 
 // What the page sent (src/desktopMenu.js).
@@ -41,6 +48,18 @@ pub struct PageState {
     find: bool,
     #[serde(default)]
     refresh: bool,
+    // Moodle's history (« Précédent », « Suivant »): None where the
+    // university has no Moodle in the app, and the entries aren't there.
+    #[serde(default)]
+    history: Option<History>,
+}
+
+#[derive(Deserialize, Clone, Copy)]
+struct History {
+    #[serde(default)]
+    back: bool,
+    #[serde(default)]
+    forward: bool,
 }
 
 #[derive(Deserialize)]
@@ -172,6 +191,17 @@ pub fn update<R: Runtime>(app: &AppHandle<R>, state: PageState) {
             let _ = handles.go.remove(item_ref(&item));
         }
     }
+    if let (Some(history), false) = (state.history, state.pages.is_empty()) {
+        if let Ok(item) = MenuItem::with_id(app, BACK, "Précédent", history.back, Some("CmdOrCtrl+[")) {
+            let _ = handles.go.append(&item);
+        }
+        if let Ok(item) = MenuItem::with_id(app, FORWARD, "Suivant", history.forward, Some("CmdOrCtrl+]")) {
+            let _ = handles.go.append(&item);
+        }
+        if let Ok(separator) = PredefinedMenuItem::separator(app) {
+            let _ = handles.go.append(&separator);
+        }
+    }
     for (index, page) in state.pages.iter().enumerate() {
         // ⌘1 to ⌘9, in the sidebar's order.
         let shortcut = (index < 9).then(|| format!("CmdOrCtrl+{}", index + 1));
@@ -196,35 +226,39 @@ fn item_ref<R: Runtime>(item: &MenuItemKind<R>) -> &dyn tauri::menu::IsMenuItem<
 pub fn handle(app: &AppHandle, event: MenuEvent) {
     let id = event.id().as_ref();
     if id == CHECK_UPDATES {
-        crate::updater::check_from_menu(app, front_window(app));
+        crate::updater::check_from_menu(app, front_window(app).map(|page| page.view));
         return;
     }
-    let Some(window) = front_window(app) else { return };
+    let Some(Page { window, view }) = front_window(app) else { return };
     let script = match id {
         SETTINGS => "window.dispatchEvent(new Event('tafac:open-settings'))".to_string(),
         PRINT => {
-            let _ = window.print();
+            // Moodle's page when it is the one in view, else the app's.
+            let _ = match crate::moodle::shown_in(app, window.label()) {
+                Some(moodle) => moodle.print(),
+                None => view.print(),
+            };
             return;
         }
-        NEW_MESSAGE | FIND | REFRESH => command_script(id, None),
+        NEW_MESSAGE | FIND | REFRESH | BACK | FORWARD => command_script(id, None),
         _ => match id.strip_prefix(GO_PREFIX) {
             Some(page) => command_script("go", Some(page)),
             None => return,
         },
     };
-    let _ = window.eval(&script);
+    let _ = view.eval(&script);
 }
 
 // The window in front, else the main one, brought back if it was closed
 // (hidden: closing it doesn't quit, main.rs).
-fn front_window<R: Runtime>(app: &AppHandle<R>) -> Option<WebviewWindow<R>> {
-    if let Some(window) = app.webview_windows().into_values().find(|window| window.is_focused().unwrap_or(false)) {
-        return Some(window);
+fn front_window<R: Runtime>(app: &AppHandle<R>) -> Option<Page<R>> {
+    if let Some(page) = crate::window::pages(app).into_iter().find(|page| page.window.is_focused().unwrap_or(false)) {
+        return Some(page);
     }
-    let window = app.get_webview_window("main")?;
-    let _ = window.show();
-    let _ = window.set_focus();
-    Some(window)
+    let page = crate::window::page(app, "main")?;
+    let _ = page.window.show();
+    let _ = page.window.set_focus();
+    Some(page)
 }
 
 fn command_script(command: &str, page: Option<&str>) -> String {

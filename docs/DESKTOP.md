@@ -23,9 +23,10 @@ the university (CAS, ADE, webmail…)
 
 - **Links** (`src-tauri/src/links.rs`): web addresses open in the browser.
   An app address opened in a new tab (the launch relay) opens where its
-  redirect points. Downloads go to the Downloads folder. The window itself
-  only loads the app's pages: any other address (`file://`, another
-  program's scheme) is refused.
+  redirect points. A new tab on Moodle (a deadline, Moodle's tile, a link
+  in a mail) opens in the app's « Moodle » (below). Downloads go to the
+  Downloads folder. The window itself only loads the app's pages: any other
+  address (`file://`, another program's scheme) is refused.
 - **Data** (macOS: `~/Library/Application Support/fr.tafac.desktop/`, closed
   to other accounts): `cookies.json` (the encrypted session cookie) and
   `server/`, the remembered app icons (`DATA_DIR`). The secret that
@@ -35,11 +36,67 @@ the university (CAS, ADE, webmail…)
   no store, or it refuses, and in development builds, it is the
   `session-secret` file of that folder, readable by the student's account
   only.
+- **The login**: the student's login and password are kept in the same
+  credential store to stay signed in (below, `src-tauri/src/signin.rs`),
+  never in a file.
 - **Socket**: in a folder only the student's account can enter
   (`$XDG_RUNTIME_DIR`, else the data folder), never the shared `/tmp`
   (`src-tauri/src/sidecar.rs`).
 - The server stops with the app: its stdin is a pipe from the app, and when
   the pipe closes the server exits, even if the app crashed.
+
+## Staying signed in
+
+The student signs in once. The university's session dies on its own (the
+Rennes CAS ends it 30 to 47 minutes after the login, whatever the student
+does): the app signs in again by itself, and the login page only comes back
+after « Se déconnecter » (`src-tauri/src/signin.rs`, used by `bridge.rs`).
+
+- **Kept**: after a login of the page's that went through (`POST
+  /__ent_auth/login`, 200), the bridge keeps its login, password and
+  university (`university` of the body, else the `X-Tafac-University`
+  header). Not the demo account's, nor a login that needed a one-time code:
+  only the student can type that one, so it would never sign in alone. Any
+  login that goes through replaces what was kept.
+- **Where**: a packaged app keeps it in the system's credential store (macOS
+  Keychain: service `fr.tafac.desktop`, account `sign-in`), read once per
+  launch. A debug build keeps it in memory only, for the run (no file, and no
+  keychain: an unsigned build would have macOS ask for it at each rebuild):
+  after a restart, `npm run desktop:dev` asks for the password again. A store
+  that refuses it leaves it in memory for the run.
+- **Signed in again**: an answer with `X-Tafac-Session: expired`
+  (`server/sessionExpiry/`), on any request of the window or of Moodle's view,
+  makes the bridge sign in with the kept login (`quiet: true`: the server
+  sends no one-time code unasked), then ask the request again: the page and
+  Moodle's view get the second answer and never see the expiry. One sign-in
+  at a time: the requests that come back expired meanwhile wait for it and
+  are asked again after. Moodle's view stays open; the launch relay it asks
+  signs in to Moodle with the new session.
+- **At launch**: the page's first questions answer signed out
+  (`/__ent_auth/universities` without a session, `/__ent_auth/session`
+  `authenticated: false`): the bridge signs in first, so the page boots on
+  the student's university, signed in, without the login page.
+- **When it can't**: the answer goes to the page as it is, which signs out to
+  its login form with its note, as on the web.
+  - the university refuses the login (`code: 'login_refused'`: the CAS
+    answered the form itself, a wrong or changed password, a locked
+    account; `server/casLogin/refusal.ts`) or asks for a code (`mfa_*`): the
+    kept login is forgotten;
+  - anything else (no network, the CAS down or answering 5xx or 429, the
+    local server down): kept. Nothing is tried again for 30 seconds; after,
+    the next expired answer, or the next launch, tries again.
+- **Forgotten** on the student's own sign-out (`POST /__ent_auth/logout`). The
+  page's sign-out after an expiry the app couldn't get past says so
+  (`X-Tafac-Logout: expired`, `logoutFromEnt({ expired: true })` in
+  `src/entApi.js`) and keeps it. The bridge waits for a sign-in under way
+  before the sign-out goes, so none signs the student in again behind it.
+- **The password** goes only to the local server's login route, and from
+  there to the university's CAS, as when the student types it. It is never
+  logged (the app's log says `[tafac] sign-in: kept`, `signed in again`,
+  `refused by the university, forgotten`…).
+- **The login page** keeps the site's wording (« Ne transite pas sur le
+  serveur de Tafac », the university's `loginPasswordNote`): nothing on it
+  mentions the Keychain.
 
 ## The window
 
@@ -78,7 +135,9 @@ the university (CAS, ADE, webmail…)
   message ⌘N, Fermer la fenêtre
   ⌘W, Imprimer… ⌘P), Édition (+ Rechercher ⌘F), Présentation (Actualiser
   ⌘R), Aller (the university's pages, ⌘1…, the one in view ticked),
-  Fenêtre. Commands reach the page as `tafac:command` events; the page
+  Fenêtre. Where Moodle is a page, Aller starts with Précédent (⌘[) and
+  Suivant (⌘]), Moodle's own history, and Imprimer… there prints Moodle's
+  page. Commands reach the page as `tafac:command` events; the page
   sends what it has (`POST /__desktop/menu`, `src/desktopMenu.js`) and the
   menu greys what doesn't apply. `src-tauri/Info.plist` sets the app's
   language to French, so what macOS adds (Outils d'écriture, Dictée…) is
@@ -90,6 +149,78 @@ the university (CAS, ADE, webmail…)
   open in the reader alone (`@media print` in `src/overrides.css`).
 - **Spelling** is checked as you type (WebKit's
   `WebContinuousSpellCheckingEnabled`, set once in the app's defaults).
+
+## Moodle
+
+Where the university has Moodle (`features.moodle`), « Moodle » is a page of
+the app: Moodle itself, signed in, beside the sidebar. In the browser it
+stays a link (`src/navItems.js`).
+
+- **A web view of its own**, not an iframe (Moodle refuses to be framed):
+  `src-tauri/src/moodle.rs` lays it over the page's slot
+  (`src/components/MoodlePage.jsx`, `src/desktopMoodle.js`), through
+  `/__desktop/moodle/*` (`desktop.rs`). It is native, so above everything
+  the page draws: the page hides it while a sheet, a menu or a note is over
+  the slot, and shows it again after. It is made hidden and only shown once
+  Moodle's page is there: the slot shows the app's own wait until then.
+- **Signing in** goes through the launch relay (`/__ent_auth/launch`): the
+  server signs in to Moodle with the student's session (a CAS ticket, or for
+  a Moodle behind Shibboleth a page that posts the sign-in, loaded as a
+  `data:` address: Tauri's `webview-data-url`). When Moodle's own session
+  runs out, the relay is asked again and the student lands on the page they
+  asked for. When the server finds the student's session expired (the CAS
+  says so: its `X-Tafac-Session: expired` header on the relay's answer,
+  `server/sessionExpiry/`), the bridge signs in again with the kept login
+  and asks the relay again (Staying signed in); only when it can't does the
+  app sign out to its login form, as the site does. When the server couldn't sign in for another reason, or Moodle
+  doesn't answer, the slot says « Moodle indisponible » with « Réessayer ».
+  Coming back to the page tries again.
+- **What it may load** comes from the server, not from the page:
+  `GET /__ent_auth/moodle/view` (`server/moodleView/policy.ts`) gives Moodle's
+  dashboard and the university's own hosts, as the launch relay knows them
+  (Moodle, the CAS, the sign-in chain, `launch.allowedDomains`). The view's
+  page only loads those; any other web address opens in the browser, and
+  anything else (the app's own scheme, `file://`) is refused. Frames inside
+  a page (an embedded video) load as in a browser: on macOS the view's
+  navigation delegate is wrapped for that (`src-tauri/src/moodle_native.rs`),
+  as Tauri's rule is asked for every frame with the address alone.
+- **Apart from the app**: the view's requests to the app's scheme are
+  refused (`main.rs`), so nothing in a course page can ask the local server
+  anything with the student's session. Its cookies live in memory only, and
+  the view is closed when the student signs out or signs in (`main.rs`, on
+  `/__ent_auth/logout` and `/login`): the next student starts from nothing.
+- **Toolbar**, in the window's top band: Précédent, Suivant, Recharger (or
+  Arrêter while a page loads), Moodle's dashboard, the page's title,
+  Télécharger when a file is in view (a PDF, a picture), Ouvrir dans le
+  navigateur. The view says what it shows through `POST
+  /__desktop/moodle/state`, which waits for a change.
+- **Tafac's look** (`src-tauri/src/moodle_style.rs`): Moodle's own pages
+  take the app's colours, faces (Collab Sans, SN Pro for headings), corners
+  and pill buttons, in light and dark and with the student's palette. The
+  view's script (`moodle_style.js`, run by WebKit before each page's own, in
+  the top frame only) adds `moodle_style.css` (and `moodle_style_dark.css`
+  in the dark theme) as constructed style sheets, and the fonts as bytes
+  (`FontFace`): a page's Content-Security-Policy governs neither, so no
+  inline style is needed. The colours are the app's page's own, resolved
+  (`readMoodleTheme`, `src/desktopMoodle.js`), sent with `open` and on each
+  change (`POST /__desktop/moodle/theme`); the open page takes a change at
+  once, without a reload. The surface only, on Moodle's own class names
+  (Boost, Bootstrap 4 and 5): a Moodle update can at worst lose some of it.
+  One change of measure: the narrow reading column (`limitedwidth`, the
+  dashboard and the courses) is as wide as Moodle's wider setting. Hidden:
+  the university's logo in Moodle's bar (the sidebar shows it, the toolbar's
+  house goes to the dashboard). Left alone: the sign-in pages (another host,
+  or Moodle's `/login/`), frames from other sites, files Moodle serves as
+  they are (`pluginfile.php`). In the dark theme, what a teacher wrote with
+  colours of its own sits on white paper, as an HTML mail does.
+- **Downloads** open the Save panel. What Moodle sends as a file
+  (`Content-Disposition: attachment`) is saved rather than shown.
+- **One view**: asked from another window, it moves there, and the first
+  window says so (« Afficher ici » brings it back).
+- **Two web views in a window**: once the view is there, Tauri no longer
+  gives the main window as a `WebviewWindow` (`get_webview_window` answers
+  None). The app's code asks for the window and its page separately
+  (`window::page`, `window::pages` in `src-tauri/src/window.rs`).
 
 ## Saved passwords (macOS)
 
@@ -115,6 +246,8 @@ Apple only allows it when the app and tafac.fr name each other:
    `/.well-known/apple-app-site-association`.
 
 Without both, the sheet has nothing to offer and the form stays as it is.
+While the app keeps a login (Staying signed in: the login page shows after
+a sign-in that couldn't be tried), the sheet doesn't open.
 
 ## Updates
 
@@ -322,6 +455,8 @@ in `TAFAC_BUNDLE_DIR`.
 
 ## Not done yet
 
+- Staying signed in, for an account that asks for a one-time code: nothing
+  is kept, the student signs in by hand at each expiry.
 - Windows and Linux: builds, Windows signing, and their updates (there the
   update installs only from « Redémarrer », not on quit, and the row needs
   the sidebar, so a window at least 1024px wide).
@@ -331,3 +466,9 @@ in `TAFAC_BUNDLE_DIR`.
   ships its files.
 - Opening an app in a new tab from the context menu (`window.open` of
   `about:blank`, then filled) is refused: that menu shows its error.
+- Moodle elsewhere than on macOS: Tauri's navigation rule is asked for
+  frames too (an embedded video from another site would go to the browser),
+  and the toolbar can't tell whether there is a page to go back to.
+- Moodle: a download shows nothing while it runs or when it is done; while
+  a sheet is over the slot, the slot is empty (no picture of Moodle's page
+  under it).

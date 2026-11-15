@@ -30,7 +30,7 @@ use std::time::{Duration, Instant, SystemTime};
 use semver::Version;
 use serde::Serialize;
 use tauri::async_runtime::{spawn, spawn_blocking};
-use tauri::{AppHandle, Manager, WebviewWindow};
+use tauri::{AppHandle, Manager, Webview};
 use tauri_plugin_updater::{Update, UpdaterExt};
 use tokio::sync::watch;
 
@@ -221,7 +221,7 @@ async fn keep_checking(app: AppHandle) {
 // « Rechercher les mises à jour… » (menu.rs): checks now and answers with a
 // note in `window`.
 #[cfg_attr(not(target_os = "macos"), allow(dead_code))]
-pub fn check_from_menu(app: &AppHandle, window: Option<WebviewWindow>) {
+pub fn check_from_menu(app: &AppHandle, window: Option<Webview>) {
     let app = app.clone();
     spawn(async move {
         check(&app, window.as_ref()).await;
@@ -236,7 +236,7 @@ pub async fn check_from_page(app: &AppHandle) -> Note {
 
 // One check, and the note that says how it went. False: no answer (offline,
 // tafac.fr down, a latest.json that doesn't read).
-async fn check(app: &AppHandle, asked_from: Option<&WebviewWindow>) -> (bool, Note) {
+async fn check(app: &AppHandle, asked_from: Option<&Webview>) -> (bool, Note) {
     let state = app.state::<Updates>();
     let current = app.package_info().version.clone();
     if !enabled(&current) {
@@ -658,12 +658,12 @@ fn tell_state(app: &AppHandle) {
         inner.told = Instant::now();
         inner.page.clone()
     };
-    for window in app.webview_windows().into_values() {
-        tell(&window, "tafac:update", &page);
+    for window in crate::window::pages(app) {
+        tell(&window.view, "tafac:update", &page);
     }
 }
 
-fn tell(window: &WebviewWindow, event: &str, detail: &impl Serialize) {
+fn tell(window: &Webview, event: &str, detail: &impl Serialize) {
     let Ok(detail) = serde_json::to_string(detail) else { return };
     let _ = window.eval(format!("window.dispatchEvent(new CustomEvent('{event}', {{ detail: {detail} }}))"));
 }

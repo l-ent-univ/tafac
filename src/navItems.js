@@ -12,7 +12,7 @@ import {
 // Main navigation, shared by the desktop sidebar and the mobile tab bar.
 
 const MOODLE_ORIGIN = universityConfig.origins?.moodle ?? null
-export const MOODLE_HREF = universityConfig.features?.moodle && MOODLE_ORIGIN
+const MOODLE_HREF = universityConfig.features?.moodle && MOODLE_ORIGIN
   ? `${ENT_AUTH_PREFIX}/launch?url=${encodeURIComponent(`${MOODLE_ORIGIN.replace(/\/$/, '')}/my/`)}`
   : null
 // Without the in-app mail page (mail.page: false in client.js), « Messagerie »

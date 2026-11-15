@@ -4,7 +4,9 @@
 // image or form can send, so a mail's content can't set them off.
 //
 //   POST /__desktop/password/pick  the system's saved passwords for tafac.fr:
-//                                  200 { username, password }, or 204
+//                                  200 { username, password }, or 204 (and
+//                                  no sheet while the app keeps a login,
+//                                  signin.rs)
 //   POST /__desktop/password/save  { username, password }: offered to be
 //                                  saved for tafac.fr; 204
 //   POST /__desktop/menu           what the page has, for the menu bar
@@ -19,13 +21,23 @@
 //   POST /__desktop/update/install the update now, then the app again: 204
 //   POST /__desktop/update/check   checks now (Réglages › Mises à jour): 200
 //                                  { kind, version }, the menu's note
-//   POST /__desktop/moodle/show    { launch, x, y, width, height }: Moodle's
-//                                  web view over the page's slot (moodle.rs),
-//                                  made the first time: 204, or 400
+//   POST /__desktop/moodle/open    { x, y, width, height, target?, theme? }: Moodle's
+//                                  web view (moodle.rs) made where the
+//                                  page's slot is, hidden, or sent to
+//                                  `target`, a page of Moodle's: 204, or 400
+//   POST /__desktop/moodle/show    { x, y, width, height }: on screen: 204
 //   POST /__desktop/moodle/bounds  { x, y, width, height }: the slot moved: 204
 //   POST /__desktop/moodle/hide    the page left « Moodle » or covers it: 204
-//   POST /__desktop/moodle/command { command: back | forward | reload | home |
-//                                  browser, home? }: the page's toolbar: 204
+//   POST /__desktop/moodle/state   { since? }: 200 { version, phase: none |
+//                                  opening | ready | signin | failed |
+//                                  elsewhere (in another window), loading,
+//                                  back, forward, title, file }; waits a
+//                                  moment for a change since `since`
+//   POST /__desktop/moodle/command { command: back | forward | reload | stop |
+//                                  home | browser | download | retry }: the
+//                                  page's toolbar: 204
+//   POST /__desktop/moodle/theme   { dark, tokens }: the app's colours, for
+//                                  Moodle's pages (moodle_style.rs): 204
 
 use serde::{Deserialize, Serialize};
 use tauri::AppHandle;
@@ -47,6 +59,9 @@ pub async fn handle(app: &AppHandle, window_label: &str, request: http::Request<
     }
 
     match request.uri().path() {
+        // The app keeps a login to sign in again by itself (signin.rs): the
+        // system's sheet would only be in the way.
+        "/__desktop/password/pick" if keeps_a_login(app) => status(204),
         "/__desktop/password/pick" => match log_pick(passwords::pick(app, window_label).await) {
             Some(credential) => {
                 let body = CredentialBody { username: credential.username, password: credential.password };
@@ -86,8 +101,8 @@ pub async fn handle(app: &AppHandle, window_label: &str, request: http::Request<
             .header("cache-control", "no-store")
             .body(serde_json::to_vec(&crate::updater::check_from_page(app).await).unwrap_or_default())
             .unwrap(),
-        "/__desktop/moodle/show" => match serde_json::from_slice::<crate::moodle::ShowBody>(request.body()) {
-            Ok(body) => match crate::moodle::show(app, window_label, body).await {
+        "/__desktop/moodle/open" => match serde_json::from_slice::<crate::moodle::OpenBody>(request.body()) {
+            Ok(body) => match crate::moodle::open(app, window_label, body).await {
                 Ok(()) => status(204),
                 Err(error) => {
                     eprintln!("[tafac] Moodle view: {error}");
@@ -96,19 +111,40 @@ pub async fn handle(app: &AppHandle, window_label: &str, request: http::Request<
             },
             Err(_) => status(400),
         },
+        "/__desktop/moodle/show" => {
+            if let Ok(bounds) = serde_json::from_slice::<crate::moodle::Bounds>(request.body()) {
+                crate::moodle::show(app, window_label, bounds);
+            }
+            status(204)
+        }
         "/__desktop/moodle/bounds" => {
             if let Ok(bounds) = serde_json::from_slice::<crate::moodle::Bounds>(request.body()) {
-                crate::moodle::bounds(app, bounds);
+                crate::moodle::bounds(app, window_label, bounds);
             }
             status(204)
         }
         "/__desktop/moodle/hide" => {
-            crate::moodle::hide(app);
+            crate::moodle::hide(app, window_label);
             status(204)
+        }
+        "/__desktop/moodle/state" => {
+            let asked = serde_json::from_slice::<crate::moodle::StateRequest>(request.body()).unwrap_or_default();
+            http::Response::builder()
+                .status(200)
+                .header("content-type", "application/json")
+                .header("cache-control", "no-store")
+                .body(serde_json::to_vec(&crate::moodle::state(app, window_label, asked).await).unwrap_or_default())
+                .unwrap()
         }
         "/__desktop/moodle/command" => {
             if let Ok(body) = serde_json::from_slice::<crate::moodle::CommandBody>(request.body()) {
-                crate::moodle::command(app, body);
+                crate::moodle::command(app, window_label, body);
+            }
+            status(204)
+        }
+        "/__desktop/moodle/theme" => {
+            if let Ok(body) = serde_json::from_slice::<crate::moodle_style::ThemeBody>(request.body()) {
+                crate::moodle::theme(app, body);
             }
             status(204)
         }
@@ -118,6 +154,11 @@ pub async fn handle(app: &AppHandle, window_label: &str, request: http::Request<
         }
         _ => status(404),
     }
+}
+
+fn keeps_a_login(app: &AppHandle) -> bool {
+    use tauri::Manager;
+    app.try_state::<std::sync::Arc<crate::bridge::Bridge>>().is_some_and(|bridge| bridge.signin.has_kept())
 }
 
 // Development: whether the system's sheet gave anything (never the values).

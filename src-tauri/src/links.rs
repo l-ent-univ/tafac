@@ -5,6 +5,9 @@
 // - An app address in a new tab is mostly the launch relay
 //   (/__ent_auth/launch): its redirect, the university service with its CAS
 //   ticket, opens in the browser. Any other app page gets its own window.
+// - A new tab on Moodle (a deadline, Moodle's tile, a link in a mail),
+//   straight or through the relay, opens in the app's « Moodle » where the
+//   university has it (moodle.rs), signed in.
 // - A download (the app's blob links with a file name: certificate, .ics,
 //   printed mail, attachments…) goes where the student picks in the Save
 //   panel (macOS), else to the Downloads folder.
@@ -31,7 +34,7 @@ fn is_outside_url(url: &Url) -> bool {
     matches!(url.scheme(), "http" | "https" | "mailto" | "tel") && !is_app_url(url)
 }
 
-fn open_outside(url: &Url) {
+pub fn open_outside(url: &Url) {
     if let Err(error) = tauri_plugin_opener::open_url(url.as_str(), None::<&str>) {
         eprintln!("[tafac] could not open {url}: {error}");
     }
@@ -78,13 +81,26 @@ pub fn allow_navigation(url: &Url) -> bool {
     }
 }
 
-// window.open and target="_blank".
-pub fn new_window(app: &AppHandle, url: Url) -> NewWindowResponse<Wry> {
-    if is_outside_url(&url) {
-        open_outside(&url);
-    } else if is_app_url(&url) {
+// window.open and target="_blank", from the page of the window `label`.
+pub fn new_window(app: &AppHandle, label: &str, url: Url) -> NewWindowResponse<Wry> {
+    if is_outside_url(&url) || is_app_url(&url) {
         let app = app.clone();
-        tauri::async_runtime::spawn(async move { open_app_link(&app, url).await });
+        let label = label.to_string();
+        tauri::async_runtime::spawn(async move {
+            // Moodle's: in « Moodle », which that page then shows.
+            let in_moodle = match crate::moodle::link_target(&app, &url).await {
+                Some(target) => crate::moodle::open_in_page(&app, &label, &target),
+                None => false,
+            };
+            if in_moodle {
+                return;
+            }
+            if is_outside_url(&url) {
+                open_outside(&url);
+            } else {
+                open_app_link(&app, url).await;
+            }
+        });
     }
     NewWindowResponse::Deny
 }
@@ -119,17 +135,27 @@ async fn open_app_link(app: &AppHandle, url: Url) {
     }
 }
 
+// A window's page starts loading (again): Moodle's view, if that page had
+// it on screen, leaves it (moodle.rs).
+pub fn page_load(window: tauri::WebviewWindow, payload: tauri::webview::PageLoadPayload<'_>) {
+    if payload.event() == tauri::webview::PageLoadEvent::Started {
+        crate::moodle::page_reloaded(window.app_handle(), window.label());
+    }
+}
+
 static WINDOW_COUNT: AtomicUsize = AtomicUsize::new(0);
 
 pub fn open_app_window(app: &AppHandle, url: Url) -> tauri::Result<()> {
     let label = format!("page-{}", WINDOW_COUNT.fetch_add(1, Ordering::Relaxed));
     let handle = app.clone();
+    let opener = label.clone();
     let window = crate::window::style(WebviewWindowBuilder::new(app, label, WebviewUrl::CustomProtocol(url)))
         .title("Tafac")
         .inner_size(1100.0, 780.0)
         .on_navigation(allow_navigation)
-        .on_new_window(move |url, _features| new_window(&handle, url))
+        .on_new_window(move |url, _features| new_window(&handle, &opener, url))
         .on_download(download)
+        .on_page_load(page_load)
         .build()?;
     crate::window::show(&window)
 }
