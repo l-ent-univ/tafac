@@ -135,21 +135,29 @@ pub fn open_app_window(app: &AppHandle, url: Url) -> tauri::Result<()> {
 }
 
 pub fn download(_webview: tauri::Webview, event: DownloadEvent<'_>) -> bool {
+    if let DownloadEvent::Requested { url, .. } = &event {
+        // A download link skips allow_navigation: the same rules here.
+        // A web file goes to the browser, which downloads it itself.
+        match classify_navigation(url) {
+            Navigation::Stay => {}
+            Navigation::Browser => {
+                open_outside(url);
+                return false;
+            }
+            Navigation::Refuse => {
+                eprintln!("[tafac] download refused: {}:", url.scheme());
+                return false;
+            }
+        }
+    }
+    save_download(event)
+}
+
+// A download whose address is accepted: where it goes (the Save panel), and
+// whether it failed. Moodle's view (moodle.rs) accepts its own site's files.
+pub fn save_download(event: DownloadEvent<'_>) -> bool {
     match event {
         DownloadEvent::Requested { url, destination } => {
-            // A download link skips allow_navigation: the same rules here.
-            // A web file goes to the browser, which downloads it itself.
-            match classify_navigation(&url) {
-                Navigation::Stay => {}
-                Navigation::Browser => {
-                    open_outside(&url);
-                    return false;
-                }
-                Navigation::Refuse => {
-                    eprintln!("[tafac] download refused: {}:", url.scheme());
-                    return false;
-                }
-            }
             let Some(folder) = downloads_folder() else { return false };
             let name = destination
                 .file_name()

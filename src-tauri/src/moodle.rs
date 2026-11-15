@@ -19,7 +19,7 @@
 use std::sync::Arc;
 
 use serde::Deserialize;
-use tauri::webview::NewWindowResponse;
+use tauri::webview::{DownloadEvent, NewWindowResponse};
 use tauri::{AppHandle, LogicalPosition, LogicalSize, Manager, Url, Webview, WebviewBuilder, WebviewUrl, Wry};
 
 use crate::bridge::{self, Bridge};
@@ -138,6 +138,7 @@ async fn create(app: &AppHandle, window_label: &str, launch: &str, bounds: Bound
 
     let window = app.get_window(window_label).ok_or("no window")?;
     let navigation_home = home.clone();
+    let download_home = home.clone();
     let new_window_app = app.clone();
     let builder = WebviewBuilder::new(LABEL, WebviewUrl::External(start))
         .on_navigation(move |url| {
@@ -159,7 +160,16 @@ async fn create(app: &AppHandle, window_label: &str, launch: &str, bounds: Bound
             }
             NewWindowResponse::Deny
         })
-        .on_download(links::download);
+        // Moodle's files (a course's PDF) are saved; any other download
+        // follows the window's rules.
+        .on_download(move |webview, event| {
+            let from_moodle = matches!(&event, DownloadEvent::Requested { url, .. } if stays_inside(url, &download_home));
+            if from_moodle {
+                links::save_download(event)
+            } else {
+                links::download(webview, event)
+            }
+        });
 
     let app = app.clone();
     tauri::async_runtime::spawn_blocking(move || {
