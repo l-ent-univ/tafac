@@ -2,6 +2,7 @@ import { useEffect, useState, useSyncExternalStore } from 'react'
 import { getBriefingSources, publishBriefingSource, subscribeBriefingSources } from './briefingSources'
 import { buildDailyBriefing } from './dailyBriefing'
 import { fetchUpcomingEvents, persistNextClassCache, readNextClassCache } from './upcomingClasses'
+import { usePageReturn, usePageShown } from './pageVisit'
 
 // The briefing follows the clock ("Encore 2 cours" becomes "Dernier cours").
 const BRIEFING_TICK_MS = 60 * 1000
@@ -64,7 +65,11 @@ export default function useDailyBriefing({
     return () => controller.abort()
   }, [classesCacheKey, classesSource, lookaheadDays, selection])
 
+  // Not while its page is kept behind another (the iOS app,
+  // src/pageVisit.js): the clock is read again as the page is back.
+  const shown = usePageShown()
   useEffect(() => {
+    if (!shown) return undefined
     function refreshClock() {
       if (document.visibilityState === 'visible') {
         setNow(new Date())
@@ -77,7 +82,8 @@ export default function useDailyBriefing({
       window.clearInterval(intervalId)
       document.removeEventListener('visibilitychange', refreshClock)
     }
-  }, [])
+  }, [shown])
+  usePageReturn(() => setNow(new Date()))
 
   useEffect(() => {
     const timeoutId = window.setTimeout(() => setIsRevealed(true), BRIEFING_MAX_WAIT_MS)

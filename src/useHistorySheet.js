@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { useClosedWithPage } from './pageVisit'
 
 // A sheet over the page with a history entry of its own, as the grade
 // detail sheet has (GradeDetailProvider): opening it adds `key` to a new
@@ -6,8 +7,12 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 // app's and the UE view's popstate handlers leave it alone). Back (Android's
 // gesture, the browser button) then only closes the sheet, Forward opens it
 // again (afresh); its own close steps back off that entry.
+// The sheet goes with its page: where a page left stays mounted (the iOS
+// app, src/pageVisit.js), it closes as the page is hidden (a mail written
+// from it shows the Messagerie, not the sheet over it).
 export function useHistorySheet(key) {
   const [isOpen, setIsOpen] = useState(false)
+  const pageShown = useClosedWithPage(() => setIsOpen(false))
   // Read by the history handlers, which outlive a render.
   const isOpenRef = useRef(false)
   useEffect(() => {
@@ -55,5 +60,5 @@ export function useHistorySheet(key) {
     return () => window.removeEventListener('popstate', handlePopState)
   }, [key])
 
-  return { isOpen, open, close }
+  return { isOpen: isOpen && pageShown, open, close }
 }

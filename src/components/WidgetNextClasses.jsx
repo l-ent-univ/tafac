@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { Icon } from '@iconify/react'
 import { Skeleton } from 'skullet/react'
 import { useSkeletonsForced, SAMPLE_CLASSES } from '../skeletonSamples'
@@ -6,6 +6,8 @@ import { formatHour, pickNextClassesDay } from '../nextClassesDay'
 import { NEXT_CLASS_LOOKAHEAD_DAYS } from '../upcomingClasses'
 import { useUpcomingClasses } from '../useUpcomingClasses'
 import { useEventAccents } from '../usePlanningWeeks'
+import { isInHiddenPage } from '../keptPages'
+import { usePageInterval } from '../pageVisit'
 import calendarIcon from '../assets/home-icons/calendar.png'
 import PlanningEventBlock from './PlanningEventBlock'
 import WidgetListStatus from './WidgetListStatus'
@@ -46,19 +48,19 @@ function useElementSize() {
       current.width === width && current.height === height ? current : { width, height }
     ))
     update(element.clientWidth, element.clientHeight)
-    const observer = new ResizeObserver(([entry]) => update(Math.round(entry.contentRect.width), Math.round(entry.contentRect.height)))
+    const observer = new ResizeObserver(([entry]) => {
+      if (!isInHiddenPage(element)) update(Math.round(entry.contentRect.width), Math.round(entry.contentRect.height))
+    })
     observer.observe(element)
     return () => observer.disconnect()
   }, [])
   return [ref, size]
 }
 
+// While the card's page is shown (src/pageVisit.js).
 function useNow() {
   const [now, setNow] = useState(() => new Date())
-  useEffect(() => {
-    const id = window.setInterval(() => setNow(new Date()), TICK_MS)
-    return () => window.clearInterval(id)
-  }, [])
+  usePageInterval(() => setNow(new Date()), TICK_MS)
   return now
 }
 

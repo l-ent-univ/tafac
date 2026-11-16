@@ -5,6 +5,9 @@ student's computer. The login and every request to the university go from
 that computer straight to the university: credentials never pass through
 tafac.fr.
 
+The iOS app is the same code built for a phone, with Node inside the app:
+`docs/IOS.md`.
+
 ## How it fits together
 
 ```
@@ -21,6 +24,11 @@ server.js, unchanged                 desktop/sidecar.mjs
 the university (CAS, ADE, webmail…)
 ```
 
+- **The page's built files** (`/assets/…`) are asked of the server once and
+  answered from memory after that (`src-tauri/src/assets.rs`), whole or in
+  part. WebKit keeps nothing from the app's scheme, and reads a video a few
+  bytes at a time: the home page's animated icons alone were some sixty
+  requests a second to the server.
 - **Links** (`src-tauri/src/links.rs`): web addresses open in the browser.
   An app address opened in a new tab (the launch relay) opens where its
   redirect points. A new tab on Moodle (a deadline, Moodle's tile, a link
@@ -393,6 +401,14 @@ nécessaire » until updated.
 
 Then the repository variable `DESKTOP_RELEASE` = `true`, and
 `DESKTOP_LATEST_FILE` on tafac.fr.
+
+## Remote settings
+
+Between two updates, the app's server reads a small signed file from
+tafac.fr, patches over its universities' settings: a feature switched off,
+an address that moved within the university's own domains. Data only, never
+code, never a new domain. Read when the app starts (not when its window is
+closed and opened again): `docs/REMOTE_SETTINGS.md`.
 
 ## Statistics
 

@@ -6,11 +6,12 @@
 // them against server/analyticsSchema.js and forwards them. Only when the
 // server has a PostHog key. No third-party script runs in the page.
 import { useEffect, useRef, useSyncExternalStore } from 'react'
+import { usePageVisit } from './pageVisit'
 import { ENT_AUTH_PREFIX } from './entApi'
 import { getStoredAnonymousAnalytics } from './profileStorage'
 import { toFormationSlug } from './formationSlug'
 import { createNavigationReporter } from './planningAnalytics'
-import { isDesktopApp } from './desktopApp'
+import { isDesktopApp, isIosApp } from './desktopApp'
 import { getDesktopUpdate, subscribeDesktopUpdate } from './desktopUpdate'
 
 const ANALYTICS_ENDPOINT = `${ENT_AUTH_PREFIX}/analytics`
@@ -117,9 +118,10 @@ function isStandalone() {
   }
 }
 
-// Where Tafac runs: the desktop app (src-tauri), the installed PWA, or a
-// browser tab.
+// Where Tafac runs: the desktop app or the iOS app (src-tauri), the
+// installed PWA, or a browser tab.
 function getClient() {
+  if (isIosApp()) return 'ios'
   if (isDesktopApp()) return 'desktop'
   return isStandalone() ? 'pwa' : 'web'
 }
@@ -220,6 +222,13 @@ export function trackDashboardView({ greetingShown = false } = {}) {
   }
 }
 
+// « Accueil » shown again where it was kept mounted (the iOS app,
+// src/keptPages.js): a view like another, of cards that load nothing, so
+// none is reported again.
+export function trackDashboardReturn() {
+  track('dashboard_viewed')
+}
+
 // Reports `widget_loaded` once per dashboard view, when `outcome` first
 // becomes { status: 'ok' | 'empty' | 'error', errorKind? }. Pass null while
 // loading (or when there is nothing to report). Background refreshes are
@@ -248,17 +257,22 @@ export function useWidgetLoadReport(widget, outcome) {
 // got there (`source`, see src/gradesAnalytics.js), then grades_loaded when
 // `outcome` (describeGradesLoad) first settles for the semester it opens on.
 // Later semester switches and background refreshes are never reported.
+// Where the page is kept mounted (the iOS app, src/pageVisit.js), each
+// showing of it is an arrival (`visit`): page_viewed again, with its
+// source; nothing loads then, so grades_loaded is the mount's alone. The
+// same for the three pages below.
 export function useGradesPageReport(source, outcome) {
+  const visit = usePageVisit()
   const startedAtRef = useRef(null)
-  const reportedRef = useRef({ view: false, load: false })
+  const reportedRef = useRef({ view: 0, load: false })
   const status = outcome?.status ?? null
   const errorKind = outcome?.errorKind ?? null
 
   useEffect(() => {
     if (startedAtRef.current === null) startedAtRef.current = performance.now()
     const reported = reportedRef.current
-    if (!reported.view) {
-      reported.view = true
+    if (reported.view !== visit) {
+      reported.view = visit
       track('page_viewed', { page: 'grades', source })
     }
     if (!status || reported.load) return
@@ -269,7 +283,7 @@ export function useGradesPageReport(source, outcome) {
       duration_bucket: getDurationBucket(performance.now() - startedAtRef.current),
       ...(status === 'error' ? { error_kind: errorKind ?? 'other' } : null),
     })
-  }, [source, status, errorKind])
+  }, [source, status, errorKind, visit])
 }
 
 // One thing done on « Mes notes » (grades_action): `action` and, for a
@@ -285,16 +299,17 @@ export function trackGradesAction(action, { from = null } = {}) {
 // (describePlanningLoad) first settles for the week it opens on. Later
 // weeks, retries and background refreshes are never reported.
 export function usePlanningPageReport(source, view, outcome) {
+  const visit = usePageVisit()
   const startedAtRef = useRef(null)
-  const reportedRef = useRef({ view: false, load: false })
+  const reportedRef = useRef({ view: 0, load: false })
   const status = outcome?.status ?? null
   const errorKind = outcome?.errorKind ?? null
 
   useEffect(() => {
     if (startedAtRef.current === null) startedAtRef.current = performance.now()
     const reported = reportedRef.current
-    if (!reported.view) {
-      reported.view = true
+    if (reported.view !== visit) {
+      reported.view = visit
       track('page_viewed', { page: 'planning', source, ...(view ? { view } : null) })
     }
     if (!status || reported.load) return
@@ -305,7 +320,7 @@ export function usePlanningPageReport(source, view, outcome) {
       duration_bucket: getDurationBucket(performance.now() - startedAtRef.current),
       ...(status === 'unavailable' ? { error_kind: errorKind ?? 'other' } : null),
     })
-  }, [source, view, status, errorKind])
+  }, [source, view, status, errorKind, visit])
 }
 
 // One thing done on the Planning page (planning_action): `action` and its
@@ -334,16 +349,17 @@ export function flushPlanningNavigation() {
 // when `outcome` (describeAssiduityLoad) first settles for the semester it
 // opens on. Semester switches and background refreshes are never reported.
 export function useAssiduityPageReport(source, outcome) {
+  const visit = usePageVisit()
   const startedAtRef = useRef(null)
-  const reportedRef = useRef({ view: false, load: false })
+  const reportedRef = useRef({ view: 0, load: false })
   const status = outcome?.status ?? null
   const errorKind = outcome?.errorKind ?? null
 
   useEffect(() => {
     if (startedAtRef.current === null) startedAtRef.current = performance.now()
     const reported = reportedRef.current
-    if (!reported.view) {
-      reported.view = true
+    if (reported.view !== visit) {
+      reported.view = visit
       track('page_viewed', { page: 'assiduity', source })
     }
     if (!status || reported.load) return
@@ -354,7 +370,7 @@ export function useAssiduityPageReport(source, outcome) {
       duration_bucket: getDurationBucket(performance.now() - startedAtRef.current),
       ...(status === 'error' ? { error_kind: errorKind ?? 'other' } : null),
     })
-  }, [source, status, errorKind])
+  }, [source, status, errorKind, visit])
 }
 
 // One thing done on « Assiduité » (assiduity_action): `action` and, for
@@ -375,16 +391,17 @@ export function trackJustifyStep(step, properties = {}) {
 // (describeMailLoad) first settles for the folder it opens on. Other folders,
 // pages of older mails and background refreshes are never reported.
 export function useMailPageReport(source, outcome) {
+  const visit = usePageVisit()
   const startedAtRef = useRef(null)
-  const reportedRef = useRef({ view: false, load: false })
+  const reportedRef = useRef({ view: 0, load: false })
   const status = outcome?.status ?? null
   const errorKind = outcome?.errorKind ?? null
 
   useEffect(() => {
     if (startedAtRef.current === null) startedAtRef.current = performance.now()
     const reported = reportedRef.current
-    if (!reported.view) {
-      reported.view = true
+    if (reported.view !== visit) {
+      reported.view = visit
       track('page_viewed', { page: 'mail', source })
     }
     if (!status || reported.load) return
@@ -395,7 +412,7 @@ export function useMailPageReport(source, outcome) {
       duration_bucket: getDurationBucket(performance.now() - startedAtRef.current),
       ...(status === 'error' ? { error_kind: errorKind ?? 'other' } : null),
     })
-  }, [source, status, errorKind])
+  }, [source, status, errorKind, visit])
 }
 
 // One thing done in the Messagerie (mail_action): `action` and its own

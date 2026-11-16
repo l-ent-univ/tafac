@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Icon } from '@iconify/react'
 import transitionDoneImage from '../assets/login/transition-done.webp'
 import { r } from '../register.js'
+import { isNativeApp } from '../desktopApp'
 
 // What a transferred setting looks like to a student. Several keys share a
 // label (favourites and pins are both "Favoris"). The weather city still
@@ -25,8 +26,11 @@ function isMobile() {
   return /iPhone|iPad|iPod|Android/i.test(navigator.userAgent)
 }
 
+// Installed already: the web app on the home screen, or the app itself
+// (iOS, desktop).
 function isStandalone() {
-  return window.matchMedia('(display-mode: standalone)').matches
+  return isNativeApp()
+    || window.matchMedia('(display-mode: standalone)').matches
     || window.navigator.standalone === true
 }
 

@@ -18,13 +18,13 @@ const WIDGET_IDS = ['greeting', 'nextClass', 'latestGrade', 'mail', 'deadlines',
 export const DURATION_BUCKETS = ['<500ms', '<1s', '<3s', '<10s', '10s+']
 const ERROR_KINDS = ['http_4xx', 'http_5xx', 'network', 'timeout', 'other']
 // How the student arrived on « Mes notes » (see src/gradesAnalytics.js).
-const GRADES_PAGE_SOURCES = ['nav', 'tabbar', 'tile', 'dashboard_card', 'sidebar_card', 'launch_card', 'history', 'other']
+const GRADES_PAGE_SOURCES = ['nav', 'tabbar', 'tile', 'dashboard_card', 'sidebar_card', 'launch_card', 'home_icon', 'history', 'other']
 const GRADES_ACTIONS = ['semester_changed', 'ue_view_opened', 'grade_detail_opened', 'pdf_downloaded', 'explainer_opened', 'department_message_expanded']
 // How the student arrived on the Planning page (see src/planningAnalytics.js).
-const PLANNING_PAGE_SOURCES = ['nav', 'tabbar', 'tile', 'dashboard_card', 'launch_card', 'history', 'other']
+const PLANNING_PAGE_SOURCES = ['nav', 'tabbar', 'tile', 'dashboard_card', 'launch_card', 'home_icon', 'history', 'other']
 // And on the Messagerie (see src/mailAnalytics.js): `grades` is « Écrire au
 // sujet de cette note », `planning` « Écrire au sujet de ce cours ».
-const MAIL_PAGE_SOURCES = ['nav', 'tabbar', 'tile', 'dashboard_card', 'launch_card', 'grades', 'planning', 'assiduity', 'history', 'other']
+const MAIL_PAGE_SOURCES = ['nav', 'tabbar', 'tile', 'dashboard_card', 'launch_card', 'home_icon', 'grades', 'planning', 'assiduity', 'history', 'other']
 // And on « Assiduité » (see src/assiduityAnalytics.js): `dashboard_card` is
 // « Accueil »'s « Assiduité » card.
 const ASSIDUITY_PAGE_SOURCES = ['nav', 'tabbar', 'dashboard_card', 'history', 'other']
@@ -124,7 +124,7 @@ export const CONTEXT_PROPERTIES = {
   browser: oneOf('chromium', 'firefox', 'safari', 'other'),
   standalone: boolean,
   // Where Tafac runs: a browser tab, the installed PWA, the desktop app.
-  client: oneOf('web', 'pwa', 'desktop'),
+  client: oneOf('web', 'pwa', 'desktop', 'ios'),
   // The desktop app's version (x.y.z).
   app_version: (value) => (typeof value === 'string' && /^\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(value) ? value : undefined),
   lang: (value) => (typeof value === 'string' && /^[a-z]{2}$/.test(value) ? value : undefined),
@@ -160,7 +160,7 @@ export const ANALYTICS_EVENTS = {
   app_opened: {
     properties: {
       app: slug(64),
-      source: oneOf('grid', 'favorites', 'sidebar', 'tabbar'),
+      source: oneOf('grid', 'favorites', 'sidebar', 'tabbar', 'home_icon'),
       // The grade service's app opened « Mes notes » instead of ScoDoc, or
       // the planning service's app the Planning page instead of the service.
       in_app: boolean,

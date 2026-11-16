@@ -14,7 +14,7 @@
 // - sidebar_card: the sidebar's "Dernière note";
 // - launch_card: the « Mes notes » announcement under the widgets;
 // - history: back, forward or a reload landing on the page.
-export const GRADES_PAGE_SOURCES = ['nav', 'tabbar', 'tile', 'dashboard_card', 'sidebar_card', 'launch_card', 'history', 'other']
+export const GRADES_PAGE_SOURCES = ['nav', 'tabbar', 'tile', 'dashboard_card', 'sidebar_card', 'launch_card', 'home_icon', 'history', 'other']
 
 export function toGradesPageSource(source) {
   return GRADES_PAGE_SOURCES.includes(source) ? source : 'other'

@@ -6,6 +6,8 @@ import { publishBriefingSource } from '../briefingSources'
 import { getRecentMail } from '../entApi'
 import { useSkeletonsForced, SAMPLE_MESSAGES } from '../skeletonSamples'
 import useFitListItems from '../useFitListItems'
+import { usePageReturn, usePageShown } from '../pageVisit'
+import { usePullRefresh } from '../usePullRefresh'
 import { addressMenuItems } from '../contextMenuItems'
 import { copyToClipboard, useContextMenu } from '../useContextMenu'
 import WidgetListStatus from './WidgetListStatus'
@@ -208,8 +210,11 @@ function WidgetRecentMail({ visible = false, preview = null, onOpenMail = null, 
     if (!preview) void loadMail()
   }, [loadMail, preview])
 
+  // While the card's page is shown: kept behind another (the iOS app,
+  // src/pageVisit.js) it asks nothing, and catches up as the page is back.
+  const shown = usePageShown()
   useEffect(() => {
-    if (preview || (state.status !== 'ok' && state.status !== 'error')) return undefined
+    if (!shown || preview || (state.status !== 'ok' && state.status !== 'error')) return undefined
 
     function refreshIfStale() {
       if (document.visibilityState !== 'visible') return
@@ -224,7 +229,13 @@ function WidgetRecentMail({ visible = false, preview = null, onOpenMail = null, 
       window.clearInterval(intervalId)
       document.removeEventListener('visibilitychange', refreshIfStale)
     }
-  }, [loadMail, preview, state.status])
+  }, [loadMail, preview, state.status, shown])
+  // Pulled down with its page (the iOS app).
+  usePullRefresh(() => loadMail({ background: true }))
+  usePageReturn(() => {
+    if (preview || (state.status !== 'ok' && state.status !== 'error')) return
+    if (Date.now() - lastLoadAtRef.current >= MAIL_REFRESH_MS) void loadMail({ background: true })
+  })
 
   // Unread count, so the busier of mail and deadlines can go first.
   useEffect(() => {

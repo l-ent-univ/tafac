@@ -14,7 +14,7 @@
 // - launch_card: the Planning's announcement under the widgets
 //   (PlanningLaunchCard);
 // - history: back, forward or a reload landing on the page.
-export const PLANNING_PAGE_SOURCES = ['nav', 'tabbar', 'tile', 'dashboard_card', 'launch_card', 'history', 'other']
+export const PLANNING_PAGE_SOURCES = ['nav', 'tabbar', 'tile', 'dashboard_card', 'launch_card', 'home_icon', 'history', 'other']
 
 export function toPlanningPageSource(source) {
   return PLANNING_PAGE_SOURCES.includes(source) ? source : 'other'

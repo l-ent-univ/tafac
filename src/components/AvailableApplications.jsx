@@ -11,6 +11,7 @@ import { getGradesOrigin, opensGradesPageInApp } from '../gradesPortalApp'
 import { getPlanningOrigin, opensPlanningPageInApp } from '../planningPortalApp'
 import { getMailOrigins, opensMailPageInApp } from '../mailPortalApp'
 import { getMoodleOrigin, opensMoodlePageInApp } from '../moodlePortalApp'
+import { isInHiddenPage } from '../keptPages'
 import ContextMenu from './ContextMenu'
 import LoadingDots from './LoadingDots'
 import MailAttachDrawer, { ATTACH_CARD_CLASS, AttachDrawerNote } from './MailAttachDrawer'
@@ -988,8 +989,14 @@ function AvailableApplications({
   canUseServerLaunch = true,
   favoritesPortalTarget = null,
   // The « Accueil » page's slot for its « Applications » row (the
-  // favourites as tiles), while that page shows.
+  // favourites as tiles), while that page shows. In the iOS app the page
+  // is kept behind the others (src/keptPages.js), its row with it:
+  // `homeAppsShown` says whether it is the one shown.
   homeAppsPortalTarget = null,
+  homeAppsShown = true,
+  // « Toutes les applications » asked from elsewhere (« Accueil »'s icon on
+  // a phone): the drawer opens each time this number goes up.
+  homeDrawerRequest = 0,
   showDescriptions = false,
   onOpenGradesPage = null,
   onOpenPlanningPage = null,
@@ -1047,17 +1054,23 @@ function AvailableApplications({
     setIsHomeDrawerOpen(false)
     setHomeDrawerQuery('')
   }, [])
+  const answeredDrawerRequestRef = useRef(homeDrawerRequest)
+  useEffect(() => {
+    if (homeDrawerRequest === answeredDrawerRequestRef.current) return
+    answeredDrawerRequestRef.current = homeDrawerRequest
+    setIsHomeDrawerOpen(true)
+  }, [homeDrawerRequest])
   // Leaving the page (or opening an app in it) closes it.
   useEffect(() => {
-    if (!homeAppsPortalTarget) closeHomeDrawer()
-  }, [homeAppsPortalTarget, closeHomeDrawer])
+    if (!homeAppsPortalTarget || !homeAppsShown) closeHomeDrawer()
+  }, [homeAppsPortalTarget, homeAppsShown, closeHomeDrawer])
   const homeAppsRowRef = useRef(null)
   useLayoutEffect(() => {
     const row = homeAppsRowRef.current
     if (!row) return undefined
     const fit = () => {
       const tiles = [...row.children]
-      if (tiles.length === 0) return
+      if (tiles.length === 0 || isInHiddenPage(row)) return
       row.style.maxHeight = `${tiles[0].offsetHeight}px`
       const firstTop = tiles[0].offsetTop
       for (const tile of tiles) {
@@ -2224,7 +2237,7 @@ function AvailableApplications({
         ? createPortal(favoritesSectionContent, favoritesPortalTarget)
         : favoritesSectionContent}
       {homeAppsContent && typeof document !== 'undefined' ? createPortal(homeAppsContent, homeAppsPortalTarget) : null}
-      {isHomeDrawerOpen && homeAppsPortalTarget && typeof document !== 'undefined'
+      {isHomeDrawerOpen && homeAppsPortalTarget && homeAppsShown && typeof document !== 'undefined'
         ? createPortal(
           <div className="fixed inset-0 z-50">
             <MailAttachDrawer

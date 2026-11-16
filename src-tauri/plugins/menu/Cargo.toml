@@ -1,0 +1,16 @@
+[package]
+name = "tauri-plugin-menu"
+version = "0.0.0"
+description = "Tafac's iOS app: the system's menu in place of the page's own"
+license = "AGPL-3.0-only"
+edition = "2021"
+publish = false
+links = "tauri-plugin-menu"
+
+[dependencies]
+tauri = { version = "2" }
+serde = "1"
+serde_json = "1"
+
+[build-dependencies]
+tauri-plugin = { version = "2", features = ["build"] }

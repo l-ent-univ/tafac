@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { trackGradesAction } from '../analytics'
 import { findEvaluation } from '../gradeDetail'
 import { GradeDetailContext } from '../gradeDetailContext'
+import { useClosedWithPage } from '../pageVisit'
 import GradeDetailModal from './GradeDetailModal'
 
 // The key the open sheet adds to its history entry's state, next to
@@ -31,6 +32,9 @@ function readOpenId(state) {
 // sheet's button, the rows' menus, as `write`), null where there's none.
 function GradeDetailProvider({ report, semesterId, subjectIcon = () => null, onWrite = null, children }) {
   const [request, setRequest] = useState(null)
+  // The sheet goes with its page (as useHistorySheet's): closed as the page
+  // is hidden, where it stays mounted behind another.
+  const pageShown = useClosedWithPage(() => setRequest(null))
   // Read by the history handlers, which outlive a render.
   const requestRef = useRef(null)
   useEffect(() => {
@@ -95,7 +99,7 @@ function GradeDetailProvider({ report, semesterId, subjectIcon = () => null, onW
   return (
     <GradeDetailContext.Provider value={value}>
       {children}
-      {found ? (
+      {found && pageShown ? (
         <GradeDetailModal
           key={`${found.module.code}:${found.evaluation.id}`}
           report={report}

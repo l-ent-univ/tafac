@@ -33,6 +33,10 @@ API_GUIDE.md
 
 # Native iOS package (kept out of the repo)
 ios/
+# Not the Swift half of the app's own Tauri plugins; Tauri's iOS API, which
+# each plugin's build copies beside it, is.
+!src-tauri/plugins/*/ios/
+src-tauri/plugins/*/.tauri/
 
 # Local name generator tool (not part of the app)
 name-lab/
@@ -49,9 +53,14 @@ data/
 
 # Desktop app (Tauri): Rust build output and what scripts/desktop-prepare.mjs
 # assembles (server copy with its production node_modules, Node binary, the
-# disk image's background joined from its two PNGs)
+# disk image's background joined from its two PNGs). The iOS app's Xcode
+# project (src-tauri/gen/apple) is kept: project.yml links Node into it. Its
+# assets/ is the copy of the app's resources each build makes.
 src-tauri/target/
-src-tauri/gen/
+src-tauri/gen/schemas/
+src-tauri/gen/apple/assets/
+src-tauri/gen/apple/Pods/
+src-tauri/gen/apple/Podfile.lock
 src-tauri/binaries/
 src-tauri/dmg/background.tiff
 desktop-build/

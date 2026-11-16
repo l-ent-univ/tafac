@@ -327,7 +327,7 @@ function LoginPage({
         onDemoLinkClick={handleDemoLinkClick}
       />
 
-      <div className="relative isolate flex min-h-screen min-w-0 flex-[1_1_auto] flex-col bg-[#f5f3ed] dark:bg-bg max-4xl:w-full">
+      <div className="login-right-panel relative isolate flex min-h-screen min-w-0 flex-[1_1_auto] flex-col bg-[#f5f3ed] dark:bg-bg max-4xl:w-full">
         {/* In the flow rather than pinned over the form, so nothing overlaps
             on short or narrow screens. */}
         <div className="flex shrink-0 items-center justify-end gap-3 px-6 pt-6 max-3xl:px-5 max-3xl:pt-5 max-md:px-4 max-md:pt-4">

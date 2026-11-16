@@ -11,13 +11,22 @@
 // - A download (the app's blob links with a file name: certificate, .ics,
 //   printed mail, attachments…) goes where the student picks in the Save
 //   panel (macOS), else to the Downloads folder.
+//
+// iOS (ios.rs) has one window and no browser beside it: the rules are the
+// same ones, and what the desktop sends to the browser opens over the app.
+// A download goes to the share sheet there (ios_downloads.rs).
 
+#[cfg(desktop)]
 use std::path::{Path, PathBuf};
+#[cfg(desktop)]
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
 
+#[cfg(desktop)]
 use tauri::webview::{DownloadEvent, NewWindowResponse};
-use tauri::{AppHandle, Manager, Url, WebviewUrl, WebviewWindowBuilder, Wry};
+use tauri::{AppHandle, Manager, Url};
+#[cfg(desktop)]
+use tauri::{WebviewUrl, WebviewWindowBuilder, Wry};
 
 use crate::bridge::{self, Bridge};
 
@@ -30,18 +39,24 @@ pub fn is_app_url(url: &Url) -> bool {
     }
 }
 
-fn is_outside_url(url: &Url) -> bool {
+pub fn is_outside_url(url: &Url) -> bool {
     matches!(url.scheme(), "http" | "https" | "mailto" | "tel") && !is_app_url(url)
 }
 
+#[cfg(desktop)]
 pub fn open_outside(url: &Url) {
     if let Err(error) = tauri_plugin_opener::open_url(url.as_str(), None::<&str>) {
         eprintln!("[tafac] could not open {url}: {error}");
     }
 }
 
+#[cfg(mobile)]
+pub fn open_outside(url: &Url) {
+    crate::ios::open_outside(url);
+}
+
 #[derive(Debug, PartialEq)]
-enum Navigation {
+pub enum Navigation {
     // Loads in the window.
     Stay,
     // Opens in the student's browser.
@@ -55,7 +70,7 @@ enum Navigation {
 // A web address goes to the browser. Anything else is refused: a file:// or
 // javascript: address, another program's scheme, none of which a page of the
 // app has a reason to open, and which a mail's link could otherwise reach.
-fn classify_navigation(url: &Url) -> Navigation {
+pub fn classify_navigation(url: &Url) -> Navigation {
     if is_app_url(url) {
         return Navigation::Stay;
     }
@@ -82,6 +97,7 @@ pub fn allow_navigation(url: &Url) -> bool {
 }
 
 // window.open and target="_blank", from the page of the window `label`.
+#[cfg(desktop)]
 pub fn new_window(app: &AppHandle, label: &str, url: Url) -> NewWindowResponse<Wry> {
     if is_outside_url(&url) || is_app_url(&url) {
         let app = app.clone();
@@ -105,7 +121,10 @@ pub fn new_window(app: &AppHandle, label: &str, url: Url) -> NewWindowResponse<W
     NewWindowResponse::Deny
 }
 
-async fn open_app_link(app: &AppHandle, url: Url) {
+// Where an app address opened in a new tab leads: for the launch relay, the
+// address its redirect points to (asked with the student's session); any
+// other app page, itself.
+pub async fn app_link_target(app: &AppHandle, url: Url) -> Url {
     let bridge = app.state::<Arc<Bridge>>().inner().clone();
     let path = match url.query() {
         Some(query) => format!("{}?{query}", url.path()),
@@ -117,7 +136,7 @@ async fn open_app_link(app: &AppHandle, url: Url) {
         .unwrap();
     let response = bridge::forward(&bridge, request).await;
 
-    let target = if response.status().is_redirection() {
+    if response.status().is_redirection() {
         response
             .headers()
             .get(http::header::LOCATION)
@@ -126,8 +145,12 @@ async fn open_app_link(app: &AppHandle, url: Url) {
             .unwrap_or(url)
     } else {
         url
-    };
+    }
+}
 
+#[cfg(desktop)]
+async fn open_app_link(app: &AppHandle, url: Url) {
+    let target = app_link_target(app, url).await;
     if is_outside_url(&target) {
         open_outside(&target);
     } else if let Err(error) = open_app_window(app, target) {
@@ -137,14 +160,17 @@ async fn open_app_link(app: &AppHandle, url: Url) {
 
 // A window's page starts loading (again): Moodle's view, if that page had
 // it on screen, leaves it (moodle.rs).
+#[cfg(desktop)]
 pub fn page_load(window: tauri::WebviewWindow, payload: tauri::webview::PageLoadPayload<'_>) {
     if payload.event() == tauri::webview::PageLoadEvent::Started {
         crate::moodle::page_reloaded(window.app_handle(), window.label());
     }
 }
 
+#[cfg(desktop)]
 static WINDOW_COUNT: AtomicUsize = AtomicUsize::new(0);
 
+#[cfg(desktop)]
 pub fn open_app_window(app: &AppHandle, url: Url) -> tauri::Result<()> {
     let label = format!("page-{}", WINDOW_COUNT.fetch_add(1, Ordering::Relaxed));
     let handle = app.clone();
@@ -160,6 +186,7 @@ pub fn open_app_window(app: &AppHandle, url: Url) -> tauri::Result<()> {
     crate::window::show(&window)
 }
 
+#[cfg(desktop)]
 pub fn download(_webview: tauri::Webview, event: DownloadEvent<'_>) -> bool {
     if let DownloadEvent::Requested { url, .. } = &event {
         // A download link skips allow_navigation: the same rules here.
@@ -181,6 +208,7 @@ pub fn download(_webview: tauri::Webview, event: DownloadEvent<'_>) -> bool {
 
 // A download whose address is accepted: where it goes (the Save panel), and
 // whether it failed. Moodle's view (moodle.rs) accepts its own site's files.
+#[cfg(desktop)]
 pub fn save_download(event: DownloadEvent<'_>) -> bool {
     match event {
         DownloadEvent::Requested { url, destination } => {
@@ -244,17 +272,19 @@ fn choose_destination(proposed: &Path) -> Option<PathBuf> {
 }
 
 // Elsewhere: straight to the Downloads folder.
-#[cfg(not(target_os = "macos"))]
+#[cfg(all(desktop, not(target_os = "macos")))]
 fn choose_destination(proposed: &Path) -> Option<PathBuf> {
     Some(proposed.to_path_buf())
 }
 
+#[cfg(desktop)]
 fn downloads_folder() -> Option<PathBuf> {
     let home = std::env::var_os(if cfg!(windows) { "USERPROFILE" } else { "HOME" })?;
     Some(PathBuf::from(home).join("Downloads"))
 }
 
 // "name.pdf", else "name (2).pdf", "name (3).pdf"…
+#[cfg(desktop)]
 fn free_path(folder: &Path, name: &str) -> PathBuf {
     let candidate = folder.join(name);
     if !candidate.exists() {

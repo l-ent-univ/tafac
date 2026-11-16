@@ -19,6 +19,7 @@ import { fileURLToPath } from 'node:url'
 import { shutdownAllAnalytics } from './server/analytics.js'
 import { fillBrandingPlaceholders, fillPagePath, fillPublicOrigin } from './server/appShell.js'
 import { createDesktopUpdateRouter, followReleases } from './server/desktopUpdate/index.ts'
+import { createAppSettingsRouter, createRemoteSettings } from './server/remoteSettings/index.ts'
 import { baselineSecurityHeaders, buildPagePolicy } from './server/securityHeaders/index.ts'
 import { createUniversitiesApp } from './server/universitiesApp.js'
 import { branding as neutralBranding } from './universities/neutral.js'
@@ -77,11 +78,18 @@ const listedUniversityPages = [...new Set(universityPages.values())]
 
 // This is the production entry point: SESSION_SECRET is mandatory here and
 // the session cookie is Secure/__Host- (see server/sessionCookie.js).
+// An app's remote settings (server/remoteSettings/): patches over its
+// universities' settings, from a signed file on tafac.fr. Only where the app
+// asks for them (REMOTE_SETTINGS_URL): elsewhere nothing is read.
+const remoteSettings = createRemoteSettings()
+await remoteSettings.ready()
+
 const universitiesApp = await createUniversitiesApp({
   universityIds,
   defaultUniversityId,
   multi: MULTI_UNIVERSITY,
   production: true,
+  remoteSettings,
 })
 
 const app = express()
@@ -123,6 +131,8 @@ app.get('/.well-known/apple-app-site-association', (req, res) => {
 // (/desktop/latest.json, from DESKTOP_LATEST_FILE or DESKTOP_LATEST_JSON) and
 // its installers' address (server/desktopUpdate, docs/DESKTOP.md).
 app.use(createDesktopUpdateRouter())
+// The apps' remote settings, served as they are (APP_SETTINGS_FILE).
+app.use(createAppSettingsRouter())
 // Published by itself: the newest GitHub release's manifest, once its
 // desktop build is done (server/desktopUpdate/follow.ts).
 followReleases()

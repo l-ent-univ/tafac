@@ -10,7 +10,7 @@ import { isValidAddress, sanitizeDisplayName } from './mailCompose'
 import { readMailSignatures } from './mailSignatureChoice'
 import { r } from './register.js'
 import { createSessionSignal, logoutHeaders } from './sessionSignal'
-import { isDesktopApp } from './desktopApp'
+import { isNativeApp } from './desktopApp'
 
 // Null on the neutral page (no university picked yet).
 export const ENT_ORIGIN = universityConfig.origins.ent
@@ -339,7 +339,7 @@ export async function logoutFromEnt({ expired = false } = {}) {
   const response = await serverFetch(`${ENT_AUTH_PREFIX}/logout`, {
     method: 'POST',
     credentials: 'same-origin',
-    headers: logoutHeaders({ expired, desktop: isDesktopApp() }),
+    headers: logoutHeaders({ expired, desktop: isNativeApp() }),
   })
 
   const payload = await parseJsonPayload(response)

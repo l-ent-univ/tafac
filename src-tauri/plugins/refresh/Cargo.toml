@@ -1,0 +1,16 @@
+[package]
+name = "tauri-plugin-refresh"
+version = "0.0.0"
+description = "Tafac's iOS app: the system's pull to refresh over the page"
+license = "AGPL-3.0-only"
+edition = "2021"
+publish = false
+links = "tauri-plugin-refresh"
+
+[dependencies]
+tauri = { version = "2" }
+serde = "1"
+serde_json = "1"
+
+[build-dependencies]
+tauri-plugin = { version = "2", features = ["build"] }

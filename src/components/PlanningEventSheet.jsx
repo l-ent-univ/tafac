@@ -93,7 +93,7 @@ function PlanningEventSheet({ event, accent, events, todayKey, searching, onWrit
       <div className="weather-modal-backdrop absolute inset-0 bg-backdrop animate-modal-backdrop-in" onClick={dismiss} aria-hidden="true" />
       <section
         ref={dialogRef}
-        className="glass-solid glass--quiet modal-surface gd-dialog planning-sheet relative isolate flex max-h-[min(820px,calc(100dvh-40px))] w-[min(448px,100%)] flex-col modal-corners [--modal-inset:24px] [--modal-inner-radius:20px] max-sm:[--modal-inset:16px] max-sm:[--modal-inner-radius:18px] border text-text outline-none max-sm:max-h-[calc(100dvh-16px)] max-sm:rounded-b-none max-sm:border-b-0"
+        className="glass-solid glass--quiet modal-surface gd-dialog planning-sheet relative isolate flex max-h-[min(820px,calc(var(--app-h)-40px))] w-[min(448px,100%)] flex-col modal-corners [--modal-inset:24px] [--modal-inner-radius:20px] max-sm:[--modal-inset:16px] max-sm:[--modal-inner-radius:18px] border text-text outline-none max-sm:max-h-[calc(var(--app-h)-16px)] max-sm:rounded-b-none max-sm:border-b-0"
         style={accentStyle(accent)}
         role="dialog"
         aria-modal="true"

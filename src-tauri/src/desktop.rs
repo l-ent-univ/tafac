@@ -101,53 +101,7 @@ pub async fn handle(app: &AppHandle, window_label: &str, request: http::Request<
             .header("cache-control", "no-store")
             .body(serde_json::to_vec(&crate::updater::check_from_page(app).await).unwrap_or_default())
             .unwrap(),
-        "/__desktop/moodle/open" => match serde_json::from_slice::<crate::moodle::OpenBody>(request.body()) {
-            Ok(body) => match crate::moodle::open(app, window_label, body).await {
-                Ok(()) => status(204),
-                Err(error) => {
-                    eprintln!("[tafac] Moodle view: {error}");
-                    status(400)
-                }
-            },
-            Err(_) => status(400),
-        },
-        "/__desktop/moodle/show" => {
-            if let Ok(bounds) = serde_json::from_slice::<crate::moodle::Bounds>(request.body()) {
-                crate::moodle::show(app, window_label, bounds);
-            }
-            status(204)
-        }
-        "/__desktop/moodle/bounds" => {
-            if let Ok(bounds) = serde_json::from_slice::<crate::moodle::Bounds>(request.body()) {
-                crate::moodle::bounds(app, window_label, bounds);
-            }
-            status(204)
-        }
-        "/__desktop/moodle/hide" => {
-            crate::moodle::hide(app, window_label);
-            status(204)
-        }
-        "/__desktop/moodle/state" => {
-            let asked = serde_json::from_slice::<crate::moodle::StateRequest>(request.body()).unwrap_or_default();
-            http::Response::builder()
-                .status(200)
-                .header("content-type", "application/json")
-                .header("cache-control", "no-store")
-                .body(serde_json::to_vec(&crate::moodle::state(app, window_label, asked).await).unwrap_or_default())
-                .unwrap()
-        }
-        "/__desktop/moodle/command" => {
-            if let Ok(body) = serde_json::from_slice::<crate::moodle::CommandBody>(request.body()) {
-                crate::moodle::command(app, window_label, body);
-            }
-            status(204)
-        }
-        "/__desktop/moodle/theme" => {
-            if let Ok(body) = serde_json::from_slice::<crate::moodle_style::ThemeBody>(request.body()) {
-                crate::moodle::theme(app, body);
-            }
-            status(204)
-        }
+        path if path.starts_with(crate::moodle::ROUTES) => crate::moodle::route(app, window_label, &request).await,
         "/__desktop/update/install" => {
             crate::updater::install(app);
             status(204)

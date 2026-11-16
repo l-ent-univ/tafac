@@ -6,6 +6,8 @@ import { publishBriefingSource } from '../briefingSources'
 import { getMoodleDeadlines } from '../entApi'
 import { useSkeletonsForced, SAMPLE_DEADLINES } from '../skeletonSamples'
 import useFitListItems from '../useFitListItems'
+import { usePageReturn, usePageShown } from '../pageVisit'
+import { usePullRefresh } from '../usePullRefresh'
 import WidgetListStatus from './WidgetListStatus'
 import {
   HOUR_MS,
@@ -262,8 +264,11 @@ function WidgetDeadlines({ visible = false, preview = null, icon = null, large =
 
   useEffect(() => () => publishBriefingSource('deadlinesCount', null), [])
 
+  // While the card's page is shown: kept behind another (the iOS app,
+  // src/pageVisit.js) it asks nothing, and catches up as the page is back.
+  const shown = usePageShown()
   useEffect(() => {
-    if (state.status !== 'ok' && state.status !== 'error') return undefined
+    if (!shown || (state.status !== 'ok' && state.status !== 'error')) return undefined
 
     // Relative labels ("Dans 25 min", "Demain") go stale between fetches.
     function refreshIfStale() {
@@ -280,7 +285,14 @@ function WidgetDeadlines({ visible = false, preview = null, icon = null, large =
       window.clearInterval(intervalId)
       document.removeEventListener('visibilitychange', refreshIfStale)
     }
-  }, [loadDeadlines, preview, state.status])
+  }, [loadDeadlines, preview, state.status, shown])
+  // Pulled down with its page (the iOS app).
+  usePullRefresh(() => loadDeadlines({ background: true }))
+  usePageReturn(() => {
+    if (state.status !== 'ok' && state.status !== 'error') return
+    setNow(new Date())
+    if (!preview && Date.now() - lastLoadAtRef.current >= DEADLINES_REFRESH_MS) void loadDeadlines({ background: true })
+  })
 
   // Hidden when Moodle can't be reached; the background refresh brings the
   // card back once it answers again. On « Accueil » (`large`) a failed load

@@ -1,6 +1,9 @@
 import { useEffect, useId, useLayoutEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { Icon } from '@iconify/react'
+import { hasNativeMenu, showNativeMenu } from '../iosMenu'
+import { dropdownMenuItems } from '../iosMenuItems'
+import { useClosedWithPage } from '../pageVisit'
 import SmoothSurface from './SmoothSurface'
 
 // The rows and panel of the apps' context menu (AvailableApplications), so
@@ -22,6 +25,11 @@ const VIEWPORT_EDGE = 12
 // icon, onSelect }], buttons under the options past a hairline (the
 // planning's « Salles et personnels », under its views), outside the list
 // of choices but in the arrows' reach.
+//
+// In the iOS app the list is the system's menu, hanging from the trigger
+// (src/iosMenu.js): the choices, the one in force ticked, then the actions.
+// The trigger stays the page's. Where the system can't, the list is this
+// one as everywhere else.
 function Dropdown({
   options,
   value,
@@ -46,6 +54,43 @@ function Dropdown({
 
   const selectedIndex = options.findIndex((option) => option.value === value)
   const selected = options[selectedIndex] ?? null
+
+  // The system's menu, where it can stand for the list (set back when it
+  // turned out it couldn't).
+  const [ownMenuOnly, setOwnMenuOnly] = useState(false)
+  const menuItems = isOpen && !ownMenuOnly ? dropdownMenuItems(options, selectedIndex, actions) : null
+  const isNative = menuItems != null && hasNativeMenu(menuItems)
+  // What is picked is looked up in the choices of the moment.
+  const latest = useRef(null)
+  useEffect(() => {
+    latest.current = { menuItems, options, actions, value, onChange }
+  })
+  useEffect(() => {
+    const box = isNative ? triggerRef.current?.getBoundingClientRect() : null
+    if (!box) return undefined
+    let live = true
+    const menu = showNativeMenu({ x: box.left, y: box.top, width: box.width, height: box.height, items: latest.current.menuItems })
+    void menu.result.then((answer) => {
+      if (!live) return
+      if (!answer.shown) {
+        setOwnMenuOnly(true)
+        return
+      }
+      setIsOpen(false)
+      const [kind, index] = String(answer.id ?? '').split(':')
+      const current = latest.current
+      if (kind === 'option') {
+        const option = current.options[Number(index)]
+        if (option && option.value !== current.value) current.onChange(option.value)
+      } else if (kind === 'action') {
+        current.actions[Number(index)]?.onSelect()
+      }
+    })
+    return () => {
+      live = false
+      menu.close()
+    }
+  }, [isNative])
 
   // Placed before paint, once the menu's size is known.
   useLayoutEffect(() => {
@@ -75,7 +120,8 @@ function Dropdown({
   }, [isOpen, isPlaced, selectedIndex])
 
   useEffect(() => {
-    if (!isOpen) return undefined
+    // The system's menu closes itself.
+    if (!isOpen || isNative) return undefined
 
     const isInside = (target) => rootRef.current?.contains(target) || menuRef.current?.contains(target)
     const handlePointerDown = (event) => {
@@ -94,7 +140,11 @@ function Dropdown({
       window.removeEventListener('scroll', handleScroll, true)
       window.removeEventListener('resize', handleResize)
     }
-  }, [isOpen])
+  }, [isOpen, isNative])
+
+  // The menu goes with its page, where a page left stays mounted (the iOS
+  // app, src/pageVisit.js).
+  const pageShown = useClosedWithPage(() => setIsOpen(false))
 
   const close = () => {
     setIsOpen(false)
@@ -178,7 +228,7 @@ function Dropdown({
         <span className="min-w-0 truncate">{triggerLabel ?? selected?.label ?? placeholder}</span>
         <Icon icon="ph:caret-down" className={`shrink-0 transition-transform duration-150 ${isOpen ? 'rotate-180' : ''} ${chevronClassName}`} aria-hidden="true" />
       </button>
-      {isOpen && typeof document !== 'undefined' ? createPortal(
+      {isOpen && !isNative && pageShown && typeof document !== 'undefined' ? createPortal(
         <div
           ref={menuRef}
           {...(hasActions ? {} : listProps)}

@@ -6,6 +6,10 @@
 // Packaged app: the Node binary shipped next to the app's executable
 // (externalBin) and the server copy in its resources
 // (scripts/desktop-prepare.mjs).
+//
+// iOS starts no process: Node runs inside the app (node.rs). Only the
+// app's address and random_hex are used there.
+#![cfg_attr(mobile, allow(dead_code))]
 
 use std::path::{Path, PathBuf};
 use std::process::{Child, Command, Stdio};
@@ -156,6 +160,9 @@ pub fn spawn(app: &AppHandle, endpoint: &str, secret: &str, data_dir: &Path) -> 
         // computer to PostHog, not through tafac.fr, and only while the
         // student leaves « Statistiques anonymes » on.
         .envs(option_env!("TAFAC_POSTHOG_PROJECT_KEY").filter(|key| !key.is_empty()).map(|key| ("POSTHOG_PROJECT_KEY", key)))
+        // The remote settings (remote_settings.rs): patches over the
+        // universities' settings, from a signed file on tafac.fr.
+        .envs(crate::remote_settings::environment(app, "desktop", data_dir))
         // Kept open: closing it (the app quits or crashes) stops the server.
         .stdin(Stdio::piped())
         .spawn()?;

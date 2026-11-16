@@ -7,12 +7,14 @@ import gradesIcon from '../assets/home-icons/grades.png'
 import homeworkIcon from '../assets/home-icons/homework.png'
 import mailIcon from '../assets/home-icons/mail.png'
 import menuIcon from '../assets/home-icons/menu.png'
-import { trackDashboardView } from '../analytics'
+import { trackDashboardReturn, trackDashboardView } from '../analytics'
 import { isWidgetAvailable } from '../dashboardWidgets'
 import { getGrades, peekGrades } from '../entApi'
 import { listGradesSemesters } from '../gradesReport'
 import { buildGreeting } from '../greeting'
 import { layoutHomeCards } from '../homeCardsLayout'
+import { isInHiddenPage } from '../keptPages'
+import { usePageReturn, usePageVisit } from '../pageVisit'
 import { NEXT_CLASS_LOOKAHEAD_DAYS, buildNextClassCacheEntryKey, buildResourceIdsFromSelection } from '../upcomingClasses'
 import useDailyBriefing from '../useDailyBriefing'
 import { coverSourceRect, pickCreditInk } from '../wallpaperInk'
@@ -30,17 +32,22 @@ import { Skeleton } from 'skullet/react'
 import { useSkeletonsForced } from '../skeletonSamples'
 import { r } from '../register.js'
 import HomeIcon from './HomeIcon'
+import HomePhoneHeader from './HomePhoneHeader'
+import { homeIconActions } from '../homeIconActions'
+import { usePhoneViewport } from '../usePhoneViewport'
 import SmoothSurface from './SmoothSurface'
 
 // The row above the greeting, in place of the card's wave: each icon
 // tilted its own way, on one line.
+// `id`: what the icon stands for (src/homeIconActions.js: on a phone each is
+// a way in, and the ones without a page aren't shown).
 const GREETING_ICONS = [
-  { src: appsIcon, rotate: -9 },
-  { src: calendarIcon, rotate: 7 },
-  { src: gradesIcon, rotate: -4 },
-  { src: homeworkIcon, rotate: 10 },
-  { src: mailIcon, rotate: -7 },
-  { src: menuIcon, rotate: 6 },
+  { id: 'apps', src: appsIcon, rotate: -9 },
+  { id: 'calendar', src: calendarIcon, rotate: 7 },
+  { id: 'grades', src: gradesIcon, rotate: -4 },
+  { id: 'homework', src: homeworkIcon, rotate: 10 },
+  { id: 'mail', src: mailIcon, rotate: -7 },
+  { id: 'menu', src: menuIcon, rotate: 6 },
 ]
 
 // The newest semester (the first-connection answer holds its relevé), for
@@ -59,14 +66,20 @@ function readNewestGrades(payload, status = payload?.['relevé'] ? 'ok' : 'loadi
   }
 }
 
-// [grades, retry]: `retry()` asks again, past the cache.
+// [grades, retry]: `retry()` asks again, past the cache. Back on the page
+// where it is kept mounted (the iOS app, src/pageVisit.js), asked as a
+// mount would: the cache while fresh, behind the cards shown.
 function useNewestGrades(enabled) {
   const [grades, setGrades] = useState(() => readNewestGrades(enabled ? peekGrades()?.grades : null))
   const [attempt, setAttempt] = useState(0)
+  const visit = usePageVisit()
+  const askedVisitRef = useRef(visit)
   useEffect(() => {
     if (!enabled) return undefined
     let active = true
-    getGrades({ force: attempt > 0 })
+    const returned = askedVisitRef.current !== visit
+    askedVisitRef.current = visit
+    getGrades({ force: attempt > 0 && !returned })
       .then((data) => {
         if (!active) return
         if (data?.grades?.['relevé']) setGrades(readNewestGrades(data.grades))
@@ -79,7 +92,7 @@ function useNewestGrades(enabled) {
     return () => {
       active = false
     }
-  }, [attempt, enabled])
+  }, [attempt, enabled, visit])
   const retry = useCallback(() => {
     setGrades(readNewestGrades(null, 'loading'))
     setAttempt((current) => current + 1)
@@ -133,7 +146,9 @@ function useMinWidth(minWidth, mounted) {
     const element = ref.current
     if (!element) return undefined
     setWide(element.clientWidth >= minWidth)
-    const observer = new ResizeObserver(([entry]) => setWide(entry.contentRect.width >= minWidth))
+    const observer = new ResizeObserver(([entry]) => {
+      if (!isInHiddenPage(element)) setWide(entry.contentRect.width >= minWidth)
+    })
     observer.observe(element)
     return () => observer.disconnect()
   }, [minWidth, mounted])
@@ -307,6 +322,15 @@ function HomeDraftPage({
   showAssiduity = false,
   onOpenAssiduity = null,
   appsSlotRef = null,
+  // The header on a phone (HomePhoneHeader): the logos as the student set
+  // them, their photo and Mon compte, and what its icons open besides the
+  // pages above (« Toutes les applications », Moodle).
+  showUniversityLogo = true,
+  logoSource = 'establishment',
+  profilePhotoSrc = null,
+  onOpenAccount = null,
+  onOpenAllApps = null,
+  onOpenMoodle = null,
 }) {
   const skeletonsForced = useSkeletonsForced()
   const displayName = userName?.trim() || ''
@@ -318,6 +342,7 @@ function HomeDraftPage({
     hasReportedViewRef.current = true
     trackDashboardView()
   }, [])
+  usePageReturn(trackDashboardReturn)
   const isShown = (widgetId) => isWidgetAvailable(widgetId, establishment) && !hiddenWidgets.includes(widgetId)
   // As the dashboard's greeting: classes from the shown card's loads, its own
   // load when the student hid the card, none without the widget.
@@ -352,9 +377,33 @@ function HomeDraftPage({
   const creditInk = useCreditInk(wallpaper?.src ?? null, wallpaper?.position ?? null, wallpaperRef, creditRef)
   const credit = wallpaper?.src ? wallpaper.credit : null
   const greeting = buildGreeting(displayName)
+  // A phone has its own header (HomePhoneHeader) instead of the band.
+  const isPhone = usePhoneViewport()
+  const phoneIcons = homeIconActions({
+    allApps: onOpenAllApps,
+    planning: onOpenPlanningPage ? () => onOpenPlanningPage('home_icon') : null,
+    grades: onOpenGradesPage ? () => onOpenGradesPage('home_icon') : null,
+    moodle: onOpenMoodle,
+    mail: onOpenMailPage ? () => onOpenMailPage('home_icon') : null,
+  }).map((action) => ({ ...GREETING_ICONS.find((icon) => icon.id === action.id), ...action }))
 
   return (
     <section className="home-draft-page w-full grid pt-4 px-6 pb-6 4xl:pt-5 max-md:px-3 max-md:pt-3 max-md:pb-5" aria-labelledby="home-draft-title">
+      {isPhone ? (
+        <HomePhoneHeader
+          greeting={greeting}
+          briefing={!briefing.loading && briefing.text ? <BlurInText key={briefing.text} text={briefing.text} /> : null}
+          briefingPending={briefing.loading}
+          wallpaper={wallpaper}
+          icons={phoneIcons}
+          establishment={establishment}
+          showUniversityLogo={showUniversityLogo}
+          logoSource={logoSource}
+          userName={displayName}
+          profilePhotoSrc={profilePhotoSrc}
+          onOpenAccount={onOpenAccount}
+        />
+      ) : (
       <div className={`page-top-band @container/band flex flex-col gap-4 min-h-[160px] -mx-6 -mt-4 px-6 pt-4 4xl:-mt-5 4xl:pt-5 max-md:-mx-3 max-md:gap-3 max-md:px-3 pb-6 max-md:pb-4 max-md:mt-[calc(-12px-var(--top-bar-height,0px))] max-md:pt-[calc(20px+var(--top-bar-height,0px))] max-md:min-h-[calc(136px+var(--top-bar-height,0px))]`}>
         {/* The wallpaper, when on: the band's right half and more, fading
             into the tint under the greeting; on a narrow band (a wide
@@ -421,6 +470,7 @@ function HomeDraftPage({
           </div>
         </div>
       </div>
+      )}
       {/* A page just launched (the Messagerie, the Planning, « Mes notes »):
           a compact card under the band until it's seen. One at a time, the
           newest first: the others render nothing (LaunchCard). */}
