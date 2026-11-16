@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   getGrades,
   getGradesDepartmentMessage,
@@ -10,6 +10,8 @@ import {
 } from './entApi'
 import { getReleveDepartment, htmlToPlainText, listGradesSemesters } from './gradesReport'
 import { describeLoadError } from './scodocPageUtils'
+import { usePageVisit } from './pageVisit'
+import { usePullRefresh } from './usePullRefresh'
 
 // A failed load, as the page shows it (`error`, a message) and as the
 // anonymous analytics count it: its category (`errorKind`) and whether the
@@ -31,8 +33,12 @@ const departmentMessages = new Map()
 // Everything the ScoDoc pages load: the first-connection answer (newest
 // semester), the other semesters on demand and in the background, the
 // department notice. Starts from the cached answer when there is one and
-// refreshes it behind the scenes (`refreshing`).
+// refreshes it behind the scenes (`refreshing`). Back on a page kept
+// mounted (the iOS app, src/pageVisit.js), asked as a mount would: the
+// cache while fresh, behind the relevé shown.
 export function useScodocReleve() {
+  const visit = usePageVisit()
+  const askedVisitRef = useRef(visit)
   const [base, setBase] = useState(() => {
     const cached = peekGrades()
     return cached
@@ -40,14 +46,19 @@ export function useScodocReleve() {
       : { status: 'loading', payload: null, error: null, fromCache: false }
   })
   const [reloadNonce, setReloadNonce] = useState(0)
+  // Pulled down with its page (the iOS app): asked again, past the cache,
+  // what is shown staying meanwhile.
+  usePullRefresh(() => setReloadNonce((current) => current + 1))
   const [selectedId, setSelectedId] = useState(() => sharedSelectedSemesterId)
   const [semesterPayloads, setSemesterPayloads] = useState({})
   const [departmentMessage, setDepartmentMessage] = useState(null)
 
   useEffect(() => {
     let cancelled = false
+    const returned = askedVisitRef.current !== visit
+    askedVisitRef.current = visit
 
-    getGrades({ force: reloadNonce > 0 })
+    getGrades({ force: reloadNonce > 0 && !returned })
       .then((data) => {
         if (cancelled) return
         if (!data?.authenticated || data.error || !data.grades) {
@@ -67,7 +78,7 @@ export function useScodocReleve() {
       })
 
     return () => { cancelled = true }
-  }, [reloadNonce])
+  }, [reloadNonce, visit])
 
   const basePayload = base.payload
   const semesters = useMemo(() => listGradesSemesters(basePayload?.semestres), [basePayload])

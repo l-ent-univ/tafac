@@ -1,0 +1,161 @@
+# The iOS app of a release, to TestFlight: built with the release's version,
+# signed for distribution and uploaded to App Store Connect, where the
+# internal testers' group gets it once Apple has processed it (docs/IOS.md,
+# « Releases »).
+#
+# Runs for a release's tag (ci.yml calls it, as it calls desktop.yml; a tag
+# pushed by hand starts it too), or by hand: for a tag already pushed, or,
+# with no tag, as a test build of a branch under a version given there
+# (nothing else of a release is made: no tag, no image, no desktop app).
+#
+# Secrets, the same App Store Connect API key as the desktop app's
+# notarization:
+#   APPLE_API_KEY_ID        the key's ID
+#   APPLE_API_ISSUER        its issuer's ID
+#   APPLE_API_PRIVATE_KEY   the content of its AuthKey_<id>.p8 file
+# The key signs the app (Xcode asks Apple for the distribution certificate
+# and profile itself: no certificate in the secrets) and uploads it. Its
+# role must allow both: Admin, or App Manager with access to certificates.
+#   POSTHOG_PROJECT_KEY     optional: the anonymous statistics, as the desktop
+
+name: iOS app
+
+on:
+  push:
+    tags: ['v*']
+  workflow_call:
+    inputs:
+      tag:
+        description: The release's tag (vX.Y.Z)
+        required: true
+        type: string
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "The release's tag (vX.Y.Z), already pushed. Empty: a test build of the branch below"
+        required: false
+        type: string
+      ref:
+        description: "Test build: the branch or commit to build"
+        required: false
+        default: main
+        type: string
+      version:
+        description: "Test build: its version (x.y.z), the next release's"
+        required: false
+        type: string
+
+permissions:
+  contents: read
+
+env:
+  # Empty for a test build started by hand.
+  TAG: ${{ inputs.tag || (github.ref_type == 'tag' && github.ref_name) || '' }}
+  TEST_REF: ${{ inputs.ref || 'main' }}
+  TEST_VERSION: ${{ inputs.version }}
+
+jobs:
+  testflight:
+    name: TestFlight
+    runs-on: macos-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          ref: ${{ env.TAG || env.TEST_REF }}
+
+      # The app's version is the tag's: the same number as the web release
+      # (a test build says its own). Its build number is the time of the
+      # build: App Store Connect takes a build only if its number is above
+      # the last one of that version, and a version built again (by hand,
+      # after a failed upload, or the release after its test) must pass.
+      - name: Version
+        run: |
+          if [ -n "$TAG" ]; then
+            if ! printf '%s' "$TAG" | grep -qE '^v[0-9]+\.[0-9]+\.[0-9]+$'; then
+              echo "::error::Not a release tag (vX.Y.Z): $TAG"
+              exit 1
+            fi
+            VERSION="${TAG#v}"
+          else
+            if ! printf '%s' "$TEST_VERSION" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+$'; then
+              echo "::error::A test build needs a version (x.y.z): '$TEST_VERSION'"
+              exit 1
+            fi
+            VERSION="$TEST_VERSION"
+          fi
+          echo "VERSION=$VERSION" >> "$GITHUB_ENV"
+          echo "BUILD_NUMBER=$(date -u +%Y%m%d%H%M)" >> "$GITHUB_ENV"
+
+      # The newest Xcode of the runner. The app's glass controls
+      # (src-tauri/plugins/glass) need the iOS 26 SDK to compile.
+      - name: Xcode
+        run: |
+          XCODE="$(ls -d /Applications/Xcode_*.app | sort -V | tail -1)"
+          sudo xcode-select -s "$XCODE"
+          SDK="$(xcrun --sdk iphoneos --show-sdk-version)"
+          echo "Xcode: $XCODE, iOS SDK $SDK"
+          if [ "${SDK%%.*}" -lt 26 ]; then
+            echo "::error::The runner's newest iOS SDK is $SDK: the app needs 26 or later. Use a newer runner image (runs-on)."
+            exit 1
+          fi
+
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 24
+          cache: npm
+      - name: Rust
+        run: |
+          rustup toolchain install stable --profile minimal --no-self-update
+          rustup default stable
+          rustup target add aarch64-apple-ios
+          rustup component add llvm-tools
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+        with:
+          workspaces: src-tauri
+      - run: npm ci
+
+      # Where Tauri's build (APPLE_API_KEY_PATH) and Apple's uploader
+      # (~/.private_keys/AuthKey_<id>.p8) each look for it.
+      - name: App Store Connect API key
+        env:
+          APPLE_API_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
+          APPLE_API_PRIVATE_KEY: ${{ secrets.APPLE_API_PRIVATE_KEY }}
+        run: |
+          if [ -z "$APPLE_API_KEY_ID" ] || [ -z "$APPLE_API_PRIVATE_KEY" ]; then
+            echo "::error::APPLE_API_KEY_ID or APPLE_API_PRIVATE_KEY is not set (docs/IOS.md)"
+            exit 1
+          fi
+          mkdir -p "$HOME/.private_keys"
+          printf '%s\n' "$APPLE_API_PRIVATE_KEY" > "$HOME/.private_keys/AuthKey_$APPLE_API_KEY_ID.p8"
+          chmod 600 "$HOME/.private_keys/AuthKey_$APPLE_API_KEY_ID.p8"
+          echo "APPLE_API_KEY_PATH=$HOME/.private_keys/AuthKey_$APPLE_API_KEY_ID.p8" >> "$GITHUB_ENV"
+
+      # `npm run ios:build` prepares the server for the Node inside the app
+      # (scripts/ios-prepare.mjs), then builds, signs and exports the .ipa.
+      - name: Build and sign the app
+        env:
+          APPLE_API_KEY: ${{ secrets.APPLE_API_KEY_ID }}
+          APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
+          # Anonymous statistics (src-tauri/src/node.rs): PostHog's public
+          # project key, as tafac.fr's. Unset, the app sends nothing.
+          TAFAC_POSTHOG_PROJECT_KEY: ${{ secrets.POSTHOG_PROJECT_KEY }}
+        run: |
+          npm run ios:build -- \
+            --export-method app-store-connect \
+            --ci \
+            --config "{\"version\":\"$VERSION\",\"bundle\":{\"iOS\":{\"bundleVersion\":\"$BUILD_NUMBER\"}}}"
+
+      - name: Upload to TestFlight
+        env:
+          APPLE_API_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
+          APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
+        run: |
+          xcrun altool --upload-app --type ios \
+            --file src-tauri/gen/apple/build/arm64/Tafac.ipa \
+            --apiKey "$APPLE_API_KEY_ID" \
+            --apiIssuer "$APPLE_API_ISSUER"
+
+      - name: The key, gone
+        if: always()
+        run: rm -rf "$HOME/.private_keys"

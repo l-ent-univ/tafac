@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import mobileInviteImg from '../assets/mobile-pwa-invite.png'
 import { APP_NAME } from '../seo'
 import { r } from '../register.js'
+import { isNativeApp } from '../desktopApp'
 
 const VISIT_COUNT_KEY = 'l-ent:visit-count'
 const PROMPT_DISMISSED_KEY = 'l-ent:pwa-prompt-dismissed'
@@ -10,8 +11,11 @@ function isMobile() {
   return /iPhone|iPad|iPod|Android/i.test(navigator.userAgent)
 }
 
+// Installed already: the web app on the home screen, or the app itself
+// (iOS, desktop).
 function isStandalone() {
-  return window.matchMedia('(display-mode: standalone)').matches
+  return isNativeApp()
+    || window.matchMedia('(display-mode: standalone)').matches
     || window.navigator.standalone === true
 }
 

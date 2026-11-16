@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { Icon } from '@iconify/react'
+import { useClosedWithPage } from '../pageVisit'
 
 const BUBBLE_WIDTH = 280
 const BUBBLE_GAP = 8
@@ -27,6 +28,12 @@ function CardInfoTip({ label, children, icon = 'ph:info', iconClassName = 'text-
     setIsHovered(false)
     setIsPinned(false)
   }, [])
+  // The note goes with its page, where a page left stays mounted (the iOS
+  // app, src/pageVisit.js).
+  const pageShown = useClosedWithPage(() => {
+    close()
+    setIsFocused(false)
+  })
 
   // Placed before paint, once the bubble's height is known.
   useLayoutEffect(() => {
@@ -60,7 +67,7 @@ function CardInfoTip({ label, children, icon = 'ph:info', iconClassName = 'text-
     }
   }, [isOpen, close])
 
-  const isShown = isOpen && position != null
+  const isShown = isOpen && position != null && pageShown
 
   return (
     <span

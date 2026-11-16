@@ -1,9 +1,11 @@
-import { isDesktopApp } from './desktopApp'
+import { isNativeApp } from './desktopApp'
 
-// Desktop app: the web view can't download from the app's own address
-// (tafac://, served by the app; macOS says "unsupported URL"), only a blob.
-// So a download link of the app's (a mail attachment) is fetched by the page
-// first, then saved from a blob (src-tauri/src/links.rs opens the Save panel).
+// The apps (desktop and iOS): the web view can't download from the app's own
+// address (tafac://, served by the app; macOS says "unsupported URL"), only
+// a blob. So a download link of the app's (a mail attachment) is fetched by
+// the page first, with its session, then saved from a blob: the desktop
+// opens its Save panel (src-tauri/src/links.rs), iOS its share sheet
+// (src-tauri/src/ios_downloads.rs).
 // In the browser nothing changes: the link downloads as usual.
 
 function isAppFile(href) {
@@ -29,10 +31,10 @@ async function saveThroughBlob(href, name) {
   window.setTimeout(() => URL.revokeObjectURL(url), 60_000)
 }
 
-// Downloads `href` as `name`: through a blob in the desktop app, as a plain
+// Downloads `href` as `name`: through a blob in the apps, as a plain
 // download link elsewhere.
 export function downloadFile(href, name) {
-  if (isDesktopApp() && isAppFile(href)) {
+  if (isNativeApp() && isAppFile(href)) {
     saveThroughBlob(href, name).catch((error) => console.warn('[tafac] download', error))
     return
   }
@@ -42,10 +44,10 @@ export function downloadFile(href, name) {
   link.click()
 }
 
-// Desktop app: every download link of the app's in the page (<a download>)
+// The apps: every download link of the app's in the page (<a download>)
 // goes through downloadFile.
 export function enableDesktopDownloads(doc = document) {
-  if (!isDesktopApp()) return
+  if (!isNativeApp()) return
   doc.addEventListener('click', (event) => {
     if (event.defaultPrevented || event.button !== 0) return
     const link = event.target instanceof Element ? event.target.closest('a[download][href]') : null

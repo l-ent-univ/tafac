@@ -12,6 +12,9 @@ import { bootUniversity } from './universityBoot'
 import { isDesktopApp, isMacDesktopApp, markDesktopApp } from './desktopApp'
 import { enableWindowMoveBand } from './desktopWindowDrag'
 import { enableDesktopDownloads } from './desktopDownloads'
+import { enableIosStatusBar } from './iosApp'
+import { enableIosGlass } from './iosGlass'
+import { enableIosPullRefresh } from './iosRefresh'
 import { blockNativeContextMenu } from './contextMenuEvents'
 import { getDesktopUpdate, loadDesktopUpdate, subscribeDesktopUpdate } from './desktopUpdate'
 
@@ -20,6 +23,9 @@ import { getDesktopUpdate, loadDesktopUpdate, subscribeDesktopUpdate } from './d
 if (isDesktopApp()) blockNativeContextMenu(window)
 markDesktopApp()
 enableDesktopDownloads()
+enableIosStatusBar()
+enableIosGlass()
+enableIosPullRefresh()
 if (isMacDesktopApp()) enableWindowMoveBand(window)
 
 // App and everything it imports (the landing and its copy too) read the

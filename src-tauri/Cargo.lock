@@ -3883,6 +3883,7 @@ dependencies = [
  "http-body-util",
  "hyper",
  "hyper-util",
+ "iana-time-zone",
  "keyring",
  "libc",
  "objc2",
@@ -3896,7 +3897,13 @@ dependencies = [
  "serde_json",
  "tauri",
  "tauri-build",
+ "tauri-plugin-glass",
+ "tauri-plugin-menu",
+ "tauri-plugin-moodle",
  "tauri-plugin-opener",
+ "tauri-plugin-refresh",
+ "tauri-plugin-share",
+ "tauri-plugin-tabbar",
  "tauri-plugin-updater",
  "tauri-plugin-window-state",
  "tokio",
@@ -4103,6 +4110,36 @@ dependencies = [
 ]
 
 [[package]]
+name = "tauri-plugin-glass"
+version = "0.0.0"
+dependencies = [
+ "serde",
+ "serde_json",
+ "tauri",
+ "tauri-plugin",
+]
+
+[[package]]
+name = "tauri-plugin-menu"
+version = "0.0.0"
+dependencies = [
+ "serde",
+ "serde_json",
+ "tauri",
+ "tauri-plugin",
+]
+
+[[package]]
+name = "tauri-plugin-moodle"
+version = "0.0.0"
+dependencies = [
+ "serde",
+ "serde_json",
+ "tauri",
+ "tauri-plugin",
+]
+
+[[package]]
 name = "tauri-plugin-opener"
 version = "2.7.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4122,6 +4159,35 @@ dependencies = [
  "url",
  "windows",
  "zbus",
+]
+
+[[package]]
+name = "tauri-plugin-refresh"
+version = "0.0.0"
+dependencies = [
+ "serde",
+ "serde_json",
+ "tauri",
+ "tauri-plugin",
+]
+
+[[package]]
+name = "tauri-plugin-share"
+version = "0.0.0"
+dependencies = [
+ "serde_json",
+ "tauri",
+ "tauri-plugin",
+]
+
+[[package]]
+name = "tauri-plugin-tabbar"
+version = "0.0.0"
+dependencies = [
+ "serde",
+ "serde_json",
+ "tauri",
+ "tauri-plugin",
 ]
 
 [[package]]

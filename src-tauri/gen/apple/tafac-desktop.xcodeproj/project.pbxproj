@@ -1,0 +1,557 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 77;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		09E44491DF62D2F9350DC7AF /* QuartzCore.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 23BD9B20B1F4D435777C5A8F /* QuartzCore.framework */; };
+		1D2D46762C650397AFD7DE39 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = 474B593A371F2B2AC6E33F40 /* PrivacyInfo.xcprivacy */; };
+		1FBAADAC15139710C798038D /* NodeMobile.xcframework in Frameworks */ = {isa = PBXBuildFile; fileRef = FF5E93D02EB2F35217A8ACE3 /* NodeMobile.xcframework */; };
+		2510CE4CE36CACD631ADC86E /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = AE23E54D2BB998DF0FC7E4DE /* Assets.xcassets */; };
+		37EC43E18CABAA298B4FD77A /* WebKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 916A7D50131D6F10A4EAF072 /* WebKit.framework */; };
+		43984D9DE96372C715A3F8A1 /* Metal.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 76D9FA59DB9C0A437B72AC83 /* Metal.framework */; };
+		59F5638B161A7E87FA955CB1 /* UIKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 8B37DF684862EA0CF5DD71F8 /* UIKit.framework */; };
+		5F15F93048D70A55962CD825 /* LaunchScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 3B1372B6FE4F00A2B350B537 /* LaunchScreen.storyboard */; };
+		775AAFB4D2EA9E2894EAFBE7 /* assets in Resources */ = {isa = PBXBuildFile; fileRef = C73F0A77DDC2F1E90C1F9612 /* assets */; };
+		7EF511362B92EA2B2ADA0558 /* MetalKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 4A40EFA94EE885E4EE4DC369 /* MetalKit.framework */; };
+		8558EFC74D2407B088A15687 /* CoreGraphics.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = E18AD4FDA7EC6708ED835C68 /* CoreGraphics.framework */; };
+		8D49A107E1AD5712A18D14AA /* NodeMobile.xcframework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = FF5E93D02EB2F35217A8ACE3 /* NodeMobile.xcframework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
+		A5D0656CC9E1E2C678AD1A4E /* libapp.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 976F66505EB769740876DC23 /* libapp.a */; };
+		B94BD6BBC9650C0E5F25D420 /* Security.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 1566860B3733FA15654A0DBB /* Security.framework */; };
+		D28AA5C377E7398F26AED4EE /* main.mm in Sources */ = {isa = PBXBuildFile; fileRef = 515EDEFBFE87EA61E00A43FF /* main.mm */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXCopyFilesBuildPhase section */
+		A2ABF36A95055D26E0BC9A3C /* Embed Frameworks */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 10;
+			files = (
+				8D49A107E1AD5712A18D14AA /* NodeMobile.xcframework in Embed Frameworks */,
+			);
+			name = "Embed Frameworks";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
+
+/* Begin PBXFileReference section */
+		0948BC441F90ED2CC2B5A70E /* menu.rs */ = {isa = PBXFileReference; path = menu.rs; sourceTree = "<group>"; };
+		1566860B3733FA15654A0DBB /* Security.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Security.framework; path = System/Library/Frameworks/Security.framework; sourceTree = SDKROOT; };
+		216AFA691742EA63D00F2BF0 /* moodle_style_dark.css */ = {isa = PBXFileReference; lastKnownFileType = text.css; path = moodle_style_dark.css; sourceTree = "<group>"; };
+		23BD9B20B1F4D435777C5A8F /* QuartzCore.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = QuartzCore.framework; path = System/Library/Frameworks/QuartzCore.framework; sourceTree = SDKROOT; };
+		3AC1637865D58F03BECE3911 /* moodle_style.css */ = {isa = PBXFileReference; lastKnownFileType = text.css; path = moodle_style.css; sourceTree = "<group>"; };
+		3B1372B6FE4F00A2B350B537 /* LaunchScreen.storyboard */ = {isa = PBXFileReference; lastKnownFileType = file.storyboard; path = LaunchScreen.storyboard; sourceTree = "<group>"; };
+		3C76B05982013089A6804612 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
+		3D0851F2DC2F0E37CCEE44D2 /* desktop.rs */ = {isa = PBXFileReference; path = desktop.rs; sourceTree = "<group>"; };
+		474B593A371F2B2AC6E33F40 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
+		4A40EFA94EE885E4EE4DC369 /* MetalKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = MetalKit.framework; path = System/Library/Frameworks/MetalKit.framework; sourceTree = SDKROOT; };
+		4D3DE93F88295E568ECA82C7 /* updater.rs */ = {isa = PBXFileReference; path = updater.rs; sourceTree = "<group>"; };
+		515EDEFBFE87EA61E00A43FF /* main.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; path = main.mm; sourceTree = "<group>"; };
+		5365C32BE633071A12E369EF /* main.rs */ = {isa = PBXFileReference; path = main.rs; sourceTree = "<group>"; };
+		554596C42C8E65BC36E7972C /* lib.rs */ = {isa = PBXFileReference; path = lib.rs; sourceTree = "<group>"; };
+		60F23CF1499D056DD68B69A5 /* jar.rs */ = {isa = PBXFileReference; path = jar.rs; sourceTree = "<group>"; };
+		64A2E9A2689A0B949C1D0665 /* assets.rs */ = {isa = PBXFileReference; path = assets.rs; sourceTree = "<group>"; };
+		694801C7D9F2EA759C24E7A0 /* moodle_style.rs */ = {isa = PBXFileReference; path = moodle_style.rs; sourceTree = "<group>"; };
+		6BE42ED4155F809AD1F5989C /* app.rs */ = {isa = PBXFileReference; path = app.rs; sourceTree = "<group>"; };
+		708C957F345AA8B369E2A5E5 /* moodle.rs */ = {isa = PBXFileReference; path = moodle.rs; sourceTree = "<group>"; };
+		76D9FA59DB9C0A437B72AC83 /* Metal.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Metal.framework; path = System/Library/Frameworks/Metal.framework; sourceTree = SDKROOT; };
+		78D2E46B142D1AE163FB026D /* moodle_native.rs */ = {isa = PBXFileReference; path = moodle_native.rs; sourceTree = "<group>"; };
+		81CBC253C8A97CB94668D30C /* bindings.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = bindings.h; sourceTree = "<group>"; };
+		8B37DF684862EA0CF5DD71F8 /* UIKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = UIKit.framework; path = System/Library/Frameworks/UIKit.framework; sourceTree = SDKROOT; };
+		8C3224A9C38C64F218016627 /* node.rs */ = {isa = PBXFileReference; path = node.rs; sourceTree = "<group>"; };
+		916A7D50131D6F10A4EAF072 /* WebKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = WebKit.framework; path = System/Library/Frameworks/WebKit.framework; sourceTree = SDKROOT; };
+		91EC9B99E3419165B26CA266 /* links.rs */ = {isa = PBXFileReference; path = links.rs; sourceTree = "<group>"; };
+		976F66505EB769740876DC23 /* libapp.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; path = libapp.a; sourceTree = "<group>"; };
+		9933E35B87AB59FC1047A4CE /* ios_chrome.rs */ = {isa = PBXFileReference; path = ios_chrome.rs; sourceTree = "<group>"; };
+		9D7C392C1AE8D3B9B4D2FBFE /* tafac-desktop_iOS.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = "tafac-desktop_iOS.app"; sourceTree = BUILT_PRODUCTS_DIR; };
+		A56C9D0EC200B4E5051E24CB /* passwords.rs */ = {isa = PBXFileReference; path = passwords.rs; sourceTree = "<group>"; };
+		A5E1513C0D7004919B965AD5 /* ios_windows.rs */ = {isa = PBXFileReference; path = ios_windows.rs; sourceTree = "<group>"; };
+		AE23E54D2BB998DF0FC7E4DE /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		C15C1209195246E37F40A8F6 /* signin.rs */ = {isa = PBXFileReference; path = signin.rs; sourceTree = "<group>"; };
+		C21AA3E341DC520DD7B310D7 /* tafac-desktop_iOS.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = "tafac-desktop_iOS.entitlements"; sourceTree = "<group>"; };
+		C40E667179AC50C842F6B3FA /* moodle_ios.rs */ = {isa = PBXFileReference; path = moodle_ios.rs; sourceTree = "<group>"; };
+		C73F0A77DDC2F1E90C1F9612 /* assets */ = {isa = PBXFileReference; lastKnownFileType = folder; path = assets; sourceTree = SOURCE_ROOT; };
+		C796002BBF891FE1C8DDBD7F /* sidecar.rs */ = {isa = PBXFileReference; path = sidecar.rs; sourceTree = "<group>"; };
+		C97158B6C7849F7C3566F759 /* moodle_style.js */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.javascript; path = moodle_style.js; sourceTree = "<group>"; };
+		CF2EBDC95A82F99DDC1B0CAC /* remote_settings.rs */ = {isa = PBXFileReference; path = remote_settings.rs; sourceTree = "<group>"; };
+		D37D72EF1075CE66754B321F /* secret.rs */ = {isa = PBXFileReference; path = secret.rs; sourceTree = "<group>"; };
+		D72C2740532B97ACD486A9FD /* ios_downloads.rs */ = {isa = PBXFileReference; path = ios_downloads.rs; sourceTree = "<group>"; };
+		E18AD4FDA7EC6708ED835C68 /* CoreGraphics.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = CoreGraphics.framework; path = System/Library/Frameworks/CoreGraphics.framework; sourceTree = SDKROOT; };
+		E733DE340264AB07B8F2CC75 /* bridge.rs */ = {isa = PBXFileReference; path = bridge.rs; sourceTree = "<group>"; };
+		EA1AADE522532B58D8949C1B /* window.rs */ = {isa = PBXFileReference; path = window.rs; sourceTree = "<group>"; };
+		FC462FE777777C8AC2E17CB4 /* ios.rs */ = {isa = PBXFileReference; path = ios.rs; sourceTree = "<group>"; };
+		FF5E93D02EB2F35217A8ACE3 /* NodeMobile.xcframework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.xcframework; name = NodeMobile.xcframework; path = "../../../desktop-build/ios/NodeMobile.xcframework"; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		547BF43C1D90B7DEC55C2F8F /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				A5D0656CC9E1E2C678AD1A4E /* libapp.a in Frameworks */,
+				1FBAADAC15139710C798038D /* NodeMobile.xcframework in Frameworks */,
+				8558EFC74D2407B088A15687 /* CoreGraphics.framework in Frameworks */,
+				43984D9DE96372C715A3F8A1 /* Metal.framework in Frameworks */,
+				7EF511362B92EA2B2ADA0558 /* MetalKit.framework in Frameworks */,
+				09E44491DF62D2F9350DC7AF /* QuartzCore.framework in Frameworks */,
+				B94BD6BBC9650C0E5F25D420 /* Security.framework in Frameworks */,
+				59F5638B161A7E87FA955CB1 /* UIKit.framework in Frameworks */,
+				37EC43E18CABAA298B4FD77A /* WebKit.framework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		2E4369DE1A315DA0BBFA5117 /* Externals */ = {
+			isa = PBXGroup;
+			children = (
+			);
+			path = Externals;
+			sourceTree = "<group>";
+		};
+		2FC5994FE012175D72B2FF8A /* bindings */ = {
+			isa = PBXGroup;
+			children = (
+				81CBC253C8A97CB94668D30C /* bindings.h */,
+			);
+			path = bindings;
+			sourceTree = "<group>";
+		};
+		3BE5B899CD547ED9264B6C5A /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+				E18AD4FDA7EC6708ED835C68 /* CoreGraphics.framework */,
+				976F66505EB769740876DC23 /* libapp.a */,
+				76D9FA59DB9C0A437B72AC83 /* Metal.framework */,
+				4A40EFA94EE885E4EE4DC369 /* MetalKit.framework */,
+				FF5E93D02EB2F35217A8ACE3 /* NodeMobile.xcframework */,
+				23BD9B20B1F4D435777C5A8F /* QuartzCore.framework */,
+				1566860B3733FA15654A0DBB /* Security.framework */,
+				8B37DF684862EA0CF5DD71F8 /* UIKit.framework */,
+				916A7D50131D6F10A4EAF072 /* WebKit.framework */,
+			);
+			name = Frameworks;
+			sourceTree = "<group>";
+		};
+		928988F8279B4A445C07A179 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				9D7C392C1AE8D3B9B4D2FBFE /* tafac-desktop_iOS.app */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		C68FA527E9EDD1A93351C31C = {
+			isa = PBXGroup;
+			children = (
+				C73F0A77DDC2F1E90C1F9612 /* assets */,
+				AE23E54D2BB998DF0FC7E4DE /* Assets.xcassets */,
+				3B1372B6FE4F00A2B350B537 /* LaunchScreen.storyboard */,
+				2E4369DE1A315DA0BBFA5117 /* Externals */,
+				E7CF5CFD46DF641679D8B345 /* Sources */,
+				C8F4A8F8F1FC0C1C13D55B23 /* src */,
+				D8D212B4D5018B2016D82903 /* tafac-desktop_iOS */,
+				3BE5B899CD547ED9264B6C5A /* Frameworks */,
+				928988F8279B4A445C07A179 /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		C8F4A8F8F1FC0C1C13D55B23 /* src */ = {
+			isa = PBXGroup;
+			children = (
+				6BE42ED4155F809AD1F5989C /* app.rs */,
+				64A2E9A2689A0B949C1D0665 /* assets.rs */,
+				E733DE340264AB07B8F2CC75 /* bridge.rs */,
+				3D0851F2DC2F0E37CCEE44D2 /* desktop.rs */,
+				9933E35B87AB59FC1047A4CE /* ios_chrome.rs */,
+				D72C2740532B97ACD486A9FD /* ios_downloads.rs */,
+				A5E1513C0D7004919B965AD5 /* ios_windows.rs */,
+				FC462FE777777C8AC2E17CB4 /* ios.rs */,
+				60F23CF1499D056DD68B69A5 /* jar.rs */,
+				554596C42C8E65BC36E7972C /* lib.rs */,
+				91EC9B99E3419165B26CA266 /* links.rs */,
+				5365C32BE633071A12E369EF /* main.rs */,
+				0948BC441F90ED2CC2B5A70E /* menu.rs */,
+				C40E667179AC50C842F6B3FA /* moodle_ios.rs */,
+				78D2E46B142D1AE163FB026D /* moodle_native.rs */,
+				216AFA691742EA63D00F2BF0 /* moodle_style_dark.css */,
+				3AC1637865D58F03BECE3911 /* moodle_style.css */,
+				C97158B6C7849F7C3566F759 /* moodle_style.js */,
+				694801C7D9F2EA759C24E7A0 /* moodle_style.rs */,
+				708C957F345AA8B369E2A5E5 /* moodle.rs */,
+				8C3224A9C38C64F218016627 /* node.rs */,
+				A56C9D0EC200B4E5051E24CB /* passwords.rs */,
+				CF2EBDC95A82F99DDC1B0CAC /* remote_settings.rs */,
+				D37D72EF1075CE66754B321F /* secret.rs */,
+				C796002BBF891FE1C8DDBD7F /* sidecar.rs */,
+				C15C1209195246E37F40A8F6 /* signin.rs */,
+				4D3DE93F88295E568ECA82C7 /* updater.rs */,
+				EA1AADE522532B58D8949C1B /* window.rs */,
+			);
+			name = src;
+			path = ../../src;
+			sourceTree = "<group>";
+		};
+		D8D212B4D5018B2016D82903 /* tafac-desktop_iOS */ = {
+			isa = PBXGroup;
+			children = (
+				3C76B05982013089A6804612 /* Info.plist */,
+				474B593A371F2B2AC6E33F40 /* PrivacyInfo.xcprivacy */,
+				C21AA3E341DC520DD7B310D7 /* tafac-desktop_iOS.entitlements */,
+			);
+			path = "tafac-desktop_iOS";
+			sourceTree = "<group>";
+		};
+		E7CF5CFD46DF641679D8B345 /* Sources */ = {
+			isa = PBXGroup;
+			children = (
+				EFEC25AE6F94AB6A9355F8FA /* tafac-desktop */,
+			);
+			path = Sources;
+			sourceTree = "<group>";
+		};
+		EFEC25AE6F94AB6A9355F8FA /* tafac-desktop */ = {
+			isa = PBXGroup;
+			children = (
+				515EDEFBFE87EA61E00A43FF /* main.mm */,
+				2FC5994FE012175D72B2FF8A /* bindings */,
+			);
+			path = "tafac-desktop";
+			sourceTree = "<group>";
+		};
+		"TEMP_2F0D2952-A97F-48BF-8CE5-51D9584AD279" /* x86_64 */ = {
+			isa = PBXGroup;
+			children = (
+			);
+			path = x86_64;
+			sourceTree = "<group>";
+		};
+		"TEMP_3EA3D209-82D5-460E-AF4D-CDE6525797FC" /* arm64 */ = {
+			isa = PBXGroup;
+			children = (
+			);
+			path = arm64;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		4B56EC5BAEF06DC04B2A05D8 /* tafac-desktop_iOS */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 688C4C315CC0640B9C7411DC /* Build configuration list for PBXNativeTarget "tafac-desktop_iOS" */;
+			buildPhases = (
+				45D48760B82A01C7EFD4E822 /* Build Rust Code */,
+				829BE6F2509ED0886353EA17 /* Sources */,
+				DE27E6A2760336EC8C372037 /* Resources */,
+				547BF43C1D90B7DEC55C2F8F /* Frameworks */,
+				A2ABF36A95055D26E0BC9A3C /* Embed Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = "tafac-desktop_iOS";
+			packageProductDependencies = (
+			);
+			productName = "tafac-desktop_iOS";
+			productReference = 9D7C392C1AE8D3B9B4D2FBFE /* tafac-desktop_iOS.app */;
+			productType = "com.apple.product-type.application";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		B549413B4B21F6E062D0A16D /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = YES;
+				LastUpgradeCheck = 1430;
+				TargetAttributes = {
+					4B56EC5BAEF06DC04B2A05D8 = {
+						DevelopmentTeam = P8XRQT7Z4K;
+					};
+				};
+			};
+			buildConfigurationList = 791B08415EBCD67620ED7CEC /* Build configuration list for PBXProject "tafac-desktop" */;
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				Base,
+				en,
+			);
+			mainGroup = C68FA527E9EDD1A93351C31C;
+			minimizedProjectReferenceProxies = 1;
+			preferredProjectObjectVersion = 77;
+			productRefGroup = 928988F8279B4A445C07A179 /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				4B56EC5BAEF06DC04B2A05D8 /* tafac-desktop_iOS */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		DE27E6A2760336EC8C372037 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				2510CE4CE36CACD631ADC86E /* Assets.xcassets in Resources */,
+				5F15F93048D70A55962CD825 /* LaunchScreen.storyboard in Resources */,
+				1D2D46762C650397AFD7DE39 /* PrivacyInfo.xcprivacy in Resources */,
+				775AAFB4D2EA9E2894EAFBE7 /* assets in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXShellScriptBuildPhase section */
+		45D48760B82A01C7EFD4E822 /* Build Rust Code */ = {
+			isa = PBXShellScriptBuildPhase;
+			alwaysOutOfDate = 1;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+			);
+			name = "Build Rust Code";
+			outputFileListPaths = (
+			);
+			outputPaths = (
+				"$(SRCROOT)/Externals/x86_64/${CONFIGURATION}/libapp.a",
+				"$(SRCROOT)/Externals/arm64/${CONFIGURATION}/libapp.a",
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "npm run -- tauri ios xcode-script -v --platform \"${PLATFORM_DISPLAY_NAME:?}\" --sdk-root \"${SDKROOT:?}\" --framework-search-paths \"${FRAMEWORK_SEARCH_PATHS:?}\" --header-search-paths \"${HEADER_SEARCH_PATHS:?}\" --gcc-preprocessor-definitions \"${GCC_PREPROCESSOR_DEFINITIONS:-}\" --configuration \"${CONFIGURATION:?}\" ${FORCE_COLOR} ${ARCHS:?}\n";
+		};
+/* End PBXShellScriptBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		829BE6F2509ED0886353EA17 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				D28AA5C377E7398F26AED4EE /* main.mm in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin XCBuildConfiguration section */
+		2AC9408D6DAFE6281CFCD064 /* debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"$(inherited)",
+					"DEBUG=1",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_VERSION = 5.0;
+			};
+			name = debug;
+		};
+		8F16F472B3DF6299066CD4CA /* release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES = YES;
+				ARCHS = (
+					arm64,
+				);
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_ENTITLEMENTS = "tafac-desktop_iOS/tafac-desktop_iOS.entitlements";
+				CODE_SIGN_IDENTITY = "iPhone Developer";
+				DEVELOPMENT_TEAM = "P8XRQT7Z4K";
+				ENABLE_BITCODE = NO;
+				"EXCLUDED_ARCHS[sdk=iphoneos*]" = x86_64;
+				FRAMEWORK_SEARCH_PATHS = (
+					"$(inherited)",
+					"\".\"",
+					"\"../../../desktop-build/ios\"",
+				);
+				INFOPLIST_FILE = "tafac-desktop_iOS/Info.plist";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				"LIBRARY_SEARCH_PATHS[arch=arm64]" = "$(inherited) $(PROJECT_DIR)/Externals/arm64/$(CONFIGURATION) $(SDKROOT)/usr/lib/swift $(DEVELOPER_DIR)/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/$(PLATFORM_NAME) $(DEVELOPER_DIR)/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift-5.0/$(PLATFORM_NAME)";
+				"LIBRARY_SEARCH_PATHS[arch=x86_64]" = "$(inherited) $(PROJECT_DIR)/Externals/x86_64/$(CONFIGURATION) $(SDKROOT)/usr/lib/swift $(DEVELOPER_DIR)/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/$(PLATFORM_NAME) $(DEVELOPER_DIR)/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift-5.0/$(PLATFORM_NAME)";
+				PRODUCT_BUNDLE_IDENTIFIER = fr.tafac.ios;
+				PRODUCT_NAME = "Tafac";
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				VALID_ARCHS = arm64;
+			};
+			name = release;
+		};
+		CE023F6DA8482130C891AC8B /* release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
+				SWIFT_VERSION = 5.0;
+			};
+			name = release;
+		};
+		FEA6A5F22894EBD9340EB44A /* debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES = YES;
+				ARCHS = (
+					arm64,
+				);
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_ENTITLEMENTS = "tafac-desktop_iOS/tafac-desktop_iOS.entitlements";
+				CODE_SIGN_IDENTITY = "iPhone Developer";
+				DEVELOPMENT_TEAM = "P8XRQT7Z4K";
+				ENABLE_BITCODE = NO;
+				"EXCLUDED_ARCHS[sdk=iphoneos*]" = x86_64;
+				FRAMEWORK_SEARCH_PATHS = (
+					"$(inherited)",
+					"\".\"",
+					"\"../../../desktop-build/ios\"",
+				);
+				INFOPLIST_FILE = "tafac-desktop_iOS/Info.plist";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				"LIBRARY_SEARCH_PATHS[arch=arm64]" = "$(inherited) $(PROJECT_DIR)/Externals/arm64/$(CONFIGURATION) $(SDKROOT)/usr/lib/swift $(DEVELOPER_DIR)/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/$(PLATFORM_NAME) $(DEVELOPER_DIR)/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift-5.0/$(PLATFORM_NAME)";
+				"LIBRARY_SEARCH_PATHS[arch=x86_64]" = "$(inherited) $(PROJECT_DIR)/Externals/x86_64/$(CONFIGURATION) $(SDKROOT)/usr/lib/swift $(DEVELOPER_DIR)/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/$(PLATFORM_NAME) $(DEVELOPER_DIR)/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift-5.0/$(PLATFORM_NAME)";
+				PRODUCT_BUNDLE_IDENTIFIER = fr.tafac.ios;
+				PRODUCT_NAME = "Tafac";
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				VALID_ARCHS = arm64;
+			};
+			name = debug;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		688C4C315CC0640B9C7411DC /* Build configuration list for PBXNativeTarget "tafac-desktop_iOS" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				FEA6A5F22894EBD9340EB44A /* debug */,
+				8F16F472B3DF6299066CD4CA /* release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = debug;
+		};
+		791B08415EBCD67620ED7CEC /* Build configuration list for PBXProject "tafac-desktop" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				2AC9408D6DAFE6281CFCD064 /* debug */,
+				CE023F6DA8482130C891AC8B /* release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = debug;
+		};
+/* End XCConfigurationList section */
+	};
+	rootObject = B549413B4B21F6E062D0A16D /* Project object */;
+}

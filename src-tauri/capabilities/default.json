@@ -1,7 +1,8 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
-  "description": "The app's pages (tafac://, local to Tauri): dragging the window by its drag regions, zooming it on a double click, and its light or dark appearance following the app's theme (the sidebar's material takes it). Nothing else.",
+  "description": "The app's pages (tafac://, local to Tauri): dragging the window by its drag regions, zooming it on a double click, and its light or dark appearance following the app's theme (the sidebar's material takes it). Nothing else. Desktop only: the iOS app's page has no command to call.",
+  "platforms": ["macOS", "windows", "linux"],
   "windows": [
     "*"
   ],

@@ -6,6 +6,12 @@ license = "AGPL-3.0-only"
 edition = "2021"
 publish = false
 
+# The app itself: the desktop's binary (src/main.rs) and, on iOS, the static
+# library Xcode links into the app (docs/IOS.md) both run it.
+[lib]
+name = "tafac_lib"
+crate-type = ["staticlib", "rlib"]
+
 [build-dependencies]
 tauri-build = { version = "2", features = [] }
 
@@ -23,6 +29,9 @@ serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 rand = "0.8"
 tauri-plugin-opener = "2"
+
+# Desktop only: iOS has one window, and its updates are the App Store's.
+[target.'cfg(not(any(target_os = "ios", target_os = "android")))'.dependencies]
 tauri-plugin-window-state = "2"
 # Updates (src/updater.rs): the check, the download and its signature, the
 # install. Driven from Rust: the page has no updater command to call.
@@ -57,6 +66,30 @@ objc2-web-kit = { version = "0.3", default-features = false, features = [
 # each system's own backend, nothing else of the crate. On Linux the Secret
 # Service over libdbus, which the window toolkit already links.
 [target.'cfg(target_os = "macos")'.dependencies.keyring]
+version = "3"
+default-features = false
+features = ["apple-native"]
+
+# iOS: the phone's time zone, for the Node inside the app (src/node.rs).
+[target.'cfg(target_os = "ios")'.dependencies]
+iana-time-zone = "0.1"
+# The web view below the status bar (src/ios_chrome.rs).
+objc2 = "0.6"
+# The system's tab bar under the page (plugins/tabbar, in Swift).
+tauri-plugin-tabbar = { path = "plugins/tabbar" }
+# The system's menu in place of the page's context menu (plugins/menu).
+tauri-plugin-menu = { path = "plugins/menu" }
+# The system's glass under the page's floating controls (plugins/glass).
+tauri-plugin-glass = { path = "plugins/glass" }
+# The system's pull to refresh on the page (plugins/refresh).
+tauri-plugin-refresh = { path = "plugins/refresh" }
+# Moodle's own web view over the page (plugins/moodle, in Swift).
+tauri-plugin-moodle = { path = "plugins/moodle" }
+# The system's share sheet for a file downloaded (plugins/share).
+tauri-plugin-share = { path = "plugins/share" }
+
+# iOS: the Keychain, as on macOS.
+[target.'cfg(target_os = "ios")'.dependencies.keyring]
 version = "3"
 default-features = false
 features = ["apple-native"]

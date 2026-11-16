@@ -2,6 +2,7 @@ import { Fragment, useEffect, useId, useRef, useState } from 'react'
 import { Icon } from '@iconify/react'
 import { trackGradesAction } from '../analytics'
 import { shadeHex } from '../colorContrast'
+import { isInHiddenPage } from '../keptPages'
 import { describeJuryDecision, formatJuryDate, hashNoticeText, readDismissedMessageHash, writeDismissedMessageHash } from '../gradesNotices'
 import { r } from '../register.js'
 
@@ -23,7 +24,10 @@ export function GradesNotice({ icon = null, media = null, tint = null, label, ti
   useEffect(() => {
     const body = bodyRef.current
     if (!collapsible || expanded || !body || typeof ResizeObserver !== 'function') return undefined
-    const observer = new ResizeObserver(() => setOverflowing(body.scrollHeight - body.clientHeight > 1))
+    const observer = new ResizeObserver(() => {
+      // Kept behind another page, out of the layout: as it was measured.
+      if (!isInHiddenPage(body)) setOverflowing(body.scrollHeight - body.clientHeight > 1)
+    })
     observer.observe(body)
     return () => observer.disconnect()
   }, [collapsible, expanded, children])

@@ -1,5 +1,7 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { publishBriefingSource } from './briefingSources'
+import { usePageVisit } from './pageVisit'
+import { usePullRefresh } from './usePullRefresh'
 import {
   buildNextClassCacheEntryKey,
   buildResourceIdsFromSelection,
@@ -15,8 +17,11 @@ const REFRESH_MS = 10 * 60 * 1000
 // Upcoming classes through the « Prochain cours » card's cache (« Accueil »'s
 // « Prochains cours », the sidebar's « Prochain cours »): what's there
 // when fresh, else one request, written back for the card and the greeting.
-// `retry()` asks again after a failed load.
+// `retry()` asks again after a failed load. Back on a page kept mounted
+// (the iOS app, src/pageVisit.js), read again as a mount would: the cache
+// while fresh.
 export function useUpcomingClasses({ selection, sessionUser, lookaheadDays }) {
+  const visit = usePageVisit()
   const resourceKey = buildResourceIdsFromSelection(selection).join('|')
   const cacheKey = buildNextClassCacheEntryKey(sessionUser, resourceKey, lookaheadDays)
   const [state, setState] = useState(() => {
@@ -25,6 +30,13 @@ export function useUpcomingClasses({ selection, sessionUser, lookaheadDays }) {
     return cached ? { status: 'ok', events: cached.events } : { status: 'loading', events: [] }
   })
   const [attempt, setAttempt] = useState(0)
+  // Pulled down with its page (the iOS app): asked again even while the
+  // cache is fresh, what is shown staying meanwhile.
+  const forcedRef = useRef(false)
+  usePullRefresh(() => {
+    forcedRef.current = true
+    setAttempt((current) => current + 1)
+  })
 
   useEffect(() => {
     if (!resourceKey || !cacheKey) {
@@ -33,7 +45,9 @@ export function useUpcomingClasses({ selection, sessionUser, lookaheadDays }) {
     }
     const cached = readNextClassCache(cacheKey)
     if (cached) setState({ status: 'ok', events: cached.events })
-    if (cached && Date.now() - cached.cachedAt < REFRESH_MS) return undefined
+    const forced = forcedRef.current
+    forcedRef.current = false
+    if (cached && !forced && Date.now() - cached.cachedAt < REFRESH_MS) return undefined
 
     const controller = new AbortController()
     fetchUpcomingEvents({ selection, lookaheadDays, signal: controller.signal })
@@ -46,7 +60,7 @@ export function useUpcomingClasses({ selection, sessionUser, lookaheadDays }) {
         if (!controller.signal.aborted) setState((current) => (current.status === 'ok' ? current : { status: 'error', events: [] }))
       })
     return () => controller.abort()
-  }, [attempt, cacheKey, lookaheadDays, resourceKey, selection])
+  }, [attempt, cacheKey, lookaheadDays, resourceKey, selection, visit])
 
   const retry = useCallback(() => {
     setState({ status: 'loading', events: [] })

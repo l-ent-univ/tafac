@@ -335,7 +335,7 @@ function PrivacyModal({ open, onClose }) {
       role="presentation"
     >
       <section
-        className="glass-solid glass--quiet modal-surface privacy-modal relative font-body w-[min(500px,100%)] max-h-[calc(100dvh-40px)] overflow-y-auto overflow-x-hidden corners-[28px] border text-[#341200] animate-modal-card-in dark:text-[var(--color-text)]"
+        className="glass-solid glass--quiet modal-surface privacy-modal relative font-body w-[min(500px,100%)] max-h-[calc(var(--app-h)-40px)] overflow-y-auto overflow-x-hidden corners-[28px] border text-[#341200] animate-modal-card-in dark:text-[var(--color-text)]"
         role="dialog"
         aria-modal="true"
         aria-labelledby="privacy-modal-title"

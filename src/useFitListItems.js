@@ -1,4 +1,5 @@
 import { useLayoutEffect, useRef, useState } from 'react'
+import { isInHiddenPage } from './keptPages'
 
 // The items (li) of a list that fit whole in its box show; the ones below
 // are hidden, out of the tab order. Checked after each render and when the
@@ -11,6 +12,8 @@ export default function useFitListItems({ slack = 0 } = {}) {
     const box = ref.current
     if (!box || typeof ResizeObserver === 'undefined') return undefined
     const fit = () => {
+      // Out of the layout with its page (kept behind another): as it was.
+      if (isInHiddenPage(box)) return
       const limit = box.getBoundingClientRect().bottom - slack
       let count = 0
       for (const item of box.querySelectorAll('li')) {

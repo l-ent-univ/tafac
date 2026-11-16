@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { isWebKit } from '../alphaVideo'
+import { usePageShown } from '../pageVisit'
 
 // The « Accueil » icon row's icons as short 3D clips with a transparent
 // background. Each one turns once and stops front-facing, where the flat
@@ -44,15 +45,26 @@ function HomeIcon({ src, size = 22, order = 0, className = '' }) {
   const clip = CLIP_BY_FLAT_ICON.get(src) ?? null
   const reduceMotion = typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
 
+  // The turn is the arrival's, once: on a page kept behind another (the
+  // iOS app, src/pageVisit.js) the clip stops, the still in its place, and
+  // doesn't play again when the page is back.
+  const shown = usePageShown()
+  const turnedRef = useRef(false)
   useEffect(() => {
     const video = videoRef.current
-    if (!video || !clip) return undefined
+    if (!video || !clip || turnedRef.current) return undefined
+    if (!shown) {
+      turnedRef.current = true
+      video.pause()
+      setLive(false)
+      return undefined
+    }
     const timer = window.setTimeout(() => {
       // Refused (a data saver, a background tab): the poster stays, which is the icon.
       video.play().catch(() => {})
     }, CANON_FIRST_MS + order * CANON_STEP_MS)
     return () => window.clearTimeout(timer)
-  }, [clip, order])
+  }, [clip, order, shown])
 
   if (!clip) {
     return <img src={src} alt="" width={size} height={size} draggable="false" className={className} aria-hidden="true" />
@@ -107,7 +119,10 @@ function HomeIcon({ src, size = 22, order = 0, className = '' }) {
         preload="auto"
         disablePictureInPicture
         className={`absolute inset-0 size-full object-contain ${live ? '' : 'invisible'}`}
-        onPlaying={() => setLive(true)}
+        onPlaying={() => {
+          // Not for a clip stopped as its page was hidden: its still stays.
+          if (!turnedRef.current) setLive(true)
+        }}
       />
     </span>
   )

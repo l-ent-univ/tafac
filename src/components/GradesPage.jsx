@@ -399,8 +399,9 @@ function GradesPage({ user = null, arrivalSource = 'other', initialGradeRequest 
         {/* The university's outage notice, as on every tab. */}
         <ServiceNotice />
         {/* On a phone, one row: the title, then the semester chip ("S2"),
-            Simuler and the PDF at its end, so nothing wraps. */}
-        <div className={`flex flex-wrap items-baseline gap-x-3 gap-y-2 max-md:flex-nowrap max-md:items-center max-md:gap-x-2 ${ueFocused ? 'sr-only' : ''}`}>
+            Simuler and the PDF at its end, so nothing wraps. iOS app: its
+            pills are of the system's glass (src/iosGlass.js). */}
+        <div data-ios-glass="" className={`flex flex-wrap items-baseline gap-x-3 gap-y-2 max-md:flex-nowrap max-md:items-center max-md:gap-x-2 ${ueFocused ? 'sr-only' : ''}`}>
           <h1 id="grades-page-title" className="m-0 leading-[1.15] text-2xl font-bold max-md:mr-auto max-md:flex max-md:min-h-10 max-md:min-w-0 max-md:items-center max-md:text-[26px] max-md:tracking-[-0.01em]">Mes notes</h1>
           {!ueFocused ? <SemesterSelect semesters={semesters} value={activeId} onChange={changeSemester} /> : null}
           {(canSimulate || canExportPdf) && !ueFocused ? (

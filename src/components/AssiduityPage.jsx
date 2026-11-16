@@ -22,6 +22,8 @@ import { assignSubjectIcons } from '../subjectIcons'
 import { copyToClipboard, useContextMenu } from '../useContextMenu'
 import { useHistorySheet } from '../useHistorySheet'
 import { useScodocReleve } from '../useScodocReleve'
+import { isInHiddenPage } from '../keptPages'
+import { usePageInterval } from '../pageVisit'
 import { GradesNotice } from './GradesNotice'
 import JustifyAbsenceSheet from './JustifyAbsenceSheet'
 import LoadingDots from './LoadingDots'
@@ -79,13 +81,11 @@ function describeEntry(entry) {
   ].filter(Boolean).join(', ')
 }
 
-// The time, once a minute: the countdowns stay true while the page is open.
+// The time, once a minute: the countdowns stay true while the page is
+// shown (src/pageVisit.js).
 function useMinuteClock() {
   const [now, setNow] = useState(() => new Date())
-  useEffect(() => {
-    const timer = window.setInterval(() => setNow(new Date()), 60 * 1000)
-    return () => window.clearInterval(timer)
-  }, [])
+  usePageInterval(() => setNow(new Date()), 60 * 1000)
   return now
 }
 
@@ -451,6 +451,8 @@ function useChipsGlide(rowRef) {
       places.current = null
       return
     }
+    // Kept behind another page, out of the layout: their places as read.
+    if (isInHiddenPage(row)) return
     const still = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
     const before = places.current
     const now = new Map()
@@ -740,7 +742,8 @@ function AssiduityPage({ arrivalSource = 'other', onComposeMail = null, absenceR
       <div className="page-top-band grid gap-5 -mx-6 -mt-4 px-6 pt-4 pb-6 4xl:-mt-5 4xl:pt-5 max-md:-mx-3 max-md:-mt-3 max-md:gap-4 max-md:px-3 max-md:pt-5 max-md:pb-4">
         {/* The university's outage notice, as on every tab. */}
         <ServiceNotice />
-        <div className="flex flex-wrap items-baseline gap-x-3 gap-y-2 max-md:flex-nowrap max-md:items-center max-md:gap-x-2">
+        {/* iOS app: the row's pills are of the system's glass (src/iosGlass.js). */}
+        <div data-ios-glass="" className="flex flex-wrap items-baseline gap-x-3 gap-y-2 max-md:flex-nowrap max-md:items-center max-md:gap-x-2">
           <h1 id="assiduity-page-title" className="m-0 leading-[1.15] text-2xl font-bold max-md:mr-auto max-md:flex max-md:min-h-10 max-md:min-w-0 max-md:items-center max-md:text-[26px] max-md:tracking-[-0.01em]">Assiduité</h1>
           <SemesterSelect semesters={semesters} value={activeId} onChange={changeSemester} />
         </div>

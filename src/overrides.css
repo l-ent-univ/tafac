@@ -1134,6 +1134,244 @@
   filter: brightness(0) invert(1);
 }
 
+/* « Accueil »'s header on a phone (HomePhoneHeader).
+
+   The photo, to the screen's edges at full strength, fading down into the
+   page. It is behind the page: it goes up at half the page's speed, fade
+   and all, so the greeting and what follows slide up over it and it lingers
+   at the top of the screen. The browser moves it itself (a scroll-driven
+   animation: nothing runs in the page); where it can't, and for whoever
+   asked for less motion, the photo scrolls with the page.
+
+   It always ends in a fade: its own, and its frame's, which is the header's
+   box and fades out along its bottom edge. Whatever part of the photo gets
+   there fades too, at any point of the scroll; and it never shows over the
+   cards below. */
+/* The header starts at the page's top edge (the section's own padding
+   taken back). With a photo it also goes up behind the status bar, where
+   the page runs under it (the iOS app, --status-bar; 0 elsewhere): the
+   photo starts at the screen's edge, what is to be read or pressed stays
+   below the bar. */
+.home-phone-header {
+  margin-top: -12px;
+  padding-top: 16px;
+}
+
+.home-phone-header[data-photo] {
+  margin-top: calc(-12px - var(--status-bar));
+  padding-top: calc(16px + var(--status-bar));
+}
+
+.home-phone-photo-frame {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+  -webkit-mask-image: linear-gradient(to bottom, black calc(100% - 96px), transparent 100%);
+  mask-image: linear-gradient(to bottom, black calc(100% - 96px), transparent 100%);
+}
+
+.home-phone-photo {
+  position: absolute;
+  inset: 0 0 auto;
+  height: calc(200px + var(--status-bar));
+  background-size: cover;
+  background-position: center;
+  -webkit-mask-image: linear-gradient(to bottom, black 22%, transparent 86%);
+  mask-image: linear-gradient(to bottom, black 22%, transparent 86%);
+}
+
+@supports (animation-timeline: scroll()) {
+  @media (prefers-reduced-motion: no-preference) {
+    .home-phone-photo {
+      animation: home-phone-photo-behind linear both;
+      animation-timeline: scroll(root block);
+      animation-range: 0 400px;
+      will-change: transform;
+    }
+  }
+}
+
+@keyframes home-phone-photo-behind {
+  to {
+    transform: translate3d(0, 200px, 0);
+  }
+}
+
+/* Behind the status bar (the iOS app): a haze of the page's colour over the
+   photo's top, for the clock to read on any photo, light or dark as the
+   theme and so as the clock is. As tall as the bar and half again: nothing
+   where there is no bar over the photo. */
+.home-phone-photo-haze {
+  position: absolute;
+  inset: 0 0 auto;
+  height: calc(var(--status-bar) * 1.5);
+  background: linear-gradient(to bottom, color-mix(in srgb, var(--color-bg) 62%, transparent), transparent);
+}
+
+/* ── iOS app · status bar ──
+   On a phone the app's web view covers the whole screen and never changes
+   size (src-tauri/src/ios_chrome.rs): the page runs behind the status bar,
+   and each screen draws its own top there, as an app does. --status-bar is
+   the bar's height (0 in a browser, in the installed web app, in the
+   desktop app and on a tablet, where the web view stays below the bar), and
+   --app-h the screen's height below it, which the sheets and dialogs size
+   themselves on.
+
+   - The pages start below the bar (the column's padding). A page's tinted
+     band spreads its colour up behind the bar; « Accueil »'s photo goes up
+     there (.home-phone-header).
+   - What sticks to the top sticks below the bar (.planning-top, the mail
+     list's header, Mes notes' way back: top: var(--status-bar)).
+   - What scrolls up passes behind the bar under a veil (.ios-status-veil).
+   - A dialog keeps below the bar, its backdrop still covering it.
+   - The screens before the dashboard (sign-in, first set-up) start below
+     the bar, in their own colour. */
+:root {
+  --status-bar: 0px;
+  --app-h: 100dvh;
+}
+
+:root[data-ios-app] {
+  --status-bar: env(safe-area-inset-top, 0px);
+  --app-h: calc(100dvh - env(safe-area-inset-top, 0px));
+}
+
+/* No zoom in the app (src/desktopApp.js): the page pans, nothing more. */
+:root[data-ios-app] {
+  touch-action: pan-x pan-y;
+}
+
+:root[data-ios-app] .app-column {
+  padding-top: var(--status-bar);
+}
+
+/* The band's colour is a spread clipped to its height (.page-top-band):
+   here it shows above it too, up to the screen's edge. */
+:root[data-ios-app] .dashboard-no-wallpaper .page-top-band {
+  clip-path: inset(calc(-1 * var(--status-bar)) -100vmax -1px);
+}
+
+:root[data-ios-app] main:not(:has(.app-column, .login-right-panel)),
+:root[data-ios-app] .login-right-panel {
+  padding-top: var(--status-bar);
+}
+
+/* The centred dialogs (their backdrop is the layer itself, padded): the
+   bar's height more at the top. The sheets hang from the bottom and stop
+   below the bar by their height (--app-h). */
+:root[data-ios-app] .weather-modal-backdrop {
+  padding-top: calc(20px + var(--status-bar));
+}
+
+@media (width < 40rem) {
+  :root[data-ios-app] .weather-modal-backdrop {
+    padding-top: calc(14px + var(--status-bar));
+  }
+}
+
+/* A control of the page's under the system's glass (src/iosGlass.js): its
+   own drawing is off, the element still in its place: a finger on the
+   glass is a finger on it. By a filter, not its opacity: that one is the
+   control's own to say (a disabled one's), and is read for the glass. No
+   highlight of WebKit's own over the glass. */
+[data-ios-glass-on] {
+  filter: opacity(0) !important;
+  transition: none !important;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* The mail reader's bar, at the screen's foot: just over the system's tab
+   bar, which is lower than the page's own was. */
+@media (width < 1024px) {
+  :root[data-ios-app] .mail-toolbar-veil {
+    bottom: calc(env(safe-area-inset-bottom, 0px) + 56px);
+  }
+}
+
+/* What scrolls up passes behind the status bar: a veil of the page's
+   colour, frosted, comes over the bar as the page scrolls, and is gone at
+   its top, where the page's own top shows (a photo, a band's colour).
+   Where the browser can't follow the scroll in CSS it is always there. It
+   ends in a fade a little below the bar, and is as tall as the bar is.
+   Not where the page's top stays stuck under the bar in its own colour
+   (the planning, the mail's list). */
+.ios-status-veil {
+  position: fixed;
+  inset: 0 0 auto;
+  z-index: 35;
+  height: calc(var(--status-bar) * 1.3);
+  pointer-events: none;
+  background-color: color-mix(in srgb, var(--color-bg) 82%, transparent);
+  -webkit-backdrop-filter: blur(14px);
+  backdrop-filter: blur(14px);
+  -webkit-mask-image: linear-gradient(to bottom, black 72%, transparent);
+  mask-image: linear-gradient(to bottom, black 72%, transparent);
+}
+
+.dashboard-no-wallpaper:has(.app-column > :not([hidden]) :is(.planning-top, .mail-list-header)) .ios-status-veil {
+  display: none;
+}
+
+@supports (animation-timeline: scroll()) {
+  .ios-status-veil {
+    animation: ios-status-veil-in linear both;
+    animation-timeline: scroll(root block);
+    animation-range: 24px 140px;
+  }
+}
+
+@keyframes ios-status-veil-in {
+  from {
+    opacity: 0;
+  }
+}
+
+/* The logos straight on the photo: the wordmark and the university's logo
+   in white, with a soft shadow, for them to read on any photo (the
+   chocolate mark keeps its colours). Without a photo, their own colours:
+   the wordmark's are LogoBut1's (white in dark mode), the university's
+   logo is inverted in dark mode unless it has a dark version of its own. */
+.home-phone-header[data-photo] :is(.home-phone-wordmark, .home-phone-uni) {
+  filter: brightness(0) invert(1) drop-shadow(0 1px 2px rgb(0 0 0 / 0.5)) drop-shadow(0 0 10px rgb(0 0 0 / 0.35));
+}
+
+:where([data-theme="dark"]) .home-phone-header:not([data-photo]) .home-phone-uni:not(.is-themed) {
+  filter: invert(1);
+}
+
+/* The account button over the photo: frosted, light or dark as the theme.
+   With the student's photo in it: a white ring. */
+.home-phone-glass {
+  border: 1px solid rgb(255 255 255 / 0.45);
+  background-color: rgb(255 255 255 / 0.6);
+  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(12px);
+}
+
+:where([data-theme="dark"]) .home-phone-glass {
+  border-color: rgb(255 255 255 / 0.15);
+  background-color: rgb(0 0 0 / 0.45);
+}
+
+.home-phone-portrait {
+  border: 2px solid rgb(255 255 255 / 0.85);
+  box-shadow: 0 2px 8px rgb(0 0 0 / 0.25);
+}
+
+/* The greeting and the day's sentence, which the photo passes behind as
+   the page scrolls: a glow in the page's colour keeps them readable. Not
+   on the icons, which are buttons. */
+.home-phone-text :is(h1, p, a) {
+  text-shadow: 0 0 2px var(--color-bg), 0 0 12px var(--color-bg), 0 0 24px var(--color-bg);
+}
+
+/* The sentence's own patch of the band's tint (BlurInText) is for the band:
+   here it would smudge the page. */
+.home-phone-text p::before {
+  content: none;
+}
+
 /* The header logo is whitened for the photo; on the plain page it would vanish. */
 .dashboard-no-wallpaper .header-university-logo {
   filter: none;
@@ -2045,6 +2283,23 @@
   animation: page-switch-veil-out 320ms ease-out backwards;
 }
 
+/* iOS app: a page switch as the system's tab bar makes one. The page comes
+   up to its size from a little smaller, around the middle of the screen,
+   while the veil clears a little faster: a short fade and a touch of scale,
+   no rise. A page is kept behind the others once visited (KeptPage) and
+   comes back where it was scrolled to (--page-scroll, useKeptPages.js):
+   the middle of the screen is that far down it. Back from display:none
+   the effect plays again; the animations inside the page are ended as it
+   shows (settleAnimations), so nothing in it arrives twice. */
+:root[data-ios-app] .app-column > .page-enter {
+  transform-origin: 50% calc(var(--page-scroll, 0px) + 45vh);
+  animation: page-enter-ios 300ms cubic-bezier(0.2, 0.8, 0.2, 1) backwards;
+}
+
+:root[data-ios-app] .page-switch-veil {
+  animation-duration: 240ms;
+}
+
 .account-modal-layout-panel {
   animation: account-modal-layout-in 360ms cubic-bezier(0.22, 1, 0.36, 1) both;
 }
@@ -2222,6 +2477,12 @@
 @keyframes page-enter-in {
   from {
     transform: translateY(6px);
+  }
+}
+
+@keyframes page-enter-ios {
+  from {
+    transform: scale(0.965);
   }
 }
 
@@ -8503,7 +8764,7 @@
    month's calendar can hang out of it. */
 .planning-top {
   position: sticky;
-  top: 0;
+  top: var(--status-bar);
   z-index: 20;
 }
 
@@ -10713,10 +10974,10 @@ div:has(> .justify-ticket) {
   }
 }
 
-/* « Moodle » in the desktop app (src/components/MoodlePage.jsx): the page
-   beside the sidebar, the whole height; Moodle's own web view lies over
-   its slot (src-tauri/src/moodle.rs). */
-:root[data-desktop-app] .moodle-page {
+/* « Moodle » in the apps, desktop and iOS (src/components/MoodlePage.jsx):
+   the page beside the sidebar, the whole height; Moodle's own web view lies
+   over its slot (src-tauri/src/moodle.rs). */
+:root:is([data-desktop-app], [data-ios-app]) .moodle-page {
   position: fixed;
   inset: 0 0 0 calc(var(--sidebar-width, 280px) + 12px);
   z-index: 1;
@@ -10724,7 +10985,7 @@ div:has(> .justify-ticket) {
 }
 
 /* The view starts right at the sidebar's edge, a hairline along its top. */
-:root[data-desktop-app] .moodle-slot {
+:root:is([data-desktop-app], [data-ios-app]) .moodle-slot {
   border-top: 0.5px solid var(--desktop-separator, var(--color-border));
 }
 
@@ -10741,18 +11002,27 @@ div:has(> .justify-ticket) {
   --tw-translate-x: 0;
 }
 
-/* Without the sidebar (Windows and Linux, a narrow window): the whole
-   width, above the tab bar. */
+/* Without the sidebar (a phone; Windows and Linux, a narrow window): the
+   whole width, above the tab bar. */
 @media (max-width: 1023.98px) {
-  :root[data-desktop-app] .moodle-page {
+  :root:is([data-desktop-app], [data-ios-app]) .moodle-page {
     left: 0;
     bottom: calc(env(safe-area-inset-bottom) + 84px);
   }
 }
 
+/* iOS: down to the screen's edge, behind the system's tab bar, which is
+   see-through: Moodle's page shows through it and scrolls clear of it
+   (src-tauri/plugins/moodle). */
+@media (max-width: 1023.98px) {
+  :root[data-ios-app] .moodle-page {
+    bottom: 0;
+  }
+}
+
 /* A page of Moodle's is loading: a line along the toolbar's bottom edge,
    a stretch of it passing from left to right. */
-:root[data-desktop-app] .moodle-loading {
+:root:is([data-desktop-app], [data-ios-app]) .moodle-loading {
   position: absolute;
   inset: auto 0 0 0;
   height: 2px;
@@ -10760,7 +11030,7 @@ div:has(> .justify-ticket) {
   pointer-events: none;
 }
 
-:root[data-desktop-app] .moodle-loading::before {
+:root:is([data-desktop-app], [data-ios-app]) .moodle-loading::before {
   content: "";
   position: absolute;
   inset: 0 auto 0 0;
@@ -10780,7 +11050,7 @@ div:has(> .justify-ticket) {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  :root[data-desktop-app] .moodle-loading::before {
+  :root:is([data-desktop-app], [data-ios-app]) .moodle-loading::before {
     width: 100%;
     animation: none;
     opacity: 0.5;

@@ -15,7 +15,7 @@
 // - grades: « Écrire au sujet de cette note » (« Mes notes »);
 // - planning: « Écrire au sujet de ce cours » (the Planning);
 // - history: back, forward or a reload landing on the page.
-export const MAIL_PAGE_SOURCES = ['nav', 'tabbar', 'tile', 'dashboard_card', 'launch_card', 'grades', 'planning', 'assiduity', 'history', 'other']
+export const MAIL_PAGE_SOURCES = ['nav', 'tabbar', 'tile', 'dashboard_card', 'launch_card', 'home_icon', 'grades', 'planning', 'assiduity', 'history', 'other']
 
 export function toMailPageSource(source) {
   return MAIL_PAGE_SOURCES.includes(source) ? source : 'other'

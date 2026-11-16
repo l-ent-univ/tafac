@@ -123,6 +123,20 @@ jobs:
       tag: v${{ needs.release.outputs.version }}
     secrets: inherit
 
+  # The iOS app of the release (ios.yml): built, signed and uploaded to
+  # TestFlight. Called from here for the same reason as the desktop app.
+  # Off until the repository variable IOS_RELEASE is "true": it needs the
+  # app in App Store Connect and Apple's API key in the secrets
+  # (docs/IOS.md).
+  ios:
+    name: iOS app
+    needs: release
+    if: vars.IOS_RELEASE == 'true'
+    uses: ./.github/workflows/ios.yml
+    with:
+      tag: v${{ needs.release.outputs.version }}
+    secrets: inherit
+
   docker-publish:
     name: Docker image
     needs: release
