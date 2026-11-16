@@ -196,7 +196,11 @@
 
 /* Collab Sans, the body face (OFL-1.1, github.com/yugalone/collab-sans,
    CollabSans-OFL.txt): the weights the app uses, and the regular italic.
-   A browser downloads only the ones a page renders. */
+   A browser downloads only the ones a page renders.
+   These files are not the upstream ones as-is: upstream's CFF outlines carry
+   widths about 0.62em wider than hmtx. macOS and Linux read hmtx, Windows
+   (DirectWrite) reads the CFF widths and spaced every letter apart. After
+   replacing a file, run scripts/fix-cff-widths.py on it. */
 @font-face {
   font-family: 'Collab Sans';
   src: url('./assets/fonts/CollabSans-Regular.woff2') format('woff2');
