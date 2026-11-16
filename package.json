@@ -60,7 +60,7 @@
     "eslint": "^9.39.1",
     "eslint-plugin-react-hooks": "^7.0.1",
     "eslint-plugin-react-refresh": "^0.4.24",
-    "globals": "^16.5.0",
+    "globals": "^17.14.0",
     "node-fetch": "^3.3.2",
     "regexpu-core": "^6.5.4",
     "typescript": "^7.0.2",
