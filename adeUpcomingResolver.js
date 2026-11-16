@@ -260,6 +260,20 @@ export function createAdeUpcomingResolver({
     selectionLabels = [],
     cacheScope = null,
   } = {}) {
+    // No ADE mobile API (origins.ade: null): the Planning is the only source,
+    // and no group chosen yet means no events rather than an error.
+    if (!fetchAdeUpcomingFromApi) {
+      const planningResult = await fetchPlanningFallbackUpcoming(fetchPlanningTimetableFromRpc, jar, {
+        date,
+        lookaheadDays,
+        resourceIds,
+        selectionLabels,
+        cacheScope,
+        source: planningSource,
+      })
+      return { ...planningResult, nextEvent: findNextUpcomingEvent(planningResult.events), fallback: null }
+    }
+
     let primaryResult = null
     let primaryError = null
 

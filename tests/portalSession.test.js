@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
-import { buildDrupalLayout, isDrupalSignedInPage, parseDrupalProfileName, parseDrupalToolCatalogue, resolvePortalKind } from '../server/portalSession.js'
+import { buildDrupalLayout, isDrupalSignedInPage, isIsorbonneSignedInPage, isPortalSignedInPage, parseDrupalProfileName, parseDrupalToolCatalogue, parseIsorbonneCatalogue, parseIsorbonneName, resolvePortalKind } from '../server/portalSession.js'
 
 test('the profile name field gives the full, given and family names', () => {
   const html = `<section id="block-nometprenom" class="page-header block">
@@ -119,4 +119,74 @@ test('the catalogue becomes a uPortal-shaped layout of launcher portlets', () =>
   assert.equal(tempo.parameters.launchUrl, 'https://tempo.example.fr/')
   assert.equal(tempo.target, '_blank')
   assert.equal(tempo.fname, undefined)
+})
+
+// iSorbonne (Sorbonne Nouvelle), anonymised from a real page.
+const ISORBONNE_PAGE = `<body><form id="navBarForm">
+  <a title="Déconnexion" class="ui-commandlink nav-link" href="logout.xhtml">Le Gall Camille <i class="fa fa-power-off"></i></a>
+</form>
+<form id="portalForm" name="portalForm">
+  <div class="col-12 text-center" id="buttonList">
+    <input type="button" class="toglem btn btn-info m-1 ombrer" value="Accueil" id="t1">
+    <input type="button" class="toglem btn btn-warning m-1" value="Etudiant" id="t2">
+    <input type="button" class="toglem btn m-1" value="Vide" id="t3">
+    <input type="button" class="btn btn-outline-dark m-1" value="Tous les services" id="temall">
+  </div>
+  <div class="tuile default col-sm-6 t1" style=""><a href="#" class="ui-commandlink favik"><i class="fa fa-star"></i></a>
+    <a class="links" href="https://apps.sorbonne-nouvelle.fr/FileExplorer" target="_35"><div class="bloc">
+      <label id="portalForm:p35" class="ui-outputlabel h4">Mes documents U&nbsp;:</label></div></a>
+  </div>
+  <div class="tuile default col-sm-6 t2" style="display: none;"><a href="#" class="favik"></a>
+    <a class="links" href="https://apps.sorbonne-nouvelle.fr/esup-mdw/" target="_54"><div class="bloc">
+      <label id="portalForm:p54" class="ui-outputlabel h4">Mon dossier de scolarité</label></div></a>
+    <i class="infos fa fa-question-circle" onclick="showDialog(54)"></i>
+    <div id="infos54" style="display:none"><label id="portalForm:j_idt212" class="ui-outputlabel"><ul><li>Notes et <strong>certificat</strong> de scolarité. ${'Encore du texte. '.repeat(20)}</li></ul></label>
+    </div>
+  </div>
+  <div class="tuile default col-sm-6 t2"><a class="links" href="javascript:void(0)"><label id="portalForm:p9" class="h4">Lien cassé</label></a></div>
+</form></body>`
+
+test('an iSorbonne page with the logout link and the tiles is signed in', () => {
+  assert.equal(isIsorbonneSignedInPage(200, ISORBONNE_PAGE), true)
+  assert.equal(isPortalSignedInPage('isorbonne', 200, ISORBONNE_PAGE), true)
+  assert.equal(isPortalSignedInPage('drupal', 200, ISORBONNE_PAGE), false)
+})
+
+test('the iSorbonne logout link counts relative (as served) or absolute (as saved)', () => {
+  const form = '<form id="portalForm"></form>'
+  assert.equal(isIsorbonneSignedInPage(200, `<a href="logout.xhtml">x</a>${form}`), true)
+  assert.equal(isIsorbonneSignedInPage(200, `<a href="https://isorbonne.sorbonne-nouvelle.fr/ENT/logout.xhtml">x</a>${form}`), true)
+  assert.equal(isIsorbonneSignedInPage(200, `<a href="nologout.xhtml">x</a>${form}`), false)
+})
+
+test('a CAS redirect or a page without the tiles is not an iSorbonne session', () => {
+  assert.equal(isIsorbonneSignedInPage(302, ISORBONNE_PAGE), false)
+  assert.equal(isIsorbonneSignedInPage(200, '<a href="/ENT/logout.xhtml">x</a>'), false)
+  assert.equal(isIsorbonneSignedInPage(200, '<form id="portalForm"></form>'), false)
+  assert.equal(isIsorbonneSignedInPage(200, null), false)
+})
+
+test('the iSorbonne logout link gives the name, family name first', () => {
+  assert.deepEqual(parseIsorbonneName(ISORBONNE_PAGE), { name: 'Camille Le Gall', given_name: 'Camille', family_name: 'Le Gall' })
+  assert.deepEqual(parseIsorbonneName('<a href="/ENT/logout.xhtml">Camille</a>'), { name: 'Camille', given_name: 'Camille', family_name: null })
+  assert.equal(parseIsorbonneName('<a href="/ENT/logout.xhtml"> <i></i></a>'), null)
+  assert.equal(parseIsorbonneName(null), null)
+})
+
+test('the iSorbonne tiles are grouped by their category button', () => {
+  const sections = parseIsorbonneCatalogue(ISORBONNE_PAGE, 'https://isorbonne.sorbonne-nouvelle.fr')
+  assert.deepEqual(sections.map((section) => section.title), ['Accueil', 'Etudiant'])
+  assert.deepEqual(sections[0].tools, [
+    { id: '35', title: 'Mes documents U', description: '', href: 'https://apps.sorbonne-nouvelle.fr/FileExplorer' },
+  ])
+  const [record] = sections[1].tools
+  assert.equal(sections[1].tools.length, 1)
+  assert.equal(record.title, 'Mon dossier de scolarité')
+  assert.ok(record.description.startsWith('Notes et certificat de scolarité.'))
+  assert.ok(record.description.endsWith('…') && record.description.length <= 161)
+  assert.equal(buildDrupalLayout(sections).layout.navigation.tabs[0].content[1].content[0].url, 'https://apps.sorbonne-nouvelle.fr/esup-mdw/')
+})
+
+test('the isorbonne portal kind is known', () => {
+  assert.equal(resolvePortalKind({ portal: 'isorbonne' }), 'isorbonne')
 })
