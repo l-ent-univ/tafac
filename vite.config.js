@@ -106,6 +106,38 @@ const gitHash = (() => {
   catch { return 'dev' }
 })()
 
+// Collab Sans under the file names the versions up to v0.28.0 ask for. Those
+// files spaced every letter apart on Windows (src/index.css). A browser still
+// on one of those versions keeps its stylesheet (the service worker's) but
+// fetches the fonts from the network: with these names it gets the repaired
+// files at its next load, without waiting for its update. To remove once
+// those versions are gone.
+const LEGACY_FONT_FILES = {
+  'CollabSans-Regular': 'CollabSans-Regular-BkQ7TDA4.woff2',
+  'CollabSans-Medium': 'CollabSans-Medium-AWjG0nOx.woff2',
+  'CollabSans-SemiBold': 'CollabSans-SemiBold-VZRXB7Ao.woff2',
+  'CollabSans-Bold': 'CollabSans-Bold-C3h1YA4i.woff2',
+  'CollabSans-ExtraBold': 'CollabSans-ExtraBold-DMR3O4st.woff2',
+  'CollabSans-Italic': 'CollabSans-Italic-DB-42wBv.woff2',
+}
+
+const legacyFontFilesPlugin = {
+  name: 'tafac-legacy-font-files',
+  apply: 'build',
+  generateBundle(_options, bundle) {
+    const copies = []
+    for (const file of Object.values(bundle)) {
+      const match = file.type === 'asset' && /^assets\/(CollabSans-[A-Za-z]+)-[\w-]+\.woff2$/.exec(file.fileName)
+      const legacy = match && LEGACY_FONT_FILES[match[1]]
+      if (legacy && file.fileName !== `assets/${legacy}`) copies.push({ fileName: `assets/${legacy}`, source: file.source })
+    }
+    // A font renamed or dropped would leave its old name unanswered, silently.
+    if (copies.length !== Object.keys(LEGACY_FONT_FILES).length) {
+      this.error(`Legacy font files: ${copies.length} of ${Object.keys(LEGACY_FONT_FILES).length} found in the build`)
+    }
+    for (const copy of copies) this.emitFile({ type: 'asset', ...copy })
+  },
+}
 
 // `isSsrBuild`: the landing page's build-time render (scripts/prerender-landing.mjs),
 // which needs no service worker.
@@ -124,6 +156,7 @@ export default defineConfig(({ isSsrBuild }) => ({
     tailwindcss(),
     react(),
     entDevAuthPlugin,
+    isSsrBuild ? null : legacyFontFilesPlugin,
     isSsrBuild ? null : VitePWA({
       registerType: 'prompt',
       includeAssets: ['icon.png', 'apple-touch-icon.png'],
