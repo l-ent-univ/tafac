@@ -111,9 +111,11 @@ import { CUSTOM_SIGNATURE_MAX_LENGTH, normalizeCustomSignatureText } from '../sr
 import { createPlanningPortalApiClient } from '../planningPortalApi.js'
 import {
   buildDrupalLayout,
-  isDrupalSignedInPage,
+  isPortalSignedInPage,
   parseDrupalProfileName,
   parseDrupalToolCatalogue,
+  parseIsorbonneCatalogue,
+  parseIsorbonneName,
   resolvePortalKind,
 } from './portalSession.js'
 import { SchoolCertificateUnavailableError, buildDemoCertificatePdf, openCertificateDownload } from './schoolCertificate.js'
@@ -217,6 +219,9 @@ const FEATURES = universityConfig.features ?? {}
 
 const ENT_ORIGIN = universityConfig.origins.ent
 const CAS_ORIGIN = universityConfig.origins.cas
+// Where the CAS's /login lives (auth.casBasePath: Sorbonne Nouvelle's is
+// under /cas), for the services that send the student to the CAS themselves.
+const CAS_BASE_URL = `${CAS_ORIGIN}${universityConfig.auth.casBasePath ?? ''}`
 const ADE_ORIGIN = universityConfig.origins.ade ?? null
 const MOODLE_ORIGIN = universityConfig.origins.moodle ?? null
 const PLANNING_ORIGIN = universityConfig.origins.planning ?? null
@@ -339,7 +344,8 @@ const PORTAL_KIND = resolvePortalKind(universityConfig.auth)
 // Second factor of the CAS login (`auth.mfa`): 'esup-otp', or none. Without
 // it a CAS that asks for a code is a failed login, as it always was.
 const MFA_PROVIDER = universityConfig.auth.mfa ?? null
-// Drupal portal: page listing the tools, read for the applications grid.
+// Drupal or iSorbonne portal: page listing the tools, read for the
+// applications grid.
 const PORTAL_CATALOG_URL = universityConfig.catalog?.path ? `${ENT_ORIGIN}${universityConfig.catalog.path}` : null
 // Moodle signs in either through its own CAS login (moodle.casLoginPath,
 // Rennes 2: '/login/index.php?authCAS=CAS', which goes straight to the CAS
@@ -1009,8 +1015,12 @@ function stripHtmlTags(html) {
     .trim()
 }
 
-function extractCasError(html) {
+function extractCasError(rawHtml) {
+  // Comments first: Apereo CAS 6 keeps a commented-out close link in its panel.
+  const html = rawHtml.replace(/<!--[\s\S]*?-->/g, '')
   const candidates = [
+    // Apereo CAS 6 (Sorbonne Nouvelle): div#loginErrorsPanel.banner-danger.
+    /<div[^>]*id=["']loginErrorsPanel["'][^>]*>([\s\S]*?)<\/div>/i,
     /<div[^>]*class=["'][^"']*(?:alert|errors?|messages?)[^"']*["'][^>]*>([\s\S]*?)<\/div>/i,
     /<p[^>]*class=["'][^"']*(?:alert|errors?|messages?)[^"']*["'][^>]*>([\s\S]*?)<\/p>/i,
   ]
@@ -1219,6 +1229,9 @@ async function performEntLogin({ username, password, otp = '', sendCode = '', au
   const portal = await fetchPortalSession(jar)
 
   if (!portal.authenticated) {
+    // Where the return from the CAS ended, without query strings (tickets).
+    const steps = portalRedirectResult.chain.map((step) => `${step.status} ${String(step.url).split('?')[0]}`)
+    console.warn(`[login] portal session not established (${PORTAL_KIND}): ${steps.join(' → ')} ; entry ${portal.status ?? '?'}`)
     throw new Error('CAS login completed, but the portal session was not established.')
   }
 
@@ -1237,12 +1250,12 @@ function isAuthenticatedLayout(layout) {
 // Signed-in state of the portal session held by the jar: { authenticated,
 // user }, `user` being the portal's own user id, or null when it has none.
 async function fetchPortalSession(jar) {
-  if (PORTAL_KIND === 'drupal') {
+  if (PORTAL_KIND !== 'uportal') {
     const response = await fetchWithJar(PORTAL_ENTRY_URL, jar, {
       headers: { Accept: HTML_ACCEPT_HEADER },
     })
     const html = await response.text()
-    return { authenticated: isDrupalSignedInPage(response.status, html), user: null }
+    return { authenticated: isPortalSignedInPage(PORTAL_KIND, response.status, html), user: null, status: response.status }
   }
 
   const layout = await fetchEntLayout(jar)
@@ -2206,23 +2219,25 @@ const {
   fetchPlanningTimetableFromRpc,
   fetchPlanningTreeFromRpc,
 } = createPlanningRpcClient({
-  casOrigin: CAS_ORIGIN,
+  casOrigin: CAS_BASE_URL,
   fetchWithJar,
   followRedirectChain,
   planningOrigin: PLANNING_ORIGIN ?? undefined,
   gwtClientId: universityConfig.planning?.gwtClientId,
+  projectId: universityConfig.planning?.projectId,
+  displayConfigurationName: universityConfig.planning?.displayConfigurationName,
 })
 
 const portalClient = PLANNING_API === 'tempo'
   ? createTempoApiClient({
-      casOrigin: CAS_ORIGIN,
+      casOrigin: CAS_BASE_URL,
       tempoOrigin: PLANNING_ORIGIN,
       timeZone: universityConfig.planning?.timeZone,
       fetchWithJar,
     })
   : PLANNING_API === 'portal-rest'
     ? createPlanningPortalApiClient({
-        casOrigin: CAS_ORIGIN,
+        casOrigin: CAS_BASE_URL,
         planningOrigin: PLANNING_ORIGIN,
         fetchWithJar,
         followRedirectChain,
@@ -2246,7 +2261,7 @@ const {
   fetchAdeUpcomingFromApi,
 } = createAdeApiClient({
   adeOrigin: ADE_ORIGIN ?? undefined,
-  casOrigin: CAS_ORIGIN,
+  casOrigin: CAS_BASE_URL,
   followRedirectChain,
   passwordKey: universityConfig.ade?.passwordKey,
   passwordIv: universityConfig.ade?.passwordIv,
@@ -2257,7 +2272,7 @@ const {
 const {
   resolveAdeUpcoming,
 } = createAdeUpcomingResolver({
-  fetchAdeUpcomingFromApi,
+  fetchAdeUpcomingFromApi: ADE_ORIGIN ? fetchAdeUpcomingFromApi : null,
   fetchPlanningTreeFromRpc,
   fetchPlanningTimetableFromRpc,
   campusSource: ADE_ORIGIN ? new URL(ADE_ORIGIN).hostname : 'campus-api',
@@ -2803,13 +2818,16 @@ app.get('/__ent_auth/account', async (req, res) => {
       })
     }
 
-    // Drupal has no userinfo API: the name comes from the profile page.
-    if (PORTAL_KIND === 'drupal') {
-      const profile = await followRedirectChain(`${ENT_ORIGIN}/user`, session.jar, {
+    // Drupal and iSorbonne have no userinfo API: the name comes from a page
+    // (Drupal's profile, iSorbonne's logout link on the entry page).
+    if (PORTAL_KIND !== 'uportal') {
+      const profileUrl = PORTAL_KIND === 'isorbonne' ? PORTAL_ENTRY_URL : `${ENT_ORIGIN}/user`
+      const profile = await followRedirectChain(profileUrl, session.jar, {
         headers: { Accept: HTML_ACCEPT_HEADER },
       })
       const html = await profile.response.text()
-      const signedIn = getHostnameFromUrl(profile.finalUrl) === ENT_HOST && isDrupalSignedInPage(profile.response.status, html)
+      const signedIn = getHostnameFromUrl(profile.finalUrl) === ENT_HOST && isPortalSignedInPage(PORTAL_KIND, profile.response.status, html)
+      const name = PORTAL_KIND === 'isorbonne' ? parseIsorbonneName(html) : parseDrupalProfileName(html)
       // Signed out of the portal: the session may be gone with it.
       if (!signedIn && await answerIfSessionExpired(req, res)) return undefined
       // The portal has no address: the webmail's (Partage), when there is one.
@@ -2817,7 +2835,7 @@ app.get('/__ent_auth/account', async (req, res) => {
       setSessionCookie(res, session)
       return res.status(200).json({
         authenticated: true,
-        account: signedIn ? { ...parseDrupalProfileName(html), email } : null,
+        account: signedIn ? { ...name, email } : null,
         sessionMode: session.mode ?? null,
       })
     }
@@ -5936,6 +5954,14 @@ app.get('/__ent_auth/student-pic', async (req, res) => {
       return res.status(404).json({ available: false, source: 'demo' })
     }
 
+    // The photo comes from ScoDoc: without it, no photo (not an error).
+    if (!GRADES_ORIGIN) {
+      setSessionCookie(res, session)
+      return wantsMeta
+        ? res.status(200).json({ authenticated: true, sessionMode: session.mode ?? null, available: false, source: 'none', previewUrl: null })
+        : res.status(404).json({ available: false, source: 'none' })
+    }
+
     const picture = await fetchGradesStudentPicture(session.jar)
     const isImage = isGradesStudentPicture(picture)
 
@@ -6804,19 +6830,21 @@ app.all('/__ent_auth/demo/request', express.text({ type: '*/*' }), (req, res) =>
   return res.send(payload.body)
 })
 
-// Drupal portal: no uPortal APIs. The applications grid asks the proxy for the
-// layout, layoutDoc and marketplace: the layout is built from the catalogue
-// page (catalog.path), the other two are empty.
+// Drupal or iSorbonne portal: no uPortal APIs. The applications grid asks the
+// proxy for the layout, layoutDoc and marketplace: the layout is built from
+// the catalogue page (catalog.path), the other two are empty.
 async function fetchDrupalCatalogPage(session) {
   const page = await followRedirectChain(PORTAL_CATALOG_URL, session.jar, {
     headers: { Accept: HTML_ACCEPT_HEADER },
   })
   const html = await page.response.text()
-  const signedIn = getHostnameFromUrl(page.finalUrl) === ENT_HOST && isDrupalSignedInPage(page.response.status, html)
+  const signedIn = getHostnameFromUrl(page.finalUrl) === ENT_HOST && isPortalSignedInPage(PORTAL_KIND, page.response.status, html)
   return signedIn ? html : null
 }
 
-if (PORTAL_KIND === 'drupal') {
+const parsePortalCatalogue = PORTAL_KIND === 'isorbonne' ? parseIsorbonneCatalogue : parseDrupalToolCatalogue
+
+if (PORTAL_KIND !== 'uportal') {
   app.get('/__ent_proxy/api/v4-3/dlm/layout.json', async (req, res) => {
     res.setHeader('Cache-Control', 'no-store')
     try {
@@ -6836,7 +6864,7 @@ if (PORTAL_KIND === 'drupal') {
       }
 
       setSessionCookie(res, session)
-      res.json(buildDrupalLayout(parseDrupalToolCatalogue(html, ENT_ORIGIN), session.user ?? null))
+      res.json(buildDrupalLayout(parsePortalCatalogue(html, ENT_ORIGIN), session.user ?? null))
     } catch (error) {
       if (await answerIfSessionExpired(req, res, error)) return
       res.status(502).json({ error: routeError(req, error) })
