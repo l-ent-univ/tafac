@@ -27,6 +27,9 @@ pub fn run() {
                 .build(),
         )
         .plugin(updater::plugin());
+    // Windows 11: the window's title bar drawn over the page (window.rs).
+    #[cfg(windows)]
+    let builder = builder.plugin(tauri_plugin_decorum::init());
     // macOS: the menu bar (menu.rs), and closing the main window doesn't
     // quit: it hides, the app (and its server) keeps running, a click on its
     // Dock icon shows it again (RunEvent::Reopen below). ⌘Q quits.
@@ -90,6 +93,8 @@ pub fn run() {
 
             #[cfg(target_os = "macos")]
             window::enable_spell_checking();
+            #[cfg(windows)]
+            window::remove_service_workers(app.handle());
 
             let start_url: tauri::Url = sidecar::app_url().parse()?;
             // Development: TAFAC_START_PATH=/rennes opens on that page.

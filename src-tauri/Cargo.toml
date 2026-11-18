@@ -94,6 +94,11 @@ version = "3"
 default-features = false
 features = ["apple-native"]
 
+# Windows: whether Mica is there (11 and later, src/window.rs).
+[target.'cfg(windows)'.dependencies]
+tauri-plugin-decorum = "1.1.1"
+windows-version = "0.1"
+
 [target.'cfg(windows)'.dependencies.keyring]
 version = "3"
 default-features = false
