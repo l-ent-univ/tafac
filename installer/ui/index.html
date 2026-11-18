@@ -1,0 +1,133 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<title>Installer Tafac</title>
+<style>
+  :root {
+    color-scheme: light dark;
+    --text: rgba(0, 0, 0, 0.9);
+    --text-2: rgba(0, 0, 0, 0.62);
+    --accent: #005fb8;
+    --accent-hover: #1a6fc0;
+    --accent-text: #fff;
+    --footer: rgba(243, 243, 243, 0.6);
+    --stroke: rgba(0, 0, 0, 0.06);
+    --btn: rgba(255, 255, 255, 0.7);
+    --btn-hover: rgba(249, 249, 249, 0.5);
+    --track: rgba(0, 0, 0, 0.45);
+    --error: #c42b1c;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --text: #fff;
+      --text-2: rgba(255, 255, 255, 0.79);
+      --accent: #60cdff;
+      --accent-hover: #5bbde9;
+      --accent-text: #000;
+      --footer: rgba(32, 32, 32, 0.5);
+      --stroke: rgba(255, 255, 255, 0.08);
+      --btn: rgba(255, 255, 255, 0.06);
+      --btn-hover: rgba(255, 255, 255, 0.08);
+      --track: rgba(255, 255, 255, 0.54);
+      --error: #ff99a4;
+    }
+  }
+  * { box-sizing: border-box; margin: 0; }
+  html, body { height: 100%; background: transparent; }
+  body {
+    font: 14px/20px "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif;
+    color: var(--text);
+    display: flex; flex-direction: column;
+    user-select: none; cursor: default;
+  }
+  main { flex: 1; padding: 32px; display: flex; flex-direction: column; gap: 16px; position: relative; overflow: hidden; }
+  .hills { position: absolute; left: 0; bottom: 0; width: 100%; pointer-events: none; }
+  .head { position: relative; }
+  .head { display: flex; align-items: center; gap: 16px; }
+  .head img { width: 56px; height: 56px; }
+  h1 { font: 600 28px/36px "Segoe UI Variable Display", "Segoe UI", sans-serif; }
+  .sub { color: var(--text-2); }
+  .status { flex: 1; align-self: center; color: var(--text-2); }
+  .status.error { color: var(--error); }
+  .progress { position: absolute; top: -2px; left: 0; right: 0; height: 3px; overflow: hidden; visibility: hidden; }
+  .progress::before { content: ""; position: absolute; inset: 1px 0; background: var(--track); opacity: .4; border-radius: 1px; }
+  .progress::after {
+    content: ""; position: absolute; top: 0; bottom: 0; width: 40%;
+    background: var(--accent); border-radius: 2px;
+    animation: slide 1.6s cubic-bezier(.5, 0, .5, 1) infinite;
+  }
+  .busy .progress { visibility: visible; }
+  @keyframes slide { from { left: -40%; } to { left: 100%; } }
+  footer {
+    display: flex; justify-content: flex-end; gap: 8px;
+    position: relative; padding: 24px; background: var(--footer); border-top: 1px solid var(--stroke);
+  }
+  button {
+    font: inherit; min-width: 120px; height: 32px; padding: 0 12px;
+    border-radius: 4px; border: 1px solid var(--stroke);
+    background: var(--btn); color: var(--text);
+  }
+  button:hover { background: var(--btn-hover); }
+  button.primary { background: var(--accent); color: var(--accent-text); border-color: transparent; }
+  button.primary:hover { background: var(--accent-hover); }
+  button:disabled { opacity: .4; pointer-events: none; }
+  button:focus-visible { outline: 2px solid var(--text); outline-offset: 1px; }
+</style>
+</head>
+<body>
+  <main>
+    <div class="head">
+      <img src="icon.png" alt="">
+      <div>
+        <h1>Tafac</h1>
+        <p class="sub">Emploi du temps, notes, services de votre université</p>
+      </div>
+    </div>
+    <img class="hills" src="hills.webp" alt="">
+  </main>
+  <footer>
+    <div class="progress"></div>
+    <p class="status" id="status"></p>
+    <button id="cancel">Annuler</button>
+    <button id="go" class="primary">Installer</button>
+  </footer>
+<script>
+  const { invoke } = window.__TAURI__.core;
+  const go = document.getElementById("go");
+  const cancel = document.getElementById("cancel");
+  const status = document.getElementById("status");
+  let done = false;
+
+  invoke("installed").then((yes) => {
+    if (yes) go.textContent = "Mettre à jour";
+  });
+
+  cancel.onclick = () => window.__TAURI__.window.getCurrentWindow().close();
+
+  go.onclick = async () => {
+    if (done) return invoke("open_app").catch(fail);
+    document.body.classList.add("busy");
+    go.disabled = cancel.disabled = true;
+    status.className = "status";
+    status.textContent = "Installation en cours";
+    try {
+      await invoke("install");
+      done = true;
+      status.textContent = "Tafac est installé";
+      go.textContent = "Ouvrir Tafac";
+      cancel.textContent = "Fermer";
+    } catch (e) {
+      fail(e);
+    }
+    document.body.classList.remove("busy");
+    go.disabled = cancel.disabled = false;
+  };
+
+  function fail(e) {
+    status.className = "status error";
+    status.textContent = String(e);
+  }
+</script>
+</body>
+</html>
