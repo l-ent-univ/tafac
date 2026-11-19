@@ -1,0 +1,17 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "identifier": "fr.tafac.ios",
+  "build": {
+    "beforeDevCommand": "",
+    "beforeBuildCommand": ""
+  },
+  "bundle": {
+    "resources": {
+      "../desktop-build/ios/server/": "server/"
+    },
+    "iOS": {
+      "minimumSystemVersion": "15.0",
+      "developmentTeam": "P8XRQT7Z4K"
+    }
+  }
+}

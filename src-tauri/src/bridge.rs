@@ -3,32 +3,139 @@
 // socket (named pipe on Windows), and its answer handed back. No TCP port:
 // other programs and browser tabs on the computer can't reach the server.
 //
-// The bridge also holds the server's cookies (jar.rs).
+// The bridge also holds the server's cookies (jar.rs), and signs in again
+// with the kept login when an answer says the session is gone (signin.rs):
+// the request is then asked again, and the page gets the second answer.
+//
+// The page's built files (/assets/…) are asked for once and answered from
+// memory after that (assets.rs): WebKit keeps nothing from this scheme, and
+// reads a video a few bytes at a time.
 
 use std::error::Error;
 use std::time::{Duration, Instant};
 
 use bytes::Bytes;
+use http::{HeaderMap, HeaderValue, Method};
 use http_body_util::{BodyExt, Full};
-use hyper::header::{CONNECTION, COOKIE, HOST, SET_COOKIE, TRANSFER_ENCODING};
+use hyper::header::{CONNECTION, CONTENT_TYPE, COOKIE, HOST, IF_MODIFIED_SINCE, IF_NONE_MATCH, IF_RANGE, RANGE, SET_COOKIE, TRANSFER_ENCODING};
 use hyper_util::rt::TokioIo;
 use tokio::io::{AsyncRead, AsyncWrite};
 
+use crate::assets::{self, Assets};
 use crate::jar::CookieJar;
+use crate::signin::{self, KeptLogin, Outcome, SignIn};
 
 type BoxError = Box<dyn Error + Send + Sync>;
 
 pub struct Bridge {
     pub endpoint: String,
     pub jar: CookieJar,
+    pub signin: SignIn,
+    pub assets: Assets,
 }
 
 // How long a request waits for the server to be up (it is starting when the
 // window opens).
 const STARTUP_WAIT: Duration = Duration::from_secs(20);
 
+// A request as it goes to the server, kept whole to be sent again.
+struct Outgoing {
+    method: Method,
+    path: String,
+    headers: HeaderMap,
+    body: Bytes,
+}
+
 pub async fn forward(bridge: &Bridge, request: http::Request<Vec<u8>>) -> http::Response<Vec<u8>> {
-    match try_forward(bridge, request).await {
+    let (parts, body) = request.into_parts();
+    let outgoing = Outgoing {
+        path: parts.uri.path_and_query().map(|value| value.as_str()).unwrap_or("/").to_string(),
+        method: parts.method,
+        headers: parts.headers,
+        body: Bytes::from(body),
+    };
+    let path = parts.uri.path();
+
+    if assets::is_asset(&outgoing.method, path) {
+        if let Some(response) = asset(bridge, &outgoing, path).await {
+            return response;
+        }
+    }
+
+    if outgoing.method == Method::POST && path == signin::LOGIN_PATH {
+        let response = send_or_answer(bridge, &outgoing, true).await;
+        let university = header(&outgoing.headers, signin::UNIVERSITY_HEADER);
+        bridge.signin.after_login(&outgoing.body, university, response.status().as_u16(), response.body()).await;
+        return response;
+    }
+    if outgoing.method == Method::POST && path == signin::LOGOUT_PATH {
+        bridge.signin.before_logout(header(&outgoing.headers, signin::LOGOUT_REASON_HEADER)).await;
+        return send_or_answer(bridge, &outgoing, true).await;
+    }
+
+    let round = bridge.signin.round();
+    let response = send_or_answer(bridge, &outgoing, true).await;
+    let signed_out = signin::says_signed_out(
+        path,
+        response.status().as_u16(),
+        header(response.headers(), signin::SESSION_HEADER),
+        response.body(),
+    );
+    if signed_out && bridge.signin.again(round, |login| sign_in_again(bridge, login)).await {
+        return send_or_answer(bridge, &outgoing, true).await;
+    }
+    response
+}
+
+// One of the page's built files, from memory; the first time, from the
+// server, asked for the whole file whatever part the page wanted. None when
+// the server has no such file to give whole: it answers the request itself.
+async fn asset(bridge: &Bridge, outgoing: &Outgoing, path: &str) -> Option<http::Response<Vec<u8>>> {
+    let range = header(&outgoing.headers, RANGE.as_str());
+    if let Some(file) = bridge.assets.get(path) {
+        return Some(assets::answer(&file, range));
+    }
+    let _one_at_a_time = bridge.assets.fetching.lock().await;
+    if let Some(file) = bridge.assets.get(path) {
+        return Some(assets::answer(&file, range));
+    }
+    let mut headers = outgoing.headers.clone();
+    for name in [RANGE, IF_RANGE, IF_NONE_MATCH, IF_MODIFIED_SINCE] {
+        headers.remove(name);
+    }
+    let whole = Outgoing { method: Method::GET, path: outgoing.path.clone(), headers, body: Bytes::new() };
+    let response = try_forward(bridge, &whole, false).await.ok()?;
+    if response.status() != http::StatusCode::OK {
+        return None;
+    }
+    Some(assets::answer(&bridge.assets.keep(path, response), range))
+}
+
+fn header<'a>(headers: &'a HeaderMap, name: &str) -> Option<&'a str> {
+    headers.get(name).and_then(|value| value.to_str().ok())
+}
+
+// The kept login, sent as the page sends one, without the old session's
+// cookie. Its answer's cookie goes to the jar: the session the retried
+// requests then carry.
+async fn sign_in_again(bridge: &Bridge, login: KeptLogin) -> Outcome {
+    let mut headers = HeaderMap::new();
+    headers.insert(CONTENT_TYPE, HeaderValue::from_static("application/json"));
+    if let Some(value) = login.university.as_deref().and_then(|id| HeaderValue::from_str(id).ok()) {
+        headers.insert(signin::UNIVERSITY_HEADER, value);
+    }
+    let outgoing = Outgoing {
+        method: Method::POST,
+        path: signin::LOGIN_PATH.to_string(),
+        headers,
+        body: Bytes::from(signin::login_request_body(&login)),
+    };
+    let response = send_or_answer(bridge, &outgoing, false).await;
+    signin::outcome(response.status().as_u16(), response.body())
+}
+
+async fn send_or_answer(bridge: &Bridge, outgoing: &Outgoing, with_cookies: bool) -> http::Response<Vec<u8>> {
+    match try_forward(bridge, outgoing, with_cookies).await {
         Ok(response) => response,
         Err(error) => {
             eprintln!("[tafac] local server unreachable: {error}");
@@ -41,21 +148,18 @@ pub async fn forward(bridge: &Bridge, request: http::Request<Vec<u8>>) -> http::
     }
 }
 
-async fn try_forward(bridge: &Bridge, request: http::Request<Vec<u8>>) -> Result<http::Response<Vec<u8>>, BoxError> {
-    let (parts, body) = request.into_parts();
-    let path = parts.uri.path_and_query().map(|value| value.as_str()).unwrap_or("/");
-
-    let mut builder = hyper::Request::builder().method(parts.method).uri(path);
-    for (name, value) in parts.headers.iter() {
+async fn try_forward(bridge: &Bridge, outgoing: &Outgoing, with_cookies: bool) -> Result<http::Response<Vec<u8>>, BoxError> {
+    let mut builder = hyper::Request::builder().method(outgoing.method.clone()).uri(outgoing.path.as_str());
+    for (name, value) in outgoing.headers.iter() {
         if name != HOST && name != COOKIE {
             builder = builder.header(name, value);
         }
     }
     builder = builder.header(HOST, "localhost");
-    if let Some(cookies) = bridge.jar.header() {
+    if let Some(cookies) = bridge.jar.header().filter(|_| with_cookies) {
         builder = builder.header(COOKIE, cookies);
     }
-    let upstream = builder.body(Full::new(Bytes::from(body)))?;
+    let upstream = builder.body(Full::new(outgoing.body.clone()))?;
 
     let response = send(&bridge.endpoint, upstream).await?;
     let (parts, body) = response.into_parts();

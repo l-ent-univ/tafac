@@ -26,6 +26,18 @@ const VARIANTS = {
     // Over the photo too: the wordmark in white (the mark keeps its colours).
     wordmark: 'header-wordmark',
   },
+  // « Accueil »'s header on a phone (HomePhoneHeader): straight on the
+  // photo, the wordmark and the university's logo in white there, in their
+  // own colours without a photo (overrides.css, .home-phone-header).
+  phone: {
+    lockupLight: 'block h-11 w-auto max-w-[230px] object-contain dark:hidden',
+    lockupDark: 'hidden h-11 w-auto max-w-[230px] object-contain dark:block',
+    lent: 'h-11',
+    uni: 'home-phone-uni h-8 w-auto min-w-0 object-contain',
+    uniSquare: 'home-phone-uni h-10 w-auto min-w-0 object-contain',
+    row: 'inline-flex items-center gap-3 min-w-0',
+    wordmark: 'home-phone-wordmark',
+  },
 }
 
 // Combined "Tafac × université" logo shown in the sidebar and header.

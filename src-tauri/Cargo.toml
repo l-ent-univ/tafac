@@ -6,11 +6,18 @@ license = "AGPL-3.0-only"
 edition = "2021"
 publish = false
 
+# The app itself: the desktop's binary (src/main.rs) and, on iOS, the static
+# library Xcode links into the app (docs/IOS.md) both run it.
+[lib]
+name = "tafac_lib"
+crate-type = ["staticlib", "rlib"]
+
 [build-dependencies]
 tauri-build = { version = "2", features = [] }
 
 [dependencies]
-tauri = { version = "2", features = ["macos-private-api"] }
+# unstable: a second web view in the window (src/moodle.rs, Window::add_child).
+tauri = { version = "2", features = ["macos-private-api", "unstable", "webview-data-url"] }
 tokio = { version = "1", features = ["net", "time", "io-util", "sync"] }
 hyper = { version = "1", features = ["client", "http1"] }
 hyper-util = { version = "0.1", features = ["tokio"] }
@@ -22,6 +29,9 @@ serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 rand = "0.8"
 tauri-plugin-opener = "2"
+
+# Desktop only: iOS has one window, and its updates are the App Store's.
+[target.'cfg(not(any(target_os = "ios", target_os = "android")))'.dependencies]
 tauri-plugin-window-state = "2"
 # Updates (src/updater.rs): the check, the download and its signature, the
 # install. Driven from Rust: the page has no updater command to call.
@@ -38,6 +48,61 @@ block2 = "0.6"
 objc2-foundation = "0.3"
 objc2-app-kit = "0.3"
 objc2-authentication-services = "0.3"
+# Moodle's view (src/moodle_native.rs): its navigation delegate. The crate
+# Tauri's web view already builds, with what it reads of it.
+objc2-web-kit = { version = "0.3", default-features = false, features = [
+    "std",
+    "objc2-app-kit",
+    "block2",
+    "WKWebView",
+    "WKFrameInfo",
+    "WKNavigation",
+    "WKNavigationAction",
+    "WKNavigationDelegate",
+    "WKNavigationResponse",
+] }
+
+# The session secret in the system's credential store (src/secret.rs):
+# each system's own backend, nothing else of the crate. On Linux the Secret
+# Service over libdbus, which the window toolkit already links.
+[target.'cfg(target_os = "macos")'.dependencies.keyring]
+version = "3"
+default-features = false
+features = ["apple-native"]
+
+# iOS: the phone's time zone, for the Node inside the app (src/node.rs).
+[target.'cfg(target_os = "ios")'.dependencies]
+iana-time-zone = "0.1"
+# The web view below the status bar (src/ios_chrome.rs).
+objc2 = "0.6"
+# The system's tab bar under the page (plugins/tabbar, in Swift).
+tauri-plugin-tabbar = { path = "plugins/tabbar" }
+# The system's menu in place of the page's context menu (plugins/menu).
+tauri-plugin-menu = { path = "plugins/menu" }
+# The system's glass under the page's floating controls (plugins/glass).
+tauri-plugin-glass = { path = "plugins/glass" }
+# The system's pull to refresh on the page (plugins/refresh).
+tauri-plugin-refresh = { path = "plugins/refresh" }
+# Moodle's own web view over the page (plugins/moodle, in Swift).
+tauri-plugin-moodle = { path = "plugins/moodle" }
+# The system's share sheet for a file downloaded (plugins/share).
+tauri-plugin-share = { path = "plugins/share" }
+
+# iOS: the Keychain, as on macOS.
+[target.'cfg(target_os = "ios")'.dependencies.keyring]
+version = "3"
+default-features = false
+features = ["apple-native"]
+
+[target.'cfg(windows)'.dependencies.keyring]
+version = "3"
+default-features = false
+features = ["windows-native"]
+
+[target.'cfg(target_os = "linux")'.dependencies.keyring]
+version = "3"
+default-features = false
+features = ["sync-secret-service"]
 
 [profile.release]
 codegen-units = 1

@@ -718,7 +718,7 @@ function UeFullView({ id, ue, headingId, backButtonRef, onClose, onKeyDown, hasN
       <div className="mx-auto w-full max-w-[820px] px-6 pb-10 pt-4 max-md:px-3 max-md:pt-3">
         {/* Stays in reach while the subjects scroll (the card clips with
             overflow: clip, not hidden, which would trap the sticky). */}
-        <div className="pointer-events-none sticky top-3 z-20 -ml-1">
+        <div className="pointer-events-none sticky top-[calc(var(--status-bar)+12px)] z-20 -ml-1">
           <button
             ref={backButtonRef}
             type="button"

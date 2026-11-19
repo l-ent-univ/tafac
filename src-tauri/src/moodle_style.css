@@ -1,0 +1,1379 @@
+/* Tafac's look over Moodle's pages (moodle_style.js puts it in; the dark
+   theme's own lines: moodle_style_dark.css).
+
+   The surface only: colours, type, corners, strokes. Nothing here places or
+   sizes anything, so a Moodle update can at worst lose some of it. Written
+   for Moodle's Boost and the themes built on it, with Bootstrap 4 (Moodle
+   4.x) or 5 (Moodle 5): their class names, and Bootstrap 5's variables. No
+   university's theme in particular.
+
+   The colours are the app's (--tafac-<role>, the roles of src/tokens.css),
+   as the app's page sends them (moodle_style.rs); until then, Sable's light
+   theme below. What a teacher wrote (a label, a page, an assignment's
+   instructions) keeps its own colours: only what it doesn't say follows. */
+
+:root {
+  --tafac-surface-page: #fcfbf8;
+  --tafac-surface-sunken: #efede7;
+  --tafac-surface-subtle: #edebe5;
+  --tafac-surface-strong: #e5e3dd;
+  --tafac-surface-field: #f3f1eb;
+  --tafac-surface-card: #ffffff;
+  --tafac-surface-raised: rgb(255 255 255 / 0.98);
+  --tafac-surface-raised-hover: #f4f6f4;
+  --tafac-ink: #491d11;
+  --tafac-ink-secondary: rgb(73 29 17 / 0.7);
+  --tafac-ink-muted: rgb(73 29 17 / 0.5);
+  --tafac-ink-faint: rgb(73 29 17 / 0.3);
+  --tafac-line: rgb(73 29 17 / 0.1);
+  --tafac-line-strong: rgb(73 29 17 / 0.16);
+  --tafac-state-hover: rgb(73 29 17 / 0.04);
+  --tafac-state-press: rgb(73 29 17 / 0.08);
+  --tafac-focus-ring: #491d11;
+  --tafac-brand: #491d11;
+  --tafac-brand-hover: #5a2617;
+  --tafac-brand-soft: rgb(73 29 17 / 0.08);
+  --tafac-on-brand: #fcfbf8;
+  --tafac-danger: #b91c1c;
+  --tafac-danger-soft: #fee2e2;
+  --tafac-warning: #9a5b00;
+  --tafac-warning-soft: #fdf0d9;
+  --tafac-success: #166534;
+  --tafac-success-soft: #dcfce7;
+  --tafac-info: #0067bd;
+  --tafac-info-soft: #dbeafe;
+  --tafac-notify: #2563eb;
+  --tafac-scrim: rgb(73 29 17 / 0.18);
+  --tafac-shadow-tint: rgb(73 29 17 / 0.1);
+  --tafac-sidebar: #f5f3ec;
+  --tafac-glass-fill: #fdfcfa;
+  --tafac-glass-fill-hover: #f3f2ef;
+
+  /* Strokes and shadows, as overrides.css draws them (light theme; the
+     dark one: moodle_style_dark.css). */
+  --tafac-glass-outer: rgb(0 0 0 / 0.1);
+  --tafac-glass-edge: rgb(255 255 255 / 0.75) rgb(255 255 255 / 0.35) rgb(255 255 255 / 0.15);
+  --tafac-glass-shadow: 0 1px 1px rgb(0 0 0 / 0.06), 0 2px 4px -1px rgb(0 0 0 / 0.09);
+  --tafac-card-shadow: 0 1px 2px rgb(0 0 0 / 0.04), 0 2px 6px -2px rgb(0 0 0 / 0.06);
+  --tafac-menu-shadow: 0 1px 2px rgb(0 0 0 / 0.06), 0 12px 32px -8px rgb(0 0 0 / 0.16);
+  --tafac-field-edge: color-mix(in srgb, var(--tafac-ink) 12%, transparent);
+  --tafac-field-edge-hover: color-mix(in srgb, var(--tafac-ink) 20%, transparent);
+  --tafac-field-inset: rgb(52 18 0 / 0.05);
+  --tafac-field-outer: color-mix(in srgb, var(--tafac-ink) 22%, transparent);
+  --tafac-field-outer-focus: color-mix(in srgb, var(--tafac-ink) 60%, transparent);
+  --tafac-select-arrow: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath fill='none' stroke='%23491d11' stroke-opacity='.6' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.6' d='m4.5 6.5 3.5 3.5 3.5-3.5'/%3E%3C/svg%3E");
+
+  --tafac-font-body: 'Collab Sans', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --tafac-font-display: 'SN Pro', 'Collab Sans', system-ui, sans-serif;
+  --tafac-radius-card: 18px;
+  --tafac-radius-box: 14px;
+  --tafac-radius-field: 12px;
+  --tafac-radius-item: 10px;
+
+  /* Bootstrap 5 (Moodle 5) reads these. */
+  --bs-body-font-family: var(--tafac-font-body);
+  --bs-body-bg: var(--tafac-surface-page);
+  --bs-body-color: var(--tafac-ink);
+  --bs-emphasis-color: var(--tafac-ink);
+  --bs-heading-color: inherit;
+  --bs-secondary-color: var(--tafac-ink-muted);
+  --bs-tertiary-color: var(--tafac-ink-faint);
+  --bs-secondary-bg: var(--tafac-surface-subtle);
+  --bs-tertiary-bg: var(--tafac-surface-sunken);
+  --bs-border-color: var(--tafac-line-strong);
+  --bs-border-color-translucent: var(--tafac-line);
+  --bs-border-radius: var(--tafac-radius-field);
+  --bs-border-radius-lg: var(--tafac-radius-card);
+  --bs-border-radius-sm: var(--tafac-radius-item);
+  --bs-link-color: var(--tafac-brand);
+  --bs-link-hover-color: var(--tafac-brand-hover);
+  --bs-focus-ring-color: var(--tafac-focus-ring);
+}
+
+/* ── The page ── */
+
+html,
+body,
+#page-wrapper,
+#page,
+#page.drawers .main-inner,
+#topofscroll,
+#region-main,
+#region-main-box {
+  background-color: var(--tafac-surface-page);
+}
+
+body {
+  color: var(--tafac-ink);
+  font-family: var(--tafac-font-body);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* The one change of measure: the view is narrower than a browser window,
+   and the narrow column Moodle keeps for reading (the dashboard, a course:
+   `limitedwidth`, 830px or a share of the window) left it cramped. As wide
+   as Moodle's own wider setting instead. */
+.pagelayout-standard #page.drawers .main-inner,
+body.limitedwidth #page.drawers .main-inner,
+.pagelayout-standard #page.drawers .footer-popover,
+body.limitedwidth #page.drawers .footer-popover,
+.pagelayout-standard .stickyfooter .sticky-footer-content,
+body.limitedwidth.uses-drawers .stickyfooter .sticky-footer-content,
+body.limitedwidth .theme-block-region-outside-coursecontentwidth,
+body.limitedwidth .theme-block-region-footer-coursecontentwidth,
+.header-maxwidth {
+  max-width: 1200px;
+}
+
+/* What Bootstrap gives a face of its own. */
+.popover,
+.tooltip,
+.btn,
+input,
+select,
+textarea,
+button {
+  font-family: var(--tafac-font-body);
+}
+
+h1, h2, h3, h4, h5, h6,
+.h1, .h2, .h3, .h4, .h5, .h6,
+.sectionname,
+.page-header-headings h1 {
+  font-family: var(--tafac-font-display);
+  letter-spacing: -0.01em;
+}
+
+.course-section .sectionname > a,
+.sectionname a {
+  color: inherit;
+}
+
+blockquote {
+  color: var(--tafac-ink-secondary);
+  border-color: var(--tafac-line-strong);
+}
+
+pre,
+.dropdown-item-text {
+  color: inherit;
+}
+
+caption,
+.blockquote-footer,
+.figure-caption,
+.form-defaultinfo,
+.no-felement.fstatic,
+.nav-link.disabled,
+a.disabled,
+.dimmed_text a,
+.block .minicalendar td.weekend {
+  color: var(--tafac-ink-muted);
+}
+
+a {
+  color: var(--tafac-brand);
+}
+
+a:hover,
+a:focus {
+  color: var(--tafac-brand-hover);
+}
+
+/* In what someone wrote, a link is underlined: the ink alone wouldn't tell
+   it from the text. */
+:is(.no-overflow, .text_to_html, .summarytext, .activity-altcontent, .activity-description, .post-content-container) a:not(.btn, [role="button"], :is(table, .generaltable) a) {
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 2px;
+}
+
+hr {
+  border-color: var(--tafac-line);
+}
+
+::selection {
+  background-color: color-mix(in srgb, var(--tafac-brand) 22%, transparent);
+}
+
+:focus-visible {
+  outline-color: var(--tafac-focus-ring);
+}
+
+/* Bootstrap's colour helpers, Moodle's surfaces. */
+.bg-white {
+  background-color: var(--tafac-surface-card) !important;
+}
+
+.bg-light,
+.bg-gray {
+  background-color: var(--tafac-surface-sunken) !important;
+}
+
+.bg-secondary {
+  background-color: var(--tafac-surface-strong) !important;
+  color: var(--tafac-ink);
+}
+
+.bg-primary {
+  background-color: var(--tafac-brand) !important;
+  color: var(--tafac-on-brand);
+}
+
+.text-muted,
+.dimmed_text,
+.text-secondary {
+  color: var(--tafac-ink-muted) !important;
+}
+
+.text-dark,
+.text-body {
+  color: var(--tafac-ink) !important;
+}
+
+.text-primary {
+  color: var(--tafac-brand) !important;
+}
+
+/* Moodle's hairlines, grey on white as it draws them: the app's (a grey
+   line would glare in the dark theme). The same selectors as Moodle's. */
+.activity,
+.activity-item .activity-afterlink,
+.activity-item .activity-altcontent.activity-description,
+.activity-item .activity-groupmode-info,
+.activity.subsection > .activity-item,
+.section li.activity:not(.activity-wrapper).hasinfo,
+.course-content ul li.section.main:not(.course-section),
+.course-section .section-summary-activities + .section,
+.path-mod .activity-information .activity-dates,
+.path-mod .activity-information .completion-info,
+.mform fieldset,
+.tertiary-navigation.full-width-bottom-border,
+.forum-post-container .replies-container .forum-post-container,
+.preferences-container .preference-table,
+.preferences-container .preference-table tr th,
+.preferences-container .preference-table tr td:nth-child(even),
+.page-mycourses .block_myoverview .block-cards,
+#frontpage-available-course-list .coursebox,
+#frontpage-course-list .coursebox,
+.course-search-result .coursebox,
+#page-report-outline-user .section,
+.courseindex .courseindex-item.active,
+.card.active,
+.divider hr,
+.max-section-alert,
+pre {
+  border-color: var(--tafac-line);
+}
+
+.table-bordered,
+.table-bordered th,
+.table-bordered td,
+.border-secondary {
+  border-color: var(--tafac-line) !important;
+}
+
+.border,
+.border-top,
+.border-bottom,
+.border-left,
+.border-right,
+.border-start,
+.border-end {
+  border-color: var(--tafac-line) !important;
+}
+
+/* ── The bar at the top ──
+   On the page's colour, a hairline under it. The university's logo goes:
+   the sidebar has it, and the toolbar's house is Moodle's dashboard. */
+
+.navbar.fixed-top,
+nav.navbar.bg-white {
+  background-color: var(--tafac-surface-page) !important;
+  border-bottom: 1px solid var(--tafac-line);
+  box-shadow: none;
+}
+
+.navbar.fixed-top::after {
+  background: none;
+}
+
+.navbar.fixed-top .navbar-brand {
+  display: none !important;
+}
+
+/* Rennes 2's portal bar (static.univ-rennes2.fr/barre-ent: Étudiants,
+   PARTAGE, Annuaire…), white whatever the theme: its links are Tafac's
+   own sidebar and apps. It goes, and the room its script makes for it on
+   the body (an inline padding) with it. Nothing elsewhere has these. */
+#barre-menu-ent {
+  display: none !important;
+}
+
+body.barre-menu-ent-body {
+  padding-top: 0 !important;
+}
+
+/* Its theme pushes Moodle's bar down by the portal bar's height. */
+body.barre-menu-ent-body .navbar.fixed-top {
+  margin-top: 0 !important;
+}
+
+.navbar .nav-link,
+.navbar .popover-region-toggle,
+.navbar .popover-region-toggle .icon,
+.primary-navigation .navigation .nav-link {
+  color: var(--tafac-ink-secondary);
+}
+
+.primary-navigation .navigation .nav-link {
+  font-weight: 500;
+  border-bottom-color: transparent;
+}
+
+.primary-navigation .navigation .nav-link:hover {
+  color: var(--tafac-ink);
+  background-color: transparent;
+}
+
+.primary-navigation .navigation .nav-link.active,
+.primary-navigation .navigation .nav-link[aria-current="true"] {
+  color: var(--tafac-ink);
+  font-weight: 600;
+  border-bottom-color: var(--tafac-brand);
+}
+
+.navbar .divider {
+  border-color: var(--tafac-line) !important;
+  background-color: var(--tafac-line);
+}
+
+.count-container {
+  background-color: var(--tafac-notify);
+  color: #ffffff;
+}
+
+.avatar.current .userinitials,
+.userinitials {
+  background-color: var(--tafac-surface-strong);
+  color: var(--tafac-ink);
+}
+
+.userinitials {
+  border-color: transparent;
+}
+
+/* ── Drawers: the course's index, the blocks, the messages ──
+   The sidebar's material. The page in the index: lifted as a card, as the
+   sidebar's current page is. */
+
+.drawer,
+.drawerheader,
+.drawer .drawerheader,
+.drawer.drawer-left,
+.drawer.drawer-right {
+  background-color: var(--tafac-sidebar);
+  border-color: var(--tafac-line);
+}
+
+.drawer {
+  box-shadow: none;
+}
+
+.courseindex .courseindex-item {
+  border-radius: var(--tafac-radius-item);
+}
+
+.courseindex .courseindex-item:hover,
+.courseindex .courseindex-item:focus {
+  background-color: var(--tafac-state-hover);
+  color: var(--tafac-ink);
+}
+
+.courseindex .courseindex-item .courseindex-link,
+.courseindex .courseindex-item .courseindex-chevron,
+.courseindex .courseindex-section-title .courseindex-link,
+.courseindex .courseindex-item :is(.courseindex-link, .courseindex-chevron):is(:hover, :focus),
+.courseindex .courseindex-item:is(:hover, :focus) :is(.courseindex-link, .courseindex-chevron) {
+  color: var(--tafac-ink);
+}
+
+.drawercontent::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.courseindex .courseindex-item.pageitem {
+  background-color: var(--tafac-surface-card);
+  color: var(--tafac-ink);
+  box-shadow: 0 0 0 1px var(--tafac-line), var(--tafac-card-shadow);
+}
+
+.courseindex .courseindex-item.pageitem a,
+.courseindex .courseindex-item.pageitem .courseindex-link {
+  color: var(--tafac-ink);
+}
+
+.courseindex .courseindex-item.dimmed .courseindex-link,
+.courseindex .courseindex-item.dimmed .courseindex-chevron {
+  color: var(--tafac-ink-muted);
+}
+
+.current-badge,
+.badge.current {
+  background-color: var(--tafac-brand) !important;
+  color: var(--tafac-on-brand) !important;
+}
+
+/* The drawers' round buttons and the footer's « ? »: as the toolbar's. */
+.drawer-toggles .drawer-toggler .btn,
+.btn-footer-popover,
+.btn-footer-communication {
+  background-color: var(--tafac-glass-fill) !important;
+  color: var(--tafac-ink);
+  border: 1px solid;
+  border-color: var(--tafac-glass-edge);
+  outline: 1px solid var(--tafac-glass-outer);
+  outline-offset: 0;
+  box-shadow: var(--tafac-glass-shadow);
+}
+
+.drawer-toggles .drawer-toggler .btn:hover,
+.btn-footer-popover:hover,
+.btn-footer-communication:hover {
+  background-color: var(--tafac-glass-fill-hover) !important;
+}
+
+.drawer-toggles .drawer-toggler .btn .icon,
+.btn-footer-popover .icon {
+  color: var(--tafac-ink);
+}
+
+/* ── Headings and tabs ── */
+
+.breadcrumb {
+  background-color: transparent;
+}
+
+.breadcrumb-item,
+.breadcrumb-item.active,
+.breadcrumb-item + .breadcrumb-item::before,
+.breadcrumb-item a {
+  color: var(--tafac-ink-muted);
+}
+
+.breadcrumb-item a:hover {
+  color: var(--tafac-ink);
+}
+
+.secondary-navigation .navigation,
+.moremenu .nav-tabs {
+  background-color: var(--tafac-surface-page);
+  border-bottom-color: var(--tafac-line);
+}
+
+.moremenu .nav-link:hover,
+.moremenu .nav-link:focus {
+  background-color: var(--tafac-state-hover);
+  border-color: transparent;
+}
+
+.moremenu .nav-link.active,
+.moremenu .nav-link.active:hover,
+.moremenu .nav-link.active:focus {
+  background-color: transparent;
+  border-color: transparent;
+  border-bottom-color: var(--tafac-brand);
+}
+
+/* The bar's « Plus » menu: its rows as the other menus'. */
+.moremenu .dropdown-menu .dropdown-item:is(:hover, :focus, :focus-within) {
+  background-color: var(--tafac-state-hover) !important;
+  color: var(--tafac-ink) !important;
+}
+
+.moremenu .dropdown-menu .dropdown-item:is(:hover, :focus, :focus-within) a,
+.moremenu .dropdown-item:is(.active, [aria-current="true"]) {
+  color: var(--tafac-ink) !important;
+}
+
+.nav-tabs {
+  border-bottom-color: var(--tafac-line);
+}
+
+.nav-tabs .nav-link {
+  color: var(--tafac-ink-secondary);
+  background-color: transparent;
+}
+
+.nav-tabs .nav-link:hover,
+.nav-tabs .nav-link:focus {
+  color: var(--tafac-ink);
+  border-color: transparent;
+}
+
+.nav-tabs .nav-link.active,
+.nav-tabs .nav-item.show .nav-link {
+  color: var(--tafac-ink);
+  background-color: transparent;
+  border-color: transparent transparent var(--tafac-brand);
+}
+
+.secondary-navigation .navigation .nav-tabs .nav-link.active {
+  border-bottom-color: var(--tafac-brand);
+  font-weight: 600;
+}
+
+/* Tabs drawn as a segmented control (some themes): the app's, a track and
+   the pick lifted on it. */
+.nav-tabs:not(.more-nav),
+.nav-pills {
+  background-color: var(--tafac-surface-sunken);
+  border-radius: var(--tafac-radius-field);
+}
+
+.nav-tabs:not(.more-nav) .nav-link,
+.nav-pills .nav-link {
+  background-color: transparent;
+  border-radius: var(--tafac-radius-item);
+  color: var(--tafac-ink-secondary);
+}
+
+.nav-tabs:not(.more-nav) .nav-link.active,
+.nav-pills .nav-link.active,
+.nav-pills .show > .nav-link {
+  background-color: var(--tafac-surface-card);
+  color: var(--tafac-ink);
+  box-shadow: 0 0 0 1px var(--tafac-line), 0 1px 2px var(--tafac-shadow-tint);
+}
+
+/* ── Cards: the blocks, the course's sections, the courses ── */
+
+.card,
+.course-section .section-item,
+.activity-header:not(:empty),
+.path-mod .activity-header:not(:empty),
+.forumpost,
+.dashboard-card {
+  background-color: var(--tafac-surface-card);
+  border: 1px solid var(--tafac-line);
+  border-radius: var(--tafac-radius-card);
+  box-shadow: var(--tafac-card-shadow);
+}
+
+/* A card in a card (a block's own): flat. */
+:is(.card, .section-item) :is(.card, .forumpost) {
+  box-shadow: none;
+}
+
+.card-header,
+.card-footer {
+  background-color: transparent;
+  border-color: var(--tafac-line);
+}
+
+.card-header:first-child {
+  border-radius: calc(var(--tafac-radius-card) - 1px) calc(var(--tafac-radius-card) - 1px) 0 0;
+}
+
+.card-footer:last-child {
+  border-radius: 0 0 calc(var(--tafac-radius-card) - 1px) calc(var(--tafac-radius-card) - 1px);
+}
+
+.card > .card-img-top,
+.card > a > .card-img-top,
+.card > a > .card-img,
+.card > .card-img,
+.dashboard-card .dashboard-card-img,
+.course-card .card-img-top {
+  border-top-left-radius: calc(var(--tafac-radius-card) - 1px);
+  border-top-right-radius: calc(var(--tafac-radius-card) - 1px);
+}
+
+.list-group-item {
+  background-color: transparent;
+  border-color: var(--tafac-line);
+  color: inherit;
+}
+
+.list-group-item-action:hover,
+.list-group-item-action:focus {
+  background-color: var(--tafac-state-hover);
+  color: inherit;
+}
+
+.list-group-item.active {
+  background-color: var(--tafac-brand-soft);
+  border-color: var(--tafac-line);
+  color: var(--tafac-ink);
+}
+
+/* The course's page. */
+.course-section {
+  border-color: var(--tafac-line);
+}
+
+.course-section.hidden .section-item,
+.course-section.orphaned .section-item,
+.activity-item.hiddenactivity {
+  background-color: var(--tafac-surface-sunken);
+}
+
+.course-section .availabilityinfo,
+.icon-box,
+.jumbotron {
+  background-color: var(--tafac-surface-sunken);
+  color: var(--tafac-ink);
+}
+
+.block_timeline .paged-content-page-container {
+  background-color: transparent;
+}
+
+.block .block-cards .course-summaryitem,
+.img-thumbnail {
+  background-color: var(--tafac-surface-card);
+  border-color: var(--tafac-line);
+}
+
+.block .block-cards span.categoryname,
+.block .block-cards .btn-link {
+  color: var(--tafac-ink);
+}
+
+.course-section .course-section-header .icons-collapse-expand,
+.btn-icon.icons-collapse-expand {
+  background-color: var(--tafac-brand-soft);
+  color: var(--tafac-ink);
+}
+
+.activity-item {
+  border-radius: var(--tafac-radius-box);
+  border-color: var(--tafac-line);
+}
+
+.activity-item:not(.activityinline) + .activity-item,
+.course-section .activity + .activity {
+  border-color: var(--tafac-line);
+}
+
+.activity-item.highlighted,
+.activity-item:target {
+  background-color: var(--tafac-brand-soft);
+}
+
+.activityiconcontainer,
+.activityiconcontainer.courseicon {
+  border-radius: var(--tafac-radius-item);
+}
+
+.activity-dates,
+.activity-item .activity-dates,
+.activity-information,
+.completion-info,
+.activity-basis .text-muted {
+  color: var(--tafac-ink-secondary);
+}
+
+.path-mod .activity-header:not(:empty) {
+  box-shadow: none;
+}
+
+.activity-header .activity-description .box.generalbox {
+  background-color: transparent;
+}
+
+/* ── Buttons: pills, as the app's ── */
+
+.btn {
+  color: var(--tafac-ink);
+  border-radius: 999px;
+  text-transform: none;
+  letter-spacing: normal;
+  font-weight: 600;
+  transition: background-color 150ms ease, border-color 150ms ease, color 150ms ease;
+}
+
+.btn-primary,
+.btn-primary:disabled,
+.btn-primary.disabled {
+  background-color: var(--tafac-brand);
+  border-color: var(--tafac-brand);
+  color: var(--tafac-on-brand);
+}
+
+.btn-primary:hover,
+.btn-primary:focus,
+.btn-primary:not(:disabled):not(.disabled):active,
+.btn-primary:not(:disabled):not(.disabled).active {
+  background-color: var(--tafac-brand-hover);
+  border-color: var(--tafac-brand-hover);
+  color: var(--tafac-on-brand);
+}
+
+.btn-secondary,
+.btn-outline-secondary,
+.btn-outline-primary,
+.btn-light,
+.btn-default,
+.btn-outline-info {
+  background-color: var(--tafac-glass-fill);
+  border-color: var(--tafac-glass-edge);
+  outline: 1px solid var(--tafac-glass-outer);
+  outline-offset: 0;
+  box-shadow: var(--tafac-glass-shadow);
+  color: var(--tafac-ink);
+}
+
+.btn-secondary:hover,
+.btn-outline-secondary:hover,
+.btn-outline-primary:hover,
+.btn-light:hover,
+.btn-default:hover,
+.btn-outline-info:hover,
+.btn-secondary:not(:disabled):not(.disabled):active,
+.btn-outline-secondary:not(:disabled):not(.disabled):active,
+.btn-outline-secondary.dropdown-toggle[aria-expanded="true"],
+.btn-secondary.dropdown-toggle[aria-expanded="true"] {
+  background-color: var(--tafac-glass-fill-hover);
+  border-color: var(--tafac-glass-edge);
+  color: var(--tafac-ink);
+}
+
+/* On a status colour, the page's: dark under the light theme's deep
+   colours, light under the dark theme's pale ones. */
+.btn-danger,
+.btn-outline-danger:hover {
+  background-color: var(--tafac-danger);
+  border-color: var(--tafac-danger);
+  color: var(--tafac-surface-page);
+}
+
+.btn-outline-danger {
+  color: var(--tafac-danger);
+  border-color: var(--tafac-danger);
+}
+
+.btn-success {
+  background-color: var(--tafac-success);
+  border-color: var(--tafac-success);
+  color: var(--tafac-surface-page);
+}
+
+.btn-link {
+  color: var(--tafac-brand);
+  font-weight: 500;
+}
+
+.btn-link:hover,
+.btn-link:focus {
+  color: var(--tafac-brand-hover);
+}
+
+.btn-icon {
+  border-radius: 999px;
+  color: var(--tafac-ink);
+}
+
+.btn-icon:hover,
+.btn-icon:focus {
+  background-color: var(--tafac-state-hover);
+}
+
+.btn:focus,
+.btn.focus,
+.btn:focus-visible {
+  box-shadow: 0 0 0 2px var(--tafac-surface-page), 0 0 0 4px var(--tafac-focus-ring);
+}
+
+.btn:focus:not(:focus-visible) {
+  box-shadow: none;
+}
+
+:is(.btn-secondary, .btn-outline-secondary, .btn-outline-primary, .btn-light, .btn-default, .btn-outline-info):focus:not(:focus-visible) {
+  box-shadow: var(--tafac-glass-shadow);
+}
+
+/* ── Fields: as the app's (a card's fill, a hairline, a firmer stroke when
+   focused) ── */
+
+.form-control,
+.custom-select,
+.form-select,
+.custom-file-label,
+.input-group-text {
+  background-color: var(--tafac-surface-card);
+  color: var(--tafac-ink);
+  border: 1px solid var(--tafac-field-edge);
+  border-radius: var(--tafac-radius-field);
+  box-shadow: inset 0 1px 1px var(--tafac-field-inset), 0 0 0 0.5px var(--tafac-field-outer);
+  transition: border-color 150ms ease, box-shadow 150ms ease;
+}
+
+.custom-select,
+.form-select,
+select.form-control {
+  background-image: var(--tafac-select-arrow);
+  background-repeat: no-repeat;
+  background-position: right 0.6rem center;
+  background-size: 16px 16px;
+}
+
+select[multiple].form-control,
+select[size].form-control:not([size="1"]),
+select[multiple].custom-select,
+select[size].custom-select:not([size="1"]) {
+  background-image: none;
+}
+
+.form-control:hover,
+.custom-select:hover,
+.form-select:hover {
+  border-color: var(--tafac-field-edge-hover);
+}
+
+.form-control:focus,
+.custom-select:focus,
+.form-select:focus {
+  background-color: var(--tafac-surface-card);
+  color: var(--tafac-ink);
+  border-color: var(--tafac-field-edge-hover);
+  box-shadow: inset 0 1px 1px var(--tafac-field-inset), 0 0 0 1px var(--tafac-field-outer-focus);
+  outline: none;
+}
+
+.form-control::placeholder {
+  color: var(--tafac-ink-muted);
+}
+
+.form-control:disabled,
+.form-control[readonly],
+.custom-control-input:disabled ~ .custom-control-label::before {
+  background-color: var(--tafac-surface-field);
+}
+
+.simplesearchform .btn-submit,
+.input-group .btn-submit {
+  background-color: var(--tafac-surface-card);
+  color: var(--tafac-ink-muted);
+  border-color: var(--tafac-field-edge);
+}
+
+.input-group > .form-control:not(:last-child),
+.input-group > .custom-select:not(:last-child) {
+  border-top-right-radius: 0;
+  border-bottom-right-radius: 0;
+}
+
+.input-group > .input-group-append > .btn,
+.input-group > .input-group-append > .input-group-text,
+.input-group > .btn:last-child {
+  border-top-left-radius: 0;
+  border-bottom-left-radius: 0;
+}
+
+.input-group > .form-control:not(:first-child),
+.input-group > .input-group-prepend + .form-control {
+  border-top-left-radius: 0;
+  border-bottom-left-radius: 0;
+}
+
+.input-group > .input-group-prepend > .btn,
+.input-group > .input-group-prepend > .input-group-text {
+  border-top-right-radius: 0;
+  border-bottom-right-radius: 0;
+}
+
+/* Bootstrap 4's check boxes and switches, Bootstrap 5's. */
+.custom-control-label::before,
+.form-check-input {
+  background-color: var(--tafac-surface-card);
+  border-color: var(--tafac-line-strong);
+}
+
+.custom-control-input:checked ~ .custom-control-label::before,
+.form-check-input:checked {
+  background-color: var(--tafac-brand);
+  border-color: var(--tafac-brand);
+}
+
+.custom-switch .custom-control-label::after {
+  background-color: var(--tafac-ink-muted);
+}
+
+.custom-switch .custom-control-input:checked ~ .custom-control-label::after {
+  background-color: var(--tafac-on-brand);
+}
+
+.custom-control-input:focus ~ .custom-control-label::before,
+.form-check-input:focus {
+  box-shadow: 0 0 0 2px var(--tafac-surface-page), 0 0 0 4px var(--tafac-focus-ring);
+}
+
+.custom-control-input:focus:not(:focus-visible) ~ .custom-control-label::before,
+.form-check-input:focus:not(:focus-visible) {
+  box-shadow: none;
+}
+
+/* ── Menus, popovers, dialogs ── */
+
+.dropdown-menu,
+.popover,
+.popover-region-container,
+.moodle-dialogue-base .moodle-dialogue-wrap {
+  background-color: var(--tafac-surface-raised);
+  color: var(--tafac-ink);
+  border: 1px solid var(--tafac-line);
+  border-radius: var(--tafac-radius-box);
+  box-shadow: var(--tafac-menu-shadow);
+}
+
+.dropdown-item {
+  color: var(--tafac-ink);
+}
+
+.dropdown-item:hover,
+.dropdown-item:focus {
+  background-color: var(--tafac-state-hover);
+  color: var(--tafac-ink);
+}
+
+.dropdown-item.active,
+.dropdown-item:active,
+.dropdown-item[aria-current="true"] {
+  background-color: var(--tafac-brand-soft);
+  color: var(--tafac-ink);
+}
+
+.dropdown-item.disabled,
+.dropdown-item:disabled,
+.dropdown-header {
+  color: var(--tafac-ink-muted);
+}
+
+.dropdown-divider {
+  border-color: var(--tafac-line);
+}
+
+/* Moodle's own round corners inside a menu (the user menu's sub-menu). */
+.dropdown-menu .carousel-item,
+.usermenu .dropdown-menu .carousel-inner {
+  border-radius: inherit;
+}
+
+.popover .arrow,
+.popover .popover-arrow,
+.tooltip .arrow,
+.tooltip .tooltip-arrow {
+  display: none;
+}
+
+.popover-header {
+  background-color: transparent;
+  border-color: var(--tafac-line);
+  color: var(--tafac-ink);
+}
+
+.popover-body {
+  color: var(--tafac-ink);
+}
+
+.tooltip-inner {
+  background-color: var(--tafac-ink);
+  color: var(--tafac-surface-page);
+  border-radius: 8px;
+}
+
+.popover-region-header-container,
+.popover-region-footer-container {
+  background-color: transparent;
+  border-color: var(--tafac-line);
+}
+
+.popover-region-header-text {
+  font-family: var(--tafac-font-display);
+  color: var(--tafac-ink);
+}
+
+.popover-region .content-item-container,
+.popover-region .content-item-container .content-item-body {
+  border-color: var(--tafac-line);
+  color: var(--tafac-ink);
+}
+
+.popover-region .content-item-container:hover,
+.popover-region .content-item-container:focus {
+  background-color: var(--tafac-state-hover);
+  color: var(--tafac-ink);
+}
+
+.popover-region .content-item-container.unread {
+  background-color: var(--tafac-brand-soft);
+}
+
+.popover-region .content-item-container .content-item-footer .timestamp {
+  color: var(--tafac-ink-muted);
+}
+
+.modal-content {
+  background-color: var(--tafac-surface-raised);
+  color: var(--tafac-ink);
+  border: 1px solid var(--tafac-line);
+  border-radius: 24px;
+  box-shadow: var(--tafac-menu-shadow);
+}
+
+.modal-header,
+.modal-footer {
+  border-color: var(--tafac-line);
+}
+
+.modal-header {
+  border-top-left-radius: 23px;
+  border-top-right-radius: 23px;
+}
+
+.modal-footer {
+  border-bottom-left-radius: 23px;
+  border-bottom-right-radius: 23px;
+}
+
+.modal-backdrop {
+  background-color: var(--tafac-scrim);
+}
+
+.modal-backdrop.show {
+  opacity: 1;
+}
+
+.close,
+.btn-close {
+  color: var(--tafac-ink);
+  text-shadow: none;
+}
+
+/* ── Messages (the drawer) ── */
+
+.message-app,
+.message-app .panel-header-container,
+.message-app .panel-body-container,
+.message-app .footer-container,
+.message-app .header-container {
+  background-color: var(--tafac-sidebar);
+  color: var(--tafac-ink);
+  border-color: var(--tafac-line);
+}
+
+.message-app .message.send {
+  background-color: var(--tafac-brand-soft);
+  color: var(--tafac-ink);
+}
+
+.message-app .message.received {
+  background-color: var(--tafac-surface-card);
+  color: var(--tafac-ink);
+}
+
+.message-app .message.send .tail {
+  border-bottom-color: var(--tafac-brand-soft);
+}
+
+.message-app .message.received .tail {
+  border-bottom-color: var(--tafac-surface-card);
+}
+
+.message-app .message {
+  border-radius: var(--tafac-radius-box);
+}
+
+.message-app .day,
+.message-app .message .time,
+.message-app .message.send .time {
+  color: var(--tafac-ink-muted);
+}
+
+.message-app .list-group-item-action.active,
+.message-app .view-overview-body .section .list-group-item:hover {
+  background-color: var(--tafac-state-hover);
+  color: var(--tafac-ink);
+}
+
+/* ── Badges, notices, progress ── */
+
+.badge {
+  border-radius: 999px;
+  font-weight: 600;
+}
+
+.badge-secondary,
+.badge.bg-secondary,
+.text-bg-secondary,
+.badge-light,
+.badge.bg-light,
+.text-bg-light {
+  background-color: var(--tafac-surface-strong) !important;
+  color: var(--tafac-ink) !important;
+}
+
+.badge-primary,
+.badge.bg-primary,
+.text-bg-primary {
+  background-color: var(--tafac-brand) !important;
+  color: var(--tafac-on-brand) !important;
+}
+
+.badge-success,
+.badge.bg-success,
+.text-bg-success,
+.badge.alert-success {
+  background-color: var(--tafac-success-soft) !important;
+  color: var(--tafac-success) !important;
+}
+
+.badge-danger,
+.badge.bg-danger,
+.text-bg-danger,
+.badge.alert-danger {
+  background-color: var(--tafac-danger-soft) !important;
+  color: var(--tafac-danger) !important;
+}
+
+.badge-warning,
+.badge.bg-warning,
+.text-bg-warning,
+.badge.alert-warning {
+  background-color: var(--tafac-warning-soft) !important;
+  color: var(--tafac-warning) !important;
+}
+
+.badge-info,
+.badge.bg-info,
+.text-bg-info,
+.badge.alert-info {
+  background-color: var(--tafac-info-soft) !important;
+  color: var(--tafac-info) !important;
+}
+
+.alert {
+  border-color: transparent;
+  border-radius: var(--tafac-radius-box);
+  color: var(--tafac-ink);
+}
+
+.alert-info,
+.alert-primary {
+  background-color: var(--tafac-info-soft);
+}
+
+.alert-success {
+  background-color: var(--tafac-success-soft);
+}
+
+.alert-warning {
+  background-color: var(--tafac-warning-soft);
+}
+
+.alert-danger,
+.alert-error {
+  background-color: var(--tafac-danger-soft);
+}
+
+.alert-secondary,
+.alert-light {
+  background-color: var(--tafac-surface-sunken);
+}
+
+.alert .alert-link,
+.alert a {
+  color: inherit;
+}
+
+.progress {
+  background-color: var(--tafac-surface-strong);
+  border-radius: 999px;
+}
+
+.progress-bar {
+  background-color: var(--tafac-brand);
+  color: var(--tafac-on-brand);
+}
+
+/* ── Tables ── */
+
+/* Some themes paint every cell white (with !important): the row's colour
+   shows through instead. */
+.table td,
+.table th {
+  background-color: transparent !important;
+}
+
+.table,
+.generaltable {
+  color: inherit;
+  --bs-table-bg: transparent;
+  --bs-table-color: inherit;
+  --bs-table-border-color: var(--tafac-line);
+  --bs-table-striped-bg: var(--tafac-state-hover);
+  --bs-table-striped-color: inherit;
+  --bs-table-hover-bg: var(--tafac-state-hover);
+  --bs-table-hover-color: inherit;
+}
+
+:is(.table, .generaltable) :is(th, td),
+:is(.table, .generaltable) :is(thead, tbody, tfoot) {
+  border-color: var(--tafac-line);
+}
+
+:is(.table, .generaltable) thead th {
+  border-bottom-color: var(--tafac-line-strong);
+}
+
+.generaltable thead th,
+.generaltable th.header {
+  background-color: transparent;
+  color: var(--tafac-ink);
+}
+
+.generaltable tbody tr:nth-of-type(even) {
+  background-color: transparent;
+}
+
+.generaltable tbody tr:nth-of-type(odd),
+.table-striped tbody tr:nth-of-type(odd) {
+  background-color: var(--tafac-state-hover);
+}
+
+.generaltable.table-hover tbody tr:hover,
+.table-hover tbody tr:hover,
+.generaltable tbody tr:hover {
+  background-color: var(--tafac-state-press);
+  color: inherit;
+}
+
+/* An assignment's status, in the app's soft colours. */
+.path-mod-assign :is(td, div, a):is(.submissionstatus, .submissionreopened, .submissionnotgraded) {
+  background-color: transparent;
+  color: var(--tafac-ink);
+}
+
+.path-mod-assign :is(td, div, a):is(.submissionstatussubmitted, .submissiongraded, .earlysubmission) {
+  background-color: var(--tafac-success-soft);
+  color: var(--tafac-ink);
+}
+
+.path-mod-assign :is(td, div, a):is(.overdue, .latesubmission, .gradingreminder) {
+  background-color: var(--tafac-danger-soft);
+  color: var(--tafac-ink);
+}
+
+.path-mod-assign :is(td, div, a):is(.submissionstatusdraft, .submissionlocked) {
+  background-color: var(--tafac-warning-soft);
+  color: var(--tafac-ink);
+}
+
+/* A student's grades in a course: Moodle paints each kind of cell its own
+   grey or white, with long selectors; the rows' colour instead. */
+:is(.path-grade-report-user, .grade-report-user) .user-grade :is(td, th, tbody tr, .baggt, .baggb) {
+  background-color: transparent !important;
+  border-color: var(--tafac-line) !important;
+}
+
+:is(.path-grade-report-user, .grade-report-user) .user-grade th.category {
+  background-color: var(--tafac-surface-sunken) !important;
+}
+
+:is(.path-grade-report-user, .grade-report-user) .user-report-container {
+  background-color: transparent;
+}
+
+/* A quiz's questions. */
+.que .info {
+  background-color: var(--tafac-surface-sunken);
+  border-color: var(--tafac-line);
+  border-radius: var(--tafac-radius-item);
+}
+
+.que .formulation {
+  background-color: var(--tafac-info-soft);
+  border-color: var(--tafac-line);
+  color: var(--tafac-ink);
+  border-radius: var(--tafac-radius-item);
+}
+
+.que :is(.outcome, .comment) {
+  background-color: var(--tafac-warning-soft);
+  border-color: var(--tafac-line);
+  color: var(--tafac-ink);
+  border-radius: var(--tafac-radius-item);
+}
+
+.que :is(.outcome, .comment) a {
+  color: inherit;
+}
+
+/* ── Pages ── */
+
+.page-link {
+  background-color: transparent;
+  border-color: var(--tafac-line);
+  color: var(--tafac-ink);
+}
+
+.page-link:hover,
+.page-link:focus {
+  background-color: var(--tafac-state-hover);
+  border-color: var(--tafac-line);
+  color: var(--tafac-ink);
+}
+
+.page-item.active .page-link {
+  background-color: var(--tafac-brand);
+  border-color: var(--tafac-brand);
+  color: var(--tafac-on-brand);
+}
+
+.page-item.disabled .page-link {
+  background-color: transparent;
+  border-color: var(--tafac-line);
+  color: var(--tafac-ink-faint);
+}
+
+/* The calendar. */
+.maincalendar .calendarmonth :is(th, td),
+.maincalendar .calendartable :is(th, td),
+.calendarmonth :is(th, td) {
+  border-color: var(--tafac-line);
+}
+
+.maincalendar .calendarmonth td.today .day-number-circle,
+.calendarmonth .today .day-number-circle {
+  background-color: var(--tafac-brand);
+  color: var(--tafac-on-brand);
+}
+
+.maincalendar .calendarmonth td.weekend,
+.calendarmonth td.weekend {
+  background-color: var(--tafac-state-hover);
+}
+
+.maincalendar .calendarmonth td:hover,
+.calendarmonth td.clickable:hover {
+  background-color: var(--tafac-state-press);
+}
+
+/* The footer. */
+#page-footer,
+.footer-popover,
+#page-footer .footer-content-popover {
+  background-color: var(--tafac-surface-raised) !important;
+  color: var(--tafac-ink);
+}
+
+#page-footer a,
+.footer-popover a {
+  color: var(--tafac-brand);
+}
+
+/* Moodle's "loading" placeholders. */
+.bg-pulse-grey {
+  background-color: var(--tafac-surface-strong) !important;
+}

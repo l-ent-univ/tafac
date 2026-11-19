@@ -5,6 +5,7 @@ import { assignAccent } from './eventAccents'
 import { startOfWeek } from './planningDates'
 import { mergeEvents, toPlanningEvent } from './planningEvents'
 import { shouldAskWeek } from './planningStates'
+import { usePullRefresh } from './usePullRefresh'
 
 // The planning's weeks, as the iOS app keeps them (PlanningEvents): one
 // /ade/upcoming request a week (its Monday and the six days after, the
@@ -48,6 +49,14 @@ function askWeek(scope, selection, monday, { force = false, retry = false } = {}
   return promise
 }
 
+// Every week known for this account asked again (a pull to refresh), each
+// keeping its classes meanwhile. → a promise settled once they all answered.
+function refreshWeeks(scope, selection) {
+  const prefix = `${scope}::`
+  const mondays = [...weeks.keys()].filter((key) => key.startsWith(prefix)).map((key) => key.slice(prefix.length))
+  return Promise.all(mondays.map((monday) => askWeek(scope, selection, monday, { force: true })))
+}
+
 // The classes of the weeks of `mondays` for this account, from the cache
 // or asked now (the same requests as the Planning's), outside a page: a
 // mail about a grade looks for its module's teachers there. A week that
@@ -67,6 +76,8 @@ export function usePlanningWeeks({ selection, user }) {
     listeners.add(listener)
     return () => listeners.delete(listener)
   }, [])
+
+  usePullRefresh(() => (selection ? refreshWeeks(scope, selection) : undefined))
 
   const load = useCallback((monday, { force = false, retry = false } = {}) => {
     if (!selection) return

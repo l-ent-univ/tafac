@@ -80,7 +80,7 @@ function ChangelogSheet() {
       <div className="changelog-backdrop absolute inset-0 bg-backdrop animate-[pwa-backdrop-in_280ms_ease-out]" onClick={closeChangelog} aria-hidden="true" />
       <section
         ref={dialogRef}
-        className="glass-solid glass--quiet modal-surface changelog-sheet relative flex w-[min(440px,100%)] max-h-[min(640px,calc(100dvh-40px))] flex-col overflow-hidden modal-corners [--modal-inset:21px] [--modal-inner-radius:20px] border text-text outline-none animate-modal-card-in max-sm:max-h-full max-sm:corners-[20px] max-sm:animate-[pwa-slide-in_350ms_cubic-bezier(0.16,1,0.3,1)]"
+        className="glass-solid glass--quiet modal-surface changelog-sheet relative flex w-[min(440px,100%)] max-h-[min(640px,calc(var(--app-h)-40px))] flex-col overflow-hidden modal-corners [--modal-inset:21px] [--modal-inner-radius:20px] border text-text outline-none animate-modal-card-in max-sm:max-h-full max-sm:corners-[20px] max-sm:animate-[pwa-slide-in_350ms_cubic-bezier(0.16,1,0.3,1)]"
         role="dialog"
         aria-modal="true"
         aria-labelledby="changelog-title"

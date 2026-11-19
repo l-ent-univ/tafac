@@ -1,0 +1,16 @@
+[package]
+name = "tauri-plugin-glass"
+version = "0.0.0"
+description = "Tafac's iOS app: the system's glass under the page's floating controls"
+license = "AGPL-3.0-only"
+edition = "2021"
+publish = false
+links = "tauri-plugin-glass"
+
+[dependencies]
+tauri = { version = "2" }
+serde = "1"
+serde_json = "1"
+
+[build-dependencies]
+tauri-plugin = { version = "2", features = ["build"] }

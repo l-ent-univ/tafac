@@ -92,7 +92,8 @@ function MailToolbar({ message, multiple = false, folderKind = 'inbox', onReply,
   ]
 
   return (
-    <div role="toolbar" aria-label="Actions du mail" className={`flex items-center gap-2 4xl:flex-wrap ${className}`}>
+    // iOS app: each group is a pill of the system's glass (src/iosGlass.js).
+    <div role="toolbar" aria-label="Actions du mail" data-ios-glass="" className={`flex items-center gap-2 4xl:flex-wrap ${className}`}>
       {/* Keyed by place: a folder's own buttons swap in without a remount. */}
       {groups.map((group, index) => (
         <div key={index} className="pointer-events-auto button-group">

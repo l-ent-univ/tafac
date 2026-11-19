@@ -1,6 +1,8 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { Icon } from '@iconify/react'
+import { hasNativeMenu, showNativeMenu } from '../iosMenu'
+import { useClosedWithPage } from '../pageVisit'
 
 // Kept this far from the window's edges.
 const EDGE_MARGIN = 12
@@ -23,9 +25,42 @@ const EDGE_MARGIN = 12
 // `button { font: inherit }`, outside Tailwind's layers. `anchor`: the
 // button it was opened from, if any: a press on it is left to that button
 // (which closes it, as a toggle), not taken as a click elsewhere.
+//
+// In the iOS app the menu is the system's (src/iosMenu.js), opened at the
+// same point with the same items; this one draws nothing then, and only
+// passes on what was picked. Where the system can't (an older iOS, a list
+// it couldn't draw), it is this one as everywhere else.
 function ContextMenu({ x, y, items, title = null, label, above = false, anchor = null, onClose }) {
   const menuRef = useRef(null)
   const [position, setPosition] = useState({ left: x, top: y, originX: '0px', originY: '0px' })
+  const [isNative, setIsNative] = useState(() => hasNativeMenu(items))
+
+  // The menu as it was opened: what is picked is looked up in the items of
+  // the moment, and the system's menu isn't opened again at each render.
+  const latest = useRef({ items, onClose })
+  useEffect(() => {
+    latest.current = { items, onClose }
+  })
+  const opened = useRef({ x, y, title, items })
+  useEffect(() => {
+    if (!isNative) return undefined
+    let live = true
+    const menu = showNativeMenu(opened.current)
+    void menu.result.then((answer) => {
+      if (!live) return
+      if (!answer.shown) {
+        setIsNative(false)
+        return
+      }
+      const { items: current, onClose: close } = latest.current
+      close()
+      if (answer.id != null) current.find((item) => item !== 'separator' && String(item.id) === answer.id)?.onSelect?.()
+    })
+    return () => {
+      live = false
+      menu.close()
+    }
+  }, [isNative])
 
   useLayoutEffect(() => {
     const menu = menuRef.current
@@ -38,9 +73,11 @@ function ContextMenu({ x, y, items, title = null, label, above = false, anchor =
     const top = Math.max(EDGE_MARGIN, Math.min(above ? y - height : y, window.innerHeight - height - EDGE_MARGIN))
     setPosition({ left, top, originX: `${x - left}px`, originY: `${y - top}px` })
     menu.querySelector('[role^="menuitem"]:not(:disabled)')?.focus({ preventScroll: true })
-  }, [x, y, above])
+  }, [x, y, above, isNative])
 
   useEffect(() => {
+    // The system's menu closes itself.
+    if (isNative) return undefined
     function handlePointerDown(event) {
       if (anchor?.contains(event.target)) return
       if (!menuRef.current?.contains(event.target)) onClose()
@@ -74,12 +111,17 @@ function ContextMenu({ x, y, items, title = null, label, above = false, anchor =
       window.removeEventListener('scroll', handleScroll, true)
       window.removeEventListener('blur', onClose)
     }
-  }, [onClose, anchor])
+  }, [onClose, anchor, isNative])
+
+  // A page's own menu goes with it, where a page left stays mounted (the
+  // iOS app, src/pageVisit.js).
+  const pageShown = useClosedWithPage(onClose)
+  if (!pageShown || isNative) return null
 
   return createPortal(
     <div
       ref={menuRef}
-      className="context-menu glass glass--menu fixed z-60 min-w-[232px] max-w-[300px] max-h-[calc(100dvh-24px)] overflow-y-auto overscroll-contain p-[5px] border corners-[16px] animate-context-menu-in"
+      className="context-menu glass glass--menu fixed z-60 min-w-[232px] max-w-[300px] max-h-[calc(var(--app-h)-24px)] overflow-y-auto overscroll-contain p-[5px] border corners-[16px] animate-context-menu-in"
       role="menu"
       aria-label={label}
       style={{ left: position.left, top: position.top, '--context-origin-x': position.originX, '--context-origin-y': position.originY }}

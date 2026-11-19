@@ -15,6 +15,7 @@ import {
 } from './universityRuntime'
 import { switchUniversityStorage } from './universityStorage'
 import { resolveRegister, setRegister } from './register.js'
+import { mergeSettings } from './remoteSettings.js'
 
 // One chunk per university: a page only downloads its own.
 const clientConfigs = import.meta.glob('../universities/*/client.js', { import: 'default' })
@@ -76,6 +77,11 @@ export async function bootUniversity() {
     // « Changer d'université »: the picker until another one is picked.
     writeUniversityChoice(null)
   }
+
+  // The apps' remote settings (server/remoteSettings/): the server's
+  // patches over this university's settings, the page's part of them.
+  const patch = config ? info?.settings?.[id] : null
+  if (patch) config = mergeSettings(config, patch)
 
   Object.assign(universityConfig, config ?? neutralConfig)
   setLoadedUniversityId(config ? id : null)

@@ -10,6 +10,8 @@ import { DEMO_MAIL_APP_FNAME, DEMO_PLANNING_APP_FNAME } from '../demoAccount'
 import { getGradesOrigin, opensGradesPageInApp } from '../gradesPortalApp'
 import { getPlanningOrigin, opensPlanningPageInApp } from '../planningPortalApp'
 import { getMailOrigins, opensMailPageInApp } from '../mailPortalApp'
+import { getMoodleOrigin, opensMoodlePageInApp } from '../moodlePortalApp'
+import { isInHiddenPage } from '../keptPages'
 import ContextMenu from './ContextMenu'
 import LoadingDots from './LoadingDots'
 import MailAttachDrawer, { ATTACH_CARD_CLASS, AttachDrawerNote } from './MailAttachDrawer'
@@ -28,6 +30,7 @@ import {
   getPortletFragment,
   mergePortlets,
   requestEnt,
+  serverFetch,
 } from '../entApi'
 
 const DEFAULT_ERROR_MESSAGE = 'Impossible de charger les applications pour le moment'
@@ -955,11 +958,21 @@ const MAIL_PORTAL_OPTIONS = {
   casOrigin: universityConfig.origins?.cas ?? '',
 }
 
+// And for Moodle's app, where Moodle is a page of the app (the desktop
+// app's, see moodlePortalApp.js). The demo's « Moodle » links elsewhere and
+// stays a link.
+const MOODLE_PORTAL_OPTIONS = {
+  moodleOrigin: universityConfig.features?.moodle ? getMoodleOrigin(universityConfig.origins?.moodle) : null,
+  launchPath: `${ENT_AUTH_PREFIX}/launch`,
+  casOrigin: universityConfig.origins?.cas ?? '',
+}
+
 // What an in-app tile says it opens (aria-description).
 const IN_APP_PAGE_DESCRIPTIONS = {
   grades: 'Ouvre Mes notes',
   planning: 'Ouvre le planning',
   mail: 'Ouvre la messagerie',
+  moodle: 'Ouvre Moodle dans l’appli',
 }
 
 // `onOpenGradesPage`: the app's own grades page, passed only while the
@@ -969,17 +982,26 @@ const IN_APP_PAGE_DESCRIPTIONS = {
 // `onOpenPlanningPage`: the same for the planning service's app and the
 // in-app Planning page, passed only while the student has it.
 // `onOpenMailPage`: and for the webmail's app and the in-app mail page.
+// `onOpenMoodlePage`: and for Moodle's app and « Moodle », in the desktop
+// app only (elsewhere Moodle is a site, and its tile a link).
 function AvailableApplications({
   establishment = null,
   canUseServerLaunch = true,
   favoritesPortalTarget = null,
   // The « Accueil » page's slot for its « Applications » row (the
-  // favourites as tiles), while that page shows.
+  // favourites as tiles), while that page shows. In the iOS app the page
+  // is kept behind the others (src/keptPages.js), its row with it:
+  // `homeAppsShown` says whether it is the one shown.
   homeAppsPortalTarget = null,
+  homeAppsShown = true,
+  // « Toutes les applications » asked from elsewhere (« Accueil »'s icon on
+  // a phone): the drawer opens each time this number goes up.
+  homeDrawerRequest = 0,
   showDescriptions = false,
   onOpenGradesPage = null,
   onOpenPlanningPage = null,
   onOpenMailPage = null,
+  onOpenMoodlePage = null,
 }) {
   const skeletonsForced = useSkeletonsForced()
   const [viewState, setViewState] = useState({
@@ -1032,17 +1054,23 @@ function AvailableApplications({
     setIsHomeDrawerOpen(false)
     setHomeDrawerQuery('')
   }, [])
+  const answeredDrawerRequestRef = useRef(homeDrawerRequest)
+  useEffect(() => {
+    if (homeDrawerRequest === answeredDrawerRequestRef.current) return
+    answeredDrawerRequestRef.current = homeDrawerRequest
+    setIsHomeDrawerOpen(true)
+  }, [homeDrawerRequest])
   // Leaving the page (or opening an app in it) closes it.
   useEffect(() => {
-    if (!homeAppsPortalTarget) closeHomeDrawer()
-  }, [homeAppsPortalTarget, closeHomeDrawer])
+    if (!homeAppsPortalTarget || !homeAppsShown) closeHomeDrawer()
+  }, [homeAppsPortalTarget, homeAppsShown, closeHomeDrawer])
   const homeAppsRowRef = useRef(null)
   useLayoutEffect(() => {
     const row = homeAppsRowRef.current
     if (!row) return undefined
     const fit = () => {
       const tiles = [...row.children]
-      if (tiles.length === 0) return
+      if (tiles.length === 0 || isInHiddenPage(row)) return
       row.style.maxHeight = `${tiles[0].offsetHeight}px`
       const firstTop = tiles[0].offsetTop
       for (const tile of tiles) {
@@ -1388,7 +1416,7 @@ function AvailableApplications({
       return fallbackBehavior
     }
 
-    const request = fetch(`/__ent_auth/launch-preview?url=${encodeURIComponent(href)}`, {
+    const request = serverFetch(`/__ent_auth/launch-preview?url=${encodeURIComponent(href)}`, {
       credentials: 'same-origin',
     })
       .then(async (response) => {
@@ -1846,11 +1874,22 @@ function AvailableApplications({
     })
   }
 
+  // Moodle's app while Moodle is a page of the app, likewise.
+  function opensMoodlePage(application) {
+    return opensMoodlePageInApp(application, {
+      ...MOODLE_PORTAL_OPTIONS,
+      hasMoodlePage: Boolean(onOpenMoodlePage),
+      resolvedHref: launchTargets[getApplicationKey(application)]?.href,
+      base: window.location.href,
+    })
+  }
+
   // The app's own page a tile opens instead of its site, or null.
   function getInAppPage(application) {
     if (opensGradesPage(application)) return 'grades'
     if (opensPlanningPage(application)) return 'planning'
     if (opensMailPage(application)) return 'mail'
+    if (opensMoodlePage(application)) return 'moodle'
     return null
   }
 
@@ -1872,6 +1911,8 @@ function AvailableApplications({
         onOpenGradesPage('tile')
       } else if (inAppPage === 'mail') {
         onOpenMailPage('tile')
+      } else if (inAppPage === 'moodle') {
+        onOpenMoodlePage('tile')
       } else {
         onOpenPlanningPage('tile')
       }
@@ -2196,7 +2237,7 @@ function AvailableApplications({
         ? createPortal(favoritesSectionContent, favoritesPortalTarget)
         : favoritesSectionContent}
       {homeAppsContent && typeof document !== 'undefined' ? createPortal(homeAppsContent, homeAppsPortalTarget) : null}
-      {isHomeDrawerOpen && homeAppsPortalTarget && typeof document !== 'undefined'
+      {isHomeDrawerOpen && homeAppsPortalTarget && homeAppsShown && typeof document !== 'undefined'
         ? createPortal(
           <div className="fixed inset-0 z-50">
             <MailAttachDrawer

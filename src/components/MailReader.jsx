@@ -20,6 +20,8 @@ import { addressMenuItems, attachmentMenuItems } from '../contextMenuItems'
 import { copyToClipboard, useContextMenu } from '../useContextMenu'
 import { trackMailAction } from '../analytics'
 import { bindFrameContextMenu } from '../contextMenuEvents'
+import { downloadFile } from '../desktopDownloads'
+import { isInHiddenPage } from '../keptPages'
 import SmoothSurface from './SmoothSurface'
 import { Skeleton } from 'skullet/react'
 
@@ -332,10 +334,7 @@ function AttachmentRows({ attachments }) {
     return attachmentMenuItems(attachment, {
       open: (href) => window.open(href, '_blank', 'noopener,noreferrer'),
       download: () => {
-        const link = document.createElement('a')
-        link.href = attachment.href
-        link.download = attachment.name
-        link.click()
+        downloadFile(attachment.href, attachment.name)
         trackMailAction('attachment_downloaded')
       },
     })
@@ -529,7 +528,8 @@ function MailBodyFrame({ message, showRemoteImages, title, onResumeDraft = null 
   const fit = useCallback(() => {
     const doc = frameRef.current?.contentDocument
     const body = doc?.body
-    if (!body) return
+    // Kept behind another page, out of the layout: fitted as it was.
+    if (!body || isInHiddenPage(frameRef.current)) return
     body.style.width = ''
     body.style.transform = ''
     const available = doc.documentElement.clientWidth
@@ -624,7 +624,8 @@ function MailBodyFrame({ message, showRemoteImages, title, onResumeDraft = null 
 // button — a pill of the app's material (.material, as the search and the
 // reader's toolbar), named after the folder left, held at the top
 // as a long mail scrolls under it. Its text on a span: a <button> takes its
-// font from index.css's `button { font: inherit }`.
+// font from index.css's `button { font: inherit }`. In the iOS app it is of
+// the system's glass (src/iosGlass.js).
 function ReaderBackRow({ onBack, label = 'Réception' }) {
   return (
     <div className="sticky top-[calc(env(safe-area-inset-top)+12px)] z-20 flex 4xl:hidden">
@@ -632,6 +633,7 @@ function ReaderBackRow({ onBack, label = 'Réception' }) {
         type="button"
         className="material inline-flex h-11 items-center gap-[6px] rounded-full pl-3 pr-4 text-text cursor-pointer focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-text/30"
         aria-label={`Retour : ${label}`}
+        data-ios-glass=""
         onClick={onBack}
       >
         <SmoothSurface />

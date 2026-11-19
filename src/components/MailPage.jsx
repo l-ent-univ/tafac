@@ -1,8 +1,9 @@
 import { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Icon } from '@iconify/react'
 import { readHistoryNav, writeHistoryNav } from '../appHistory'
-import { getMailDraft, getMailFolders, getMailPrefs, getRecentMail, mailAction, mailFolderAction, onMailSessionExpired } from '../entApi'
+import { getMailDraft, getMailFolders, getMailPrefs, getRecentMail, mailAction, mailFolderAction } from '../entApi'
 import { newDraftSaver, useMailSend } from '../useMailSend'
+import { registerOpenComposer, takeKeptMail } from '../mailHeldDraft'
 import LoadingDots from './LoadingDots'
 import { MailThread } from './MailReader'
 import { fetchThread, loadMessage, prefetchMailThread, settledValue, threadCache, threadKey } from '../mailReadCache'
@@ -37,6 +38,9 @@ import SmoothSurface from './SmoothSurface'
 import { Skeleton } from 'skullet/react'
 import { isMacDesktopApp } from '../desktopApp'
 import { onDesktopCommand } from '../desktopMenu'
+import { isInHiddenPage } from '../keptPages'
+import { usePageReturn, usePageShown } from '../pageVisit'
+import { usePullRefresh } from '../usePullRefresh'
 import { SAMPLE_MAIL_ROWS, useSkeletonsForced } from '../skeletonSamples'
 
 // The composer and its editor (Tiptap) load the first time one opens: most
@@ -204,39 +208,6 @@ function MailToast({ toast, onExpire, readerOpen }) {
           ) : null}
         </div>
       ) : null}
-    </div>
-  )
-}
-
-// « Se reconnecter »: App signs the student out and opens its login page,
-// the one way back to a webmail session (the server's CAS sign-in is what
-// expired, or the app's own session).
-function SignInAgainButton({ onClick }) {
-  return (
-    <button
-      type="button"
-      className="material inline-flex shrink-0 items-center px-3 py-2 rounded-full text-text cursor-pointer focus-visible:outline-2 focus-visible:outline-text"
-      onClick={onClick}
-    >
-      <SmoothSurface />
-      {/* On a span: index.css gives buttons the inherited font. */}
-      <span className="text-[13px] font-semibold leading-none">Se reconnecter</span>
-    </button>
-  )
-}
-
-// Over a list already loaded when the session has expired meanwhile: that
-// list stays to be read, the notice says why nothing more will load (rather
-// than « Mails indisponibles », which reads as an outage).
-function MailSessionNotice({ onSignInAgain, className = '' }) {
-  return (
-    <div className={`glass-solid flex min-w-0 items-center gap-3 rounded-[14px] px-4 py-3 ${className}`} role="status">
-      <Icon icon="ph:lock" className="size-[18px] shrink-0 text-text-muted" aria-hidden="true" />
-      <div className="grid min-w-0 flex-1 gap-0.5">
-        <p className="m-0 text-[14px] font-semibold leading-tight text-text">Session expirée</p>
-        <p className="m-0 text-[13px] font-medium leading-snug text-text-muted">{r('Reconnecte-toi pour retrouver tes mails', 'Reconnectez-vous pour retrouver vos mails')}</p>
-      </div>
-      {onSignInAgain ? <SignInAgainButton onClick={onSignInAgain} /> : null}
     </div>
   )
 }
@@ -602,8 +573,6 @@ function MailListItem({ message, fallbackHref, now, onOpen, onContextMenu, onHov
 // inbox as an endless list, newest first, each message opening in the reader
 // (its own history entry: Back returns to the list, on the row it came
 // from). Older pages load as the end of the list nears the screen.
-// `onSignInAgain`: the « Se reconnecter » of an expired session (App's
-// sign-out, then its login page).
 // `sender`: the student's { name, email } (App's account), the composer's
 // « De : ». `composeRequest`: a mail another page asks to write (App's,
 // « Écrire au sujet de cette note » in « Mes notes », « … de ce cours » in
@@ -612,7 +581,7 @@ function MailListItem({ message, fallbackHref, now, onOpen, onContextMenu, onHov
 // `canAttachGrades`: the composer's « Une note… » (« Mes notes » in the app).
 // `planning`: { selection, user }, the composer's « Un cours… » (the
 // Planning in the app), null without.
-function MailPage({ onReaderOpenChange, onSignInAgain, sender = null, composeRequest = null, onComposeRequestHandled = () => {}, arrivalSource = 'other', canAttachGrades = false, planning = null }) {
+function MailPage({ onReaderOpenChange, sender = null, composeRequest = null, onComposeRequestHandled = () => {}, arrivalSource = 'other', canAttachGrades = false, planning = null }) {
   const skeletonsForced = useSkeletonsForced()
   // nextOffset: where the next page starts on the server.
   // `folder`: the folder the list is of (the one shown until another's
@@ -624,17 +593,6 @@ function MailPage({ onReaderOpenChange, onSignInAgain, sender = null, composeReq
   // { key, text, onUndo }: the notice after an action (MailToast).
   const [toast, setToast] = useState(null)
   const toastTimerRef = useRef(null)
-  // A mail route answered that the session is gone (entApi's
-  // onMailSessionExpired: a 401, or the list's { authenticated: false }).
-  // The list already loaded stays, under a « Session expirée » notice, and
-  // the actions' failures say so; a list loaded again clears it. The ref:
-  // read by those failures, set before mailAction's answer reaches them.
-  const [isSessionExpired, setIsSessionExpired] = useState(false)
-  const sessionExpiredRef = useRef(false)
-  useEffect(() => onMailSessionExpired(() => {
-    sessionExpiredRef.current = true
-    setIsSessionExpired(true)
-  }), [])
   // The message shown in the reader, from the history entry (a reload keeps it).
   const [openId, setOpenId] = useState(() => readHistoryNav().mail)
   const openIdRef = useRef(openId)
@@ -648,7 +606,6 @@ function MailPage({ onReaderOpenChange, onSignInAgain, sender = null, composeReq
     status: state.status,
     messageCount: state.messages.length,
     errorKind: state.errorKind,
-    sessionExpired: isSessionExpired,
   }))
   const arrivedOnMailRef = useRef(false)
   useEffect(() => {
@@ -784,7 +741,10 @@ function MailPage({ onReaderOpenChange, onSignInAgain, sender = null, composeReq
   useEffect(() => {
     const sentinel = headerSentinelRef.current
     if (!sentinel) return undefined
-    const observer = new IntersectionObserver(([entry]) => setIsHeaderStuck(!entry.isIntersecting))
+    const observer = new IntersectionObserver(([entry]) => {
+      // Kept behind another page, out of the layout: as it was.
+      if (!isInHiddenPage(sentinel)) setIsHeaderStuck(!entry.isIntersecting)
+    })
     observer.observe(sentinel)
     return () => observer.disconnect()
   }, [])
@@ -815,14 +775,8 @@ function MailPage({ onReaderOpenChange, onSignInAgain, sender = null, composeReq
         storeHref(WEBMAIL_HREF_KEY, result.webmailHref)
         setStoredWebmailHref(result.webmailHref)
       }
-      // A list again: the session is back (or was never gone).
-      if (result.status === 'ok') {
-        sessionExpiredRef.current = false
-        setIsSessionExpired(false)
-      }
       setState((current) => {
-        // The session gone: the list shown stays (another folder's too,
-        // asked for meanwhile), under the « Session expirée » notice.
+        // The session gone: the list shown stays while the app signs out.
         if (result.status === 'unauthenticated' && current.status === 'ok') return current
         if (!background || current.status !== 'ok' || current.folder !== folder) return { ...result, folder, nextOffset: result.messages.length }
         // Keep the last good list on a failed background refresh.
@@ -867,10 +821,15 @@ function MailPage({ onReaderOpenChange, onSignInAgain, sender = null, composeReq
     await Promise.all([loadMail({ background: true, fresh: true }), loadFolders(), minimumSpin])
     setIsRefreshing(false)
   }, [isRefreshing, loadMail, loadFolders])
+  // Pulled down (the iOS app): the same refresh as the button's.
+  usePullRefresh(refresh)
 
   // A look at the folders every NEW_MAIL_CHECK_MS while the page is shown,
-  // and as soon as it's shown again.
+  // and as soon as it's shown again. Not while it is kept behind another
+  // page (the iOS app, src/pageVisit.js): back on it, see below.
+  const shown = usePageShown()
   useEffect(() => {
+    if (!shown) return undefined
     function checkIfShown() {
       if (document.visibilityState === 'visible') void loadFolders()
     }
@@ -880,7 +839,7 @@ function MailPage({ onReaderOpenChange, onSignInAgain, sender = null, composeReq
       window.clearInterval(intervalId)
       document.removeEventListener('visibilitychange', checkIfShown)
     }
-  }, [loadFolders])
+  }, [loadFolders, shown])
 
   // Another folder: the list shown stays, dimmed, until the new one's first
   // page replaces it at once (isFolderSwitching); its search starts over,
@@ -1016,7 +975,7 @@ function MailPage({ onReaderOpenChange, onSignInAgain, sender = null, composeReq
   }, [loadMail, loadFolders])
 
   useEffect(() => {
-    if (state.status === 'loading') return undefined
+    if (!shown || state.status === 'loading') return undefined
 
     function refreshIfStale() {
       if (document.visibilityState !== 'visible') return
@@ -1032,7 +991,23 @@ function MailPage({ onReaderOpenChange, onSignInAgain, sender = null, composeReq
       window.clearInterval(intervalId)
       document.removeEventListener('visibilitychange', refreshIfStale)
     }
-  }, [loadMail, loadFolders, state.status])
+  }, [loadMail, loadFolders, state.status, shown])
+
+  // Back on the page where it is kept mounted (the iOS app): what its
+  // mount does for an arrival. The mail its entry names opens (« Accueil »'s
+  // « Mails récents »; without one, the page is as it was left), and the
+  // mailbox is looked at as when the window is shown again: the folders,
+  // and the list behind the one shown if it is stale.
+  usePageReturn(() => {
+    const { mail } = readHistoryNav()
+    if (mail && mail !== openIdRef.current) {
+      autoOpenedIdRef.current = null
+      trackMailAction('mail_opened', { from: arrivalSource === 'dashboard_card' ? 'widget' : 'history' })
+      setOpenId(mail)
+    }
+    void loadFolders()
+    if (state.status !== 'loading' && Date.now() - lastLoadAtRef.current >= MAIL_REFRESH_MS) void loadMail({ background: true })
+  })
 
   // A step back when the reader has its entry (forward reopens it);
   // popstate then closes it.
@@ -1151,10 +1126,6 @@ function MailPage({ onReaderOpenChange, onSignInAgain, sender = null, composeReq
     if (!onUndo && !busy) toastTimerRef.current = window.setTimeout(() => setToast(null), TOAST_MS)
   }, [])
   useEffect(() => () => window.clearTimeout(toastTimerRef.current), [])
-  // An action's failure notice: « Session expirée » when that's why (the
-  // 401 is reported before mailAction answers), else what didn't happen.
-  const failureText = useCallback((text) => (sessionExpiredRef.current ? 'Session expirée' : text), [])
-
   // The composer (MailComposer): { key, kind, message, saver, restore,
   // sendError } while one is open, `message` the mail answered or
   // forwarded, `saver` its draft's saves (newDraftSaver), `restore` the
@@ -1186,9 +1157,9 @@ function MailPage({ onReaderOpenChange, onSignInAgain, sender = null, composeReq
       trackMailAction('compose_opened', { kind: toComposeKind(kind) })
       showComposer({ key: Date.now(), kind, message, saver: newDraftSaver() })
     } catch {
-      showToast(failureText('Le mail n’a pas chargé'))
+      showToast('Le mail n’a pas chargé')
     }
-  }, [folderId, showComposer, showToast, failureText])
+  }, [folderId, showComposer, showToast])
   const closeComposer = useCallback(() => setComposer(null), [])
   const confirmPendingCompose = useCallback(() => {
     void composerApiRef.current?.saveNow()
@@ -1214,6 +1185,17 @@ function MailPage({ onReaderOpenChange, onSignInAgain, sender = null, composeReq
   const reopenComposer = useCallback((snapshot, sendError) => {
     showComposer({ key: Date.now(), kind: snapshot.kind, message: snapshot.message, saver: snapshot.saver, restore: snapshot, sendError })
   }, [showComposer])
+
+  // A mail kept through an expired session (App's sign-out,
+  // src/mailHeldDraft.js): the open composer's, once changed. Signed in
+  // again, it opens here as it was; another kept with it (a send taken
+  // back) goes to Brouillons.
+  useEffect(() => registerOpenComposer(() => (composerApiRef.current?.isDirty() ? composerApiRef.current.snapshot() : null)), [])
+  useEffect(() => {
+    const [first, ...others] = takeKeptMail()
+    for (const kept of others) void kept.saver.save(kept.state)
+    if (first) reopenComposer(first, null)
+  }, [reopenComposer])
   const handleSent = useCallback((snapshot) => {
     const origin = snapshot.state?.origin
     if (origin?.messageId) {
@@ -1320,9 +1302,9 @@ function MailPage({ onReaderOpenChange, onSignInAgain, sender = null, composeReq
         },
       })
     } catch {
-      showToast(failureText('Le brouillon n’a pas chargé'))
+      showToast('Le brouillon n’a pas chargé')
     }
-  }, [showComposer, showToast, failureText])
+  }, [showComposer, showToast])
   useEffect(() => {
     resumeDraftRef.current = resumeDraft
   }, [resumeDraft])
@@ -1445,9 +1427,9 @@ function MailPage({ onReaderOpenChange, onSignInAgain, sender = null, composeReq
     void mailAction(messageIdsOf(ids), action).then((ok) => {
       if (ok) return
       patchMessages(ids, (entry) => ({ [key]: before.get(entry.id) ?? !value }))
-      showToast(failureText(key === 'unread' ? 'Le mail n’a pas pu être marqué' : 'Le drapeau n’a pas pu être changé'))
+      showToast(key === 'unread' ? 'Le mail n’a pas pu être marqué' : 'Le drapeau n’a pas pu être changé')
     })
-  }, [findMessage, messageIdsOf, patchMessages, showToast, failureText, cancelPendingRead])
+  }, [findMessage, messageIdsOf, patchMessages, showToast, cancelPendingRead])
 
   // Trash or junk: out of the list at once, the next mail (or the one above)
   // in the reader if the open one went, and a notice to bring them back to
@@ -1566,7 +1548,7 @@ function MailPage({ onReaderOpenChange, onSignInAgain, sender = null, composeReq
       void done.then((ok) => {
         if (ok) return
         if (folderIdRef.current === from) restore()
-        showToast(failureText(failedText))
+        showToast(failedText)
       })
       return
     }
@@ -1575,16 +1557,16 @@ function MailPage({ onReaderOpenChange, onSignInAgain, sender = null, composeReq
       // After the action itself: undone only once it went through, back to
       // the folder they were in.
       void done.then((ok) => (ok ? mailAction(actionIds, 'move', { folder: from }) : true)).then((ok) => {
-        if (!ok) showToast(failureText(plural ? 'Les mails n’ont pas pu être remis' : 'Le mail n’a pas pu être remis'))
+        if (!ok) showToast(plural ? 'Les mails n’ont pas pu être remis' : 'Le mail n’a pas pu être remis')
         else if (folderIdRef.current === from) restore()
       })
     })
     void done.then((ok) => {
       if (ok) return
       if (folderIdRef.current === from) restore()
-      showToast(failureText(failedText))
+      showToast(failedText)
     })
-  }, [state.messages, search, visibleMessages, openId, closeMail, showToast, failureText, messageIdsOf])
+  }, [state.messages, search, visibleMessages, openId, closeMail, showToast, messageIdsOf])
 
   // « Déplacer » picked a folder: the mails filed there, out of this list
   // as a deletion would take them, « Annuler » moving them back.
@@ -1630,11 +1612,11 @@ function MailPage({ onReaderOpenChange, onSignInAgain, sender = null, composeReq
     }
     void mailFolderAction(id, 'read').then((ok) => {
       if (ok) return
-      showToast(failureText('Les mails n’ont pas pu être marqués comme lus'))
+      showToast('Les mails n’ont pas pu être marqués comme lus')
       if (folderIdRef.current === id) void loadMail({ background: true, fresh: true })
       void loadFolders()
     })
-  }, [state.folder, folders, cancelPendingRead, showToast, failureText, loadMail, loadFolders])
+  }, [state.folder, folders, cancelPendingRead, showToast, loadMail, loadFolders])
 
   // « Vider la corbeille », « Vider les indésirables » (confirmed first):
   // all of it deleted for good, then the list empty, with a plain notice —
@@ -1646,7 +1628,7 @@ function MailPage({ onReaderOpenChange, onSignInAgain, sender = null, composeReq
     const ok = await mailFolderAction(id, 'empty')
     if (ok) trackMailAction('empty_folder', { folder_kind: kind })
     if (!ok) {
-      showToast(failureText(kind === 'trash' ? 'La corbeille n’a pas pu être vidée' : 'Les indésirables n’ont pas pu être vidés'))
+      showToast(kind === 'trash' ? 'La corbeille n’a pas pu être vidée' : 'Les indésirables n’ont pas pu être vidés')
       return
     }
     // Its count at once; the tree (the trash's sub-folders gone) with the
@@ -1660,7 +1642,7 @@ function MailPage({ onReaderOpenChange, onSignInAgain, sender = null, composeReq
     }
     showToast(kind === 'trash' ? 'Corbeille vidée' : 'Indésirables vidés')
     void loadFolders()
-  }, [folders, showToast, failureText, closeMail, loadFolders])
+  }, [folders, showToast, closeMail, loadFolders])
 
   // The confirmation dialog's « Supprimer » / « Vider ».
   const confirmPending = useCallback(() => {
@@ -1712,9 +1694,9 @@ function MailPage({ onReaderOpenChange, onSignInAgain, sender = null, composeReq
       setToast(null)
     } catch {
       if (pdf) trackMailAction('pdf', { result: 'error' })
-      showToast(failureText(pdf ? 'Le PDF n’a pas pu être créé' : 'Le mail n’a pas pu être imprimé'))
+      showToast(pdf ? 'Le PDF n’a pas pu être créé' : 'Le mail n’a pas pu être imprimé')
     }
-  }, [folderId, showToast, failureText])
+  }, [folderId, showToast])
 
   const contextMenuItems = (() => {
     if (!contextMenu) return []
@@ -1914,10 +1896,6 @@ function MailPage({ onReaderOpenChange, onSignInAgain, sender = null, composeReq
             onToggleFlag={() => setMessagesFlag(targetIds, 'flagged', !targetState?.flagged, 'toolbar')}
             onClose={isMultiple || isPanelClosing ? null : closeMail}
           />
-          {/* On a phone the list (and its notice) is hidden behind the
-              reader: the notice over the mail then. Beside the list, the
-              list's own is in view. */}
-          {isSessionExpired && !isPanelClosing ? <MailSessionNotice className="4xl:hidden" onSignInAgain={onSignInAgain} /> : null}
           {isMultiple ? (
             <MailSelection count={selection.length} onClear={() => setSelectedIds([])} />
           ) : panelId ? (
@@ -1956,7 +1934,7 @@ function MailPage({ onReaderOpenChange, onSignInAgain, sender = null, composeReq
           takes the section's top padding inside (a negative margin back), so
           it keeps it when stuck: at 4xl 33px, level with the reader's
           toolbar (the panel's 12px inset, 1px border and 20px padding). */}
-      <div className={`gd-header ${hasOpenedMail ? 'mail-pop-in' : ''} sticky top-0 z-20 -mx-6 -mt-4 grid gap-4 px-6 pt-4 pb-4 max-md:-mx-3 max-md:-mt-5 max-md:px-3 max-md:pt-5 4xl:mt-0 4xl:pt-[33px] ${isHeaderStuck ? 'is-stuck' : ''}`}>
+      <div className={`gd-header mail-list-header ${hasOpenedMail ? 'mail-pop-in' : ''} sticky top-[var(--status-bar)] z-20 -mx-6 -mt-4 grid gap-4 px-6 pt-4 pb-4 max-md:-mx-3 max-md:-mt-5 max-md:px-3 max-md:pt-5 4xl:mt-0 4xl:pt-[33px] ${isHeaderStuck ? 'is-stuck' : ''}`}>
       {/* The other pages' tinted top, its own layer behind (as the
           planning's): the band clips its spread to its height, which would
           cut the pills' tooltips hanging under it. */}
@@ -1969,8 +1947,11 @@ function MailPage({ onReaderOpenChange, onSignInAgain, sender = null, composeReq
           named group (search): a plain one would also show the refresh
           button's tooltip whenever the row is hovered. */}
       {/* Above the folder pills (z-10): the refresh button's glass makes its
-          own stacking context, so its tooltip couldn't rise over them. */}
-      <div className="group/search relative z-10 flex min-w-0 items-center" data-searching={query ? '' : undefined}>
+          own stacking context, so its tooltip couldn't rise over them.
+          iOS app: the row's two buttons are of the system's glass
+          (src/iosGlass.js); the field is a field, the folders' pills change
+          width as one is picked: the page's. */}
+      <div data-ios-glass="" className="group/search relative z-10 flex min-w-0 items-center" data-searching={query ? '' : undefined}>
         {/* Folded away too while a mail is open beside the list (from 4xl):
             the reader takes the room, the search and the button keep theirs.
             Still read out (folded, not removed). */}
@@ -2021,10 +2002,6 @@ function MailPage({ onReaderOpenChange, onSignInAgain, sender = null, composeReq
         />
       ) : null}
       </div>
-
-      {/* Over the list already loaded, which stays to be read (with no list,
-          the whole-page state below says it instead). */}
-      {isSessionExpired && state.status === 'ok' ? <MailSessionNotice onSignInAgain={onSignInAgain} /> : null}
 
       {state.status === 'loading' ? <MailListPlaceholder /> : null}
 
@@ -2122,18 +2099,9 @@ function MailPage({ onReaderOpenChange, onSignInAgain, sender = null, composeReq
         </div>
       ) : null}
 
-      {/* No list to keep: an expired session (said so, with the way back
-          in) or the mail not answering. A failed first load counts as the
-          former when another mail route said the session is gone. */}
-      {state.status === 'unauthenticated' || (state.status === 'error' && isSessionExpired) ? (
-        <PageEmptyState
-          icon="ph:lock"
-          title="Session expirée"
-          action={onSignInAgain ? <SignInAgainButton onClick={onSignInAgain} /> : null}
-        >
-          {r('Reconnecte-toi pour retrouver tes mails', 'Reconnectez-vous pour retrouver vos mails')}
-        </PageEmptyState>
-      ) : state.status === 'error' || state.status === 'disabled' ? (
+      {/* The mail not answering. An expired session ('unauthenticated')
+          shows nothing here: the app signs out (App's onSessionExpired). */}
+      {state.status === 'error' || state.status === 'disabled' ? (
         <PageEmptyState icon="ph:envelope-simple" title="Mails indisponibles">La messagerie ne répond pas, réessaie dans un moment</PageEmptyState>
       ) : null}
       </div>

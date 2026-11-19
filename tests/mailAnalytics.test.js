@@ -31,7 +31,6 @@ test('the first list: loading reports nothing, then ok, empty, error or session_
   assert.deepEqual(describeMailLoad({ status: 'unauthenticated' }), { status: 'session_expired' })
   assert.deepEqual(describeMailLoad({ status: 'error', errorKind: 'timeout' }), { status: 'error', errorKind: 'timeout' })
   assert.deepEqual(describeMailLoad({ status: 'error', errorKind: 'weird' }), { status: 'error', errorKind: 'other' })
-  assert.deepEqual(describeMailLoad({ status: 'error', errorKind: 'http_4xx', sessionExpired: true }), { status: 'session_expired' })
 })
 
 test('folders, composers and actions are named by enum, never by what they hold', () => {

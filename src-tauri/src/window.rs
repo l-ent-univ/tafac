@@ -19,7 +19,7 @@
 // colour (light or dark, as the system is), then shown: no white flash
 // before the page.
 
-use tauri::{Manager, Runtime, WebviewWindow, WebviewWindowBuilder};
+use tauri::{AppHandle, Manager, Runtime, Webview, WebviewWindow, WebviewWindowBuilder, Window};
 
 #[cfg(target_os = "macos")]
 const MIN_SIZE: (f64, f64) = (1024.0, 640.0);
@@ -67,6 +67,24 @@ pub fn show<R: Runtime>(window: &WebviewWindow<R>) -> tauri::Result<()> {
         window.set_background_color(Some(color))?;
     }
     window.show()
+}
+
+// One of the app's windows and the page in it (its web view has the window's
+// label). Not Tauri's WebviewWindow: with Moodle's view added to a window
+// (moodle.rs) it holds two web views, and Tauri no longer gives it as one
+// (`get_webview_window` answers None, `webview_windows` leaves it out).
+pub struct Page<R: Runtime> {
+    pub window: Window<R>,
+    pub view: Webview<R>,
+}
+
+pub fn page<R: Runtime>(app: &AppHandle<R>, label: &str) -> Option<Page<R>> {
+    Some(Page { window: app.get_window(label)?, view: app.get_webview(label)? })
+}
+
+// Every window of the app with its page.
+pub fn pages<R: Runtime>(app: &AppHandle<R>) -> Vec<Page<R>> {
+    app.windows().into_keys().filter_map(|label| page(app, &label)).collect()
 }
 
 // macOS: spelling checked as you type in the page's fields (the composer,

@@ -22,8 +22,8 @@ const universityLogo = universityConfig.branding.logo
 const universityLogoAlt = universityConfig.branding.logoAlt ?? universityConfig.university?.name ?? ''
 // A square badge (branding.logoShape) shows taller than a wordmark.
 const universityLogoSquare = universityConfig.branding.logoShape === 'square'
-const passwordNote = universityConfig.branding.loginPasswordNote ?? null
 const IS_DESKTOP_APP = isDesktopApp()
+const passwordNote = universityConfig.branding.loginPasswordNote ?? null
 const repoUrl = universityConfig.branding.about?.repoUrl ?? null
 const loginLinks = universityConfig.links ?? {}
 // "Mot de passe oublié" / "Activer mon compte" under the button, hidden for now.
@@ -32,6 +32,9 @@ const SHOW_ACCOUNT_LINKS = false
 // Pill fields like the rest of the app's inputs, in the widget colour so they
 // stand out on the page. Focus keeps the app-wide outline (index.css).
 export const FIELD_CLASS = 'box-border w-full min-h-[52px] field rounded-full px-[18px] py-[15px] text-base leading-none text-text font-body'
+// Compact: the fields' labels are for screen readers only, their names in
+// the fields instead; wide, the labels show and the placeholders don't.
+const COMPACT_PLACEHOLDER_CLASS = 'placeholder:text-text-muted 4xl:placeholder:text-transparent'
 const LINK_CLASS = 'corners-[4px] text-[14px] font-medium leading-[1.2] text-text-70 underline decoration-text-30 underline-offset-[3px] transition-colors duration-120 hover:text-text hover:decoration-current font-body'
 
 // No university picked yet (tafac.fr serves them all): the page lists them
@@ -146,6 +149,7 @@ function LoginPage({
   credentials,
   checking,
   errorMessage,
+  noticeMessage = '',
   requireOTP = false,
   otpMethods = null,
   otpSent = null,
@@ -323,7 +327,7 @@ function LoginPage({
         onDemoLinkClick={handleDemoLinkClick}
       />
 
-      <div className="relative isolate flex min-h-screen min-w-0 flex-[1_1_auto] flex-col bg-[#f5f3ed] dark:bg-bg max-4xl:w-full">
+      <div className="login-right-panel relative isolate flex min-h-screen min-w-0 flex-[1_1_auto] flex-col bg-[#f5f3ed] dark:bg-bg max-4xl:w-full">
         {/* In the flow rather than pinned over the form, so nothing overlaps
             on short or narrow screens. */}
         <div className="flex shrink-0 items-center justify-end gap-3 px-6 pt-6 max-3xl:px-5 max-3xl:pt-5 max-md:px-4 max-md:pt-4">
@@ -339,26 +343,20 @@ function LoginPage({
 
         <div className="flex flex-1 flex-col items-center justify-center px-6 py-4 max-3xl:px-5 max-md:justify-start max-md:px-4 max-md:pt-8 max-md:pb-8">
           <div className="flex w-full max-w-[420px] flex-col items-center gap-7 max-md:gap-6">
-            {/* The left panel (its app logo, Papillon's badge and tagline)
-                is hidden below 4xl: all three here instead. */}
-            <div className="hidden flex-col items-center gap-3 text-center max-4xl:flex">
-              <div className="flex flex-col items-center gap-1.5">
-                <LogoBut1 className="h-10" />
-                <div className="flex flex-wrap items-center justify-center gap-2">
-                  <BetaTag />
-                  <PapillonBadge className="text-text-muted hover:text-text" />
-                </div>
-              </div>
-              <p className="m-0 text-[15px] font-medium leading-[1.25] text-text-muted font-body">{r('Cours, notes et services de ton université', 'Cours, notes et services de votre université')}</p>
+            {/* Compact (no left panel): Tafac's logo and its BÊTA, one row
+                over the title. */}
+            <div className="hidden items-center justify-center gap-2.5 max-4xl:flex">
+              <LogoBut1 className="h-10" />
+              <BetaTag />
             </div>
 
             <div className="flex w-full flex-col items-center text-center">
-              <header className="flex flex-col items-center gap-5">
+              <header className="flex flex-col items-center gap-5 max-4xl:gap-0">
                 {/* What Tafac works with, over the title: the university's
                     logo under "Compatible avec" rather than as the form's
                     header (Tafac isn't the university's). */}
                 {universityLogo ? (
-                  <div className="flex flex-col items-center gap-2">
+                  <div className="flex flex-col items-center gap-2 max-4xl:hidden">
                     <span className="text-[12px] font-medium leading-none text-text-muted font-body">Compatible avec</span>
                     <img
                       className={`block w-auto max-w-[180px] object-contain dark:invert ${universityLogoSquare ? 'h-[72px]' : 'h-10'}`}
@@ -379,11 +377,23 @@ function LoginPage({
                     <h2 className="m-0 text-balance text-[32px] leading-[1.05] max-md:text-[28px]">Vérification à double facteur</h2>
                   </FormStep>
                   <FormStep open={!requireOTP}>
-                    <p className="m-0 pt-2 text-[15px] font-medium leading-[1.35] text-text-70 font-body">
+                    <p className={`m-0 pt-2 text-[15px] font-medium leading-[1.35] text-text-70 font-body ${universityLogo && !isPicker ? 'max-4xl:hidden' : ''}`}>
                       {isPicker
                         ? r('Choisis ton université', 'Choisissez votre université')
                         : r("Utilise tes codes fournis par ton établissement d'enseignement supérieur", "Utilisez vos codes fournis par votre établissement d'enseignement supérieur")}
                     </p>
+                    {/* Compact: which codes and the university's logo on one
+                        line, in place of the sentence and the logo's block. */}
+                    {universityLogo && !isPicker ? (
+                      <p className="m-0 hidden items-center justify-center gap-2 pt-2.5 text-[15px] font-medium leading-none text-text-70 font-body max-4xl:flex">
+                        <span>{r('Avec tes identifiants', 'Avec vos identifiants')}</span>
+                        <img
+                          className={`block w-auto max-w-[140px] object-contain dark:invert ${universityLogoSquare ? 'h-9' : 'h-6'}`}
+                          src={universityLogo}
+                          alt={universityLogoAlt}
+                        />
+                      </p>
+                    ) : null}
                   </FormStep>
                 </div>
               </header>
@@ -391,6 +401,15 @@ function LoginPage({
               {/* A university's outage notice (`serviceNotice`), over its
                   form; none on the neutral picker. */}
               <ServiceNotice className="mt-5" />
+
+              {/* Why the student is here again (the session expired): said
+                  calmly, not as an error, until they sign in or one comes. */}
+              {noticeMessage && !errorMessage && !requireOTP ? (
+                <p className="m-0 mt-5 flex items-center justify-center gap-1.5 text-[14px] font-medium leading-[1.35] text-text-muted font-body" role="status">
+                  <Icon icon="ph:clock-counter-clockwise" className="h-4 w-4 shrink-0" aria-hidden="true" />
+                  {noticeMessage}
+                </p>
+              ) : null}
 
               {isPicker ? <UniversityPicker /> : null}
 
@@ -404,14 +423,15 @@ function LoginPage({
                     the next render. The submit reads them from the form. */}
                 <form ref={formRef} className="mt-6 flex w-full flex-col" onSubmit={handleSubmit}>
                   <FormStep open={!requireOTP}>
-                  <div className="flex flex-col gap-4 pb-1.5">
+                  <div className="flex flex-col gap-4 pb-1.5 max-4xl:gap-3">
                     <div className="flex flex-col gap-[7px]">
-                      <label htmlFor="login-username" className="pl-[18px] text-left text-[13px] font-semibold leading-none text-text-70 font-body">Identifiant</label>
+                      <label htmlFor="login-username" className="pl-[18px] text-left text-[13px] font-semibold leading-none text-text-70 font-body max-4xl:sr-only">Identifiant</label>
                       <input
                         ref={usernameRef}
                         id="login-username"
                         name="username"
-                        className={FIELD_CLASS}
+                        className={`${FIELD_CLASS} ${COMPACT_PLACEHOLDER_CLASS}`}
+                        placeholder="Identifiant"
                         autoComplete="username"
                         autoCapitalize="none"
                         autoCorrect="off"
@@ -423,12 +443,13 @@ function LoginPage({
                     </div>
 
                     <div className="flex flex-col gap-[7px]">
-                      <label htmlFor="login-password" className="pl-[18px] text-left text-[13px] font-semibold leading-none text-text-70 font-body">Mot de passe</label>
+                      <label htmlFor="login-password" className="pl-[18px] text-left text-[13px] font-semibold leading-none text-text-70 font-body max-4xl:sr-only">Mot de passe</label>
                       <div className="relative">
                         <input
                           id="login-password"
                           name="password"
-                          className={`${FIELD_CLASS} pr-[52px]`}
+                          className={`${FIELD_CLASS} ${COMPACT_PLACEHOLDER_CLASS} pr-[52px]`}
+                          placeholder="Mot de passe"
                           autoComplete="current-password"
                           type={showPassword ? 'text' : 'password'}
                           defaultValue={credentials.password}
@@ -518,7 +539,7 @@ function LoginPage({
                     Se connecter
                   </LentButton>
 
-                  {/* Desktop app: the password doesn't go through Tafac. */}
+                  {/* Desktop app: where the password is kept. */}
                   {IS_DESKTOP_APP ? (
                     <FormStep open={!requireOTP}>
                       <DesktopPasswordNote />
@@ -555,12 +576,22 @@ function LoginPage({
                   </div>
                 ) : null}
 
-                {/* What happens to the password. */}
+                {/* What happens to the password: a card; compact, a plain
+                    line under the button (none in the desktop app, whose
+                    own note is there already). */}
                 {passwordNote ? (
-                  <p className="glass-solid m-0 mt-5 box-border w-full corners-[16px] border px-4 py-3 text-[13px] font-medium leading-[1.4] text-text-muted font-body">
-                    <Icon icon="ph:lock" className="mr-[6px] inline-block h-[14px] w-[14px] align-[-2px]" aria-hidden="true" />
-                    {passwordNote}
-                  </p>
+                  <>
+                    <p className="glass-solid m-0 mt-5 box-border w-full corners-[16px] border px-4 py-3 text-[13px] font-medium leading-[1.4] text-text-muted font-body max-4xl:hidden">
+                      <Icon icon="ph:lock" className="mr-[6px] inline-block h-[14px] w-[14px] align-[-2px]" aria-hidden="true" />
+                      {passwordNote}
+                    </p>
+                    {IS_DESKTOP_APP ? null : (
+                      <p className="m-0 mt-3 hidden text-balance text-center text-[13px] font-medium leading-[1.4] text-text-muted font-body max-4xl:block">
+                        <Icon icon="ph:lock" className="mr-[5px] inline-block h-[13px] w-[13px] align-[-2px]" aria-hidden="true" />
+                        {passwordNote}
+                      </p>
+                    )}
+                  </>
                 ) : null}
 
                 </>
@@ -602,6 +633,10 @@ function LoginPage({
               </div>
             </div>
           ) : null}
+
+          <span className="hidden max-4xl:inline-flex">
+            <PapillonBadge className="text-text-muted hover:text-text" />
+          </span>
 
           <footer className="flex flex-wrap items-center justify-center gap-x-4 gap-y-1 text-[12px] font-medium leading-[1.4] text-text-muted font-body" aria-label="Copyright">
             <span>{universityConfig.branding.loginFooterLine}</span>

@@ -21,8 +21,9 @@ import WelcomeFromLent from './components/WelcomeFromLent'
 import { settingsTransfer } from './settingsTransferBoot'
 import { appendPreviewToken, findProfilePhotoCandidate } from './profilePhoto'
 import { DEMO_CREDENTIALS, DEMO_SESSION_MODE, DEMO_SIGNATURE_LOGIN } from './demoAccount'
-import { isDesktopApp, isMacDesktopApp } from './desktopApp'
+import { isDesktopApp, isIosApp, isMacDesktopApp, isNativeApp } from './desktopApp'
 import { syncWindowTheme } from './desktopWindowTheme'
+import { syncIosAppearance } from './iosApp'
 import { onDesktopCommand, syncDesktopMenu } from './desktopMenu'
 import { signatureLogin } from './mailSignatureChoice'
 import { storeBrowserPasswordCredential } from './browserCredentials'
@@ -62,6 +63,7 @@ import PlanningPage from './components/PlanningPage'
 import MailPage from './components/MailPage'
 import AssiduityPage from './components/AssiduityPage'
 import HomeDraftPage from './components/HomeDraftPage'
+import KeptPage from './components/KeptPage'
 import LoadingDots from './components/LoadingDots'
 import PageLoading from './components/PageLoading'
 import { listWallpaperFolderImages, resolveHeroImage } from './heroImage'
@@ -69,14 +71,18 @@ import { WALLPAPER_FOLDERS, effectiveWallpaperChoice, wallpaperChoiceAnalyticsVa
 import { useWallpaperTint } from './useWallpaperTint'
 import { getStoredPalette, getStoredTheme, persistPalette, persistTheme, watchTheme } from './theme'
 import MobileTabBar from './components/MobileTabBar'
-import { buildNavItems, getMobileTabItems } from './navItems'
+import { buildNavItems, getMobileTabItems, openNavItemLink } from './navItems'
+import { toDayKey } from './planningDates'
+import { useKeptPages } from './useKeptPages'
+import MoodlePage from './components/MoodlePage'
 import { getHomeWidgets } from './dashboardWidgets'
 import { bindHistorySession, readHistoryNav, writeHistoryNav } from './appHistory'
 import { forgetShapes } from 'skullet'
 import { clearNextClassCache } from './upcomingClasses'
 import { clearMailReadCache } from './mailReadCache'
 import { clearMailSignatures } from './mailSignatureStore'
-import { clearMailSends, flushMailSends } from './useMailSend'
+import { clearMailSends, flushMailSends, takeBackMailSends } from './useMailSend'
+import { dropKeptMail, hasKeptMail, keepMail, keepMailFor, snapshotOpenComposer } from './mailHeldDraft'
 import useGradesFormation from './useGradesFormation'
 import { clearStoredCustomBackground, getStoredCustomBackground, saveCustomBackground } from './customBackground'
 import { CUSTOM_PROFILE_PHOTO_KEY, clearStoredCustomProfilePhoto, getStoredCustomProfilePhoto, saveCustomProfilePhoto } from './customProfilePhoto'
@@ -87,7 +93,7 @@ import {
   setAnalyticsFormation,
   setAnalyticsUserEnabled,
   track,
-  useAnalyticsAvailable,
+  useAnalyticsShown,
 } from './analytics'
 import {
   clearAdeTimetableCache,
@@ -101,6 +107,7 @@ import {
   getStudentProfilePictureMeta,
   loginToEnt,
   logoutFromEnt,
+  onSessionExpired,
   preloadSchoolCertificateStatus,
 } from './entApi'
 import { r, resolveRegister, setRegister } from './register.js'
@@ -536,10 +543,23 @@ function getFrenchAuthErrorMessage(error, context = 'login') {
     : r('La connexion a échoué, vérifie tes identifiants puis réessaie', 'La connexion a échoué, vérifiez vos identifiants puis réessayez')
 }
 
-// Signed in without the CAS ticket the other services sign in with (the
-// session's `degraded`): signed out completely rather than left with some
-// services missing, and told why on the login form.
-const degradedSessionMessage = () => r('Ta session a expiré, reconnecte-toi', 'Votre session a expiré, reconnectez-vous')
+// The login form's note after an expired session (signOutExpiredSession):
+// `keptMail`, a mail being written was kept for the next sign-in.
+const expiredSessionMessage = (keptMail = false) => (keptMail
+  ? r('Session expirée, reconnecte-toi pour reprendre ton mail', 'Session expirée, reconnectez-vous pour reprendre votre mail')
+  : r('Session expirée, reconnecte-toi', 'Session expirée, reconnectez-vous'))
+
+// Sent to the login form by the server when the session expired on the
+// way to a service (/__ent_auth/launch, in a tab of its own): the note
+// once, and the address without it.
+function takeExpiredLoginNote() {
+  const url = new URL(window.location.href)
+  if (url.searchParams.get('session') !== 'expired') return false
+  url.searchParams.delete('session')
+  window.history.replaceState(window.history.state, '', `${url.pathname}${url.search}${url.hash}`)
+  return true
+}
+let arrivedExpired = typeof window !== 'undefined' && takeExpiredLoginNote()
 
 function buildDebugSnapshot(label, data, error = '') {
   return {
@@ -895,11 +915,11 @@ function reportSettingsTransfer() {
 
 const LOGIN_PATH = '/login'
 
-// Installed app (PWA or desktop) and arrivals from the old l'ent address skip
-// the landing page.
+// Installed app (PWA, desktop or iOS) and arrivals from the old l'ent address
+// skip the landing page.
 function shouldOpenOnLogin() {
   return settingsTransfer.arrived
-    || isDesktopApp()
+    || isNativeApp()
     || window.matchMedia('(display-mode: standalone)').matches
     || window.navigator.standalone === true
 }
@@ -987,7 +1007,7 @@ function App() {
   // « Assiduité » in the phone's tab bar instead of Moodle (Réglages › Apparence).
   const [showAssiduityTab, setShowAssiduityTab] = useState(() => getStoredAssiduityTab())
   const [anonymousAnalytics, setAnonymousAnalytics] = useState(() => getStoredAnonymousAnalytics())
-  const isAnalyticsAvailable = useAnalyticsAvailable()
+  const isAnalyticsAvailable = useAnalyticsShown()
   const [profileUser, setProfileUser] = useState(null)
   const [isHydratingProfile, setIsHydratingProfile] = useState(false)
   const [hasHydratedProfile, setHasHydratedProfile] = useState(false)
@@ -1089,6 +1109,61 @@ function App() {
     setPathname(path)
   }, [])
 
+  // Signed in at the last check: signing out (or the session expiring) then
+  // leads to the landing page (the effect below), unless it's to the login
+  // form (signOutExpiredSession).
+  const wasAuthenticatedRef = useRef(false)
+
+  // The session is no longer valid: the server said so on an answer
+  // (src/entApi.js's onSessionExpired, from X-Tafac-Session), or on the
+  // first check (`expired`, or `degraded`: no CAS ticket for the services).
+  // Signed out at once rather than left with services failing one by one,
+  // and to the login form, which says why. A mail being written or waiting
+  // to go is kept for this student's next sign-in in this tab
+  // (src/mailHeldDraft.js): the session can't save it any more. One at a
+  // time: the requests failing together sign out once.
+  const expiringRef = useRef(false)
+  const signOutExpiredSession = useCallback(async (user) => {
+    if (expiringRef.current) return
+    expiringRef.current = true
+    try {
+      const writing = snapshotOpenComposer()
+      const sending = await takeBackMailSends()
+      const keptMail = keepMail(user, [...sending, writing])
+      try {
+        // Not the student's own sign-out: the desktop app keeps the login
+        // it signs in again with (src-tauri/src/signin.rs).
+        await logoutFromEnt({ expired: true })
+      } catch {
+        // Signed out here all the same: the server ended it already.
+      }
+      clearSignedOutClientCaches()
+      forgetMailAccount()
+      bindHistorySession(null)
+      setActivePage('home')
+      writeHistoryNav({ page: 'home' }, { replace: true })
+      wasAuthenticatedRef.current = false
+      setSessionState({
+        checking: false,
+        authenticated: false,
+        user: null,
+        givenName: null,
+        account: null,
+        degraded: false,
+        degradedReason: null,
+        sessionSource: null,
+        canUseServerLaunch: false,
+        // Not an error: a calm note over the form (LoginPage's notice).
+        error: '',
+        notice: expiredSessionMessage(keptMail),
+        requireOTP: false,
+      })
+      navigate(LOGIN_PATH, { replace: true })
+    } finally {
+      expiringRef.current = false
+    }
+  }, [navigate])
+
   const refreshSession = useCallback(async (options = {}) => {
     const { exposeOutput = false } = options
 
@@ -1107,32 +1182,10 @@ function App() {
       setAnalyticsAvailable(session?.analyticsEnabled)
       reportSettingsTransfer()
 
-      if (session.authenticated && session.degraded) {
-        try {
-          await logoutFromEnt()
-        } catch {
-          // Signed out here all the same: the next check tries again.
-        }
-        clearSignedOutClientCaches()
-        forgetMailAccount()
-        bindHistorySession(null)
-        setActivePage('home')
-        writeHistoryNav({ page: 'home' }, { replace: true })
-        setSessionState({
-          checking: false,
-          authenticated: false,
-          user: null,
-          givenName: null,
-          account: null,
-          degraded: false,
-          degradedReason: null,
-          sessionSource: null,
-          canUseServerLaunch: false,
-          error: degradedSessionMessage(),
-        })
-        navigate(LOGIN_PATH, { replace: true })
+      if ((session.authenticated && session.degraded) || (!session.authenticated && session.expired)) {
+        await signOutExpiredSession(session.user ?? null)
         if (exposeOutput) {
-          commitDebugState('Session', session, degradedSessionMessage())
+          commitDebugState('Session', session, expiredSessionMessage())
         }
         return null
       }
@@ -1151,6 +1204,10 @@ function App() {
 
       const authenticated = Boolean(session.authenticated)
       const user = session.user ?? null
+      // Arrived on the login form from a service the session had expired
+      // for (takeExpiredLoginNote): said once.
+      const expiredNote = !authenticated && arrivedExpired
+      arrivedExpired = false
 
       setSessionState({
         checking: false,
@@ -1163,6 +1220,7 @@ function App() {
         sessionSource: session.sessionSource ?? null,
         canUseServerLaunch: Boolean(session.canUseServerLaunch),
         error: '',
+        notice: expiredNote ? expiredSessionMessage() : '',
       })
 
       if (!authenticated) {
@@ -1199,7 +1257,11 @@ function App() {
     } finally {
       setHasCheckedInitialSession(true)
     }
-  }, [commitDebugState, navigate, startDebugState])
+  }, [commitDebugState, signOutExpiredSession, startDebugState])
+
+  // The server's answers: the session expired.
+  const sessionUser = sessionState.authenticated ? sessionState.user : null
+  useEffect(() => onSessionExpired(() => void signOutExpiredSession(sessionUser)), [signOutExpiredSession, sessionUser])
 
   useEffect(() => {
     clearLegacySensitiveClientCaches()
@@ -1236,7 +1298,6 @@ function App() {
   // /login. Signing in leaves /login for /, signing out (or the session
   // expiring) goes to the landing page.
   const showLoginPage = pathname === LOGIN_PATH || opensOnLogin
-  const wasAuthenticatedRef = useRef(false)
   useEffect(() => {
     if (sessionState.checking) return
     if (sessionState.authenticated) {
@@ -1937,6 +1998,12 @@ function App() {
     () => getMobileTabItems(establishment, { gradesSupported }).some((item) => item.page === 'mail'),
     [establishment, gradesSupported],
   )
+  // « Moodle » as a page of the app (the desktop app's, navItems.js):
+  // Moodle's links and its tile open it instead of the site.
+  const hasMoodlePage = useMemo(
+    () => getMobileTabItems(establishment, { gradesSupported }).some((item) => item.page === 'moodle'),
+    [establishment, gradesSupported],
+  )
   const hasMobileTabBar =useMemo(() => getMobileTabItems(establishment, { gradesSupported }).length > 0, [establishment, gradesSupported])
   // « Nouveautés » about « Mes notes » only reach students who have it: a
   // school with the page and a relevé confirmed BUT (not while unknown, so
@@ -1979,7 +2046,9 @@ function App() {
   )
   // « Accueil » (HomeDraftPage), every university: the page shown when no
   // other is.
-  const isHomePage = !isGradesPage && !isPlanningPage && !isMailPage && !isAssiduityPage
+  // « Moodle » in the apps (MoodlePage): Moodle in the window.
+  const isMoodlePage = activePage === 'moodle' && hasMoodlePage
+  const isHomePage = !isGradesPage && !isPlanningPage && !isMailPage && !isAssiduityPage && !isMoodlePage
   // The « Accueil » band's tint (--page-top-band, overrides.css): the
   // wallpaper's main colour when it shows one, else the brand's.
   const homeBandTint = useWallpaperTint(isHomePage && showWallpaper ? heroImage.src : null)
@@ -1988,7 +2057,7 @@ function App() {
   const isSidePanelOpen = (isMailPage && mailReaderOpen) || (isPlanningPage && planningSidePanelOpen)
   const isSidebarAutoCompact = isSidePanelOpen && !sidebarCompact && !sidebarAutoCompactDismissed
   // The page the sidebar and the tab bar show as selected.
-  const shownPage = isGradesPage ? 'grades' : isPlanningPage ? 'planning' : isMailPage ? 'mail' : isAssiduityPage ? 'assiduity' : 'home'
+  const shownPage = isGradesPage ? 'grades' : isPlanningPage ? 'planning' : isMailPage ? 'mail' : isAssiduityPage ? 'assiduity' : isMoodlePage ? 'moodle' : 'home'
   // Being on « Mes notes » is having seen its launch, however the student
   // got there (tab, card, "Dernière note", app list, a reload on the page):
   // the dashboard card and the tab's « Nouveau » go. After the audience
@@ -2043,6 +2112,7 @@ function App() {
   useEffect(() => watchTheme(theme, palette), [theme, palette])
   useEffect(() => {
     if (isMacDesktopApp()) syncWindowTheme(theme)
+    syncIosAppearance(theme)
   }, [theme])
 
   const handleThemeChange = useCallback((nextTheme) => {
@@ -2103,30 +2173,59 @@ function App() {
     topBarObserverRef.current = observer
   }, [])
 
+  // iOS app: a page visited stays mounted behind the one shown, as a
+  // native tab's (src/keptPages.js), for this account and the pages there
+  // are: signed out, or with other pages, the hidden ones go.
+  const pagesOnOffer = useMemo(
+    () => ['home', ...getMobileTabItems(establishment, { gradesSupported }).map((item) => item.page).filter(Boolean)],
+    [establishment, gradesSupported],
+  )
+  const { pages: keptPages, leave: leaveKeptPage } = useKeptPages({
+    owner: isIosApp() && sessionState.authenticated ? `${universityConfig.id}:${sessionState.user ?? ''}` : null,
+    offer: pagesOnOffer,
+    page: shownPage,
+    columnRef: dashboardColumnElementRef,
+  })
+
   // Shows a page at its top, once it's rendered. Wide screens scroll the
-  // column itself, narrower ones the window.
+  // column itself, narrower ones the window. In the iOS app the page left
+  // keeps its scroll and the one shown comes back where it was left
+  // (useKeptPages), unless asked `fromTop`.
   // `source`: how « Mes notes » or the planning was reached
   // (src/gradesAnalytics.js, src/planningAnalytics.js).
-  const showPage = useCallback((page, source = 'other') => {
+  const showPage = useCallback((page, source = 'other', { fromTop = false } = {}) => {
     if (page === 'grades') setGradesArrivalSource(source)
     if (page === 'planning') setPlanningArrivalSource(source)
     if (page === 'mail') setMailArrivalSource(source)
     if (page === 'assiduity') setAssiduityArrivalSource(source)
     setActivePage(page)
     setHasSwitchedPage(true)
+    if (leaveKeptPage(page, { fromTop })) return
     window.requestAnimationFrame(() => {
       dashboardColumnElementRef.current?.scrollTo({ top: 0 })
       window.scrollTo({ top: 0 })
     })
-  }, [])
+  }, [leaveKeptPage])
 
   // Sidebar / tab bar page switch: a new history entry. `source` says where
   // from, for « Mes notes »'s and the planning's page_viewed ('nav',
-  // 'tabbar'…).
-  const handleNavigatePage = useCallback((page, source = 'other') => {
+  // 'tabbar'…). `options`: showPage's.
+  const handleNavigatePage = useCallback((page, source = 'other', options = undefined) => {
     if (page !== activePageRef.current) writeHistoryNav({ page })
-    showPage(page, source)
+    // « Moodle » from the sidebar or the tab bar: counted as its link is
+    // where Moodle opens in a tab (navItems.js).
+    if (page === 'moodle' && (source === 'nav' || source === 'tabbar' || source === 'home_icon')) {
+      track('app_opened', { app: 'moodle', source: source === 'nav' ? 'sidebar' : source, in_app: true })
+    }
+    showPage(page, source, options)
   }, [showPage])
+
+  // Signed in again after an expired session that kept a mail: on to the
+  // mail page, which opens it (src/mailHeldDraft.js).
+  const signedInUser = sessionState.authenticated && !sessionState.checking ? sessionState.user : null
+  useEffect(() => {
+    if (signedInUser && hasMailPage && hasKeptMail(signedInUser)) handleNavigatePage('mail')
+  }, [signedInUser, hasMailPage, handleNavigatePage])
 
   // A grade of « Accueil »'s « Dernières notes » (or the sidebar's,
   // `source`): "Mes notes", opened on that grade.
@@ -2149,8 +2248,11 @@ function App() {
   // class's day (today without one).
   const [pendingPlanningDay, setPendingPlanningDay] = useState(null)
   const handleOpenPlanningDay = useCallback((day) => {
-    setPendingPlanningDay(day ?? null)
-    handleNavigatePage('planning', 'dashboard_card')
+    // iOS app: a planning kept from an earlier visit is on the day it was
+    // left on, so today is said too; either way the day is seen from the
+    // page's top.
+    setPendingPlanningDay(day ?? (isIosApp() ? toDayKey(Date.now()) : null))
+    handleNavigatePage('planning', 'dashboard_card', { fromTop: true })
   }, [handleNavigatePage])
   const clearPendingPlanningDay = useCallback(() => setPendingPlanningDay(null), [])
   // The webmail's app in the app lists ('tile'): the mail page rather than
@@ -2177,12 +2279,47 @@ function App() {
     handleNavigatePage('mail', ['course', 'timetable'].includes(request?.kind) ? 'planning' : request?.kind === 'absence' ? 'assiduity' : 'grades')
   }, [handleNavigatePage])
   const clearPendingMailCompose = useCallback(() => setPendingMailCompose(null), [])
+  // Moodle's app in the app lists ('tile'), and in the desktop app any link
+  // to a page of Moodle's (a deadline, a link in a mail: `url`, sent by the
+  // app, src-tauri/src/links.rs): « Moodle », on that page.
+  const [pendingMoodleTarget, setPendingMoodleTarget] = useState(null)
+  const handleOpenMoodlePage = useCallback((source = 'tile', url = null) => {
+    setPendingMoodleTarget(url)
+    handleNavigatePage('moodle', source)
+  }, [handleNavigatePage])
+  const clearPendingMoodleTarget = useCallback(() => setPendingMoodleTarget(null), [])
+  // « Accueil »'s icons on a phone (HomePhoneHeader). Moodle's: its page
+  // where it is one (the apps), else its link, as the tab bar's; none where
+  // the university has no Moodle. The apps': « Toutes les applications »,
+  // the drawer of the app list, which opens on each new request.
+  const moodleNavItem = useMemo(
+    () => buildNavItems(establishment, { gradesSupported }).find((item) => item.id === 'moodle') ?? null,
+    [establishment, gradesSupported],
+  )
+  const handleOpenMoodleFromIcon = useMemo(() => {
+    if (!moodleNavItem) return null
+    return moodleNavItem.page
+      ? () => handleOpenMoodlePage('home_icon')
+      : () => openNavItemLink(moodleNavItem, 'home_icon')
+  }, [moodleNavItem, handleOpenMoodlePage])
+  const [allAppsRequest, setAllAppsRequest] = useState(0)
+  const handleOpenAllApps = useCallback(() => setAllAppsRequest((request) => request + 1), [])
+  useEffect(() => {
+    if (!isNativeApp() || !hasMoodlePage) return undefined
+    return onDesktopCommand(({ command, url }) => {
+      if (command === 'moodle' && typeof url === 'string') handleOpenMoodlePage('link', url)
+    })
+  }, [hasMoodlePage, handleOpenMoodlePage])
+  // Whether Moodle can go back and forward, for the menu bar (null off its
+  // page).
+  const [moodleHistory, setMoodleHistory] = useState(null)
 
   // Desktop app on macOS, the menu bar (src/desktopMenu.js): « Aller » lists
   // this university's pages (none signed out), the one in view ticked; « Nouveau
   // message » needs the mail page; « Rechercher » applies to the Messagerie
-  // and the Planning, « Actualiser » to the Messagerie (those pages handle
-  // them).
+  // and the Planning, « Actualiser » to the Messagerie and to « Moodle »
+  // (those pages handle them); « Précédent » and « Suivant » are Moodle's
+  // own, there only where Moodle is a page.
   const isSignedIn = sessionState.authenticated && !sessionState.checking
   const desktopMenuPages = useMemo(
     () => (isSignedIn ? buildNavItems(establishment, { gradesSupported }).filter((item) => item.page).map((item) => ({ id: item.page, label: item.label })) : []),
@@ -2195,9 +2332,12 @@ function App() {
       current: isSignedIn ? shownPage : null,
       compose: isSignedIn && hasMailPage,
       find: isSignedIn && (shownPage === 'mail' || shownPage === 'planning'),
-      refresh: isSignedIn && shownPage === 'mail',
+      refresh: isSignedIn && (shownPage === 'mail' || shownPage === 'moodle'),
+      ...(isSignedIn && hasMoodlePage
+        ? { history: { back: shownPage === 'moodle' && Boolean(moodleHistory?.back), forward: shownPage === 'moodle' && Boolean(moodleHistory?.forward) } }
+        : null),
     })
-  }, [desktopMenuPages, isSignedIn, shownPage, hasMailPage])
+  }, [desktopMenuPages, isSignedIn, shownPage, hasMailPage, hasMoodlePage, moodleHistory])
   useEffect(() => {
     if (!isMacDesktopApp()) return undefined
     return onDesktopCommand(({ command, page }) => {
@@ -2547,6 +2687,7 @@ function App() {
       ...current,
       checking: true,
       error: '',
+      notice: '',
     }))
     startDebugState('Connexion')
 
@@ -2642,7 +2783,7 @@ function App() {
         ...current,
         error: error?.code === 'mfa_required' ? 'Envoi du code impossible' : getFrenchAuthErrorMessage(error, 'login'),
         // An answer about the identifiers sends back to them.
-        requireOTP: !(error?.status === 401 && !error?.code),
+        requireOTP: !(error?.status === 401 && (!error?.code || error.code === 'login_refused')),
       }))
     }
   }
@@ -2751,6 +2892,8 @@ function App() {
 
     try {
       const result = await logoutFromEnt()
+      // Signed out on purpose: nothing of theirs waits for a next sign-in.
+      dropKeptMail()
       clearSignedOutClientCaches()
       // No reload follows: the mails read, the signatures, any send and the
       // history's mail entries must not carry over to whoever signs in
@@ -2781,17 +2924,6 @@ function App() {
       }))
       commitDebugState('Deconnexion', null, message)
     }
-  }
-
-  // The mail page's « Se reconnecter » (its session expired: the app's own,
-  // or only the server's CAS sign-in behind the webmail, which a new
-  // sign-in alone renews). Signed out as by the header's button, then
-  // straight to the login form rather than the landing page an expiry
-  // otherwise leads to (wasAuthenticatedRef's effect above).
-  async function handleSignInAgain() {
-    wasAuthenticatedRef.current = false
-    await handleLogout()
-    navigate(LOGIN_PATH, { replace: true })
   }
 
   function handleHeaderAction() {
@@ -2834,7 +2966,10 @@ function App() {
   // mailSignatureStore.js, mailSendQueue.js). Done while rendering, not in
   // an effect: the mail page reads its entry and the cache in its own first
   // render, which comes before any effect of this one. Idempotent.
-  if (sessionState.authenticated && sessionState.user && bindHistorySession(sessionState.user)) forgetMailAccount()
+  if (sessionState.authenticated && sessionState.user && bindHistorySession(sessionState.user)) {
+    forgetMailAccount()
+    keepMailFor(sessionState.user)
+  }
 
   const shouldHoldInitialRender = !hasCheckedInitialSession && sessionState.checking
   const isProfileSwitching = sessionState.authenticated && profileUser !== sessionState.user
@@ -2904,6 +3039,7 @@ function App() {
     : {
         checking: sessionState.checking,
         errorMessage: sessionState.error,
+        noticeMessage: sessionState.notice ?? '',
         requireOTP: Boolean(sessionState.requireOTP),
         otpMethods: loginMfa.methods,
         otpSent: loginMfa.sent,
@@ -3003,7 +3139,7 @@ function App() {
                 the « Accueil » page's band, which runs up behind it (its
                 wallpaper too): see-through and above it, its height for the
                 band to know (--top-bar-height). */}
-            <div ref={topBarRef} className={`${isHomePage ? 'max-md:relative max-md:z-10 max-md:!bg-transparent' : 'max-md:hidden'} 4xl:hidden`}>
+            <div ref={topBarRef} className="max-md:hidden 4xl:hidden">
               <AppHeader
                 onNavigatePage={sessionState.authenticated ? handleNavigatePage : undefined}
                 authenticated={sessionState.authenticated}
@@ -3041,16 +3177,27 @@ function App() {
                 establishment={establishment}
                 canUseServerLaunch={sessionState.canUseServerLaunch}
                 favoritesPortalTarget={isSidebarViewport ? favoritesSlotEl : null}
-                homeAppsPortalTarget={isHomePage ? homeAppsSlotEl : null}
+                homeAppsPortalTarget={isHomePage || keptPages.home ? homeAppsSlotEl : null}
+                homeAppsShown={isHomePage}
+                homeDrawerRequest={allAppsRequest}
                 showDescriptions={showAppDescriptions}
                 onOpenGradesPage={hasGradesPage ? handleOpenGradesPage : null}
                 onOpenPlanningPage={hasPlanningPage ? handleOpenPlanningPage : null}
                 onOpenMailPage={hasMailPage ? handleOpenMailPage : null}
+                onOpenMoodlePage={hasMoodlePage ? handleOpenMoodlePage : null}
               />
             </div>
-            {isHomePage ? (
-              <div className="page-enter flex-1 min-h-0 4xl:flex-none 4xl:min-h-0">
+            {/* Each page in its place (KeptPage): there while it's shown and,
+                in the iOS app, kept behind the others once it was. */}
+            {isHomePage || keptPages.home ? (
+              <KeptPage key={keptPages.home?.key} kept={keptPages.home} shown={isHomePage}>
                 <HomeDraftPage
+                  showUniversityLogo={showUniversityLogo}
+                  logoSource={logoSource}
+                  profilePhotoSrc={profilePhotoSrc}
+                  onOpenAccount={handleOpenAccountModal}
+                  onOpenAllApps={handleOpenAllApps}
+                  onOpenMoodle={handleOpenMoodleFromIcon}
                   userName={sessionState.givenName ?? sessionState.user}
                   sessionUser={sessionState.user}
                   establishment={establishment}
@@ -3071,27 +3218,36 @@ function App() {
                   onOpenMailPage={hasMailPage ? handleOpenMailPage : null}
                   appsSlotRef={setHomeAppsSlotEl}
                 />
-              </div>
+              </KeptPage>
             ) : null}
-            {isGradesPage ? (
-              <div className="page-enter flex-1 min-h-0 4xl:flex-none 4xl:min-h-0">
+            {isGradesPage || keptPages.grades ? (
+              <KeptPage key={keptPages.grades?.key} kept={keptPages.grades} shown={isGradesPage}>
                 <GradesPage user={sessionState.user} arrivalSource={gradesArrivalSource} initialGradeRequest={pendingGradeRequest} onInitialGradeRequestHandled={clearPendingGradeRequest} onComposeMail={hasMailPage ? handleComposeMail : null} />
-              </div>
+              </KeptPage>
             ) : null}
-            {isPlanningPage ? (
-              <div className="page-enter flex-1 min-h-0 4xl:flex-none 4xl:min-h-0">
+            {isPlanningPage || keptPages.planning ? (
+              <KeptPage key={keptPages.planning?.key} kept={keptPages.planning} shown={isPlanningPage}>
                 <PlanningPage selection={selectedTp} user={sessionState.user} showWeekend={showPlanningWeekend} onOpenAccount={handleOpenAccountModal} initialDay={pendingPlanningDay} onInitialDayHandled={clearPendingPlanningDay} arrivalSource={planningArrivalSource} onComposeMail={hasMailPage ? handleComposeMail : null} onSidePanelOpenChange={handlePlanningSidePanelOpenChange} onOpenPlanningSettings={handleOpenPlanningSettings} />
-              </div>
+              </KeptPage>
             ) : null}
-            {isAssiduityPage ? (
-              <div className="page-enter flex-1 min-h-0 4xl:flex-none 4xl:min-h-0">
+            {isAssiduityPage || keptPages.assiduity ? (
+              <KeptPage key={keptPages.assiduity?.key} kept={keptPages.assiduity} shown={isAssiduityPage}>
                 <AssiduityPage arrivalSource={assiduityArrivalSource} onComposeMail={hasMailPage ? handleComposeMail : null} absenceReasons={universityConfig.establishments?.byId?.[establishment]?.absenceReasons} findsClassTeacher={hasPlanningPage} />
-              </div>
+              </KeptPage>
             ) : null}
-            {isMailPage ? (
-              <div className="page-enter flex-1 min-h-0 4xl:flex-none 4xl:min-h-0">
-                <MailPage onReaderOpenChange={handleMailReaderOpenChange} onSignInAgain={() => void handleSignInAgain()} sender={mailSender} composeRequest={pendingMailCompose} onComposeRequestHandled={clearPendingMailCompose} arrivalSource={mailArrivalSource} canAttachGrades={hasGradesPage} planning={mailPlanning} />
-              </div>
+            {/* Not kept: its native view keeps Moodle's own state. */}
+            {isMoodlePage ? (
+              <MoodlePage
+                target={pendingMoodleTarget}
+                onTargetHandled={clearPendingMoodleTarget}
+                signsInOnMoodle={sessionState.user === DEMO_CREDENTIALS.username}
+                onHistoryChange={setMoodleHistory}
+              />
+            ) : null}
+            {isMailPage || keptPages.mail ? (
+              <KeptPage key={keptPages.mail?.key} kept={keptPages.mail} shown={isMailPage}>
+                <MailPage onReaderOpenChange={handleMailReaderOpenChange} sender={mailSender} composeRequest={pendingMailCompose} onComposeRequestHandled={clearPendingMailCompose} arrivalSource={mailArrivalSource} canAttachGrades={hasGradesPage} planning={mailPlanning} />
+              </KeptPage>
             ) : null}
             {/* The build line and « À propos »: on « Accueil » only (its
                 photo's credit is in its band). */}
@@ -3106,6 +3262,9 @@ function App() {
               <div key={activePage} aria-hidden="true" className="page-switch-veil pointer-events-none absolute inset-0 z-20" />
             ) : null}
           </div>
+          {/* iOS app: over the status bar once the page has scrolled under
+              it (overrides.css, « iOS app · status bar »). */}
+          {isIosApp() ? <div className="ios-status-veil" aria-hidden="true" /> : null}
           <MobileTabBar
             establishment={establishment}
             gradesSupported={gradesSupported}
@@ -3124,6 +3283,7 @@ function App() {
         initialSectionId={accountModalSection}
         onClose={handleCloseAccountModal}
         onManageAccount={sessionState.user === DEMO_CREDENTIALS.username || !manageAccountUrl ? null : handleManageAccount}
+        onLogout={handleHeaderAction}
         onYearChange={handleAccountModalYearChange}
         onTdChange={handleAccountModalTdChange}
         onTpChange={handleAccountModalTpChange}

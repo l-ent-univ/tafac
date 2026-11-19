@@ -42,11 +42,14 @@ import {
 } from './sessionCookie.js'
 import { createLaunchTargetPolicy } from './launchTargets.js'
 import { isCredentialTarget } from './casLogin/credentialTarget.ts'
+import { CasLoginRefusedError, isCasRefusal } from './casLogin/refusal.ts'
 import { CookieJar, cookieMatchesHost } from './cookieJar/index.ts'
 import { createEntProxy } from './entProxy/index.ts'
 import { isCrossSiteRequest } from './launchRelay/requestSite.ts'
 import { redactLaunchPreview } from './launchRelay/tickets.ts'
+import { buildMoodleViewPolicy } from './moodleView/policy.ts'
 import { createRouteErrorReporter, dropDebugFields } from './routeErrors/index.ts'
+import { SESSION_EXPIRED_CODE, createCasSessionProbe, createEndedSessions, markSessionExpired } from './sessionExpiry/index.ts'
 import { createFailureWindow, createLoginRateLimiter } from './loginRateLimit/index.ts'
 import { fetchEsupOtpChannels, pickEsupOtpAutoTransport, readEsupOtpPage, sendEsupOtpCode } from './esupOtp.js'
 import {
@@ -377,6 +380,11 @@ const HTML_ACCEPT_HEADER = 'text/html,application/xhtml+xml,application/xml;q=0.
 // the TGC cookie) on the university side.
 const CAS_LOGOUT_URL = `${CAS_ORIGIN}${universityConfig.auth.casLogoutPath ?? '/logout'}`
 const CAS_LOGOUT_TIMEOUT_MS = 4000
+// The CAS login page without a service: the password form once the ticket
+// behind the TGC is dead (server/sessionExpiry).
+const CAS_PROBE_URL = `${CAS_ORIGIN}/login`
+const CAS_PROBE_TIMEOUT_MS = 8000
+const endedSessions = createEndedSessions()
 
 function isCasHost(hostname) {
   return Boolean(hostname) && hostname === CAS_HOST
@@ -866,6 +874,8 @@ function clearMoodleCaches(sessionId) {
 }
 
 function setSessionCookie(res, session) {
+  // An answer that comes after the session ended doesn't bring it back.
+  if (endedSessions.reasonOf(session.id)) return
   pruneRuntimeSessions()
   session.lastSeenAt = Date.now()
   runtimeSessions.set(session.id, session)
@@ -1164,7 +1174,7 @@ async function performEntLogin({ username, password, otp = '', sendCode = '', au
     const stepExecution = isCasPasswordForm(stepHtml) ? '' : extractHiddenInputValue(stepHtml, 'execution')
 
     if (!stepExecution) {
-      throw new Error(extractCasError(stepHtml) || 'CAS login failed. Check your username and password.')
+      throw new CasLoginRefusedError(extractCasError(stepHtml) || 'CAS login failed. Check your username and password.')
     }
 
     if (!otp) {
@@ -1190,8 +1200,9 @@ async function performEntLogin({ username, password, otp = '', sendCode = '', au
 
   if (!isRedirectStatus(submitResponse.status)) {
     const html = await submitResponse.text()
-    const message = extractCasError(html)
-    throw new Error(message || 'CAS login failed. Check your username and password.')
+    const message = extractCasError(html) || 'CAS login failed. Check your username and password.'
+    // The CAS's own answer to the form: refused (server/casLogin/refusal.ts).
+    throw isCasRefusal(submitResponse.status) ? new CasLoginRefusedError(message) : new Error(message)
   }
 
   const location = submitResponse.headers.get('location')
@@ -1300,6 +1311,62 @@ async function terminateCasSession(jar) {
   } catch {
     // Timeout or network error: nothing more to do.
   }
+}
+
+// Whether the CAS sign-in behind a session still lives (server/sessionExpiry):
+// asked when a route fails, never on its own.
+const casSessionProbe = createCasSessionProbe({
+  hasTicket: (jar) => jar.hasCookie(CAS_HOST, 'TGC'),
+  fetchLoginPage: async (jar) => {
+    const response = await fetchWithJar(CAS_PROBE_URL, jar, {
+      headers: { Accept: HTML_ACCEPT_HEADER },
+      redirect: 'manual',
+      signal: AbortSignal.timeout(CAS_PROBE_TIMEOUT_MS),
+    })
+    return { status: response.status, html: await response.text() }
+  },
+})
+
+// 'expired' only when the CAS said so; the demo account never expires.
+async function checkCasSession(session) {
+  if (!session || isDemoSession(session)) return 'valid'
+  return casSessionProbe.check(session.id, session.jar)
+}
+
+// Ends the session here: its state dropped, its cookie cleared, and the
+// page told why when it expired (markSessionExpired). `req` and `error`:
+// what found it expired, for the log (an error's class and message, which
+// hold no cookie, token or answer, as routeError's).
+function endSession(res, session, reason, { req = null, error = null } = {}) {
+  endedSessions.end(session.id, reason)
+  casSessionProbe.forget(session.id)
+  dropRuntimeSession(session.id)
+  clearSensitiveSessionCaches(session)
+  clearSessionCookies(res)
+  if (reason === 'expired') {
+    markSessionExpired(res)
+    const failure = error instanceof Error ? `, after ${error.name}: ${error.message.slice(0, 200)}` : ''
+    console.info(`[session] signed out, the CAS session has expired (${req ? `${req.method} ${req.path}` : 'unknown route'}${failure})`)
+  }
+}
+
+// A route that failed for a signed-in student: when the CAS says the
+// session is gone (or it was found gone meanwhile), the student is signed
+// out and the route answers 401 { error: 'session_expired' }; true then.
+// Anything else (an outage, a timeout, one service refusing) leaves the
+// session as it is: false, and the route answers its own error.
+async function answerIfSessionExpired(req, res, error = null) {
+  if (res.headersSent) return false
+  if (endedSessions.reasonOf(readSessionCookie(req)?.data?.id) === 'expired') {
+    markSessionExpired(res)
+    res.status(401).json({ error: SESSION_EXPIRED_CODE })
+    return true
+  }
+  const session = getSessionFromRequest(req)
+  if (!session || await checkCasSession(session) !== 'expired' || res.headersSent) return false
+  endSession(res, session, 'expired', { req, error })
+  res.status(401).json({ error: SESSION_EXPIRED_CODE })
+  return true
 }
 
 // One ScoDoc sign-in at a time per cookie jar: concurrent doAuth runs (grades
@@ -1468,6 +1535,11 @@ function getSessionFromRequest(req) {
   const decoded = readSessionCookie(req)
   const data = decoded?.data
   if (!data || typeof data.id !== 'string' || !data.id || isSessionDataExpired(data)) {
+    return null
+  }
+
+  // Signed out or found expired, its cookie still on a request in flight.
+  if (endedSessions.reasonOf(data.id)) {
     return null
   }
 
@@ -2204,6 +2276,26 @@ if (IS_PRODUCTION) {
   app.use(['/__ent_auth', '/__ent_proxy'], dropDebugFields())
 }
 
+// A request without a session of the app's own (its cookie gone, past its
+// lifetime, signed out elsewhere): every answer says so to the page, which
+// signs out if it thought it was signed in (server/sessionExpiry). Not the
+// routes that are about signing in and out, nor the ones used signed out.
+const SESSION_FREE_PATHS = new Set([
+  '/__ent_auth/session',
+  '/__ent_auth/login',
+  '/__ent_auth/logout',
+  '/__ent_auth/analytics',
+])
+
+app.use((req, res, next) => {
+  const routed = req.path.startsWith('/__ent_auth/') || req.path.startsWith('/__ent_proxy/')
+  const sessionFree = SESSION_FREE_PATHS.has(req.path) || req.path.startsWith('/__ent_auth/universities')
+  if (routed && !sessionFree && !getSessionFromRequest(req)) {
+    markSessionExpired(res)
+  }
+  next()
+})
+
 // Anonymous audience measurement (see server/analytics.js, docs/ANALYTICS.md).
 // Registered before express.json() so it gets its own small body limit and
 // also accepts navigator.sendBeacon's text/plain bodies. Always answers 204
@@ -2494,6 +2586,8 @@ app.get('/__ent_auth/session', async (req, res) => {
     if (!session) {
       return res.status(200).json({
         authenticated: false,
+        // Found expired by another request, its cookie still sent.
+        ...(endedSessions.reasonOf(readSessionCookie(req)?.data?.id) === 'expired' ? { expired: true } : null),
         user: null,
         sessionMode: null,
         sessionSource: null,
@@ -2525,12 +2619,18 @@ app.get('/__ent_auth/session', async (req, res) => {
       portal = await reestablishEntSessionOnce(session)
     }
 
+    // Signed out only when the CAS says the session is dead; the portal
+    // failing to sign in again for another reason is an error, the
+    // session kept (the page tries again later).
     if (!portal) {
-      dropRuntimeSession(session.id)
-      clearSensitiveSessionCaches(session)
-      clearSessionCookies(res)
+      if (await checkCasSession(session) !== 'expired') {
+        throw new Error('The portal session could not be established again.')
+      }
+      endSession(res, session, 'expired', { req })
       return res.status(200).json({
         authenticated: false,
+        // The page says why on the login form.
+        expired: true,
         user: null,
         sessionMode: null,
         sessionSource: null,
@@ -2558,6 +2658,7 @@ app.get('/__ent_auth/session', async (req, res) => {
         university: UNIVERSITY_ID,
     })
   } catch (error) {
+    if (await answerIfSessionExpired(req, res, error)) return
     res.status(500).json({
       error: routeError(req, error),
     })
@@ -2617,7 +2718,10 @@ app.post('/__ent_auth/login', async (req, res) => {
       })
     }
 
-    const result = await performEntLogin({ username, password, otp, sendCode, autoSend: !sendLimit })
+    // `quiet`: a sign-in the student doesn't see (the desktop app signing
+    // in again by itself, src-tauri/src/signin.rs) sends no code unasked.
+    const autoSend = !sendLimit && req.body.quiet !== true
+    const result = await performEntLogin({ username, password, otp, sendCode, autoSend })
     loginRateLimiter.recordSuccess(getLoginRequesterIp(req), normalizeLoginIdentifier(username))
     // The password lives only in this request: the session keeps the CAS TGC,
     // which signs in to every service (ENT, ADE, Moodle, webmail…) on its own.
@@ -2650,7 +2754,7 @@ app.post('/__ent_auth/login', async (req, res) => {
       university: UNIVERSITY_ID,
     })
   } catch (error) {
-    const code = error instanceof CasMfaError ? error.code : null
+    const code = error instanceof CasMfaError || error instanceof CasLoginRefusedError ? error.code : null
     const mfa = error instanceof CasMfaError ? error.mfa : null
 
     if (mfa?.sent) {
@@ -2706,6 +2810,8 @@ app.get('/__ent_auth/account', async (req, res) => {
       })
       const html = await profile.response.text()
       const signedIn = getHostnameFromUrl(profile.finalUrl) === ENT_HOST && isDrupalSignedInPage(profile.response.status, html)
+      // Signed out of the portal: the session may be gone with it.
+      if (!signedIn && await answerIfSessionExpired(req, res)) return undefined
       // The portal has no address: the webmail's (Partage), when there is one.
       const email = signedIn ? await fetchMailAddress(session) : null
       setSessionCookie(res, session)
@@ -2742,6 +2848,9 @@ app.get('/__ent_auth/account', async (req, res) => {
       }
     }
 
+    // Not the signed-in user's: the session may be gone with the portal's.
+    if (await answerIfSessionExpired(req, res)) return undefined
+
     // If not a JWT, try to parse as JSON
     let data = text
     try {
@@ -2757,6 +2866,7 @@ app.get('/__ent_auth/account', async (req, res) => {
       sessionMode: session.mode ?? null,
     })
   } catch (error) {
+    if (await answerIfSessionExpired(req, res, error)) return
     res.status(500).json({
       error: routeError(req, error),
     })
@@ -2852,6 +2962,7 @@ app.get('/__ent_auth/planning', async (req, res) => {
       },
     })
   } catch (error) {
+    if (await answerIfSessionExpired(req, res, error)) return
     res.status(500).json({
       error: routeError(req, error),
     })
@@ -2877,6 +2988,19 @@ app.get('/__ent_auth/launch-preview', async (req, res) => {
   const preview = await previewServerLaunch(targetUrl, session)
   return res.status(200).json(redactLaunchPreview(preview))
 })
+
+// The session found expired on the way to a service: signed out, and the
+// browser to the login form, which says why. The desktop app's Moodle view
+// reads the header instead (src-tauri/src/moodle.rs).
+const LOGIN_EXPIRED_PATH = '/login?session=expired'
+
+async function redirectIfLaunchExpired(req, res, session, error = null) {
+  if (await checkCasSession(session) !== 'expired') return false
+  endSession(res, session, 'expired', { req, error })
+  res.setHeader('Cache-Control', 'no-store')
+  res.redirect(LOGIN_EXPIRED_PATH)
+  return true
+}
 
 app.get('/__ent_auth/launch', async (req, res) => {
   const targetUrl = req.query.url
@@ -2929,8 +3053,9 @@ app.get('/__ent_auth/launch', async (req, res) => {
       }))
       return
     } catch (error) {
-      // No server-side relay possible (TGT expired, unexpected page): the
-      // browser completes the Moodle sign-in itself.
+      if (!debug && await redirectIfLaunchExpired(req, res, session, error)) return
+      // No server-side relay possible (an unexpected page, a service
+      // down): the browser completes the Moodle sign-in itself.
       if (debug) {
         return res.json({
           finalUrl: targetUrl,
@@ -2947,6 +3072,7 @@ app.get('/__ent_auth/launch', async (req, res) => {
 
   const launchCapabilities = getSessionLaunchCapabilities(session)
   if (!launchCapabilities.canUseServerLaunch) {
+    if (!debug && await redirectIfLaunchExpired(req, res, session)) return
     if (debug) {
       return res.json({
         finalUrl: targetUrl,
@@ -2988,6 +3114,9 @@ app.get('/__ent_auth/launch', async (req, res) => {
           continue
         }
         if (debug) return res.json({ finalUrl: currentUrl, chain })
+        // The CAS asks for the password: signed out when it is the session
+        // that is gone, not a service asking for more.
+        if (isCasLoginForm(html, currentUrl) && await redirectIfLaunchExpired(req, res, session)) return
         return res.redirect(currentUrl)
       }
 
@@ -3026,6 +3155,7 @@ app.get('/__ent_auth/launch', async (req, res) => {
     res.redirect(targetUrl)
   } catch (err) {
     if (debug) return res.json({ error: String(err), chain })
+    if (await redirectIfLaunchExpired(req, res, session, err)) return
     res.redirect(targetUrl)
   }
 })
@@ -3071,6 +3201,7 @@ app.get('/__ent_auth/grades', async (req, res) => {
       grades: gradesData,
     })
   } catch (error) {
+    if (await answerIfSessionExpired(req, res, error)) return
     res.status(500).json({
       error: routeError(req, error),
     })
@@ -3139,6 +3270,7 @@ app.get('/__ent_auth/grades/semester/:semesterId', async (req, res) => {
       grades: gradesData,
     })
   } catch (error) {
+    if (await answerIfSessionExpired(req, res, error)) return
     res.status(500).json({
       error: routeError(req, error),
     })
@@ -3178,6 +3310,7 @@ app.get('/__ent_auth/grades/department-message', async (req, res) => {
       message: typeof payload.message === 'string' && payload.message.trim() ? payload.message : null,
     })
   } catch (error) {
+    if (await answerIfSessionExpired(req, res, error)) return
     res.status(500).json({
       error: routeError(req, error),
     })
@@ -3270,6 +3403,7 @@ app.get('/__ent_auth/grades/evaluation-distribution', async (req, res) => {
     setSessionCookie(res, session)
     res.status(200).json({ authenticated: true, ...distribution })
   } catch (error) {
+    if (await answerIfSessionExpired(req, res, error)) return
     res.status(500).json({
       error: routeError(req, error),
     })
@@ -3343,6 +3477,7 @@ app.get('/__ent_auth/grades/report.pdf', async (req, res) => {
     res.setHeader('Content-Disposition', `inline; filename="releve-${semesterId}.pdf"`)
     res.status(200).send(pdf)
   } catch (error) {
+    if (await answerIfSessionExpired(req, res, error)) return
     res.status(500).json({
       error: routeError(req, error),
     })
@@ -3912,21 +4047,19 @@ async function endZimbraSession(context) {
 // can act on, and a map of the upstream for anyone probing the proxy. The
 // page tells a failure from a success by the status alone (src/entApi.js:
 // getRecentMail, getMailMessage, getMailThread, getMailFolders, mailAction).
-// One case keeps a code of its own: the webmail sign-in found the CAS
-// session lapsed (establishZimbraContext), which a new sign-in fixes and
-// « Réessayer » doesn't. The 401 « no session » answers and /recent's
-// { authenticated: false } are left as they are, before any of this.
+// When the CAS says the session behind the webmail is gone, the student is
+// signed out instead (answerIfSessionExpired). The 401 « no session »
+// answers and /recent's { authenticated: false } are left as they are,
+// before any of this.
 // Logged: the error's class and message, never a mail, a cookie or a token
 // (none is ever put in these messages).
-const MAIL_CAS_EXPIRED_PATTERN = /^CAS session (expired|unavailable)\b/
-
-function sendMailRouteError(res, route, error) {
+async function sendMailRouteError(res, route, error) {
   const name = error instanceof Error ? error.name : 'Error'
   const message = error instanceof Error ? error.message : String(error)
   const cause = error instanceof Error && error.cause?.code ? ` (${error.cause.code})` : ''
   console.error(`[mail] ${route} failed: ${name}: ${message.slice(0, 300)}${cause}`)
-  const code = MAIL_CAS_EXPIRED_PATTERN.test(message) ? 'mail_session_expired' : 'mail_unavailable'
-  return res.headersSent ? res.end() : res.status(500).json({ error: code })
+  if (await answerIfSessionExpired(res.req, res, error)) return undefined
+  return res.headersSent ? res.end() : res.status(500).json({ error: 'mail_unavailable' })
 }
 
 // One message, cleaned for the reader (server/mailMessage.js). neuter: 0
@@ -4225,6 +4358,7 @@ app.get('/__ent_auth/mail/part', async (req, res) => {
     body.pipe(res)
     return undefined
   } catch {
+    if (await answerIfSessionExpired(req, res)) return undefined
     return res.headersSent ? res.destroy() : res.status(502).end()
   }
 })
@@ -5708,6 +5842,18 @@ function fetchMoodleDeadlinesOnce(session) {
   return promise
 }
 
+// The desktop app's Moodle view: where Moodle is and which addresses are
+// the university's (server/moodleView/policy.ts). Signed in only: the
+// answer is the session's university's.
+app.get('/__ent_auth/moodle/view', (req, res) => {
+  res.setHeader('Cache-Control', 'no-store')
+  const policy = getSessionFromRequest(req) ? buildMoodleViewPolicy(universityConfig, launchTargets) : null
+  if (!policy) {
+    return res.status(404).json({ ok: false })
+  }
+  return res.status(200).json(policy)
+})
+
 // 6d. Moodle deadlines endpoint
 app.get('/__ent_auth/moodle/deadlines', async (req, res) => {
   try {
@@ -5746,6 +5892,7 @@ app.get('/__ent_auth/moodle/deadlines', async (req, res) => {
       deadlines,
     })
   } catch (error) {
+    if (await answerIfSessionExpired(req, res, error)) return
     // Messages are built from status codes, error codes and hostnames only —
     // never from cookies, the sesskey or upstream bodies.
     return res.status(500).json({
@@ -5825,6 +5972,7 @@ app.get('/__ent_auth/student-pic', async (req, res) => {
     res.setHeader('Content-Length', String(picture.size))
     return res.status(200).end(picture.buffer)
   } catch (error) {
+    if (await answerIfSessionExpired(req, res, error)) return
     if (req.query.meta === '1') {
       return res.status(500).json({
         error: routeError(req, error),
@@ -5888,6 +6036,7 @@ app.post('/__ent_auth/app-icons', async (req, res) => {
     setSessionCookie(res, session)
     return res.status(200).json({ ok: true, palette: APP_ICON_THEME.palette, icons })
   } catch (error) {
+    if (await answerIfSessionExpired(req, res, error)) return
     return res.status(500).json({
       ok: false,
       error: routeError(req, error),
@@ -5975,6 +6124,8 @@ app.get('/__ent_auth/documents/school-certificate/status', async (req, res) => {
     // "No certificate" is remembered; a network hiccup is retried next time.
     if (error instanceof SchoolCertificateUnavailableError) {
       schoolCertificateStatusCache.set(session.id, { at: Date.now(), status: { available: false } })
+    } else if (await answerIfSessionExpired(req, res, error)) {
+      return undefined
     }
     return res.status(200).json({ available: false })
   }
@@ -6019,6 +6170,7 @@ app.get('/__ent_auth/documents/school-certificate', async (req, res) => {
     return res.status(200).send(certificate.body)
   } catch (error) {
     const unavailable = error instanceof SchoolCertificateUnavailableError
+    if (!unavailable && await answerIfSessionExpired(req, res, error)) return undefined
     return res.status(unavailable ? 404 : 502).json({
       ok: false,
       error: unavailable ? 'Aucun certificat de scolarité disponible.' : 'Certificat indisponible pour le moment.',
@@ -6050,6 +6202,7 @@ app.get('/__ent_auth/ade/status', async (req, res) => {
     const result = await fetchAdeApi('/timetable/getAdeStatus', null)
     res.status(200).json({ ok: result.ok, status: result.status, data: result.data })
   } catch (error) {
+    if (await answerIfSessionExpired(req, res, error)) return
     res.status(502).json({ ok: false, error: routeError(req, error) })
   }
 })
@@ -6139,6 +6292,7 @@ app.get('/__ent_auth/ade/calendar', async (req, res) => {
       },
     })
   } catch (error) {
+    if (await answerIfSessionExpired(req, res, error)) return
     res.status(500).json({ error: routeError(req, error) })
   }
 })
@@ -6221,6 +6375,7 @@ app.get('/__ent_auth/ade/tree', async (req, res) => {
       },
     })
   } catch (error) {
+    if (await answerIfSessionExpired(req, res, error)) return
     res.status(500).json({ error: routeError(req, error) })
   }
 })
@@ -6266,6 +6421,7 @@ app.get('/__ent_auth/ade/directory', async (req, res) => {
       },
     })
   } catch (error) {
+    if (await answerIfSessionExpired(req, res, error)) return
     res.status(500).json({ error: routeError(req, error) })
   }
 })
@@ -6328,6 +6484,7 @@ app.get('/__ent_auth/ade/search', async (req, res) => {
       },
     })
   } catch (error) {
+    if (await answerIfSessionExpired(req, res, error)) return
     res.status(500).json({ error: routeError(req, error) })
   }
 })
@@ -6423,6 +6580,7 @@ app.get('/__ent_auth/ade/timetable', async (req, res) => {
       },
     })
   } catch (error) {
+    if (await answerIfSessionExpired(req, res, error)) return
     res.status(500).json({ error: routeError(req, error) })
   }
 })
@@ -6541,6 +6699,7 @@ app.post('/__ent_auth/ade/upcoming', async (req, res) => {
       },
     })
   } catch (error) {
+    if (await answerIfSessionExpired(req, res, error)) return
     res.status(500).json({ error: routeError(req, error) })
   }
 })
@@ -6600,6 +6759,7 @@ app.get('/__ent_auth/ade/alerts', async (req, res) => {
     setSessionCookie(res, entSession)
     res.status(200).json({ authenticated: true, sessionMode: entSession.mode ?? null, alerts: result.data, debug: { apiStatus: result.status, apiOk: result.ok, ...authResult } })
   } catch (error) {
+    if (await answerIfSessionExpired(req, res, error)) return
     res.status(500).json({ error: routeError(req, error) })
   }
 })
@@ -6612,8 +6772,7 @@ app.post('/__ent_auth/logout', async (req, res) => {
   if (session?.id) {
     // Read before the runtime state goes: the webmail session it signs.
     const mailContext = runtimeMailContexts.get(session.id) ?? null
-    dropRuntimeSession(session.id)
-    clearSensitiveSessionCaches(session)
+    endSession(res, session, 'signed-out')
 
     if (!isDemoSession(session)) {
       await Promise.all([terminateCasSession(session.jar), endZimbraSession(mailContext)])
@@ -6672,12 +6831,14 @@ if (PORTAL_KIND === 'drupal') {
         html = await fetchDrupalCatalogPage(session)
       }
       if (html === null) {
-        return res.status(401).json({ error: 'The portal session has expired.' })
+        if (await answerIfSessionExpired(req, res)) return undefined
+        return res.status(502).json({ error: routeError(req, new Error('The portal session could not be established again.')) })
       }
 
       setSessionCookie(res, session)
       res.json(buildDrupalLayout(parseDrupalToolCatalogue(html, ENT_ORIGIN), session.user ?? null))
     } catch (error) {
+      if (await answerIfSessionExpired(req, res, error)) return
       res.status(502).json({ error: routeError(req, error) })
     }
   })
