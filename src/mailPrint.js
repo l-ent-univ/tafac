@@ -110,10 +110,11 @@ function isAppleTouchDevice() {
 // The file handed over: on iOS through the share sheet (« Enregistrer dans
 // Fichiers », AirDrop, « Imprimer »), a download there landing in a
 // viewer; elsewhere, or when sharing is refused (the tap too long ago), a
-// download. 'shared', 'cancelled' or 'downloaded'.
-async function deliverFile(blob, name) {
+// download. 'shared', 'cancelled' or 'downloaded'. Also the student card's
+// PNG (src/studentCardImage.js).
+export async function deliverFile(blob, name) {
   if (isAppleTouchDevice() && typeof navigator.share === 'function') {
-    const file = new File([blob], name, { type: 'application/pdf' })
+    const file = new File([blob], name, { type: blob.type || 'application/pdf' })
     if (navigator.canShare?.({ files: [file] })) {
       try {
         await navigator.share({ files: [file] })
