@@ -21,7 +21,7 @@ import WelcomeFromLent from './components/WelcomeFromLent'
 import { settingsTransfer } from './settingsTransferBoot'
 import { appendPreviewToken, findProfilePhotoCandidate } from './profilePhoto'
 import { DEMO_CREDENTIALS, DEMO_SESSION_MODE, DEMO_SIGNATURE_LOGIN } from './demoAccount'
-import { isDesktopApp, isIosApp, isMacDesktopApp, isNativeApp } from './desktopApp'
+import { isDesktopApp, isIosApp, isMacDesktopApp, isMicaDesktopApp, isNativeApp } from './desktopApp'
 import { syncWindowTheme } from './desktopWindowTheme'
 import { syncIosAppearance } from './iosApp'
 import { onDesktopCommand, syncDesktopMenu } from './desktopMenu'
@@ -1966,10 +1966,14 @@ function App() {
     images: listWallpaperFolderImages(id, establishment),
     today: resolveHeroImage(establishment, new Date(), heroOffset, id),
   })).filter((folder) => folder.images.length > 0), [establishment, heroOffset])
+  // Never picked: the establishment's folder when it names one
+  // (defaultWallpaperFolder), else the university's.
+  const defaultWallpaperFolder = universityConfig.establishments?.byId?.[establishment]?.defaultWallpaperFolder ?? null
   const activeWallpaper = useMemo(() => effectiveWallpaperChoice(wallpaperChoice, {
     hasCustom: Boolean(customBackground),
     folderImages: (id) => wallpaperFolders.find((folder) => folder.id === id)?.images ?? [],
-  }), [customBackground, wallpaperChoice, wallpaperFolders])
+    preferredFolder: defaultWallpaperFolder,
+  }), [customBackground, defaultWallpaperFolder, wallpaperChoice, wallpaperFolders])
   const heroImage = useMemo(() => {
     if (activeWallpaper.folder === 'custom') return { src: customBackground, position: null, credit: null }
     const folder = wallpaperFolders.find((entry) => entry.id === activeWallpaper.folder)
@@ -2111,7 +2115,7 @@ function App() {
 
   useEffect(() => watchTheme(theme, palette), [theme, palette])
   useEffect(() => {
-    if (isMacDesktopApp()) syncWindowTheme(theme)
+    if (isMacDesktopApp() || isMicaDesktopApp()) syncWindowTheme(theme)
     syncIosAppearance(theme)
   }, [theme])
 
@@ -3113,7 +3117,6 @@ function App() {
             ].filter(Boolean).join(' ') || sessionState.account?.name || sessionState.givenName || sessionState.user}
             userSubtitle={HAS_PERSONAL_PLANNING ? null : selectedTp?.label ?? selectedTp?.tpLabel ?? selectedTp?.tdLabel ?? selectedTp?.yearLabel ?? null}
             profilePhotoSrc={profilePhotoSrc}
-            onLogout={handleHeaderAction}
             onAccountClick={handleOpenAccountModal}
             favoritesSlotRef={setFavoritesSlotEl}
             hasPendingUpdate={hasPendingUpdate}

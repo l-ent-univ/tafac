@@ -12,9 +12,14 @@ export function normalizeWallpaperChoice(value) {
   return { folder: value.folder, image: typeof value.image === 'string' && value.image ? value.image : null }
 }
 
-// The photo of the day of the university's folder, or of Tafac's when the
-// university has no photos (no such folder then).
-export function defaultWallpaperChoice(folderImages = () => []) {
+// The photo of the day of the folder the establishment starts on
+// (`preferredFolder`: its `defaultWallpaperFolder`, IUT Lannion's is
+// Tafac's), else of the university's, or of Tafac's when the university has
+// no photos (no such folder then).
+export function defaultWallpaperChoice(folderImages = () => [], preferredFolder = null) {
+  if (WALLPAPER_FOLDERS.includes(preferredFolder) && folderImages(preferredFolder).length > 0) {
+    return { folder: preferredFolder, image: null }
+  }
   return { folder: folderImages('university').length > 0 ? 'university' : 'tafac', image: null }
 }
 
@@ -24,8 +29,8 @@ export function defaultWallpaperChoice(folderImages = () => []) {
 // longer in its folder (a new build renamed it, the university dropped
 // it): that folder's photo of the day.
 // `folderImages(folder)` lists a folder's photos ({ src }).
-export function effectiveWallpaperChoice(choice, { hasCustom = false, folderImages = () => [] } = {}) {
-  const fallback = defaultWallpaperChoice(folderImages)
+export function effectiveWallpaperChoice(choice, { hasCustom = false, folderImages = () => [], preferredFolder = null } = {}) {
+  const fallback = defaultWallpaperChoice(folderImages, preferredFolder)
   if (!choice) return hasCustom ? { folder: 'custom', image: null } : fallback
   if (choice.folder === 'custom') return hasCustom ? choice : fallback
   if (folderImages(choice.folder).length === 0) return fallback

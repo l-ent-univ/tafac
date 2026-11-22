@@ -12,6 +12,8 @@ import DesktopUpdateRow, { CompactDesktopUpdateButton } from './DesktopUpdateRow
 import SidebarNextClass from './SidebarNextClass'
 import { SIDEBAR_NEXT_CLASS_ENABLED, useSidebarNextClassShown } from '../sidebarNextClassPref'
 import Tooltip from './Tooltip'
+import { MAC_PLATFORMS, macDownloadUrl, resolveMacDownloads, shouldOfferMacApp } from '../macAppDownload'
+import MacAppDownloadModal from './MacAppDownloadModal'
 import { buildNavItems, openNavItemLink } from '../navItems'
 import {
   COMPACT_SIDEBAR_WIDTH,
@@ -202,6 +204,60 @@ function CompactTooltip(props) {
   return <Tooltip side="right" {...props} />
 }
 
+// Website on a Mac only: the desktop app's newest disk image (the apps and
+// other systems show nothing). Folded, under the account; unfolded, at the
+// foot's end. A browser that says the processor (Chromium) downloads
+// straight away; Safari and Firefox ask which one (MacAppDownloadModal).
+function MacAppDownloadButton({ compact = false }) {
+  const [offered] = useState(shouldOfferMacApp)
+  const [download, setDownload] = useState(() => ({
+    platform: null,
+    installers: Object.fromEntries(MAC_PLATFORMS.map((platform) => [platform, macDownloadUrl(platform)])),
+  }))
+  const [isChooserOpen, setIsChooserOpen] = useState(false)
+  const closeChooser = useCallback(() => setIsChooserOpen(false), [])
+
+  useEffect(() => {
+    if (!offered) return undefined
+    let cancelled = false
+    void resolveMacDownloads().then((resolved) => {
+      if (!cancelled) setDownload(resolved)
+    })
+    return () => { cancelled = true }
+  }, [offered])
+
+  if (!offered) return null
+  // A round of solid glass (its hover darkens it a touch), the app's material.
+  const className = 'glass-solid group relative inline-flex shrink-0 items-center justify-center size-8 rounded-full p-0 text-text cursor-pointer no-underline'
+  const content = (
+    <>
+      <Icon icon="ph:download-simple" className="w-4 h-4" aria-hidden="true" />
+      {compact ? (
+        <CompactTooltip title="Tafac pour Mac" detail="Télécharger l’app" />
+      ) : (
+        // Held to the button's end: the sidebar's edge is close.
+        <Tooltip title="Télécharger Tafac pour Mac" side="top-end" />
+      )}
+    </>
+  )
+
+  if (download.platform) {
+    return (
+      <a href={download.installers[download.platform]} className={className} aria-label="Télécharger Tafac pour Mac">
+        {content}
+      </a>
+    )
+  }
+  return (
+    <>
+      <button type="button" className={className} aria-label="Télécharger Tafac pour Mac" aria-haspopup="dialog" onClick={() => setIsChooserOpen(true)}>
+        {content}
+      </button>
+      <MacAppDownloadModal open={isChooserOpen} onClose={closeChooser} installers={download.installers} />
+    </>
+  )
+}
+
 // The compact sidebar's « Nouvelle version »: the rocket alone.
 function CompactUpdateButton({ onUpdateClick }) {
   const [isApplying, setIsApplying] = useState(false)
@@ -238,7 +294,6 @@ function Sidebar({
   userName,
   userSubtitle,
   profilePhotoSrc,
-  onLogout,
   onAccountClick,
   favoritesSlotRef = null,
   hasPendingUpdate = false,
@@ -294,10 +349,10 @@ function Sidebar({
   }
   const handlePeekLeave = () => schedulePeek(false, SIDEBAR_PEEK_CLOSE_DELAY_MS)
   // On the folded sidebar: it unfolds from its navigation, not from its foot
-  // (account, sign out). The unfolded panel lays its foot out on one row:
-  // the button aimed at would move from under the pointer (the account down
-  // by 42px, « Se déconnecter » to the right, the account in its place).
-  // There the folded buttons are used as they are.
+  // (account, the Mac app's download). The unfolded panel lays its foot out
+  // on one row: the button aimed at would move from under the pointer (the
+  // account down by 42px, the download to the right, the account in its
+  // place). There the folded buttons are used as they are.
   const handleFoldedPointer = (event) => {
     if (!canPeek || event.pointerType !== 'mouse' || isPeekOpen) return
     if (event.target.closest?.('[data-sidebar-foot]')) {
@@ -512,17 +567,7 @@ function Sidebar({
               <Icon icon="ph:gear-six" className="w-4 h-4 transition-opacity duration-120 ease-in-out group-hover:opacity-70" aria-hidden="true" />
               <Tooltip title="Réglages" side="top" />
             </button>
-            <button
-              type="button"
-              onClick={onLogout}
-              disabled={checking}
-              className="group relative inline-flex shrink-0 items-center justify-center size-8 rounded-full bg-transparent border-0 text-text-muted cursor-pointer disabled:opacity-40 disabled:cursor-wait"
-              aria-label="Se déconnecter"
-            >
-              <Icon icon="ph:sign-out" className="w-4 h-4 transition-opacity duration-120 ease-in-out group-hover:opacity-70" aria-hidden="true" />
-              {/* Held to the button's end: the sidebar's edge is close. */}
-              <Tooltip title="Se déconnecter" side="top-end" />
-            </button>
+            <MacAppDownloadButton />
           </div>
         ) : null}
       </div>
@@ -613,16 +658,7 @@ function Sidebar({
                   </span>
                   <CompactTooltip title={userName || 'Mon compte'} detail={userSubtitle} />
                 </button>
-                <button
-                  type="button"
-                  onClick={onLogout}
-                  disabled={checking}
-                  className="group relative inline-flex items-center justify-center size-8 rounded-full bg-transparent border-0 text-text-muted cursor-pointer transition-opacity duration-120 ease-in-out hover:opacity-70 disabled:opacity-40 disabled:cursor-wait"
-                  aria-label="Se déconnecter"
-                >
-                  <Icon icon="ph:sign-out" className="w-4 h-4" aria-hidden="true" />
-                  <CompactTooltip title="Se déconnecter" />
-                </button>
+                <MacAppDownloadButton compact />
               </>
             ) : null}
           </div>

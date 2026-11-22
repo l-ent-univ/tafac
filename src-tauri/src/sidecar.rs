@@ -147,7 +147,16 @@ pub fn spawn(app: &AppHandle, endpoint: &str, secret: &str, data_dir: &Path) -> 
     let _ = std::fs::remove_file(endpoint);
 
     let (node, script) = locate(app)?;
-    let child = Command::new(node)
+    let mut command = Command::new(node);
+    // Windows: Node is a console program, so without this it opens a
+    // terminal window of its own behind the app, with the server's logs.
+    #[cfg(windows)]
+    {
+        use std::os::windows::process::CommandExt;
+        const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+        command.creation_flags(CREATE_NO_WINDOW);
+    }
+    let child = command
         .arg(script)
         .env("PORT", endpoint)
         .env("SESSION_SECRET", secret)

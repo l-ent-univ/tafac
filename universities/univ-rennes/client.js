@@ -144,6 +144,9 @@ export default {
         logo: iutLannionLogo,
         logoDark: iutLannionLogoDark,
         logoShape: 'square',
+        // Never picked in Réglages › Apparence: Tafac's photo of the day,
+        // not the IUT's (still offered there).
+        defaultWallpaperFolder: 'tafac',
         heroImages: [
           {
             src: heroLannionIut,

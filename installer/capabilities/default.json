@@ -1,0 +1,6 @@
+{
+  "identifier": "default",
+  "description": "The setup's window: its own commands only (install, open)",
+  "windows": ["*"],
+  "permissions": ["core:default", "core:window:allow-close"]
+}

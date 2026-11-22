@@ -11,11 +11,7 @@ function AppHeader({ authenticated, checking, establishment = null, showUniversi
     onNavigatePage('home', 'logo')
   }
 
-  const actionLabel = checking
-    ? 'Chargement...'
-    : authenticated
-      ? 'Se déconnecter'
-      : 'Se connecter'
+  const actionLabel = checking ? 'Chargement...' : 'Se connecter'
 
   return (
     // Above what follows (relative z-[1]): the cards' area paints over the
@@ -27,20 +23,9 @@ function AppHeader({ authenticated, checking, establishment = null, showUniversi
         </a>
 
         <div className="flex items-center gap-2 justify-end max-md:ml-auto max-md:items-start max-md:gap-[0.4rem]">
+          {/* Signed in: « Se déconnecter » is in Réglages › Compte. */}
           {authenticated ? (
             <>
-
-              <button
-                type="button"
-                className="glass-solid header-logout-btn inline-flex items-center justify-center gap-2 px-3 py-[10px] border rounded-full text-text-secondary text-[0.9rem] font-medium leading-[1.06] whitespace-nowrap cursor-pointer transition-[background-color,opacity] duration-120 ease-in-out hover:not-disabled: disabled:opacity-40 disabled:cursor-wait max-md:w-[42px] max-md:min-w-[42px] max-md:h-[42px] max-md:p-0 max-md:justify-center max-md:gap-0 max-md:text-text"
-                onClick={onPrimaryAction}
-                disabled={checking}
-                aria-label={actionLabel}
-              >
-                <Icon icon="ph:sign-in" className="w-4 h-4 shrink-0 max-md:w-[1.1rem] max-md:h-[1.1rem]" aria-hidden="true" />
-                <span className="max-md:hidden">{actionLabel}</span>
-              </button>
-
               <button
                 type="button"
                 className="glass-solid header-account-btn inline-flex items-center justify-center gap-2 px-3 py-[10px] border rounded-full text-text text-[0.9rem] font-semibold leading-[1.06] whitespace-nowrap cursor-pointer transition-[background-color,opacity] duration-120 ease-in-out hover:not-disabled: disabled:opacity-40 disabled:cursor-wait max-md:w-[42px] max-md:min-w-[42px] max-md:h-[42px] max-md:p-0 max-md:justify-center max-md:gap-0"
