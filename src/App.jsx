@@ -3113,7 +3113,6 @@ function App() {
             ].filter(Boolean).join(' ') || sessionState.account?.name || sessionState.givenName || sessionState.user}
             userSubtitle={HAS_PERSONAL_PLANNING ? null : selectedTp?.label ?? selectedTp?.tpLabel ?? selectedTp?.tdLabel ?? selectedTp?.yearLabel ?? null}
             profilePhotoSrc={profilePhotoSrc}
-            onLogout={handleHeaderAction}
             onAccountClick={handleOpenAccountModal}
             favoritesSlotRef={setFavoritesSlotEl}
             hasPendingUpdate={hasPendingUpdate}

@@ -161,7 +161,9 @@ export default defineConfig(({ isSsrBuild }) => ({
       registerType: 'prompt',
       includeAssets: ['icon.png', 'apple-touch-icon.png'],
       workbox: {
-        navigateFallbackDenylist: [/^\/__ent_auth/, /^\/__ent_proxy/],
+        // /desktop/: the desktop app's manifest and installers
+        // (server/desktopUpdate), never the page.
+        navigateFallbackDenylist: [/^\/__ent_auth/, /^\/__ent_proxy/, /^\/desktop\//],
       },
       // One build for every university: the installed app is Tafac's.
       manifest: {
@@ -202,5 +204,10 @@ export default defineConfig(({ isSsrBuild }) => ({
     // name is another site reaching this server through a DNS it controls.
     allowedHosts: ['.tafac.fr'],
     // /__ent_proxy is handled by the shared entAuthApp middleware above.
+    // The desktop app's manifest and installers are tafac.fr's
+    // (server/desktopUpdate): the website's « Tafac pour Mac » button.
+    proxy: {
+      '/desktop/': { target: 'https://tafac.fr', changeOrigin: true },
+    },
   },
 }))

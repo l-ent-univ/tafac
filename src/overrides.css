@@ -6974,8 +6974,7 @@
 /* Phones: the header buttons float over the photo in the glass material,
    like the tab bar. */
 @media (width < 1024px) {
-  .header-account-btn,
-  .header-logout-btn {
+  .header-account-btn {
     background-color: var(--glass-fill);
     border-color: var(--glass-edge);
     outline: 1px solid var(--glass-outer);
@@ -6985,13 +6984,11 @@
     box-shadow: var(--glass-shadow);
   }
 
-  .header-account-btn:active:not(:disabled),
-  .header-logout-btn:active:not(:disabled) {
+  .header-account-btn:active:not(:disabled) {
     background-color: rgb(255 255 255 / 0.75);
   }
 
-  :where([data-theme="dark"]) .header-account-btn:active:not(:disabled),
-  :where([data-theme="dark"]) .header-logout-btn:active:not(:disabled) {
+  :where([data-theme="dark"]) .header-account-btn:active:not(:disabled) {
     background-color: rgb(255 255 255 / 0.14);
   }
 }
@@ -11198,5 +11195,23 @@ div:has(> .justify-ticket) {
 
   :root[data-desktop-app] .moodle-toolbar {
     display: none !important;
+  }
+}
+
+/* ── « Tafac pour Mac » (MacAppDownloadModal) ──
+   The download button's chip name slides in when the pick changes. */
+.mac-choice-name {
+  display: inline-block;
+  animation: mac-choice-name 380ms cubic-bezier(0.32, 0.72, 0, 1);
+}
+
+@keyframes mac-choice-name {
+  from { opacity: 0; transform: translateY(6px); filter: blur(3px); }
+  to { opacity: 1; transform: none; filter: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mac-choice-name {
+    animation: none;
   }
 }
