@@ -10716,9 +10716,14 @@ div:has(> .justify-ticket) {
    rubber band past the ends of anything that scrolls (the page's column,
    the mail list, the planning, carousels: in the app the page itself
    rarely scrolls, its columns do), and no link or picture dragged out of
-   the window (its address is tafac://, of no use anywhere else). */
+   the window (its address is tafac://, of no use anywhere else). On
+   macOS on everything that scrolls; elsewhere only on the page itself:
+   Chromium (WebView2 on Windows) also stops scroll chaining there, so a
+   wheel over a widget that scrolls (the planning's grid, a carousel) would
+   never scroll the page around it. */
 :root[data-desktop-app],
-:root[data-desktop-app] * {
+:root[data-desktop-app] body,
+:root[data-desktop-macos] * {
   overscroll-behavior: none;
 }
 
@@ -10730,7 +10735,8 @@ div:has(> .justify-ticket) {
   cursor: default;
 }
 
-/* macOS (data-desktop-macos): the sidebar is the window's own, on the
+/* macOS (data-desktop-macos) and Windows 11 (data-desktop-windows, on
+   Mica, below): the sidebar is the window's own, on the
    system's sidebar material (src-tauri/src/window.rs puts it behind the
    page, the window being see-through). Flush with the window's edges, full
    height, see-through, a hairline on its right, the window's buttons in its
@@ -10740,28 +10746,28 @@ div:has(> .justify-ticket) {
    after it (its margin, not its padding: the top band's spread stops at
    the column's edge) and paints the page's background, and the page
    behind it is clear. */
-:root[data-desktop-macos]:has(.sidebar-panel),
-:root[data-desktop-macos]:has(.sidebar-panel) body,
-:root[data-desktop-macos] main:has(.sidebar-panel) {
+:root:is([data-desktop-macos], [data-desktop-windows]):has(.sidebar-panel),
+:root:is([data-desktop-macos], [data-desktop-windows]):has(.sidebar-panel) body,
+:root:is([data-desktop-macos], [data-desktop-windows]) main:has(.sidebar-panel) {
   background: transparent;
 }
 
-:root[data-desktop-macos] .app-column {
+:root:is([data-desktop-macos], [data-desktop-windows]) .app-column {
   margin-left: calc(var(--sidebar-width, 280px) + 12px);
   padding-left: 0;
   background-color: var(--color-bg);
 }
 
-:root[data-desktop-macos] {
+:root:is([data-desktop-macos], [data-desktop-windows]) {
   /* macOS' separator colour: a hairline between the material and the page. */
   --desktop-separator: rgb(0 0 0 / 0.1);
 }
 
-:root[data-desktop-macos]:where([data-theme="dark"]) {
+:root:is([data-desktop-macos], [data-desktop-windows]):where([data-theme="dark"]) {
   --desktop-separator: rgb(255 255 255 / 0.1);
 }
 
-:root[data-desktop-macos] .sidebar-panel {
+:root:is([data-desktop-macos], [data-desktop-windows]) .sidebar-panel {
   top: 0;
   left: 0;
   bottom: 0;
@@ -10773,7 +10779,7 @@ div:has(> .justify-ticket) {
   outline: none;
 }
 
-:root[data-desktop-macos] .sidebar-panel:not(.sidebar-peek) {
+:root:is([data-desktop-macos], [data-desktop-windows]) .sidebar-panel:not(.sidebar-peek) {
   background-color: transparent;
   box-shadow: none;
   -webkit-backdrop-filter: none;
@@ -10781,7 +10787,7 @@ div:has(> .justify-ticket) {
 }
 
 /* Folded: its 40px column of icons in the middle, under the buttons. */
-:root[data-desktop-macos] .sidebar-panel--compact {
+:root:is([data-desktop-macos], [data-desktop-windows]) .sidebar-panel--compact {
   padding-inline: 28px;
 }
 
@@ -10791,41 +10797,148 @@ div:has(> .justify-ticket) {
    material shows there, and the panel over it is see-through. The page
    under it is hidden rather than blurred, as under a Mac sidebar laid over
    a window's content. The folded strip's icons, under the panel, go. */
-:root[data-desktop-macos] .sidebar-panel.sidebar-peek {
+:root:is([data-desktop-macos], [data-desktop-windows]) .sidebar-panel.sidebar-peek {
   width: calc(var(--sidebar-width) + 12px);
   background-color: transparent;
 }
 
-:root[data-desktop-macos] .sidebar-panel.sidebar-peek.is-open {
+:root:is([data-desktop-macos], [data-desktop-windows]) .sidebar-panel.sidebar-peek.is-open {
   width: calc(var(--sidebar-full-width, 280px) + 12px);
 }
 
-:root[data-desktop-macos] .sidebar-peek ~ .app-column {
+:root:is([data-desktop-macos], [data-desktop-windows]) .sidebar-peek ~ .app-column {
   clip-path: inset(-100vmax -100vmax -100vmax 0);
   transition: clip-path 260ms cubic-bezier(0.32, 0.72, 0, 1);
 }
 
-:root[data-desktop-macos] .sidebar-peek.is-open ~ .app-column {
+:root:is([data-desktop-macos], [data-desktop-windows]) .sidebar-peek.is-open ~ .app-column {
   clip-path: inset(-100vmax -100vmax -100vmax calc(var(--sidebar-full-width, 280px) - var(--sidebar-width)));
   transition: clip-path 340ms cubic-bezier(0.32, 0.72, 0, 1);
 }
 
-:root[data-desktop-macos] .sidebar-panel--compact > * {
+:root:is([data-desktop-macos], [data-desktop-windows]) .sidebar-panel--compact > * {
   transition: opacity 120ms ease-out;
 }
 
-:root[data-desktop-macos] .sidebar-panel--compact:has(~ .sidebar-peek.is-open) {
+:root:is([data-desktop-macos], [data-desktop-windows]) .sidebar-panel--compact:has(~ .sidebar-peek.is-open) {
   border-right-color: transparent;
 }
 
-:root[data-desktop-macos] .sidebar-panel--compact:has(~ .sidebar-peek.is-open) > * {
+:root:is([data-desktop-macos], [data-desktop-windows]) .sidebar-panel--compact:has(~ .sidebar-peek.is-open) > * {
   opacity: 0;
 }
 
 @media (prefers-reduced-motion: reduce) {
-  :root[data-desktop-macos] .sidebar-peek ~ .app-column,
-  :root[data-desktop-macos] .sidebar-panel--compact > * {
+  :root:is([data-desktop-macos], [data-desktop-windows]) .sidebar-peek ~ .app-column,
+  :root:is([data-desktop-macos], [data-desktop-windows]) .sidebar-panel--compact > * {
     transition: none;
+  }
+}
+
+/* Windows 11 (data-desktop-windows): as in Settings. The title bar is drawn
+   over the page (tauri-plugin-decorum, src-tauri/src/window.rs): a 48px band
+   on the Mica, the app's name on its left, the window's buttons on its
+   right. The sidebar starts below it, on the Mica too, with no hairline
+   beside it. The page is on a solid layer under the band, its top-left
+   corner rounded, a 1px stroke (Fluent's card stroke) on its edges. */
+:root[data-desktop-windows] {
+  --desktop-titlebar-height: 48px;
+  --desktop-separator: rgb(0 0 0 / 0.0578);
+  --desktop-caption-hover: rgb(0 0 0 / 0.0373);
+}
+
+:root[data-desktop-windows]:where([data-theme="dark"]) {
+  --desktop-separator: rgb(255 255 255 / 0.0698);
+  --desktop-caption-hover: rgb(255 255 255 / 0.0605);
+}
+
+/* The band and its buttons (decorum sets 32px and its own colours inline
+   or in a style it adds: the !important wins over them). Fluent's caption
+   buttons, square (the band's height on each side), a light wash on hover, red behind
+   the close button's white cross. */
+:root[data-desktop-windows] [data-tauri-decorum-tb] {
+  height: var(--desktop-titlebar-height) !important;
+  align-items: stretch !important;
+  z-index: 100 !important;
+}
+
+:root[data-desktop-windows] [data-tauri-decorum-tb] > [data-tauri-drag-region] {
+  display: flex;
+  align-items: center;
+  padding-left: 16px;
+}
+
+:root[data-desktop-windows] [data-tauri-decorum-tb] > [data-tauri-drag-region]::before {
+  content: "Tafac";
+  font: 400 12px/16px "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif;
+  color: var(--color-text);
+  pointer-events: none;
+}
+
+/* The app's icon before its name, 16px as in Fluent apps: the rounded
+   one (src-tauri/icons/icon.ico at 32px), inline so the band needs no
+   file of its own. */
+:root[data-desktop-windows] [data-tauri-decorum-tb] > [data-tauri-drag-region]::after {
+  content: "";
+  order: -1;
+  width: 16px;
+  height: 16px;
+  margin-right: 12px;
+  background: url("data:image/png;base64,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") center / contain no-repeat;
+  pointer-events: none;
+}
+
+:root[data-desktop-windows] .decorum-tb-btn {
+  width: var(--desktop-titlebar-height) !important;
+  height: var(--desktop-titlebar-height) !important;
+  color: var(--color-text) !important;
+}
+
+:root[data-desktop-windows] .decorum-tb-btn:hover {
+  background-color: var(--desktop-caption-hover) !important;
+}
+
+:root[data-desktop-windows] #decorum-tb-close:hover {
+  background-color: #c42b1c !important;
+  color: #fff !important;
+}
+
+:root[data-desktop-windows] .sidebar-panel {
+  padding-top: calc(var(--desktop-titlebar-height) + 8px);
+  border-right: 0;
+}
+
+:root[data-desktop-windows] .app-column {
+  margin-top: var(--desktop-titlebar-height);
+  height: calc(100vh - var(--desktop-titlebar-height));
+  border-top: 1px solid var(--desktop-separator);
+  border-left: 1px solid var(--desktop-separator);
+  border-top-left-radius: 8px;
+}
+
+/* The right side panels and the full-screen composer: below the band, not
+   under its buttons. */
+:root[data-desktop-windows] :is(.mail-reader-panel, .side-panel, .mail-composer.is-fullscreen) {
+  top: calc(var(--desktop-titlebar-height) + 12px);
+}
+
+:root[data-desktop-windows] .mail-composer.is-fullscreen {
+  top: var(--desktop-titlebar-height);
+}
+
+/* Narrower than the sidebar's layout (4xl): the window can be, unlike on
+   macOS. No sidebar there: the page takes the window below the band. */
+@media (width < 1024px) {
+  :root[data-desktop-windows] body {
+    padding-top: var(--desktop-titlebar-height);
+  }
+
+  :root[data-desktop-windows] .app-column {
+    margin-top: 0;
+    height: auto;
+    margin-left: 0;
+    border: 0;
+    border-radius: 0;
   }
 }
 
@@ -11008,6 +11121,25 @@ div:has(> .justify-ticket) {
   :root:is([data-desktop-app], [data-ios-app]) .moodle-page {
     left: 0;
     bottom: calc(env(safe-area-inset-bottom) + 84px);
+  }
+}
+
+/* Windows: « Moodle » (fixed to the window, not in .app-column) below the
+   band as well, with the column's edge and corner: its toolbar under the
+   band would be the band's (drag and buttons), not the page's. After the
+   rules above, which it overrides. */
+:root[data-desktop-windows] .moodle-page {
+  top: var(--desktop-titlebar-height);
+  border-top: 1px solid var(--desktop-separator);
+  border-left: 1px solid var(--desktop-separator);
+  border-top-left-radius: 8px;
+  overflow: hidden;
+}
+
+@media (width < 1024px) {
+  :root[data-desktop-windows] .moodle-page {
+    border: 0;
+    border-radius: 0;
   }
 }
 

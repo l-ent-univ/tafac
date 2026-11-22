@@ -271,14 +271,37 @@ fn choose_destination(proposed: &Path) -> Option<PathBuf> {
     Some(path)
 }
 
+// Windows: the system's Save dialog, the same way (on the main thread, where
+// WebView2 asks; it already asked before replacing a file).
+#[cfg(windows)]
+fn choose_destination(proposed: &Path) -> Option<PathBuf> {
+    let mut dialog = rfd::FileDialog::new().set_title("Enregistrer");
+    if let Some(name) = proposed.file_name() {
+        dialog = dialog.set_file_name(name.to_string_lossy());
+    }
+    if let Some(folder) = proposed.parent() {
+        dialog = dialog.set_directory(folder);
+    }
+    let path = dialog.save_file()?;
+    if path.exists() {
+        let _ = std::fs::remove_file(&path);
+    }
+    Some(path)
+}
+
 // Elsewhere: straight to the Downloads folder.
-#[cfg(all(desktop, not(target_os = "macos")))]
+#[cfg(all(desktop, not(target_os = "macos"), not(windows)))]
 fn choose_destination(proposed: &Path) -> Option<PathBuf> {
     Some(proposed.to_path_buf())
 }
 
 #[cfg(desktop)]
 fn downloads_folder() -> Option<PathBuf> {
+    // The known folder, wherever the student moved it (OneDrive…).
+    #[cfg(windows)]
+    if let Some(folder) = dirs::download_dir() {
+        return Some(folder);
+    }
     let home = std::env::var_os(if cfg!(windows) { "USERPROFILE" } else { "HOME" })?;
     Some(PathBuf::from(home).join("Downloads"))
 }

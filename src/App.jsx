@@ -21,7 +21,7 @@ import WelcomeFromLent from './components/WelcomeFromLent'
 import { settingsTransfer } from './settingsTransferBoot'
 import { appendPreviewToken, findProfilePhotoCandidate } from './profilePhoto'
 import { DEMO_CREDENTIALS, DEMO_SESSION_MODE, DEMO_SIGNATURE_LOGIN } from './demoAccount'
-import { isDesktopApp, isIosApp, isMacDesktopApp, isNativeApp } from './desktopApp'
+import { isDesktopApp, isIosApp, isMacDesktopApp, isMicaDesktopApp, isNativeApp } from './desktopApp'
 import { syncWindowTheme } from './desktopWindowTheme'
 import { syncIosAppearance } from './iosApp'
 import { onDesktopCommand, syncDesktopMenu } from './desktopMenu'
@@ -2111,7 +2111,7 @@ function App() {
 
   useEffect(() => watchTheme(theme, palette), [theme, palette])
   useEffect(() => {
-    if (isMacDesktopApp()) syncWindowTheme(theme)
+    if (isMacDesktopApp() || isMicaDesktopApp()) syncWindowTheme(theme)
     syncIosAppearance(theme)
   }, [theme])
 

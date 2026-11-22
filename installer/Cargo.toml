@@ -1,0 +1,21 @@
+[package]
+name = "tafac-installer"
+version = "0.0.0"
+description = "Tafac's setup on Windows: a small window over the NSIS setup"
+license = "AGPL-3.0-only"
+edition = "2021"
+publish = false
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = [] }
+serde = { version = "1", features = ["derive"] }
+
+[profile.release]
+codegen-units = 1
+lto = true
+opt-level = "s"
+strip = true
+panic = "abort"
