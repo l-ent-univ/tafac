@@ -1966,10 +1966,14 @@ function App() {
     images: listWallpaperFolderImages(id, establishment),
     today: resolveHeroImage(establishment, new Date(), heroOffset, id),
   })).filter((folder) => folder.images.length > 0), [establishment, heroOffset])
+  // Never picked: the establishment's folder when it names one
+  // (defaultWallpaperFolder), else the university's.
+  const defaultWallpaperFolder = universityConfig.establishments?.byId?.[establishment]?.defaultWallpaperFolder ?? null
   const activeWallpaper = useMemo(() => effectiveWallpaperChoice(wallpaperChoice, {
     hasCustom: Boolean(customBackground),
     folderImages: (id) => wallpaperFolders.find((folder) => folder.id === id)?.images ?? [],
-  }), [customBackground, wallpaperChoice, wallpaperFolders])
+    preferredFolder: defaultWallpaperFolder,
+  }), [customBackground, defaultWallpaperFolder, wallpaperChoice, wallpaperFolders])
   const heroImage = useMemo(() => {
     if (activeWallpaper.folder === 'custom') return { src: customBackground, position: null, credit: null }
     const folder = wallpaperFolders.find((entry) => entry.id === activeWallpaper.folder)

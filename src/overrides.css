@@ -1198,6 +1198,53 @@
   }
 }
 
+/* Beside the sidebar (HomePhoneHeader's `wide`): from the column's top
+   (the section's 20px taken back), and the page scrolls in
+   its column (.app-column, App.jsx), not the window: the parallax follows
+   that scroll by its name (not `nearest`: the photo's frame, which clips
+   it, would be the one found), still at half its speed. */
+.home-phone-header-wide,
+.home-phone-header-wide[data-photo] {
+  margin-top: -20px;
+  padding-top: 20px;
+}
+
+.home-phone-header-wide .home-phone-photo {
+  height: 220px;
+  background-position: center 40%;
+  -webkit-mask-image: linear-gradient(to bottom, black 30%, transparent 92%);
+  mask-image: linear-gradient(to bottom, black 30%, transparent 92%);
+}
+
+@supports (animation-timeline: scroll()) {
+  @media (prefers-reduced-motion: no-preference) {
+    .home-phone-header-wide .home-phone-photo {
+      animation-name: home-phone-photo-behind-wide;
+      animation-timeline: --app-column;
+      animation-range: 0 440px;
+    }
+  }
+}
+
+.app-column {
+  scroll-timeline: --app-column block;
+}
+
+@keyframes home-phone-photo-behind-wide {
+  to {
+    transform: translate3d(0, 220px, 0);
+  }
+}
+
+/* On the website, the photo on to the window's left edge, under the
+   floating sidebar (12px from the edges, above the column): the header
+   reaches over the column's padding that keeps the page clear of it, and
+   gives it back to its text. */
+.home-phone-header-under-sidebar {
+  margin-left: calc(-24px - var(--sidebar-width, 280px) - 12px);
+  padding-left: calc(24px + var(--sidebar-width, 280px) + 12px);
+}
+
 /* Behind the status bar (the iOS app): a haze of the page's colour over the
    photo's top, for the clock to read on any photo, light or dark as the
    theme and so as the clock is. As tall as the bar and half again: nothing
@@ -1364,12 +1411,6 @@
    on the icons, which are buttons. */
 .home-phone-text :is(h1, p, a) {
   text-shadow: 0 0 2px var(--color-bg), 0 0 12px var(--color-bg), 0 0 24px var(--color-bg);
-}
-
-/* The sentence's own patch of the band's tint (BlurInText) is for the band:
-   here it would smudge the page. */
-.home-phone-text p::before {
-  content: none;
 }
 
 /* The header logo is whitened for the photo; on the plain page it would vanish. */
