@@ -44,7 +44,9 @@ const MIN_SIZE: (f64, f64) = (380.0, 560.0);
 const TRAFFIC_LIGHTS: (f64, f64) = (18.0, 22.0);
 
 pub fn style<'a, R: Runtime, M: Manager<R>>(builder: WebviewWindowBuilder<'a, R, M>) -> WebviewWindowBuilder<'a, R, M> {
-    let builder = builder.min_inner_size(MIN_SIZE.0, MIN_SIZE.1).visible(false);
+    // Files dropped on the page are the page's (the composer's attachments,
+    // its drop sheets): Tauri's own handler would take them before it.
+    let builder = builder.min_inner_size(MIN_SIZE.0, MIN_SIZE.1).visible(false).disable_drag_drop_handler();
     #[cfg(target_os = "macos")]
     let builder = {
         use tauri::utils::config::WindowEffectsConfig;

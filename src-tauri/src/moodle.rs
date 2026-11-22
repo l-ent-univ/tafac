@@ -505,7 +505,7 @@ fn builder(app: &AppHandle, policy: &Policy, start: Url) -> WebviewBuilder<Wry> 
     builder
 }
 
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
 fn hooks(app: &AppHandle) -> crate::moodle_native::Hooks {
     let (shown, changed, failed) = (moodle(app), moodle(app), moodle(app));
     crate::moodle_native::Hooks {
@@ -568,7 +568,7 @@ async fn make(app: &AppHandle, window: tauri::Window, policy: &Policy, bounds: B
             .add_child(builder, LogicalPosition::new(bounds.x, bounds.y), LogicalSize::new(bounds.width, bounds.height))
             .map(|view| {
                 let _ = view.hide();
-                #[cfg(target_os = "macos")]
+                #[cfg(any(target_os = "macos", windows))]
                 {
                     let handle = handle.clone();
                     crate::moodle_native::install(&view, move || hooks(&handle));
@@ -905,7 +905,7 @@ fn go(view: &View, command: Command) {
     });
 }
 
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
 fn go(view: &View, command: Command) {
     use crate::moodle_native::Move;
     let to = match command {
@@ -916,7 +916,7 @@ fn go(view: &View, command: Command) {
     crate::moodle_native::go(view, to);
 }
 
-#[cfg(all(desktop, not(target_os = "macos")))]
+#[cfg(all(desktop, not(target_os = "macos"), not(windows)))]
 fn go(view: &View, command: Command) {
     let _ = view.eval(match command {
         Command::Back => "history.back()",
@@ -1018,14 +1018,14 @@ async fn reading(view: &View) -> (bool, bool, bool, String) {
     view.reading().await
 }
 
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
 async fn reading(view: &View) -> (bool, bool, bool, String) {
     let reading = crate::moodle_native::read(view).await;
     (reading.loading, reading.back, reading.forward, reading.title)
 }
 
 // Elsewhere the view doesn't say: the arrows stay on.
-#[cfg(all(desktop, not(target_os = "macos")))]
+#[cfg(all(desktop, not(target_os = "macos"), not(windows)))]
 async fn reading(_view: &View) -> (bool, bool, bool, String) {
     (false, true, true, String::new())
 }

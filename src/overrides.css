@@ -10854,7 +10854,7 @@ div:has(> .justify-ticket) {
 
 /* The band and its buttons (decorum sets 32px and its own colours inline
    or in a style it adds: the !important wins over them). Fluent's caption
-   buttons: 46 wide, the band's height, a light wash on hover, red behind
+   buttons, square (the band's height on each side), a light wash on hover, red behind
    the close button's white cross. */
 :root[data-desktop-windows] [data-tauri-decorum-tb] {
   height: var(--desktop-titlebar-height) !important;
@@ -10889,7 +10889,7 @@ div:has(> .justify-ticket) {
 }
 
 :root[data-desktop-windows] .decorum-tb-btn {
-  width: 46px !important;
+  width: var(--desktop-titlebar-height) !important;
   height: var(--desktop-titlebar-height) !important;
   color: var(--color-text) !important;
 }
@@ -11121,6 +11121,25 @@ div:has(> .justify-ticket) {
   :root:is([data-desktop-app], [data-ios-app]) .moodle-page {
     left: 0;
     bottom: calc(env(safe-area-inset-bottom) + 84px);
+  }
+}
+
+/* Windows: « Moodle » (fixed to the window, not in .app-column) below the
+   band as well, with the column's edge and corner: its toolbar under the
+   band would be the band's (drag and buttons), not the page's. After the
+   rules above, which it overrides. */
+:root[data-desktop-windows] .moodle-page {
+  top: var(--desktop-titlebar-height);
+  border-top: 1px solid var(--desktop-separator);
+  border-left: 1px solid var(--desktop-separator);
+  border-top-left-radius: 8px;
+  overflow: hidden;
+}
+
+@media (width < 1024px) {
+  :root[data-desktop-windows] .moodle-page {
+    border: 0;
+    border-radius: 0;
   }
 }
 

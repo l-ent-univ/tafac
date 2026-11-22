@@ -94,10 +94,16 @@ version = "3"
 default-features = false
 features = ["apple-native"]
 
-# Windows: whether Mica is there (11 and later, src/window.rs).
+# Windows: whether Mica is there (11 and later, src/window.rs); the Save
+# dialog and the Downloads folder, even when moved (src/links.rs).
 [target.'cfg(windows)'.dependencies]
 tauri-plugin-decorum = "1.1.1"
 windows-version = "0.1"
+rfd = { version = "0.15", default-features = false }
+dirs = "6"
+# Moodle's view on WebView2 (src/moodle_native_windows.rs): Tauri's versions.
+webview2-com = "0.39"
+windows = { version = "0.62", features = ["Win32_Foundation"] }
 
 [target.'cfg(windows)'.dependencies.keyring]
 version = "3"
