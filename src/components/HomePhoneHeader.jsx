@@ -1,14 +1,20 @@
 import HomeIcon from './HomeIcon'
 import ServiceNotice from './ServiceNotice'
 import UniversityLockup from './UniversityLockup'
-import { isIosApp } from '../desktopApp'
+import { isDesktopApp, isIosApp } from '../desktopApp'
 
-// « Accueil »'s top in the phone layout (a phone, a tablet: below 1024px,
-// usePhoneViewport), in place of the app's top bar and of the band the
-// sidebar's layout has (HomeDraftPage): the photo to the screen's edges, at
-// full strength, fading down into the page; over it the logos and the
-// account; then the row of icons, the greeting and the day in a sentence, on
-// the page.
+// « Accueil »'s top: the photo to the page's edges, at full strength, fading
+// down into the page; over it the logos and the account; then the row of
+// icons, the greeting and the day in a sentence, on the page.
+//
+// - In the phone layout (a phone, a tablet: below 1024px, usePhoneViewport)
+//   it stands in for the app's top bar.
+// - `wide` (beside the sidebar): no logos or account, the sidebar has them;
+//   larger icons and greeting, the text as wide as the cards
+//   (max-w-[1320px], HomeDraftPage). The page scrolls in its column there,
+//   which the photo's parallax follows (overrides.css). On the website the
+//   photo runs on to the window's left edge, under the floating sidebar;
+//   not in the desktop app, whose sidebar is the window's own material.
 //
 // - The logos sit straight on the photo, in white there (overrides.css), in
 //   their own colours without one. Not in the iOS app: the app is Tafac, its
@@ -30,6 +36,7 @@ import { isIosApp } from '../desktopApp'
 //   the page's colour for the clock to read (overrides.css, « iOS app ·
 //   status bar »).
 function HomePhoneHeader({
+  wide = false,
   greeting,
   briefing = null,
   briefingPending = false,
@@ -44,11 +51,12 @@ function HomePhoneHeader({
 }) {
   const hasPhoto = Boolean(wallpaper?.src)
   const credit = hasPhoto ? wallpaper.credit : null
-  const showLogos = !isIosApp()
+  const showLogos = !wide && !isIosApp()
+  const underSidebar = wide && !isDesktopApp()
   const initial = (userName || '?').trim().charAt(0).toUpperCase()
 
   return (
-    <header className="home-phone-header relative -mx-3 px-5 pb-1" data-photo={hasPhoto ? '' : undefined}>
+    <header className={`home-phone-header relative ${wide ? `home-phone-header-wide -mx-6 px-6 pb-2 ${underSidebar ? 'home-phone-header-under-sidebar' : ''}` : '-mx-3 px-5 pb-1'}`} data-photo={hasPhoto ? '' : undefined}>
       {hasPhoto ? (
         <div className="home-phone-photo-frame" aria-hidden="true">
           <div
@@ -59,6 +67,7 @@ function HomePhoneHeader({
         </div>
       ) : null}
 
+      {wide ? null : (
       <div className={`relative flex items-center ${showLogos ? 'justify-between' : 'justify-end'}`}>
         {showLogos ? <UniversityLockup variant="phone" establishment={establishment} showLogo={showUniversityLogo} logoSource={logoSource} /> : null}
         <button
@@ -73,34 +82,42 @@ function HomePhoneHeader({
             : <span className="font-body text-[15px] font-semibold leading-none" aria-hidden="true">{initial}</span>}
         </button>
       </div>
+      )}
 
-      <div className="relative mt-3 empty:hidden">
+      <div className={`relative empty:hidden ${wide ? 'max-w-[1320px]' : 'mt-3'}`}>
         <ServiceNotice />
       </div>
 
-      <div className={`home-phone-text relative ${hasPhoto ? 'mt-[72px]' : 'mt-7'}`}>
+      <div className={`home-phone-text relative ${wide ? `max-w-[1320px] ${hasPhoto ? 'mt-[92px]' : 'mt-10'}` : hasPhoto ? 'mt-[72px]' : 'mt-7'}`}>
         {icons.length > 0 ? (
-          <div className="-ml-1.5 flex items-center">
+          <div className={`-ml-1.5 flex items-center ${wide ? 'gap-0.5' : ''}`}>
             {icons.map(({ id, src, rotate, label, onPress }, index) => (
               <button
                 key={id}
                 type="button"
                 aria-label={label}
                 onClick={onPress}
-                className="flex h-11 w-10 shrink-0 cursor-pointer items-center justify-center rounded-xl border-0 bg-transparent p-0 transition-transform duration-150 ease-out active:scale-[0.88] focus-visible:outline-2 focus-visible:outline-text"
+                className={`group relative flex shrink-0 cursor-pointer items-center justify-center rounded-xl border-0 bg-transparent p-0 transition-transform duration-150 ease-out active:scale-[0.88] focus-visible:outline-2 focus-visible:outline-text ${wide ? 'h-12 w-11 hover:z-10' : 'h-11 w-10'}`}
               >
                 {/* On arrival the icons come into focus one after the other
                     (.home-icon-deal), each turning once as it lands. */}
                 <span className="home-icon-deal block" style={{ '--i': index, '--r': `${rotate}deg`, transform: 'rotate(var(--r))' }}>
-                  <HomeIcon src={src} size={28} order={index} className="block size-7 select-none" />
+                  {/* Hovered (a pointer, so beside the sidebar), an icon
+                      grows a little with a springy overshoot. */}
+                  <HomeIcon
+                    src={src}
+                    size={wide ? 36 : 28}
+                    order={index}
+                    className={wide ? 'block size-9 select-none transition-transform duration-[450ms] ease-[cubic-bezier(0.34,1.8,0.5,1)] group-hover:scale-[1.15] motion-reduce:transition-none' : 'block size-7 select-none'}
+                  />
                 </span>
               </button>
             ))}
           </div>
         ) : null}
-        <h1 id="home-draft-title" className="m-0 mt-1 font-display text-[30px] font-bold leading-[1.1] tracking-[-0.015em] text-text">{greeting}</h1>
+        <h1 id="home-draft-title" className={`m-0 mt-1 font-display font-bold ${wide ? 'text-[36px]' : 'text-[30px]'} leading-[1.1] tracking-[-0.015em] text-text`}>{greeting}</h1>
         {/* The sentence's room (15px, 1.35), there before it is: two lines
-            on a phone, one where it fits in one (a tablet). */}
+            on a phone, one where it fits in one (a tablet, a computer). */}
         {briefingPending || briefing ? <div className="mt-1.5 min-h-[20.25px] max-sm:min-h-[40.5px]">{briefing}</div> : null}
         {credit?.author ? (
           <a
