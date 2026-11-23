@@ -9219,12 +9219,14 @@ button.planning-block:active {
    colour, as the Assiduité page's row is (assiduity-row-flash), then let go. */
 .widget-card.planning-block.is-highlighted,
 .widget-card.planning-list-card.is-highlighted {
-  animation: planning-class-flash 2.2s ease-out both;
+  animation: planning-class-flash 2.4s ease-out both;
 }
 
 @keyframes planning-class-flash {
-  0%, 40% {
-    background-color: color-mix(in srgb, var(--accent) 24%, var(--color-widget-bg));
+  0%, 45% {
+    background-color: color-mix(in srgb, var(--accent) 34%, var(--color-widget-bg));
+    outline: 1.5px solid var(--accent);
+    outline-offset: -1.5px;
   }
 }
 
@@ -9232,11 +9234,12 @@ button.planning-block:active {
    lateness, soft once justified); the list's cards wear the status tag. */
 .planning-absence-dot {
   position: absolute;
-  top: 7px;
-  right: 7px;
-  width: 7px;
-  height: 7px;
+  top: 6px;
+  right: 6px;
+  width: 9px;
+  height: 9px;
   border-radius: 9999px;
+  box-shadow: 0 0 0 2px var(--color-widget-bg);
   background: color-mix(in srgb, var(--color-text) 35%, transparent);
 }
 
