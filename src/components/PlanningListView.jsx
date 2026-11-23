@@ -49,7 +49,7 @@ export function PlanningListCard({ event, accent, ongoing, onOpen, menuProps = n
   return (
     <button
       type="button"
-      className={`planning-list-card widget-card widget-card-visible isolate relative flex w-full min-w-0 items-stretch gap-3 overflow-hidden card-corners-sm border bg-widget-bg p-[13px] text-left text-text cursor-pointer 4xl:gap-4 4xl:px-4 ${highlighted ? 'is-highlighted' : ''} ${absence ? `has-absence is-${absence.status}` : ''} ${className}`}
+      className={`planning-list-card widget-card widget-card-visible isolate relative flex w-full min-w-0 items-stretch gap-3 overflow-hidden card-corners-sm border bg-widget-bg p-[13px] text-left text-text cursor-pointer 4xl:gap-4 4xl:px-4 ${highlighted ? 'is-highlighted' : ''} ${absence ? `is-${absence.status}` : ''} ${className}`}
       style={accentStyle(accent)}
       data-event-id={event.id}
       onClick={() => onOpen(event)}

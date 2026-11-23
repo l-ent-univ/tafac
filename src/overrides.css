@@ -9215,44 +9215,37 @@ button.planning-block:active {
   outline-offset: 2px;
 }
 
-/* « Voir sur le planning »: the absence's class lit up in its colour, then
-   let go (PlanningPage's highlightId). No movement, so reduced motion keeps it. */
+/* « Voir sur le planning »: the absence's class washed a moment in its
+   colour, as the Assiduité page's row is (assiduity-row-flash), then let go. */
 .widget-card.planning-block.is-highlighted,
 .widget-card.planning-list-card.is-highlighted {
-  z-index: 2;
-  animation: planning-class-flash 2.4s ease-out both;
+  animation: planning-class-flash 2.2s ease-out both;
 }
 
 @keyframes planning-class-flash {
-  0%, 55% {
-    box-shadow: 0 0 0 3px var(--accent), 0 0 26px 6px color-mix(in srgb, var(--accent) 50%, transparent);
+  0%, 40% {
+    background-color: color-mix(in srgb, var(--accent) 24%, var(--color-widget-bg));
   }
 }
 
-/* « Absences »: a class with an absence in it, ringed in its status' colour
-   (red not justified, a lateness amber, soft once justified), a dot on the
-   grid's blocks. */
-.widget-card.has-absence {
-  --absence-ring: color-mix(in srgb, var(--color-text) 35%, transparent);
-  box-shadow: inset 0 0 0 2px var(--absence-ring), var(--glass-quiet-shadow);
-}
-
-.widget-card.has-absence.is-unjustified {
-  --absence-ring: var(--color-error);
-}
-
-.widget-card.has-absence.is-late {
-  --absence-ring: #f2a600;
-}
-
+/* « Absences »: a small dot on the grid's blocks (red not justified, amber a
+   lateness, soft once justified); the list's cards wear the status tag. */
 .planning-absence-dot {
   position: absolute;
-  top: 6px;
-  right: 6px;
-  width: 8px;
-  height: 8px;
+  top: 7px;
+  right: 7px;
+  width: 7px;
+  height: 7px;
   border-radius: 9999px;
-  background: var(--absence-ring);
+  background: color-mix(in srgb, var(--color-text) 35%, transparent);
+}
+
+.is-unjustified > .planning-absence-dot {
+  background: var(--color-error);
+}
+
+.is-late > .planning-absence-dot {
+  background: #f2a600;
 }
 
 /* The course's colour, set inline in both themes (--accent, --accent-dark,

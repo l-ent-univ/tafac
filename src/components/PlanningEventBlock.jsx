@@ -93,7 +93,7 @@ function PlanningEventBlock({ event, accent, variant, stackFirst = false, width,
     </>
   )
   const card = {
-    className: `planning-block widget-card widget-card-visible isolate border bg-widget-bg text-text ${highlighted ? 'is-highlighted' : ''} ${absence ? `has-absence is-${absence.status}` : ''}`,
+    className: `planning-block widget-card widget-card-visible isolate border bg-widget-bg text-text ${highlighted ? 'is-highlighted' : ''} ${absence ? `is-${absence.status}` : ''}`,
     style: { width, height, borderRadius: layout.radius, ...accentStyle(accent), ...style },
     'data-event-id': event.id,
   }
