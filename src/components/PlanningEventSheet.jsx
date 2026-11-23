@@ -4,8 +4,11 @@ import { Icon } from '@iconify/react'
 import { dayText, durationText, formatTime, relativeDayText } from '../planningDates'
 import { nextOccurrences } from '../planningEvents'
 import { accentStyle } from '../eventAccents'
+import { canJustify } from '../assiduityDisplay'
 import { FULL_BLOCK_HEIGHT } from '../eventBlockLayout'
+import AbsenceTag from './AbsenceTag'
 import PlanningEventBlock from './PlanningEventBlock'
+import SmoothSurface from './SmoothSurface'
 import CloseButton from './CloseButton'
 import Tooltip from './Tooltip'
 import { GROUP_CARD_CLASSES, GroupRow } from './GroupCard'
@@ -26,7 +29,10 @@ function linkHost(href) {
 // takes the planning to its day). `searching`: those weeks are still on
 // their way. `onWrite`: « Écrire au sujet de ce cours » (a mail about it,
 // in the Messagerie), null without the in-app mail page.
-function PlanningEventSheet({ event, accent, events, todayKey, searching, onWrite = null, onClose, onPickDay }) {
+// `absence`: the student's absence in this class, when « Absences » is shown
+// (its status, and « Justifier » through `onJustify(absence)`, null without
+// the in-app Messagerie or when there is nothing to justify).
+function PlanningEventSheet({ event, accent, events, todayKey, searching, absence = null, onJustify = null, onWrite = null, onClose, onPickDay }) {
   const dialogRef = useRef(null)
   const dismiss = useSheetDrag(dialogRef, onClose)
   const scrollRef = useRef(null)
@@ -143,6 +149,25 @@ function PlanningEventSheet({ event, accent, events, todayKey, searching, onWrit
                     <GroupRow icon="ph:link" title={event.linkLabel ?? 'Lien'} detail={linkHost(event.link)} href={event.link} />
                   ) : null}
                 </ul>
+                {absence ? (
+                  <div className="flex flex-wrap items-center gap-2">
+                    <AbsenceTag status={absence.status} className="h-[30px]! p-2!" />
+                    <span className="min-w-0 flex-1 font-body text-[13px] font-medium leading-[1.3] text-text-secondary">
+                      {absence.status === 'late' ? 'Arrivé en retard' : `Absent de ${absence.start} à ${absence.end}`}
+                    </span>
+                    {onJustify && canJustify(absence) ? (
+                      <button
+                        type="button"
+                        onClick={() => onJustify(absence)}
+                        className="lent-button justify-button relative inline-flex h-[30px] cursor-pointer items-center gap-1.5 rounded-full px-3 after:absolute after:-inset-[7px]"
+                      >
+                        <SmoothSurface />
+                        <Icon icon="ph:seal-check" className="size-[15px]" aria-hidden="true" />
+                        <span className="font-body text-[13px] font-medium leading-none">Justifier</span>
+                      </button>
+                    ) : null}
+                  </div>
+                ) : null}
               </div>
               {/* Titled like the sections of Mes notes. */}
               <section className="gd-rise grid gap-3" style={{ '--d': '80ms' }} aria-labelledby="planning-occurrences-title">

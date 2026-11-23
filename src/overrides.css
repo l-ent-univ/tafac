@@ -7727,7 +7727,7 @@
   }
 }
 
-.button-group-item[aria-expanded="true"] {
+.button-group-item:is([aria-expanded="true"], [aria-pressed="true"]) {
   background-color: rgb(52 18 0 / 0.08);
 }
 
@@ -7757,7 +7757,7 @@
   }
 }
 
-:where([data-theme="dark"]) .button-group-item[aria-expanded="true"] {
+:where([data-theme="dark"]) .button-group-item:is([aria-expanded="true"], [aria-pressed="true"]) {
   background-color: rgb(255 255 255 / 0.1);
 }
 
@@ -9213,6 +9213,46 @@ button.planning-block:active {
 .planning-block:focus-visible {
   outline: 2px solid var(--color-brand);
   outline-offset: 2px;
+}
+
+/* « Voir sur le planning »: the absence's class lit up in its colour, then
+   let go (PlanningPage's highlightId). No movement, so reduced motion keeps it. */
+.widget-card.planning-block.is-highlighted,
+.widget-card.planning-list-card.is-highlighted {
+  z-index: 2;
+  animation: planning-class-flash 2.4s ease-out both;
+}
+
+@keyframes planning-class-flash {
+  0%, 55% {
+    box-shadow: 0 0 0 3px var(--accent), 0 0 26px 6px color-mix(in srgb, var(--accent) 50%, transparent);
+  }
+}
+
+/* « Absences »: a class with an absence in it, ringed in its status' colour
+   (red not justified, a lateness amber, soft once justified), a dot on the
+   grid's blocks. */
+.widget-card.has-absence {
+  --absence-ring: color-mix(in srgb, var(--color-text) 35%, transparent);
+  box-shadow: inset 0 0 0 2px var(--absence-ring), var(--glass-quiet-shadow);
+}
+
+.widget-card.has-absence.is-unjustified {
+  --absence-ring: var(--color-error);
+}
+
+.widget-card.has-absence.is-late {
+  --absence-ring: #f2a600;
+}
+
+.planning-absence-dot {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  width: 8px;
+  height: 8px;
+  border-radius: 9999px;
+  background: var(--absence-ring);
 }
 
 /* The course's colour, set inline in both themes (--accent, --accent-dark,

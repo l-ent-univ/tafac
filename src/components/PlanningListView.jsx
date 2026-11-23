@@ -1,8 +1,10 @@
 import { useEffect, useRef } from 'react'
 import { Icon } from '@iconify/react'
+import { ABSENCE_STATUS_LABELS } from '../absenceMail'
 import { accentStyle } from '../eventAccents'
 import { agendaDayText, durationText, formatTime, weekRangeText } from '../planningDates'
 import { isOngoing, listWeekDays } from '../planningEvents'
+import AbsenceTag from './AbsenceTag'
 import PlanningNote from './PlanningNote'
 
 // The phone's tab bar over the page's bottom (and its margin).
@@ -36,7 +38,7 @@ function MetaLabel({ icon, text }) {
 // their own, as an agenda's. A button opening the class's sheet; also the
 // composer's « Un cours… » drawer's (MailCoursePicker), `className` its
 // own.
-export function PlanningListCard({ event, accent, ongoing, onOpen, menuProps = null, className = '' }) {
+export function PlanningListCard({ event, accent, ongoing, onOpen, menuProps = null, highlighted = false, absence = null, className = '' }) {
   const hours = `${formatTime(event.start)} – ${formatTime(event.end)}`
   const duration = durationText(event.start, event.end)
   const meta = [
@@ -47,11 +49,12 @@ export function PlanningListCard({ event, accent, ongoing, onOpen, menuProps = n
   return (
     <button
       type="button"
-      className={`planning-list-card widget-card widget-card-visible isolate relative flex w-full min-w-0 items-stretch gap-3 overflow-hidden card-corners-sm border bg-widget-bg p-[13px] text-left text-text cursor-pointer 4xl:gap-4 4xl:px-4 ${className}`}
+      className={`planning-list-card widget-card widget-card-visible isolate relative flex w-full min-w-0 items-stretch gap-3 overflow-hidden card-corners-sm border bg-widget-bg p-[13px] text-left text-text cursor-pointer 4xl:gap-4 4xl:px-4 ${highlighted ? 'is-highlighted' : ''} ${absence ? `has-absence is-${absence.status}` : ''} ${className}`}
       style={accentStyle(accent)}
+      data-event-id={event.id}
       onClick={() => onOpen(event)}
       {...menuProps?.(event.id)}
-      aria-label={`${formatTime(event.start)} à ${formatTime(event.end)}, ${event.title}${meta.map((part) => `, ${part.text}`).join('')}, ${duration}${ongoing ? ', en cours' : ''}`}
+      aria-label={`${formatTime(event.start)} à ${formatTime(event.end)}, ${event.title}${meta.map((part) => `, ${part.text}`).join('')}, ${duration}${ongoing ? ', en cours' : ''}${absence ? `, ${ABSENCE_STATUS_LABELS[absence.status]}` : ''}`}
     >
       <span className="latest-grade-wash planning-accent-fill" aria-hidden="true" />
       <span className="planning-list-bar planning-accent-fill" aria-hidden="true" />
@@ -62,7 +65,8 @@ export function PlanningListCard({ event, accent, ongoing, onOpen, menuProps = n
             <span className="4xl:hidden" aria-hidden="true">· </span>
             {duration}
           </span>
-          {ongoing ? <OngoingBadge className="ml-auto 4xl:hidden" /> : null}
+          {absence ? <AbsenceTag status={absence.status} /> : null}
+          {ongoing ? <OngoingBadge className={`${absence ? '' : 'ml-auto '}4xl:hidden`} /> : null}
         </span>
         <span className="grid min-w-0 flex-1 gap-1">
           <span className="line-clamp-2 font-body text-[16px] font-semibold leading-[1.25] text-text [overflow-wrap:anywhere]">{event.title}</span>
@@ -110,7 +114,7 @@ function DayHeading({ day, todayKey, count }) {
 // a day then picked in it (the strip, "Aujourd’hui") is scrolled to just
 // under the page's top (`active`: the page in view, not a neighbour in
 // the pager).
-function PlanningListView({ monday, selectedDay, events, statusOn, accentFor, now, todayKey, active, onOpen, menuProps = null, onRetry = null, onOpenAccount = null }) {
+function PlanningListView({ monday, selectedDay, events, statusOn, accentFor, now, todayKey, active, onOpen, menuProps = null, marks = null, onRetry = null, onOpenAccount = null }) {
   const days = listWeekDays(events, monday, { todayKey, selectedDay })
   const listRef = useRef(null)
   // The day last scrolled for: only another one picked scrolls to it (the
@@ -169,7 +173,7 @@ function PlanningListView({ monday, selectedDay, events, statusOn, accentFor, no
             <ul className="m-0 grid min-w-0 list-none gap-2 p-0 4xl:gap-2.5">
               {dayEvents.map((event) => (
                 <li key={event.id} className="flex min-w-0">
-                  <PlanningListCard event={event} accent={accentFor(event.title)} ongoing={isOngoing(event, now)} onOpen={onOpen} menuProps={menuProps} />
+                  <PlanningListCard event={event} accent={accentFor(event.title)} ongoing={isOngoing(event, now)} onOpen={onOpen} menuProps={menuProps} highlighted={marks?.highlightId === event.id} absence={marks?.absenceOf?.(event) ?? null} />
                 </li>
               ))}
             </ul>

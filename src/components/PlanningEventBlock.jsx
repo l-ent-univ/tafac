@@ -1,4 +1,5 @@
 import { Icon } from '@iconify/react'
+import { ABSENCE_STATUS_LABELS } from '../absenceMail'
 import { accentStyle } from '../eventAccents'
 import { layoutEventBlock } from '../eventBlockLayout'
 import { durationText, formatTime } from '../planningDates'
@@ -51,7 +52,9 @@ function MetaLabel({ icon, text, design, style }) {
 // notes" cards wear their UEs' colours), its accent bar, the title, and the
 // room and the teacher as they fit. No time: the grid tells it. A button
 // opening the class's sheet, or the card alone without `onOpen`.
-function PlanningEventBlock({ event, accent, variant, stackFirst = false, width, height, style, onOpen, menuProps = null }) {
+// `highlighted`: lit up a moment (« Voir sur le planning »); `absence`: the
+// student's absence in it, ringed in its status' colour with a dot.
+function PlanningEventBlock({ event, accent, variant, stackFirst = false, width, height, style, onOpen, menuProps = null, highlighted = false, absence = null }) {
   const layout = layoutEventBlock({
     width,
     height,
@@ -86,11 +89,13 @@ function PlanningEventBlock({ event, accent, variant, stackFirst = false, width,
           </span>
         ) : null}
       </span>
+      {absence ? <span className="planning-absence-dot" aria-hidden="true" /> : null}
     </>
   )
   const card = {
-    className: 'planning-block widget-card widget-card-visible isolate border bg-widget-bg text-text',
+    className: `planning-block widget-card widget-card-visible isolate border bg-widget-bg text-text ${highlighted ? 'is-highlighted' : ''} ${absence ? `has-absence is-${absence.status}` : ''}`,
     style: { width, height, borderRadius: layout.radius, ...accentStyle(accent), ...style },
+    'data-event-id': event.id,
   }
 
   // At the top of its sheet: the card alone.
@@ -102,7 +107,7 @@ function PlanningEventBlock({ event, accent, variant, stackFirst = false, width,
       {...card}
       onClick={() => onOpen(event)}
       {...menuProps?.(event.id)}
-      aria-label={`${formatTime(event.start)} à ${formatTime(event.end)}, ${event.title}${[event.location, event.teacher].filter(Boolean).map((part) => `, ${part}`).join('')}, ${durationText(event.start, event.end)}`}
+      aria-label={`${formatTime(event.start)} à ${formatTime(event.end)}, ${event.title}${[event.location, event.teacher].filter(Boolean).map((part) => `, ${part}`).join('')}, ${durationText(event.start, event.end)}${absence ? `, ${ABSENCE_STATUS_LABELS[absence.status]}` : ''}`}
     >
       {content}
     </button>

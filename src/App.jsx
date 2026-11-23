@@ -2251,7 +2251,12 @@ function App() {
   // « Accueil »'s « Prochains cours »: the planning page, opened on that
   // class's day (today without one).
   const [pendingPlanningDay, setPendingPlanningDay] = useState(null)
-  const handleOpenPlanningDay = useCallback((day) => {
+  // `focus`: an absence (« Voir sur le planning » on « Accueil »'s line),
+  // whose class the planning lights up on the day.
+  const [pendingPlanningFocus, setPendingPlanningFocus] = useState(null)
+  const clearPendingPlanningFocus = useCallback(() => setPendingPlanningFocus(null), [])
+  const handleOpenPlanningDay = useCallback((day, focus = null) => {
+    setPendingPlanningFocus(focus?.date ? focus : null)
     // iOS app: a planning kept from an earlier visit is on the day it was
     // left on, so today is said too; either way the day is seen from the
     // page's top.
@@ -3238,7 +3243,7 @@ function App() {
             ) : null}
             {isPlanningPage || keptPages.planning ? (
               <KeptPage key={keptPages.planning?.key} kept={keptPages.planning} shown={isPlanningPage}>
-                <PlanningPage selection={selectedTp} user={sessionState.user} showWeekend={showPlanningWeekend} onOpenAccount={handleOpenAccountModal} initialDay={pendingPlanningDay} onInitialDayHandled={clearPendingPlanningDay} arrivalSource={planningArrivalSource} onComposeMail={hasMailPage ? handleComposeMail : null} onSidePanelOpenChange={handlePlanningSidePanelOpenChange} onOpenPlanningSettings={handleOpenPlanningSettings} />
+                <PlanningPage selection={selectedTp} user={sessionState.user} showWeekend={showPlanningWeekend} onOpenAccount={handleOpenAccountModal} initialDay={pendingPlanningDay} onInitialDayHandled={clearPendingPlanningDay} initialFocus={pendingPlanningFocus} onInitialFocusHandled={clearPendingPlanningFocus} canShowAbsences={hasAssiduityPage} absenceReasons={universityConfig.establishments?.byId?.[establishment]?.absenceReasons} arrivalSource={planningArrivalSource} onComposeMail={hasMailPage ? handleComposeMail : null} onSidePanelOpenChange={handlePlanningSidePanelOpenChange} onOpenPlanningSettings={handleOpenPlanningSettings} />
               </KeptPage>
             ) : null}
             {isAssiduityPage || keptPages.assiduity ? (

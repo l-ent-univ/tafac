@@ -151,7 +151,7 @@ function MarkPopover({ entry, accent, anchor, popoverRef, justifies, onOpen, onO
             </button>
           ) : null}
           {onOpenPlanning ? (
-            <button type="button" onClick={() => onOpenPlanning(entry.date.slice(0, 10))} className={`${MARK_ACTION} group relative justify-center size-[28px]`} aria-label="Voir sur le planning">
+            <button type="button" onClick={() => onOpenPlanning(entry.date.slice(0, 10), entry)} className={`${MARK_ACTION} group relative justify-center size-[28px]`} aria-label="Voir sur le planning">
               <Icon icon="ph:calendar-blank" className="size-[14px]" aria-hidden="true" />
               <Tooltip title="Voir sur le planning" side="top" />
             </button>
@@ -377,7 +377,8 @@ function MiniLine({ timeline, entriesById, assigned, justifies, onOpen, onOpenPl
 // mark's popover, to the Assiduité page (null: the popover has no buttons);
 // `justifies`: the page can justify (it writes the mail, so with the
 // Messagerie), else no « Justifier »; `onOpenPage`: the title opens the
-// page; `onOpenPlanning(day)`: the popover's planning button.
+// page; `onOpenPlanning(day, entry)`: the popover's planning button (the class
+// of the absence is lit up there).
 function WidgetAssiduity({ payload, releve, config, status, onOpen = null, justifies = false, onOpenPage = null, onOpenPlanning = null }) {
   const skeletonsForced = useSkeletonsForced()
   // Read once: the card is redrawn as the page loads, the line stays put.
