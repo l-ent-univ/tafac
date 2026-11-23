@@ -9230,25 +9230,27 @@ button.planning-block:active {
   }
 }
 
-/* « Absences »: a small dot on the grid's blocks (red not justified, amber a
-   lateness, soft once justified); the list's cards wear the status tag. */
-.planning-absence-dot {
+/* « Absences »: a small round status badge in the grid's blocks' corner (its
+   icon the status' as the Assiduité page's pills, red not justified);
+   the list's cards wear the status tag. */
+.planning-absence-badge {
   position: absolute;
-  top: 6px;
-  right: 6px;
-  width: 9px;
-  height: 9px;
+  top: 5px;
+  right: 5px;
+  display: inline-flex;
+  width: 18px;
+  height: 18px;
+  align-items: center;
+  justify-content: center;
   border-radius: 9999px;
-  box-shadow: 0 0 0 2px var(--color-widget-bg);
-  background: color-mix(in srgb, var(--color-text) 35%, transparent);
+  background: var(--color-widget-bg);
+  color: var(--color-text-secondary);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--color-text) 10%, transparent);
 }
 
-.is-unjustified > .planning-absence-dot {
-  background: var(--color-error);
-}
-
-.is-late > .planning-absence-dot {
-  background: #f2a600;
+.is-unjustified > .planning-absence-badge {
+  background: var(--color-error-bg);
+  color: var(--color-error);
 }
 
 /* The course's colour, set inline in both themes (--accent, --accent-dark,

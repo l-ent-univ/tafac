@@ -41,7 +41,8 @@ const PHONE_VIEWS = ['day', 'twoDays', 'list']
 const WIDE_VIEW_KEY = 'l-ent:planning-wide-view'
 const WIDE_VIEWS = ['day', 'week', 'list']
 const WIDE_QUERY = '(min-width: 1024px)'
-// « Absences »: the absences shown on the classes, kept in this browser.
+// « Absences »: the absences marked on the classes (on unless turned off),
+// kept in this browser.
 const ABSENCES_KEY = 'l-ent:planning-absences'
 // « Salles et personnels »' side panel (PlanningDirectoryPanel): narrower
 // than the mail reader by default, a list; dragged from its left edge and
@@ -90,9 +91,9 @@ function scrollToPageTop(element) {
 
 function readAbsencesShown() {
   try {
-    return localStorage.getItem(ABSENCES_KEY) === '1'
+    return localStorage.getItem(ABSENCES_KEY) !== '0'
   } catch {
-    return false
+    return true
   }
 }
 
@@ -247,7 +248,10 @@ function PlanningPage({ selection = null, user = null, showWeekend = false, onOp
     if (next) trackPlanningAction('absences_toggled')
     setAbsencesWanted(next)
   }, [absencesWanted])
-  const absenceOf = useMemo(() => (showAbsences ? (event) => absenceOn(absenceEntries, event) : null), [showAbsences, absenceEntries])
+  // A class's sheet and menu always know its absence; the marks on the
+  // planning itself follow « Absences ».
+  const absenceFor = useMemo(() => (canShowAbsences ? (event) => absenceOn(absenceEntries, event) : null), [canShowAbsences, absenceEntries])
+  const absenceOf = showAbsences ? absenceFor : null
   // The class lit up (« Voir sur le planning »): looked for among the
   // events as they come in, once; scrolled to, and let go after a moment.
   const [highlightId, setHighlightId] = useState(null)
@@ -451,7 +455,7 @@ function PlanningPage({ selection = null, user = null, showWeekend = false, onOp
   const eventMenuProps = useContextMenu((id) => {
     const event = events.find((entry) => entry.id === id)
     if (!event) return null
-    const absence = absenceOf?.(event)
+    const absence = absenceFor?.(event)
     return [
       { id: 'open', label: 'Voir le détail', icon: 'ph:eye', onSelect: () => openSheet(event) },
       openJustify && absence && canJustify(absence) ? { id: 'justify', label: 'Justifier', icon: 'ph:seal-check', onSelect: () => openJustify(absence) } : null,
@@ -595,7 +599,7 @@ function PlanningPage({ selection = null, user = null, showWeekend = false, onOp
           todayKey={todayKey}
           searching={occurrenceWeeks.some((monday) => statusOn(monday) === 'loading')}
           onClose={sheet.close}
-          absence={absenceOf?.(openEvent) ?? null}
+          absence={absenceFor?.(openEvent) ?? null}
           onJustify={openJustify}
           onWrite={writeAboutCourse ? () => void writeAboutCourse(openEvent) : null}
           onPickDay={(day) => {
@@ -605,7 +609,7 @@ function PlanningPage({ selection = null, user = null, showWeekend = false, onOp
           }}
         />
       ) : null}
-      {showAbsences ? <PlanningAbsencesLoader onEntries={setAbsenceEntries} /> : null}
+      {canShowAbsences ? <PlanningAbsencesLoader onEntries={setAbsenceEntries} /> : null}
       {justifySheet.isOpen && justifyEntry ? (
         <JustifyAbsenceSheet entry={justifyEntry} extraReasons={absenceReasons} findsClassTeacher onCompose={onComposeMail} onClose={justifySheet.close} />
       ) : null}

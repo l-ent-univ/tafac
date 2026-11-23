@@ -1,5 +1,6 @@
 import { Icon } from '@iconify/react'
 import { ABSENCE_STATUS_LABELS } from '../absenceMail'
+import { STATUS_STYLES } from '../assiduityDisplay'
 import { accentStyle } from '../eventAccents'
 import { layoutEventBlock } from '../eventBlockLayout'
 import { durationText, formatTime } from '../planningDates'
@@ -89,7 +90,7 @@ function PlanningEventBlock({ event, accent, variant, stackFirst = false, width,
           </span>
         ) : null}
       </span>
-      {absence ? <span className="planning-absence-dot" aria-hidden="true" /> : null}
+      {absence ? <span className="planning-absence-badge" aria-hidden="true"><Icon icon={STATUS_STYLES[absence.status]?.icon ?? 'ph:check-circle'} style={{ width: 11, height: 11 }} /></span> : null}
     </>
   )
   const card = {
