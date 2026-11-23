@@ -1420,7 +1420,26 @@ function App() {
 
     async function hydrateProfile() {
       try {
-        const storedSelection = getStoredTpSelection(sessionState.user)
+        let storedSelection = getStoredTpSelection(sessionState.user)
+
+        // A personal timetable (planning.personal): a group picked in the tree
+        // (an ADE id, digits) before the student's own timetable was offered,
+        // or while it couldn't be found, gives way to it once the tree offers
+        // it (« Mon emploi du temps », an id without digits). Mon compte has
+        // no « Mon groupe » to change it there.
+        if (storedSelection && universityConfig.planning?.personal === true && /\d/.test(String(storedSelection.resourceId ?? ''))) {
+          const personalSelection = await getAdeTree()
+            .then((response) => response?.tree?.defaultSelection ?? null)
+            .catch(() => null)
+          if (cancelled) {
+            return
+          }
+          if (personalSelection?.resourceId && !/\d/.test(String(personalSelection.resourceId))) {
+            persistTpSelection(personalSelection, sessionState.user)
+            clearAdeTimetableCache()
+            storedSelection = getStoredTpSelection(sessionState.user) ?? personalSelection
+          }
+        }
 
         if (storedSelection) {
           if (cancelled) {

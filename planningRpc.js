@@ -130,10 +130,12 @@ function buildPlanningSerializationPolicySet(policiesByServiceName) {
   return serializationPolicies
 }
 
-function extractPlanningSerializationPoliciesFromCache(scriptText) {
+export function extractPlanningSerializationPoliciesFromCache(scriptText) {
   const policiesByServiceName = new Map()
 
-  for (const match of scriptText.matchAll(/\$w\.call\(this,\$Ad\(\),'([^']+)','([A-F0-9]{32})'/g)) {
+  // The minified names change with each ADE build (Rennes: $w/$Ad,
+  // Sorbonne Nouvelle 6.12: Xx/UDd): any `<fn>.call(this,<fn>(),…)`.
+  for (const match of scriptText.matchAll(/[\w$]+\.call\(this,[\w$]+\(\),'([^']+)','([A-F0-9]{32})'/g)) {
     policiesByServiceName.set(match[1], match[2])
   }
 
@@ -402,6 +404,84 @@ function parsePlanningIdentifier(text) {
   return match ? match[0].slice(1, -1) : null
 }
 
+// The criteria getResourceIds takes: the student's "L…" identifier (Rennes),
+// or, on ADE 6.12 (Sorbonne Nouvelle), their enrolment codes, listed right
+// after the String class in the login's string table.
+export function parsePlanningLoginIdentifiers(text) {
+  const legacyIdentifier = parsePlanningIdentifier(text)
+  if (legacyIdentifier) {
+    return [legacyIdentifier]
+  }
+
+  const strings = extractPlanningStringArray(text)
+  const start = strings.indexOf('java.lang.String/2004016611')
+  const codes = []
+  for (const value of start === -1 ? [] : strings.slice(start + 1)) {
+    if (!/^[A-Z0-9{}:-]+$/.test(value)) {
+      break
+    }
+    codes.push(value)
+  }
+  return codes
+}
+
+// The student's own ADE resources, from getResourceIds. The Rennes Planning
+// (an "L…" identifier) has exactly one: a failed call, or no id in its
+// answer, is an error as it always was, so a passing failure isn't kept as
+// « no group » for the context's lifetime. ADE 6.12 (Sorbonne Nouvelle) may
+// match none of the enrolment codes: [] then, the tree opens at its root
+// and timetables need a chosen group.
+export function readPlanningResourceIds(result, { v612 = false } = {}) {
+  if (v612) {
+    return result.ok ? parsePlanningIntegerList(result.text).filter(Number.isInteger) : []
+  }
+
+  if (!result.ok) {
+    throw new Error(`Planning resource ids failed (${result.status}): ${result.text.slice(0, 240)}`)
+  }
+
+  const resourceId = parsePlanningFirstInteger(result.text)
+  if (!Number.isInteger(resourceId)) {
+    throw new Error(`Could not extract planning resource id: ${result.text.slice(0, 240)}`)
+  }
+  return [resourceId]
+}
+
+// A personal timetable (planning.personal: true, Sorbonne Nouvelle): the
+// student's own ADE resources, found at login (one per enrolment group, so
+// no single group in the tree holds the whole week), stand together for a
+// « Mon emploi du temps » the client adopts as its group, as TEMPO's
+// (tempoApi.js). Its id has no digit: the timetable reads it as no group
+// asked, the student's own resources then.
+export const PLANNING_PERSONAL_RESOURCE_ID = 'personal'
+const PLANNING_PERSONAL_LABEL = 'Mon emploi du temps'
+
+export function buildPlanningPersonalSelection() {
+  return {
+    resourceId: PLANNING_PERSONAL_RESOURCE_ID,
+    label: PLANNING_PERSONAL_LABEL,
+    parentResourceId: null,
+    parentLabel: null,
+    contextLabel: PLANNING_PERSONAL_LABEL,
+    programResourceId: null,
+    programLabel: null,
+    yearResourceId: null,
+    yearLabel: null,
+    tdResourceId: null,
+    tdLabel: null,
+    tpResourceId: null,
+    tpLabel: null,
+  }
+}
+
+// An ArrayList<Integer> answer, which GWT writes backwards:
+// [last, Integer type, …, first, Integer type, size, ArrayList type, [strings], …].
+export function parsePlanningIntegerList(text) {
+  const payload = evaluatePlanningRpcPayload(text)
+  const numbers = payload.slice(0, payload.findIndex(Array.isArray))
+  return numbers.slice(0, -2).filter((_, index) => index % 2 === 0).reverse()
+}
+
 function extractPlanningCalendarString(text) {
   const payload = evaluatePlanningRpcPayload(text)
   const stringArray = payload.find((value) => Array.isArray(value) && value.every((item) => typeof item === 'string'))
@@ -435,7 +515,8 @@ function formatUtcDate(utcMs) {
 }
 
 function extractPlanningWeekEntries(calendarString) {
-  const weekPattern = /\{"(-?\d+)""(\d{13})""(S\d+\s+\d{2}\/\d{2}\/\d{4}\s+-\s+\d{2}\/\d{2}\/\d{4})""(true|false)"/g
+  // Labels: "S12 01/12/2025 - 07/12/2025" (Rennes) or "01 décembre 2025" (ADE 6.12).
+  const weekPattern = /\{"(-?\d+)""(\d{13})""(S\d+\s+\d{2}\/\d{2}\/\d{4}\s+-\s+\d{2}\/\d{2}\/\d{4}|\d{2} [^"\d]+ \d{4})""(true|false)"/g
   const weeksByIndex = new Map()
   let match
 
@@ -503,8 +584,8 @@ function buildPlanningLoginBody(moduleBase, clientId, serializationPolicy) {
   return `7|0|8|${moduleBase}|${serializationPolicy}|com.adesoft.gwt.directplan.client.rpc.MyPlanningClientServiceProxy|method1login|J|com.adesoft.gwt.core.client.rpc.data.LoginRequest/3705388826|com.adesoft.gwt.directplan.client.rpc.data.DirectLoginRequest/635437471||1|2|3|4|2|5|6|${clientId}|7|0|0|0|1|1|8|8|-1|0|0|`
 }
 
-function buildPlanningLoadProjectBody(moduleBase, clientId, serializationPolicy) {
-  return `7|0|7|${moduleBase}|${serializationPolicy}|com.adesoft.gwt.core.client.rpc.WebClientServiceProxy|method6loadProject|J|I|Z|1|2|3|4|3|5|6|7|${clientId}|1|0|`
+function buildPlanningLoadProjectBody(moduleBase, clientId, serializationPolicy, projectId) {
+  return `7|0|7|${moduleBase}|${serializationPolicy}|com.adesoft.gwt.core.client.rpc.WebClientServiceProxy|method6loadProject|J|I|Z|1|2|3|4|3|5|6|7|${clientId}|${projectId}|0|`
 }
 
 function buildPlanningSavedPropertiesBody(moduleBase, clientId, serializationPolicy) {
@@ -519,8 +600,8 @@ function buildPlanningEventFieldsBody(moduleBase, clientId, serializationPolicy)
   return `7|0|5|${moduleBase}|${serializationPolicy}|com.adesoft.gwt.directplan.client.rpc.DirectPlanningPlanningServiceProxy|method2getEventFields|J|1|2|3|4|1|5|${clientId}|`
 }
 
-function buildPlanningDisplayConfigurationBody(moduleBase, clientId, serializationPolicy) {
-  return `7|0|8|${moduleBase}|${serializationPolicy}|com.adesoft.gwt.core.client.rpc.ConfigurationServiceProxy|method28getDisplayConfigurationByName|J|java.lang.String/2004016611|Z|web-default|1|2|3|4|3|5|6|7|${clientId}|8|0|`
+function buildPlanningDisplayConfigurationBody(moduleBase, clientId, serializationPolicy, displayConfigurationName) {
+  return `7|0|8|${moduleBase}|${serializationPolicy}|com.adesoft.gwt.core.client.rpc.ConfigurationServiceProxy|method28getDisplayConfigurationByName|J|java.lang.String/2004016611|Z|${displayConfigurationName}|1|2|3|4|3|5|6|7|${clientId}|8|0|`
 }
 
 function buildPlanningCalendarBody(moduleBase, clientId, serializationPolicy) {
@@ -535,8 +616,21 @@ function buildPlanningConnectedStudentBody(moduleBase, clientId, serializationPo
   return `7|0|5|${moduleBase}|${serializationPolicy}|com.adesoft.gwt.pac.client.rpc.PacServiceProxy|method2getConnectedStudent|J|1|2|3|4|1|5|${clientId}|`
 }
 
-function buildPlanningResourceIdsBody(moduleBase, clientId, serializationPolicy, identifier) {
-  return `7|0|13|${moduleBase}|${serializationPolicy}|com.adesoft.gwt.directplan.client.rpc.DirectPlanningServiceProxy|method7getResourceIds|J|java.util.List|java.util.Map|Z|java.util.ArrayList/4159755760|java.util.HashMap/1797211028|com.adesoft.gwt.directplan.client.rpc.ResourceFieldCriteria/1324434193|java.lang.String/2004016611|${identifier}|1|2|3|4|4|5|6|7|8|${clientId}|9|0|10|1|11|1|9|1|12|13|0|`
+function buildPlanningResourceIdsBody(moduleBase, clientId, serializationPolicy, identifiers) {
+  const refs = identifiers.map((_, index) => `12|${13 + index}`).join('|')
+  return `7|0|${12 + identifiers.length}|${moduleBase}|${serializationPolicy}|com.adesoft.gwt.directplan.client.rpc.DirectPlanningServiceProxy|method7getResourceIds|J|java.util.List|java.util.Map|Z|java.util.ArrayList/4159755760|java.util.HashMap/1797211028|com.adesoft.gwt.directplan.client.rpc.ResourceFieldCriteria/1324434193|java.lang.String/2004016611|${identifiers.join('|')}|1|2|3|4|4|5|6|7|8|${clientId}|9|0|10|1|11|1|9|${identifiers.length}|${refs}|0|`
+}
+
+// ADE 6.12 (Sorbonne Nouvelle): getLegends/getTimetable renumbered, with an
+// extra list argument, over every resource of the student at once.
+function buildPlanningLegendsBodyV612(moduleBase, clientId, serializationPolicy, displayConfigurationId, resourceIds, weekIndex) {
+  const resources = resourceIds.map((id) => `10|${id}`).join('|')
+  return `7|0|14|${moduleBase}|${serializationPolicy}|com.adesoft.gwt.directplan.client.rpc.DirectPlanningPlanningServiceProxy|method6getLegends|J|com.adesoft.gwt.core.client.rpc.data.planning.PlanningSelection/927838067|com.extjs.gxt.ui.client.data.SortInfo/1143517771|java.util.List|java.util.ArrayList/4159755760|java.lang.Integer/3438268394|Cumul|Déplacement|com.extjs.gxt.ui.client.Style$SortDir/3873584144|NAME|1|2|3|4|4|5|6|7|8|${clientId}|6|9|7|10|0|10|1|10|2|10|3|10|4|10|5|10|6|${displayConfigurationId}|11|12|0|0|9|${resourceIds.length}|${resources}|9|1|10|${weekIndex}|7|13|1|14|9|0|`
+}
+
+function buildPlanningTimetableBodyV612(moduleBase, clientId, serializationPolicy, displayConfigurationId, resourceIds, weekIndex) {
+  const resources = resourceIds.map((id) => `11|${id}`).join('|')
+  return `7|0|13|${moduleBase}|${serializationPolicy}|com.adesoft.gwt.directplan.client.rpc.DirectPlanningPlanningServiceProxy|method10getTimetable|J|com.adesoft.gwt.core.client.rpc.data.planning.PlanningSelection/927838067|I|Z|java.util.List|java.util.ArrayList/4159755760|java.lang.Integer/3438268394|Cumul|Déplacement|1|2|3|4|7|5|6|7|7|8|9|9|${clientId}|6|10|7|11|0|11|1|11|2|11|3|11|4|11|5|11|6|${displayConfigurationId}|12|13|0|0|10|${resourceIds.length}|${resources}|10|1|11|${weekIndex}|770|627|1|10|0|10|0|`
 }
 
 function buildPlanningLegendsBody(moduleBase, clientId, serializationPolicy, displayConfigurationId, resourceId, weekIndex) {
@@ -706,6 +800,85 @@ function extractPlanningTimetableEvents(text, dayLabels) {
 
     return left.title.localeCompare(right.title)
   })
+}
+
+// ADE 6.12 (Sorbonne Nouvelle) draws the week transposed: one row per day,
+// `width` pixels high. Each SquareEvent is written
+// [x, y, width, height, 0, three String refs, …its text list…, size, ArrayList],
+// the list, read backwards, being its fields with a null between each:
+// title, teachers (when some), rooms (one or several), time.
+// shortcut: layout checked on a single capture; if a Planning shows
+// columns-per-day, derive the day from x instead.
+export function extractPlanningTimetableEventsV612(text, dayLabels) {
+  const payload = evaluatePlanningRpcPayload(text)
+  const stringIndex = payload.findIndex(Array.isArray)
+  const strings = payload[stringIndex] ?? []
+  const numbers = payload.slice(0, stringIndex)
+  const stringType = strings.indexOf('java.lang.String/2004016611') + 1
+  const listType = strings.indexOf('java.util.ArrayList/4159755760') + 1
+  const events = []
+
+  for (let marker = 1; marker < numbers.length - 1; marker += 1) {
+    if (numbers[marker + 1] !== listType || !(numbers[marker] > 0)) {
+      continue
+    }
+
+    const texts = []
+    let cursor = marker - 1
+    while (texts.length < numbers[marker] && cursor >= 1) {
+      if (numbers[cursor] === stringType) {
+        texts.push(strings[numbers[cursor - 1] - 1] ?? '')
+        cursor -= 2
+      } else if (numbers[cursor] === 0) {
+        texts.push(null)
+        cursor -= 1
+      } else {
+        break
+      }
+    }
+
+    const values = texts.filter(Boolean)
+    const timeIndex = values.findLastIndex((value) => /^\d{2}h\d{2} - \d{2}h\d{2}$/.test(value))
+    if (texts.length !== numbers[marker] || timeIndex < 2 || cursor < 7) {
+      continue
+    }
+
+    // After the title: the teachers (when some), then the rooms, as many
+    // as the class has, each in its own field. A room reads « site - room »
+    // (« Nation - B113 »), a teacher « NAME First name » (a hyphenated name
+    // has no spaces round its dash): the rooms start at the first field
+    // like that. None like it: the last field is the room, as before.
+    // Checked on real weeks: « title, room », « title, teacher, room »,
+    // « title, teacher, room, room, room ».
+    const rest = values.slice(1, timeIndex)
+    const firstRoom = rest.findIndex((value) => /\S\s-\s\S/.test(value))
+    const roomsFrom = firstRoom === -1 ? Math.max(0, rest.length - 1) : firstRoom
+    const teachers = rest.slice(0, roomsFrom)
+    const rooms = rest.slice(roomsFrom)
+
+    const [x, y, width, height] = numbers.slice(cursor - 7, cursor - 3)
+    const dayIndex = width > 0 ? Math.round(y / width) : 0
+    const dayLabel = dayLabels[dayIndex] ?? null
+    const dayDate = dayLabel ? parseLegendDateLabel(dayLabel) : null
+    const timeRange = parsePlanningTimeRange(values[timeIndex])
+
+    events.push({
+      title: values[0],
+      teacher: teachers.join(', '),
+      location: rooms.join(', '),
+      groups: [],
+      dayIndex,
+      dayLabel,
+      date: dayDate,
+      timeLabel: values[timeIndex],
+      start: dayDate && timeRange ? `${dayDate}T${timeRange.start}:00` : null,
+      end: dayDate && timeRange ? `${dayDate}T${timeRange.end}:00` : null,
+      lane: 0,
+      layout: { x, y, width, height },
+    })
+  }
+
+  return events.sort((left, right) => (left.start ?? '').localeCompare(right.start ?? '') || left.title.localeCompare(right.title))
 }
 
 function extractPlanningStringArray(text) {
@@ -1149,6 +1322,11 @@ export function createPlanningRpcClient({
   followRedirectChain,
   planningOrigin,
   gwtClientId,
+  projectId = 1,
+  displayConfigurationName = 'web-default',
+  // planning.personal: the tree offers the student's own resources as
+  // their group (buildPlanningPersonalSelection), when the login found some.
+  personalTimetable = false,
 }) {
   if (typeof casOrigin !== 'string' || !casOrigin) {
     throw new TypeError('createPlanningRpcClient requires a casOrigin string.')
@@ -1188,6 +1366,7 @@ export function createPlanningRpcClient({
       const permutations = extractPlanningPermutationsFromBootstrap(scriptText)
       const selectedPermutation = permutations.myPlanning ?? PLANNING_GWT_FALLBACK_HASH
       let serializationPolicies = PLANNING_GWT_FALLBACK_SERIALIZATION_POLICIES
+      let v612 = false
 
       try {
         const cacheResponse = await fetchWithJar(`${moduleBase}${selectedPermutation}.cache.html`, jar, {
@@ -1200,6 +1379,7 @@ export function createPlanningRpcClient({
 
         if (cacheResponse.ok) {
           serializationPolicies = extractPlanningSerializationPoliciesFromCache(cacheText)
+          v612 = cacheText.includes('method10getTimetable')
         }
       } catch {
         serializationPolicies = PLANNING_GWT_FALLBACK_SERIALIZATION_POLICIES
@@ -1208,6 +1388,7 @@ export function createPlanningRpcClient({
       return {
         permutations,
         serializationPolicies,
+        v612,
       }
     })()
 
@@ -1263,17 +1444,19 @@ export function createPlanningRpcClient({
     const {
       permutations,
       serializationPolicies,
+      v612 = false,
     } = await getPlanningRpcMetadata(jar)
 
     const loginResult = await postPlanningRpc(jar, 'MyPlanningClientServiceProxy', permutations.myPlanning, buildPlanningLoginBody(moduleBase, clientId, serializationPolicies.myPlanning))
     ensurePlanningRpcOk(loginResult, 'Planning login')
 
-    const planningIdentifier = parsePlanningIdentifier(loginResult.text)
+    const planningIdentifiers = parsePlanningLoginIdentifiers(loginResult.text)
+    const planningIdentifier = planningIdentifiers[0] ?? null
     if (!planningIdentifier) {
       throw new Error(`Could not extract planning identifier from login response: ${loginResult.text.slice(0, 240)}`)
     }
 
-    const loadProjectResult = await postPlanningRpc(jar, 'WebClientServiceProxy', permutations.webClient, buildPlanningLoadProjectBody(moduleBase, clientId, serializationPolicies.webClient))
+    const loadProjectResult = await postPlanningRpc(jar, 'WebClientServiceProxy', permutations.webClient, buildPlanningLoadProjectBody(moduleBase, clientId, serializationPolicies.webClient, projectId))
     ensurePlanningRpcOk(loadProjectResult, 'Planning project load')
 
     const savedPropertiesResult = await postPlanningRpc(jar, 'WebClientServiceProxy', permutations.webClient, buildPlanningSavedPropertiesBody(moduleBase, clientId, serializationPolicies.webClient))
@@ -1285,7 +1468,7 @@ export function createPlanningRpcClient({
     const eventFieldsResult = await postPlanningRpc(jar, 'DirectPlanningPlanningServiceProxy', permutations.directPlanningPlanning, buildPlanningEventFieldsBody(moduleBase, clientId, serializationPolicies.directPlanningPlanning))
     ensurePlanningRpcOk(eventFieldsResult, 'Planning event fields')
 
-    const displayConfigurationResult = await postPlanningRpc(jar, 'ConfigurationServiceProxy', permutations.configuration, buildPlanningDisplayConfigurationBody(moduleBase, clientId, serializationPolicies.configuration))
+    const displayConfigurationResult = await postPlanningRpc(jar, 'ConfigurationServiceProxy', permutations.configuration, buildPlanningDisplayConfigurationBody(moduleBase, clientId, serializationPolicies.configuration, displayConfigurationName))
     ensurePlanningRpcOk(displayConfigurationResult, 'Planning display configuration')
 
     const displayConfigurationId = parsePlanningFirstInteger(displayConfigurationResult.text)
@@ -1293,8 +1476,9 @@ export function createPlanningRpcClient({
       throw new Error(`Could not extract planning display configuration id: ${displayConfigurationResult.text.slice(0, 240)}`)
     }
 
-    const connectedStudentResult = await postPlanningRpc(jar, 'PacServiceProxy', permutations.pac, buildPlanningConnectedStudentBody(moduleBase, clientId, serializationPolicies.pac))
-    ensurePlanningRpcOk(connectedStudentResult, 'Planning connected student')
+    // Called as the web client does; its answer is unused, and a Planning
+    // without the PAC module (Sorbonne Nouvelle) fails it harmlessly.
+    await postPlanningRpc(jar, 'PacServiceProxy', permutations.pac, buildPlanningConnectedStudentBody(moduleBase, clientId, serializationPolicies.pac))
 
     const calendarResult = await postPlanningRpc(jar, 'DirectPlanningServiceProxy', permutations.directPlanning, buildPlanningCalendarBody(moduleBase, clientId, serializationPolicies.directPlanning))
     ensurePlanningRpcOk(calendarResult, 'Planning calendar')
@@ -1307,17 +1491,18 @@ export function createPlanningRpcClient({
     const sqlModeResult = await postPlanningRpc(jar, 'DirectPlanningPlanningServiceProxy', permutations.directPlanningPlanning, buildPlanningSetSqlModeBody(moduleBase, clientId, serializationPolicies.directPlanningPlanning, calendarString))
     ensurePlanningRpcOk(sqlModeResult, 'Planning SQL mode')
 
-    const resourceIdsResult = await postPlanningRpc(jar, 'DirectPlanningServiceProxy', permutations.directPlanning, buildPlanningResourceIdsBody(moduleBase, clientId, serializationPolicies.directPlanning, planningIdentifier))
-    ensurePlanningRpcOk(resourceIdsResult, 'Planning resource ids')
-
-    const resourceId = parsePlanningFirstInteger(resourceIdsResult.text)
-    if (!Number.isInteger(resourceId)) {
-      throw new Error(`Could not extract planning resource id: ${resourceIdsResult.text.slice(0, 240)}`)
-    }
+    // The student's own ADE resources, found by their identifier (Rennes: one)
+    // or enrolment codes (Sorbonne Nouvelle: one per group, maybe none):
+    // readPlanningResourceIds.
+    const resourceIdsResult = await postPlanningRpc(jar, 'DirectPlanningServiceProxy', permutations.directPlanning, buildPlanningResourceIdsBody(moduleBase, clientId, serializationPolicies.directPlanning, planningIdentifiers))
+    const resourceIds = readPlanningResourceIds(resourceIdsResult, { v612 })
+    const resourceId = resourceIds[0] ?? null
 
     return {
       clientId,
+      v612,
       resourceId,
+      resourceIds,
       planningIdentifier,
       displayConfigurationId,
       calendarString,
@@ -1369,11 +1554,21 @@ export function createPlanningRpcClient({
     const { value: timetable, context } = await withPlanningContextRetry(jar, options, async (context) => {
       const requestedResourceId = parseAdeTreeResourceId(rawTargetResourceId)
       const resourceId = Number.isInteger(requestedResourceId) ? requestedResourceId : context.resourceId
+      if (!Number.isInteger(resourceId)) {
+        throw new Error('No planning resource: choose a group in the planning tree.')
+      }
+      const resourceIds = Number.isInteger(requestedResourceId) ? [requestedResourceId] : (context.resourceIds ?? [resourceId])
       const weekResolution = resolvePlanningWeekEntry(context.calendarString, targetDate)
       const resolvedWeek = summarizePlanningWeek(weekResolution.week)
       const planningSelectionWeekIndex = Math.max(0, weekResolution.week.index - 1)
       const cachePolicy = buildPlanningTimetablePolicy(resolvedWeek)
-      const cacheKey = cacheScope ? `${cacheScope}:${resourceId}:${resolvedWeek?.startDate ?? planningSelectionWeekIndex}` : null
+      const cacheKey = cacheScope ? `${cacheScope}:${resourceIds.join(',')}:${resolvedWeek?.startDate ?? planningSelectionWeekIndex}` : null
+      const legendsBody = context.v612
+        ? buildPlanningLegendsBodyV612(moduleBase, context.clientId, context.serializationPolicies.directPlanningPlanning, context.displayConfigurationId, resourceIds, planningSelectionWeekIndex)
+        : buildPlanningLegendsBody(moduleBase, context.clientId, context.serializationPolicies.directPlanningPlanning, context.displayConfigurationId, resourceId, planningSelectionWeekIndex)
+      const timetableBody = context.v612
+        ? buildPlanningTimetableBodyV612(moduleBase, context.clientId, context.serializationPolicies.directPlanningPlanning, context.displayConfigurationId, resourceIds, planningSelectionWeekIndex)
+        : buildPlanningTimetableBody(moduleBase, context.clientId, context.serializationPolicies.directPlanningPlanning, context.displayConfigurationId, resourceId, planningSelectionWeekIndex)
 
       return readThroughPlanningCache({
         bucket: 'timetable',
@@ -1382,15 +1577,17 @@ export function createPlanningRpcClient({
         cacheKey,
         policy: cachePolicy,
         loadValue: async () => {
-          const legendsResult = await postPlanningRpc(jar, 'DirectPlanningPlanningServiceProxy', context.permutations.directPlanningPlanning, buildPlanningLegendsBody(moduleBase, context.clientId, context.serializationPolicies.directPlanningPlanning, context.displayConfigurationId, resourceId, planningSelectionWeekIndex))
+          const legendsResult = await postPlanningRpc(jar, 'DirectPlanningPlanningServiceProxy', context.permutations.directPlanningPlanning, legendsBody)
           ensurePlanningRpcOk(legendsResult, 'Planning legends')
 
           const legends = extractPlanningLegends(legendsResult.text)
 
-          const timetableResult = await postPlanningRpc(jar, 'DirectPlanningPlanningServiceProxy', context.permutations.directPlanningPlanning, buildPlanningTimetableBody(moduleBase, context.clientId, context.serializationPolicies.directPlanningPlanning, context.displayConfigurationId, resourceId, planningSelectionWeekIndex))
+          const timetableResult = await postPlanningRpc(jar, 'DirectPlanningPlanningServiceProxy', context.permutations.directPlanningPlanning, timetableBody)
           ensurePlanningRpcOk(timetableResult, 'Planning timetable')
 
-          const events = extractPlanningTimetableEvents(timetableResult.text, legends.dayLabels)
+          const events = context.v612
+            ? extractPlanningTimetableEventsV612(timetableResult.text, legends.dayLabels)
+            : extractPlanningTimetableEvents(timetableResult.text, legends.dayLabels)
 
           return {
             events,
@@ -1485,6 +1682,11 @@ export function createPlanningRpcClient({
     })
 
     tree.cache.context = context.cache
+    // The tree's own first view: the student's timetable as their group.
+    // None found (no enrolment code matched): the tree, to pick one.
+    if (personalTimetable && parseAdeTreeResourceId(rawTargetResourceId) === null && context.resourceIds?.length) {
+      return { ...tree, selectionSchema: 'planning-personal', defaultSelection: buildPlanningPersonalSelection() }
+    }
     return tree
   }
 

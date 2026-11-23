@@ -2029,7 +2029,13 @@ function AvailableApplications({
         ? [...orderedFavorites, ...visibleServices.filter((service) => !favoritesByKey.has(getApplicationKey(service))).slice(0, HOME_EXTRA_APPS)]
           .filter((application) => !getInAppPage(application))
         : orderedFavorites
-    const showRow = home ? viewState.status === 'ready' : shouldShowFavoriteRow
+    // « Accueil »'s row isn't the favourites alone: without any (status
+    // 'empty', the list loaded), it still has the first apps and « Toutes
+    // les applications », the way to every app. A portal whose favourites
+    // stay in the browser (services.localFavorites: Rennes 2, Sorbonne
+    // Nouvelle) starts with none.
+    const homeHasApps = home && (viewState.status === 'ready' || viewState.status === 'empty') && visibleServices.length > 0
+    const showRow = home ? viewState.status === 'ready' || homeHasApps : shouldShowFavoriteRow
     const titleId = home ? 'home-apps-title' : 'favorites-strip-title'
     // Radii are concentric: item radius = icon radius + item padding.
     // min-w-0: as a grid item the list would otherwise grow to its longest
@@ -2057,7 +2063,7 @@ function AvailableApplications({
         ? 'min-w-0 text-[14px] font-semibold leading-[1.2] whitespace-nowrap overflow-hidden text-ellipsis max-md:w-full max-md:text-[11px] max-md:text-center'
         : 'min-w-0 text-[14px] font-semibold leading-[1.2] whitespace-nowrap overflow-hidden text-ellipsis max-md:w-full max-md:text-[12px] max-md:text-center max-md:whitespace-normal max-md:line-clamp-2'
 
-    if (shouldHideFavoritesSection) return null
+    if (shouldHideFavoritesSection && !homeHasApps) return null
     // The names are ink, not the brand: a colour palette leaves them be.
     return (
       <section className="favorites-bar grid gap-2 relative text-ink" aria-labelledby={titleId}>
