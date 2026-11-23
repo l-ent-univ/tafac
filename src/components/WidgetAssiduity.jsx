@@ -17,6 +17,7 @@ import { accentStyle, courseKey } from '../eventAccents'
 import { isModuleCode, normalizeModuleCode, titleModuleCodes } from '../moduleTeachers'
 import { readAssigned } from '../usePlanningWeeks'
 import SmoothSurface from './SmoothSurface'
+import Tooltip from './Tooltip'
 import { Skeleton } from 'skullet/react'
 import { useSkeletonsForced } from '../skeletonSamples'
 
@@ -66,7 +67,9 @@ const PILLS = {
   late: 'status-tag status-tag--carved status-tag--dashed text-text-secondary',
 }
 const MARK_REACH = 24
-const POPOVER_WIDTH = 272
+const POPOVER_WIDTH = 288
+// The app's secondary button (glass-solid, as the sidebar's round buttons).
+const MARK_ACTION = 'glass-solid inline-flex h-[28px] shrink-0 cursor-pointer items-center rounded-full border text-text transition-[background-color] duration-150 hover:bg-brand-subtle'
 const markBottom = (mark) => 8 + mark.stack * 11
 const canJustify = (entry) => entry.status === 'unjustified' || entry.status === 'late'
 
@@ -124,24 +127,31 @@ function MarkPopover({ entry, accent, anchor, onOpen, onOpenPlanning, onEnter, o
         {entry.teacher ? <span className="min-w-0 truncate">{entry.teacher}</span> : null}
       </span>
       {onOpen || onOpenPlanning ? (
-        <span className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1">
+        // One row of real buttons, all the same height: « Justifier » first
+        // when it applies, then the planning (a round icon, it wouldn't fit
+        // spelled out) and « Voir plus ». Labels sit in a <span>: the global
+        // `button { font: inherit }` (index.css) outranks utilities on the
+        // button itself.
+        <span className="mt-1 flex items-center gap-1.5">
           {justifiable ? (
-            <button type="button" onClick={() => onOpen(entry.id, 'justify')} className="lent-button justify-button relative inline-flex h-[30px] cursor-pointer items-center gap-1.5 rounded-full px-3">
+            <button type="button" onClick={() => onOpen(entry.id, 'justify')} className="lent-button justify-button relative mr-auto inline-flex h-[28px] shrink-0 cursor-pointer items-center gap-1.5 rounded-full px-2.5">
               <SmoothSurface />
-              <Icon icon="ph:seal-check" className="size-[15px]" aria-hidden="true" />
+              <Icon icon="ph:seal-check" className="size-[14px]" aria-hidden="true" />
               <span className="font-body text-[13px] font-medium leading-none">Justifier</span>
             </button>
           ) : null}
           {onOpenPlanning ? (
-            <button type="button" onClick={() => onOpenPlanning(entry.date.slice(0, 10))} className="inline-flex h-[30px] cursor-pointer items-center gap-1 rounded-full px-2 font-body text-[13px] font-medium leading-none text-text-secondary hover:text-text">
-              <Icon icon="ph:calendar-blank" className="size-[13px]" aria-hidden="true" />
-              Voir sur le planning
+            <button type="button" onClick={() => onOpenPlanning(entry.date.slice(0, 10))} className={`${MARK_ACTION} group relative justify-center size-[28px]`} aria-label="Voir sur le planning">
+              <Icon icon="ph:calendar-blank" className="size-[14px]" aria-hidden="true" />
+              <Tooltip title="Voir sur le planning" side="top" />
             </button>
           ) : null}
-          {onOpen ? <button type="button" onClick={() => onOpen(entry.id, 'view')} className="inline-flex h-[30px] cursor-pointer items-center gap-1 rounded-full px-2 font-body text-[13px] font-medium leading-none text-text-secondary hover:text-text">
-            Voir plus
-            <Icon icon="ph:arrow-right" className="size-[13px]" aria-hidden="true" />
-          </button> : null}
+          {onOpen ? (
+            <button type="button" onClick={() => onOpen(entry.id, 'view')} className={`${MARK_ACTION} gap-1 pl-3 pr-2.5`}>
+              <span className="font-body text-[13px] font-medium leading-none">Voir plus</span>
+              <Icon icon="ph:arrow-right" className="size-[14px]" aria-hidden="true" />
+            </button>
+          ) : null}
         </span>
       ) : null}
     </div>,
