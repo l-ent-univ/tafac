@@ -447,6 +447,33 @@ export function readPlanningResourceIds(result, { v612 = false } = {}) {
   return [resourceId]
 }
 
+// A personal timetable (planning.personal: true, Sorbonne Nouvelle): the
+// student's own ADE resources, found at login (one per enrolment group, so
+// no single group in the tree holds the whole week), stand together for a
+// « Mon emploi du temps » the client adopts as its group, as TEMPO's
+// (tempoApi.js). Its id has no digit: the timetable reads it as no group
+// asked, the student's own resources then.
+export const PLANNING_PERSONAL_RESOURCE_ID = 'personal'
+const PLANNING_PERSONAL_LABEL = 'Mon emploi du temps'
+
+export function buildPlanningPersonalSelection() {
+  return {
+    resourceId: PLANNING_PERSONAL_RESOURCE_ID,
+    label: PLANNING_PERSONAL_LABEL,
+    parentResourceId: null,
+    parentLabel: null,
+    contextLabel: PLANNING_PERSONAL_LABEL,
+    programResourceId: null,
+    programLabel: null,
+    yearResourceId: null,
+    yearLabel: null,
+    tdResourceId: null,
+    tdLabel: null,
+    tpResourceId: null,
+    tpLabel: null,
+  }
+}
+
 // An ArrayList<Integer> answer, which GWT writes backwards:
 // [last, Integer type, …, first, Integer type, size, ArrayList type, [strings], …].
 export function parsePlanningIntegerList(text) {
@@ -778,7 +805,8 @@ function extractPlanningTimetableEvents(text, dayLabels) {
 // ADE 6.12 (Sorbonne Nouvelle) draws the week transposed: one row per day,
 // `width` pixels high. Each SquareEvent is written
 // [x, y, width, height, 0, three String refs, …its text list…, size, ArrayList],
-// the list being [title, null, teacher?, null, room, null, time] read backwards.
+// the list, read backwards, being its fields with a null between each:
+// title, teachers (when some), rooms (one or several), time.
 // shortcut: layout checked on a single capture; if a Planning shows
 // columns-per-day, derive the day from x instead.
 export function extractPlanningTimetableEventsV612(text, dayLabels) {
@@ -815,6 +843,19 @@ export function extractPlanningTimetableEventsV612(text, dayLabels) {
       continue
     }
 
+    // After the title: the teachers (when some), then the rooms, as many
+    // as the class has, each in its own field. A room reads « site - room »
+    // (« Nation - B113 »), a teacher « NAME First name » (a hyphenated name
+    // has no spaces round its dash): the rooms start at the first field
+    // like that. None like it: the last field is the room, as before.
+    // Checked on real weeks: « title, room », « title, teacher, room »,
+    // « title, teacher, room, room, room ».
+    const rest = values.slice(1, timeIndex)
+    const firstRoom = rest.findIndex((value) => /\S\s-\s\S/.test(value))
+    const roomsFrom = firstRoom === -1 ? Math.max(0, rest.length - 1) : firstRoom
+    const teachers = rest.slice(0, roomsFrom)
+    const rooms = rest.slice(roomsFrom)
+
     const [x, y, width, height] = numbers.slice(cursor - 7, cursor - 3)
     const dayIndex = width > 0 ? Math.round(y / width) : 0
     const dayLabel = dayLabels[dayIndex] ?? null
@@ -823,8 +864,8 @@ export function extractPlanningTimetableEventsV612(text, dayLabels) {
 
     events.push({
       title: values[0],
-      teacher: values.slice(1, timeIndex - 1).join(', '),
-      location: values[timeIndex - 1],
+      teacher: teachers.join(', '),
+      location: rooms.join(', '),
       groups: [],
       dayIndex,
       dayLabel,
@@ -1283,6 +1324,9 @@ export function createPlanningRpcClient({
   gwtClientId,
   projectId = 1,
   displayConfigurationName = 'web-default',
+  // planning.personal: the tree offers the student's own resources as
+  // their group (buildPlanningPersonalSelection), when the login found some.
+  personalTimetable = false,
 }) {
   if (typeof casOrigin !== 'string' || !casOrigin) {
     throw new TypeError('createPlanningRpcClient requires a casOrigin string.')
@@ -1638,6 +1682,11 @@ export function createPlanningRpcClient({
     })
 
     tree.cache.context = context.cache
+    // The tree's own first view: the student's timetable as their group.
+    // None found (no enrolment code matched): the tree, to pick one.
+    if (personalTimetable && parseAdeTreeResourceId(rawTargetResourceId) === null && context.resourceIds?.length) {
+      return { ...tree, selectionSchema: 'planning-personal', defaultSelection: buildPlanningPersonalSelection() }
+    }
     return tree
   }
 

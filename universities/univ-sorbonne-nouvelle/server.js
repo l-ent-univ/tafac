@@ -22,6 +22,9 @@ export default {
     gwtClientId: 'aHcZolc',
     projectId: 5,
     displayConfigurationName: 'Planning_ENT',
+    // The student's own groups, found at login from their enrolment codes,
+    // are their timetable: no group to pick (planningRpc.js).
+    personal: true,
   },
 
   auth: {

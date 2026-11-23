@@ -49,6 +49,8 @@ export default {
 
   planning: {
     serviceUrl: planningServiceUrl,
+    // A personal timetable: no « Mon groupe » to choose in Mon compte.
+    personal: true,
   },
 
   // One establishment for everyone, with the "Prochain cours" card.

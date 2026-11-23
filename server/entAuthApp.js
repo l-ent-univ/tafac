@@ -2227,6 +2227,7 @@ const {
   gwtClientId: universityConfig.planning?.gwtClientId,
   projectId: universityConfig.planning?.projectId,
   displayConfigurationName: universityConfig.planning?.displayConfigurationName,
+  personalTimetable: universityConfig.planning?.personal === true,
 })
 
 const portalClient = PLANNING_API === 'tempo'
@@ -6394,6 +6395,10 @@ app.get('/__ent_auth/ade/tree', async (req, res) => {
         currentResourceId: tree.currentResourceId,
         focusResourceId: tree.focusResourceId,
         currentPathIds: tree.currentPathIds,
+        // planning.personal (Sorbonne Nouvelle): « Mon emploi du temps »,
+        // adopted by the client. Absent elsewhere.
+        selectionSchema: tree.selectionSchema,
+        defaultSelection: tree.defaultSelection,
       },
       debug: {
         finalUrl: tree.finalUrl,

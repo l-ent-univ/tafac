@@ -32,16 +32,20 @@ test('integer lists are read back in their sent order', () => {
 })
 
 test('ADE 6.12 timetable: one row per day, text list read backwards', () => {
-  const strings = ['java.util.ArrayList/4159755760', 'SquareEvent', 'java.lang.Integer/3438268394', '', 'java.lang.Boolean/476441737', 'java.lang.String/2004016611', 'Course A', 'Room 1', '09h30 - 11h00', 'Course B', 'Teacher B', 'Room 2', '10h00 - 12h00']
+  const strings = ['java.util.ArrayList/4159755760', 'SquareEvent', 'java.lang.Integer/3438268394', '', 'java.lang.Boolean/476441737', 'java.lang.String/2004016611', 'Course A', 'Room 1', '09h30 - 11h00', 'Course B', 'Teacher B', 'Room 2', '10h00 - 12h00', 'Course C', 'Teacher C', 'Nation - B316', 'Nation - A202 (8)', '14h00 - 15h00']
   // Monday (y 0) with no teacher, Thursday (y 329, rows 110 high) with one.
   const monday = [92, 0, 109, 55, 0, 4, 4, 4, 9, 6, 0, 8, 6, 0, 7, 6, 5, 1, 0, 3, 1, 1, 2]
   const thursday = [110, 329, 110, 74, 0, 4, 4, 4, 13, 6, 0, 12, 6, 0, 11, 6, 0, 10, 6, 7, 1, 0, 3, 1, 1, 2]
-  const text = `//OK[${[...thursday, ...monday, 2, 1].join(',')},${JSON.stringify(strings)},0,7]`
-  const days = ['Lundi 09/11/2026', 'Mardi 10/11/2026', 'Mercredi 11/11/2026', 'Jeudi 12/11/2026']
+  // Friday (y 440) as a real week has it: a teacher, then two rooms, each
+  // field after a null.
+  const friday = [120, 440, 110, 37, 0, 4, 4, 4, 18, 6, 0, 17, 6, 0, 16, 6, 0, 15, 6, 0, 14, 6, 9, 1]
+  const text = `//OK[${[...friday, ...thursday, ...monday, 3, 1].join(',')},${JSON.stringify(strings)},0,7]`
+  const days = ['Lundi 09/11/2026', 'Mardi 10/11/2026', 'Mercredi 11/11/2026', 'Jeudi 12/11/2026', 'Vendredi 13/11/2026']
   const events = extractPlanningTimetableEventsV612(text, days)
   assert.deepEqual(events.map(({ title, teacher, location, start, end }) => ({ title, teacher, location, start, end })), [
     { title: 'Course A', teacher: '', location: 'Room 1', start: '2026-11-09T09:30:00', end: '2026-11-09T11:00:00' },
     { title: 'Course B', teacher: 'Teacher B', location: 'Room 2', start: '2026-11-12T10:00:00', end: '2026-11-12T12:00:00' },
+    { title: 'Course C', teacher: 'Teacher C', location: 'Nation - B316, Nation - A202 (8)', start: '2026-11-13T14:00:00', end: '2026-11-13T15:00:00' },
   ])
 })
 
