@@ -4,16 +4,17 @@ import { Icon } from '@iconify/react'
 import { dayText, durationText, formatTime, relativeDayText } from '../planningDates'
 import { nextOccurrences } from '../planningEvents'
 import { accentStyle } from '../eventAccents'
-import { ABSENCE_STATUS_LABELS } from '../absenceMail'
-import { canJustify } from '../assiduityDisplay'
+import { STATUS_STYLES, canJustify } from '../assiduityDisplay'
 import { FULL_BLOCK_HEIGHT } from '../eventBlockLayout'
-import AbsenceTag from './AbsenceTag'
 import PlanningEventBlock from './PlanningEventBlock'
 import SmoothSurface from './SmoothSurface'
 import CloseButton from './CloseButton'
 import Tooltip from './Tooltip'
 import { GROUP_CARD_CLASSES, GroupRow } from './GroupCard'
 import { useSheetDrag } from '../useSheetDrag'
+
+// What the class's absence row says, as a row of its details.
+const ABSENCE_TITLES = { unjustified: 'Absence non justifiée', justified: 'Absence justifiée', late: 'Retard' }
 
 function linkHost(href) {
   try {
@@ -145,30 +146,29 @@ function PlanningEventSheet({ event, accent, events, todayKey, searching, absenc
                   <GroupRow icon="ph:clock" title={`De ${formatTime(event.start)} à ${formatTime(event.end)}`} />
                   <GroupRow icon="ph:calendar-blank" title={`${dayText(event.day)} · ${durationText(event.start, event.end)}`} />
                   {event.group ? <GroupRow icon="ph:users-three" title={event.group} /> : null}
+                  {absence ? (
+                    <GroupRow
+                      icon={STATUS_STYLES[absence.status]?.icon ?? 'ph:check-circle'}
+                      title={ABSENCE_TITLES[absence.status] ?? ABSENCE_TITLES.justified}
+                      detail={absence.status === 'late' ? 'Arrivé en retard à ce cours' : `De ${absence.start} à ${absence.end}`}
+                      trailing={onJustify && canJustify(absence) ? (
+                        <button
+                          type="button"
+                          onClick={() => onJustify(absence)}
+                          className="lent-button justify-button relative inline-flex h-[30px] cursor-pointer items-center gap-1.5 rounded-full px-3 after:absolute after:-inset-[7px]"
+                        >
+                          <SmoothSurface />
+                          <Icon icon="ph:seal-check" className="size-[15px]" aria-hidden="true" />
+                          <span className="font-body text-[13px] font-medium leading-none">Justifier</span>
+                        </button>
+                      ) : null}
+                    />
+                  ) : null}
                   {event.notes ? <GroupRow icon="ph:info" title={event.notes} wrap /> : null}
                   {event.link ? (
                     <GroupRow icon="ph:link" title={event.linkLabel ?? 'Lien'} detail={linkHost(event.link)} href={event.link} />
                   ) : null}
                 </ul>
-                {absence ? (
-                  <div className="flex flex-wrap items-center gap-2">
-                    <AbsenceTag status={absence.status} className="h-[30px]! p-2!" />
-                    <span className="min-w-0 flex-1 font-body text-[13px] font-medium leading-[1.3] text-text-secondary">
-                      {absence.status === 'late' ? 'Arrivé en retard à ce cours' : `${ABSENCE_STATUS_LABELS[absence.status]}, de ${absence.start} à ${absence.end}`}
-                    </span>
-                    {onJustify && canJustify(absence) ? (
-                      <button
-                        type="button"
-                        onClick={() => onJustify(absence)}
-                        className="lent-button justify-button relative inline-flex h-[30px] cursor-pointer items-center gap-1.5 rounded-full px-3 after:absolute after:-inset-[7px]"
-                      >
-                        <SmoothSurface />
-                        <Icon icon="ph:seal-check" className="size-[15px]" aria-hidden="true" />
-                        <span className="font-body text-[13px] font-medium leading-none">Justifier</span>
-                      </button>
-                    ) : null}
-                  </div>
-                ) : null}
               </div>
               {/* Titled like the sections of Mes notes. */}
               <section className="gd-rise grid gap-3" style={{ '--d': '80ms' }} aria-labelledby="planning-occurrences-title">
