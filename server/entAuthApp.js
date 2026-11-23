@@ -119,7 +119,7 @@ import {
   resolvePortalKind,
 } from './portalSession.js'
 import { SchoolCertificateUnavailableError, buildDemoCertificatePdf, openCertificateDownload } from './schoolCertificate.js'
-import { createPlanningRpcClient } from '../planningRpc.js'
+import { buildPlanningPersonalSelection, createPlanningRpcClient } from '../planningRpc.js'
 import { createTempoApiClient } from '../tempoApi.js'
 import {
   DEMO_ACCOUNT,
@@ -6334,11 +6334,14 @@ app.get('/__ent_auth/ade/tree', async (req, res) => {
     const requestedTreeId = String(req.query.etabsVets ?? '')
 
     if (isDemoSession(entSession)) {
-      // A personal timetable (TEMPO) has no group to pick: the demo adopts
-      // its single group, as a real account does (no network call).
+      // A personal timetable (TEMPO, planning.personal) has no group to
+      // pick: the demo adopts the student's own, as a real account does (no
+      // network call). The demo's timetable answers any group.
       const tree = PLANNING_API === 'tempo'
         ? await fetchPortalTree(entSession.jar, {})
-        : buildDemoAdeTreePayload(requestedTreeId)
+        : universityConfig.planning?.personal === true && !requestedTreeId
+          ? { ...buildDemoAdeTreePayload(requestedTreeId), selectionSchema: 'planning-personal', defaultSelection: buildPlanningPersonalSelection() }
+          : buildDemoAdeTreePayload(requestedTreeId)
       setSessionCookie(res, entSession)
       return res.status(200).json({
         authenticated: true,
