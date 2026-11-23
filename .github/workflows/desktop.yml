@@ -1,8 +1,8 @@
-# The desktop app (macOS, Apple Silicon and Intel) of a release: built at the
-# release's version, signed with the Developer ID certificate, notarized, and
-# added to the GitHub release with what the installed apps need to update
-# themselves. docs/DESKTOP.md says how updates work, what to set up first and
-# how to release one.
+# The desktop app of a release (macOS, Apple Silicon and Intel; Windows x64):
+# built at the release's version, signed (the Mac's with the Developer ID
+# certificate, then notarized), and added to the GitHub release with what the
+# installed apps need to update themselves. docs/DESKTOP.md says how updates
+# work, what to set up first and how to release one.
 #
 # For the tag vX.Y.Z, on its release:
 #   Tafac_X.Y.Z_aarch64.app.tar.gz, .sig   the update (Apple Silicon)
@@ -10,7 +10,10 @@
 #   Tafac_X.Y.Z_aarch64.dmg, _x64.dmg      the first install
 #   Tafac_aarch64.dmg, Tafac_x64.dmg       the same, under a name that stays
 #                                          (…/releases/latest/download/…)
-#   latest.json                            what tafac.fr serves at
+#   Tafac_X.Y.Z_x64-setup.exe, .sig        the update (Windows)
+#   Tafac_X.Y.Z_x64.exe                    the first install (Windows)
+#   Tafac_x64.exe                          the same, under a name that stays
+#   latest.json                           what tafac.fr serves at
 #                                          /desktop/latest.json (an artifact
 #                                          of the run too)
 # Nothing reaches the installed apps until latest.json is published on
@@ -245,9 +248,74 @@ jobs:
           security delete-keychain "$RUNNER_TEMP/tafac-signing.keychain-db" || true
           rm -f "$RUNNER_TEMP/AuthKey.p8" src-tauri/embedded.provisionprofile
 
+  # Windows (x64), on its own runner: the Node the app ships and the server's
+  # packages are per platform (scripts/desktop-prepare.mjs). Not signed with a
+  # certificate yet (SmartScreen warns at the first launch, docs/DESKTOP.md):
+  # only the update's signature, with the same key as the Mac's.
+  build-windows:
+    name: Windows (x64)
+    needs: prepare
+    runs-on: windows-latest
+    timeout-minutes: 60
+    permissions:
+      contents: write
+    defaults:
+      run:
+        shell: bash
+    env:
+      VERSION: ${{ needs.prepare.outputs.version }}
+      BUNDLE: src-tauri/target/release/bundle
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          ref: ${{ env.TAG }}
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 24
+          cache: npm
+      - name: Rust
+        run: |
+          rustup toolchain install stable --profile minimal --no-self-update
+          rustup default stable
+      # The app's crate and the installer's (its own Cargo.lock).
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+        with:
+          workspaces: |
+            src-tauri
+            installer
+      - run: npm ci
+      # The NSIS setup, its update signature, the installer around it and
+      # this platform's piece of latest.json (scripts/desktop-windows.mjs).
+      - name: Build the app, the update and the installer
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+          DESKTOP_DOWNLOAD_BASE: https://github.com/${{ github.repository }}/releases/download/${{ env.TAG }}
+          # Anonymous statistics, as the Mac's (src-tauri/src/sidecar.rs).
+          TAFAC_POSTHOG_PROJECT_KEY: ${{ secrets.POSTHOG_PROJECT_KEY }}
+        run: node scripts/desktop-windows.mjs "$VERSION"
+      - name: Add them to the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release upload "$TAG" \
+            "$BUNDLE/nsis/Tafac_${VERSION}_x64-setup.exe" \
+            "$BUNDLE/nsis/Tafac_${VERSION}_x64-setup.exe.sig" \
+            "$BUNDLE/nsis/Tafac_${VERSION}_x64.exe" \
+            "$BUNDLE/nsis/Tafac_x64.exe" \
+            --clobber
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: latest-windows-x86_64
+          path: ${{ env.BUNDLE }}/latest-windows-x86_64.json
+          if-no-files-found: error
+
   manifest:
     name: latest.json
-    needs: [prepare, build]
+    # A failed Windows build doesn't hold the Mac's update back: latest.json
+    # then has no Windows platform, and the site offers no Windows download.
+    needs: [prepare, build, build-windows]
+    if: ${{ !cancelled() && needs.build.result == 'success' }}
     runs-on: ubuntu-latest
     permissions:
       contents: write

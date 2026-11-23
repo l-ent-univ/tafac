@@ -334,7 +334,8 @@ from `DESKTOP_LATEST_FILE` (a path, read again whenever the file changes: no
 restart) or `DESKTOP_LATEST_JSON` (the JSON itself). A manifest that the apps
 couldn't read, or whose `minimum` is above its `version`, is not served
 (404, a line in the server's log): to the apps that is no answer.
-`/desktop/download/<platform>` (`darwin-aarch64`, `darwin-x86_64`) sends to
+`/desktop/download/<platform>` (`darwin-aarch64`, `darwin-x86_64`,
+`windows-x86_64`) sends to
 that platform's `installer`: a download link that never changes and only
 moves when an update is published.
 
@@ -357,6 +358,15 @@ version, and logs what it does (`[tafac] update: …`). Run from a packaged
 debug app (`tauri build --debug --bundles app`), not `desktop:dev`: there is
 no app to replace there, and the install is refused.
 
+## Downloading it
+
+On the website, a visitor on a Mac or on Windows is offered the app: signed
+out, on the landing page (Windows: `LandingWindowsApp`); signed in, in the
+sidebar's foot (`MacAppDownloadButton`, `WindowsAppDownloadButton`). They
+read the installers of `/desktop/latest.json`: Windows' button shows only
+once the newest release has a `windows-x86_64` platform
+(`src/windowsAppDownload.js`). The apps themselves show nothing.
+
 ## Releasing an update
 
 1. **Tag**: merging to main creates the release `vX.Y.Z` (`ci.yml`), as for
@@ -369,6 +379,13 @@ no app to replace there, and the install is refused.
    and signature (`scripts/desktop-updater-archive.mjs`) and the disk image
    (`scripts/desktop-dmg.mjs`), and adds them to the GitHub release with
    `latest.json` (`scripts/desktop-latest.mjs`).
+   For Windows (x64, on its own runner, `scripts/desktop-windows.mjs`): the
+   NSIS setup (`Tafac_X.Y.Z_x64-setup.exe`, what the installed apps download)
+   with its signature, and the first install, the Fluent window of
+   `installer/` around that setup (`Tafac_X.Y.Z_x64.exe`, also
+   `Tafac_x64.exe`). The same updater key signs it. A failed Windows build
+   doesn't hold the Mac's update back: `latest.json` then has no
+   `windows-x86_64`, and the site offers no Windows download.
 3. **Publish**: by itself. tafac.fr reads the newest release's
    `latest.json` every 10 minutes and, when it changed and checks, writes it
    to `DESKTOP_LATEST_FILE`, where it serves it from
@@ -473,9 +490,11 @@ in `TAFAC_BUNDLE_DIR`.
 
 - Staying signed in, for an account that asks for a one-time code: nothing
   is kept, the student signs in by hand at each expiry.
-- Windows and Linux: builds, Windows signing, and their updates (there the
-  update installs only from « Redémarrer », not on quit, and the row needs
-  the sidebar, so a window at least 1024px wide).
+- Linux: builds and updates.
+- Windows: the setup isn't signed with a certificate (SmartScreen warns at the
+  first launch), no ARM64 build, and its update installs only from
+  « Redémarrer », not on quit (the row needs the sidebar, so a window at
+  least 1024px wide).
 - A bad signature is not reported anywhere (PostHog): it only shows in the
   app's own log.
 - The service worker doesn't register on `tafac://`: harmless, the app
