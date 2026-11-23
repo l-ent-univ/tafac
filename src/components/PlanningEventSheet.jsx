@@ -4,6 +4,7 @@ import { Icon } from '@iconify/react'
 import { dayText, durationText, formatTime, relativeDayText } from '../planningDates'
 import { nextOccurrences } from '../planningEvents'
 import { accentStyle } from '../eventAccents'
+import { ABSENCE_STATUS_LABELS } from '../absenceMail'
 import { canJustify } from '../assiduityDisplay'
 import { FULL_BLOCK_HEIGHT } from '../eventBlockLayout'
 import AbsenceTag from './AbsenceTag'
@@ -153,7 +154,7 @@ function PlanningEventSheet({ event, accent, events, todayKey, searching, absenc
                   <div className="flex flex-wrap items-center gap-2">
                     <AbsenceTag status={absence.status} className="h-[30px]! p-2!" />
                     <span className="min-w-0 flex-1 font-body text-[13px] font-medium leading-[1.3] text-text-secondary">
-                      {absence.status === 'late' ? 'Arrivé en retard' : `Absent de ${absence.start} à ${absence.end}`}
+                      {absence.status === 'late' ? 'Arrivé en retard à ce cours' : `${ABSENCE_STATUS_LABELS[absence.status]}, de ${absence.start} à ${absence.end}`}
                     </span>
                     {onJustify && canJustify(absence) ? (
                       <button

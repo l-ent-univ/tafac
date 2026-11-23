@@ -4,6 +4,7 @@ import { STATUS_STYLES } from '../assiduityDisplay'
 import { accentStyle } from '../eventAccents'
 import { layoutEventBlock } from '../eventBlockLayout'
 import { durationText, formatTime } from '../planningDates'
+import AbsenceTag from './AbsenceTag'
 
 // Text widths, measured on a canvas in the cards' body font (Inter: the
 // title semibold, the room and the teacher medium, as the block draws
@@ -90,7 +91,12 @@ function PlanningEventBlock({ event, accent, variant, stackFirst = false, width,
           </span>
         ) : null}
       </span>
-      {absence ? <span className="planning-absence-badge" aria-hidden="true"><Icon icon={STATUS_STYLES[absence.status]?.icon ?? 'ph:check-circle'} style={{ width: 11, height: 11 }} /></span> : null}
+      {absence ? (
+        // « Absent » spelled out where the block has the room, else its icon.
+        height >= 56
+          ? <AbsenceTag status={absence.status} className="absolute right-[6px] bottom-[6px] h-5! px-1.5!" />
+          : <span className="planning-absence-badge" aria-hidden="true"><Icon icon={STATUS_STYLES[absence.status]?.icon ?? 'ph:check-circle'} style={{ width: 11, height: 11 }} /></span>
+      ) : null}
     </>
   )
   const card = {
