@@ -1229,8 +1229,9 @@ async function performEntLogin({ username, password, otp = '', sendCode = '', au
   const portal = await fetchPortalSession(jar)
 
   if (!portal.authenticated) {
-    // Where the return from the CAS ended, without query strings (tickets).
-    const steps = portalRedirectResult.chain.map((step) => `${step.status} ${String(step.url).split('?')[0]}`)
+    // Where the return from the CAS ended, without query strings (tickets)
+    // or path parameters (a Java portal's `;jsessionid=…`).
+    const steps = portalRedirectResult.chain.map((step) => `${step.status} ${String(step.url).split(/[?;#]/)[0]}`)
     console.warn(`[login] portal session not established (${PORTAL_KIND}): ${steps.join(' → ')} ; entry ${portal.status ?? '?'}`)
     throw new Error('CAS login completed, but the portal session was not established.')
   }

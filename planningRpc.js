@@ -425,6 +425,28 @@ export function parsePlanningLoginIdentifiers(text) {
   return codes
 }
 
+// The student's own ADE resources, from getResourceIds. The Rennes Planning
+// (an "L…" identifier) has exactly one: a failed call, or no id in its
+// answer, is an error as it always was, so a passing failure isn't kept as
+// « no group » for the context's lifetime. ADE 6.12 (Sorbonne Nouvelle) may
+// match none of the enrolment codes: [] then, the tree opens at its root
+// and timetables need a chosen group.
+export function readPlanningResourceIds(result, { v612 = false } = {}) {
+  if (v612) {
+    return result.ok ? parsePlanningIntegerList(result.text).filter(Number.isInteger) : []
+  }
+
+  if (!result.ok) {
+    throw new Error(`Planning resource ids failed (${result.status}): ${result.text.slice(0, 240)}`)
+  }
+
+  const resourceId = parsePlanningFirstInteger(result.text)
+  if (!Number.isInteger(resourceId)) {
+    throw new Error(`Could not extract planning resource id: ${result.text.slice(0, 240)}`)
+  }
+  return [resourceId]
+}
+
 // An ArrayList<Integer> answer, which GWT writes backwards:
 // [last, Integer type, …, first, Integer type, size, ArrayList type, [strings], …].
 export function parsePlanningIntegerList(text) {
@@ -1426,10 +1448,10 @@ export function createPlanningRpcClient({
     ensurePlanningRpcOk(sqlModeResult, 'Planning SQL mode')
 
     // The student's own ADE resources, found by their identifier (Rennes: one)
-    // or enrolment codes (Sorbonne Nouvelle: one per group). None found: null,
-    // the tree opens at its root and timetables need a chosen group.
+    // or enrolment codes (Sorbonne Nouvelle: one per group, maybe none):
+    // readPlanningResourceIds.
     const resourceIdsResult = await postPlanningRpc(jar, 'DirectPlanningServiceProxy', permutations.directPlanning, buildPlanningResourceIdsBody(moduleBase, clientId, serializationPolicies.directPlanning, planningIdentifiers))
-    const resourceIds = resourceIdsResult.ok ? parsePlanningIntegerList(resourceIdsResult.text).filter(Number.isInteger) : []
+    const resourceIds = readPlanningResourceIds(resourceIdsResult, { v612 })
     const resourceId = resourceIds[0] ?? null
 
     return {

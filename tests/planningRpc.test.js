@@ -5,6 +5,7 @@ import {
   extractPlanningTimetableEventsV612,
   parsePlanningIntegerList,
   parsePlanningLoginIdentifiers,
+  readPlanningResourceIds,
 } from '../planningRpc.js'
 
 const SERVICES = ['WebClientServiceProxy', 'ConfigurationServiceProxy', 'MyPlanningClientServiceProxy', 'DirectPlanningServiceProxy', 'DirectPlanningPlanningServiceProxy', 'PacServiceProxy']
@@ -42,4 +43,16 @@ test('ADE 6.12 timetable: one row per day, text list read backwards', () => {
     { title: 'Course A', teacher: '', location: 'Room 1', start: '2026-11-09T09:30:00', end: '2026-11-09T11:00:00' },
     { title: 'Course B', teacher: 'Teacher B', location: 'Room 2', start: '2026-11-12T10:00:00', end: '2026-11-12T12:00:00' },
   ])
+})
+
+test('resource ids: the Rennes Planning still needs its one id, ADE 6.12 may have none', () => {
+  const list = '//OK[30,2,20,2,10,2,3,1,["java.util.ArrayList/4159755760","java.lang.Integer/3438268394"],0,7]'
+  // Rennes: the first integer, as before; a failure or no id throws (nothing
+  // cached as « no group »).
+  assert.deepEqual(readPlanningResourceIds({ ok: true, status: 200, text: '//OK[42,2,1,1,["java.util.ArrayList/4159755760","java.lang.Integer/3438268394"],0,7]' }), [42])
+  assert.throws(() => readPlanningResourceIds({ ok: false, status: 500, text: 'down' }), /resource ids failed \(500\)/)
+  assert.throws(() => readPlanningResourceIds({ ok: true, status: 200, text: '//EX[2,1,["x"],0,7]' }), /Could not extract planning resource id/)
+  // ADE 6.12: every id, in order; none matched or a refusal gives [].
+  assert.deepEqual(readPlanningResourceIds({ ok: true, status: 200, text: list }, { v612: true }), [10, 20, 30])
+  assert.deepEqual(readPlanningResourceIds({ ok: false, status: 500, text: 'down' }, { v612: true }), [])
 })
