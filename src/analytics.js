@@ -374,7 +374,7 @@ export function useAssiduityPageReport(source, outcome) {
 }
 
 // One thing done on « Assiduité » (assiduity_action): `action` and, for
-// « Justifier » opened, where `from` ('row', 'countdown', 'menu').
+// « Justifier » opened, where `from` ('row', 'countdown', 'menu', 'home').
 export function trackAssiduityAction(action, { from = null } = {}) {
   track('assiduity_action', { action, ...(from ? { from } : null) })
 }

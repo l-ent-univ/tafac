@@ -3224,6 +3224,7 @@ function App() {
                   onOpenGradesPage={hasGradesPage ? handleOpenGradesPage : null}
                   showAssiduity={hasAssiduityPage}
                   onOpenAssiduity={hasAssiduityPage ? handleOpenAssiduityFromCard : null}
+                  assiduityJustifies={hasMailPage}
                   onOpenPlanningPage={hasPlanningPage ? handleOpenPlanningPage : null}
                   onOpenMailPage={hasMailPage ? handleOpenMailPage : null}
                   appsSlotRef={setHomeAppsSlotEl}
