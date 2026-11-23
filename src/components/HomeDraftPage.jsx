@@ -231,6 +231,9 @@ function HomeDraftPage({
   // card opens it.
   showAssiduity = false,
   onOpenAssiduity = null,
+  // « Justifier » from the card's marks: where the page can (the Messagerie
+  // writes the mail).
+  assiduityJustifies = false,
   appsSlotRef = null,
   // The header on a phone (HomePhoneHeader): the logos as the student set
   // them, their photo and Mon compte, and what its icons open besides the
@@ -394,23 +397,25 @@ function HomeDraftPage({
               </div>
             ) : null}
             {showAssiduityCard ? (
-              // The card opens « Assiduité » (Enter or Space too), as
-              // « Moyenne » opens « Mes notes ».
+              // A click on the card opens « Assiduité », as « Moyenne » opens
+              // « Mes notes ». Not a link itself: its marks are buttons, so
+              // the keyboard's way to the page is the card's title
+              // (WidgetAssiduity's Header).
               <div
                 data-card="assiduity"
-                className={`${cellClasses('assiduity')} ${onOpenAssiduity ? 'cursor-pointer rounded-[31px] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-text' : ''}`}
-                role={onOpenAssiduity ? 'link' : undefined}
-                tabIndex={onOpenAssiduity ? 0 : undefined}
-                aria-label={onOpenAssiduity ? 'Assiduité, voir la page' : undefined}
-                onClick={onOpenAssiduity ?? undefined}
-                onKeyDown={onOpenAssiduity ? (event) => {
-                  if (event.key !== 'Enter' && event.key !== ' ') return
-                  if (event.target !== event.currentTarget) return
-                  event.preventDefault()
-                  onOpenAssiduity()
-                } : undefined}
+                className={`${cellClasses('assiduity')} ${onOpenAssiduity ? 'cursor-pointer' : ''}`}
+                onClick={onOpenAssiduity ? () => onOpenAssiduity() : undefined}
               >
-                <WidgetAssiduity payload={grades.payload} releve={grades.releve} config={grades.config} status={grades.status} />
+                <WidgetAssiduity
+                  payload={grades.payload}
+                  releve={grades.releve}
+                  config={grades.config}
+                  status={grades.status}
+                  onOpen={onOpenAssiduity ? (id, action) => onOpenAssiduity({ id, action }) : null}
+                  justifies={assiduityJustifies}
+                  onOpenPage={onOpenAssiduity ? () => onOpenAssiduity() : null}
+                  onOpenPlanning={onOpenPlanningDay}
+                />
               </div>
             ) : null}
           </div>

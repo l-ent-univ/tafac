@@ -2400,7 +2400,14 @@ function App() {
     setShowPlanningWeekend(show)
   }, [sessionState.user])
   // « Accueil »'s « Assiduité » card: the page, as a dashboard card.
-  const handleOpenAssiduityFromCard = useCallback(() => handleNavigatePage('assiduity', 'dashboard_card'), [handleNavigatePage])
+  // `request`: { id, action } from a mark's popover (« Justifier » opens the
+  // walkthrough, « Voir plus » the absence in the list), handed to the page.
+  const [pendingAssiduityRequest, setPendingAssiduityRequest] = useState(null)
+  const handleOpenAssiduityFromCard = useCallback((request = null) => {
+    setPendingAssiduityRequest(request)
+    handleNavigatePage('assiduity', 'dashboard_card')
+  }, [handleNavigatePage])
+  const clearPendingAssiduityRequest = useCallback(() => setPendingAssiduityRequest(null), [])
   const handleAssiduityTabChange = useCallback((show) => {
     persistAssiduityTab(show, sessionState.user)
     setShowAssiduityTab(show)
@@ -3217,6 +3224,7 @@ function App() {
                   onOpenGradesPage={hasGradesPage ? handleOpenGradesPage : null}
                   showAssiduity={hasAssiduityPage}
                   onOpenAssiduity={hasAssiduityPage ? handleOpenAssiduityFromCard : null}
+                  assiduityJustifies={hasMailPage}
                   onOpenPlanningPage={hasPlanningPage ? handleOpenPlanningPage : null}
                   onOpenMailPage={hasMailPage ? handleOpenMailPage : null}
                   appsSlotRef={setHomeAppsSlotEl}
@@ -3235,7 +3243,7 @@ function App() {
             ) : null}
             {isAssiduityPage || keptPages.assiduity ? (
               <KeptPage key={keptPages.assiduity?.key} kept={keptPages.assiduity} shown={isAssiduityPage}>
-                <AssiduityPage arrivalSource={assiduityArrivalSource} onComposeMail={hasMailPage ? handleComposeMail : null} absenceReasons={universityConfig.establishments?.byId?.[establishment]?.absenceReasons} findsClassTeacher={hasPlanningPage} />
+                <AssiduityPage arrivalSource={assiduityArrivalSource} initialRequest={pendingAssiduityRequest} onInitialRequestHandled={clearPendingAssiduityRequest} onComposeMail={hasMailPage ? handleComposeMail : null} absenceReasons={universityConfig.establishments?.byId?.[establishment]?.absenceReasons} findsClassTeacher={hasPlanningPage} />
               </KeptPage>
             ) : null}
             {/* Not kept: its native view keeps Moodle's own state. */}

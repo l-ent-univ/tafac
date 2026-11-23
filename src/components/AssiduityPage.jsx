@@ -16,6 +16,7 @@ import {
   sumAbsenceHours,
 } from '../assiduity'
 import { ABSENCE_STATUS_LABELS } from '../absenceMail'
+import { DAY_LONG, DAY_SHORT, STATUS_STYLES, canJustify, capitalize, describeEntry, formatDay } from '../assiduityDisplay'
 import { trackAssiduityAction, trackJustifyStep, useAssiduityPageReport } from '../analytics'
 import { advanceJustifyReach, describeAssiduityLoad, toAssiduityPageSource } from '../assiduityAnalytics'
 import { assignSubjectIcons } from '../subjectIcons'
@@ -45,18 +46,7 @@ import SmoothSurface from './SmoothSurface'
 
 const CARD = 'widget-card widget-card-visible shadow-md border border-white card-corners bg-widget-bg text-text min-w-0'
 const SECTION_TITLE = 'flex items-center gap-[5px] text-brand'
-const DAY_SHORT = new Intl.DateTimeFormat('fr-FR', { weekday: 'short', day: 'numeric', month: 'short' })
-const DAY_LONG = new Intl.DateTimeFormat('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' })
 const RANGE_DAY = new Intl.DateTimeFormat('fr-FR', { day: 'numeric', month: 'short' })
-
-// How each status reads: its pill, its mark on the semester line.
-const STATUS_STYLES = {
-  // Engraved tags (.status-tag): pressed into the card, not justified
-  // tinted red; a lateness's edge dashed, as lighter.
-  unjustified: { pill: 'status-tag status-tag--error text-error', icon: 'ph:warning-circle' },
-  justified: { pill: 'status-tag status-tag--carved text-text-secondary', icon: 'ph:check-circle' },
-  late: { pill: 'status-tag status-tag--carved status-tag--dashed text-text-secondary', icon: 'ph:clock' },
-}
 
 const FILTERS = [
   { value: 'all', label: 'Toutes' },
@@ -64,22 +54,6 @@ const FILTERS = [
   { value: 'justified', label: 'Justifiées' },
   { value: 'late', label: 'Retards' },
 ]
-
-const capitalize = (text) => (text ? text.charAt(0).toLocaleUpperCase('fr-FR') + text.slice(1) : text)
-
-function formatDay(value, format = DAY_SHORT) {
-  const day = parseDay(value)
-  return day ? format.format(day).replace('.', '') : ''
-}
-
-function describeEntry(entry) {
-  return [
-    capitalize(formatDay(entry.date, DAY_LONG)),
-    `${entry.start} – ${entry.end}`,
-    entry.subjectTitle,
-    ABSENCE_STATUS_LABELS[entry.status],
-  ].filter(Boolean).join(', ')
-}
 
 // The time, once a minute: the countdowns stay true while the page is
 // shown (src/pageVisit.js).
@@ -375,8 +349,6 @@ function SubjectBreakdown({ subjects, subjectIcon, selected, onSelect }) {
   )
 }
 
-// Whether « Justifier » is offered: an absence not justified, a lateness.
-const canJustify = (entry) => entry.status === 'unjustified' || entry.status === 'late'
 
 // One absence of the list: its day, its hours, its subject and teacher,
 // its status; the evaluations held meanwhile and what they became;
@@ -556,7 +528,10 @@ function AbsenceHistory({ entries, filter, onFilter, subject, onClearSubject, hi
 // the teacher of an absence's class (Cc) when ScoDoc names none.
 // `arrivalSource`: how the student got here, for the anonymous analytics
 // (src/assiduityAnalytics.js); the page mounts once per arrival.
-function AssiduityPage({ arrivalSource = 'other', onComposeMail = null, absenceReasons = [], findsClassTeacher = false }) {
+// `initialRequest`: { id, action: 'justify' | 'view' }, an absence picked on
+// « Accueil »'s line (WidgetAssiduity): its « Justifier » walkthrough, or
+// its place in the list; handled once the absences are in.
+function AssiduityPage({ arrivalSource = 'other', onComposeMail = null, absenceReasons = [], findsClassTeacher = false, initialRequest = null, onInitialRequestHandled = null }) {
   // Dev: the debug panel can hold the page on its first load (loadingDebug.js).
   const simulateLoading = useLoadingSimulated()
   const { base, semesters, activeId, selectSemester, entry, releve, config } = useScodocReleve()
@@ -656,12 +631,20 @@ function AssiduityPage({ arrivalSource = 'other', onComposeMail = null, absenceR
   // Messagerie's composer. Not offered without the in-app Messagerie.
   const justifySheet = useHistorySheet('tafacAbsenceJustify')
   const [justifyEntry, setJustifyEntry] = useState(null)
-  // `from`: a row's button, a countdown card, the right-click menu.
+  // `from`: a row's button, a countdown card, the right-click menu, a
+  // mark's popover on « Accueil » ('home', initialRequest).
   const openJustify = useMemo(() => (onComposeMail ? (item, from = 'row') => {
     trackAssiduityAction('justify_opened', { from })
     setJustifyEntry(item)
     justifySheet.open()
   } : null), [onComposeMail, justifySheet])
+  useEffect(() => {
+    const requested = initialRequest ? entriesById.get(initialRequest.id) : null
+    if (!requested) return
+    if (initialRequest.action === 'justify' && openJustify && canJustify(requested)) openJustify(requested, 'home')
+    else pickEntry(requested.id)
+    onInitialRequestHandled?.()
+  }, [initialRequest, entriesById, openJustify, pickEntry, onInitialRequestHandled])
   // Anonymous analytics of the walkthrough (justify_step): `opened` and
   // `closed` follow the sheet itself, however it closes (its buttons,
   // Escape, Back, the mail written), `closed` with the furthest step

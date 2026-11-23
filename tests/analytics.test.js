@@ -468,6 +468,7 @@ test('« Assiduité »: its page, its load, its actions and « Justifier », nev
   assert.deepEqual(keep('assiduity_loaded', { status: 'error', duration_bucket: '<3s', error_kind: 'http_5xx' }), { status: 'error', duration_bucket: '<3s', error_kind: 'http_5xx' })
   assert.equal(keep('assiduity_loaded', { status: 'absent' }), null)
   assert.deepEqual(keep('assiduity_action', { action: 'justify_opened', from: 'countdown', ...leaks }), { action: 'justify_opened', from: 'countdown' })
+  assert.deepEqual(keep('assiduity_action', { action: 'justify_opened', from: 'home' }), { action: 'justify_opened', from: 'home' })
   assert.deepEqual(keep('assiduity_action', { action: 'mark_picked', from: 'row' }), { action: 'mark_picked' })
   assert.equal(keep('assiduity_action', { action: 'absence_deleted' }), null)
   // « Justifier »: the reason never goes, the proof only where it belongs.

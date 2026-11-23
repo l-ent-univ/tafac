@@ -124,7 +124,7 @@ export function usePlanningWeeks({ selection, user }) {
 // here, kept in this browser so a course keeps its colour.
 const ACCENTS_KEY = 'l-ent:planning-accents'
 
-function readAssigned() {
+export function readAssigned() {
   try {
     const stored = JSON.parse(localStorage.getItem(ACCENTS_KEY) ?? '{}')
     return stored && typeof stored === 'object' ? stored : {}
