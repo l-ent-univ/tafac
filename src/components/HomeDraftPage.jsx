@@ -410,7 +410,7 @@ function HomeDraftPage({
                   onOpenAssiduity()
                 } : undefined}
               >
-                <WidgetAssiduity payload={grades.payload} releve={grades.releve} config={grades.config} status={grades.status} onOpen={onOpenAssiduity ? (id, action) => onOpenAssiduity({ id, action }) : null} />
+                <WidgetAssiduity payload={grades.payload} releve={grades.releve} config={grades.config} status={grades.status} onOpen={onOpenAssiduity ? (id, action) => onOpenAssiduity({ id, action }) : null} onOpenPlanning={onOpenPlanningDay} />
               </div>
             ) : null}
           </div>

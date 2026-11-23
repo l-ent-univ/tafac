@@ -91,7 +91,7 @@ function accentIndexFor(assigned, entry) {
 // What a mark says, in the planning's colours: day, hours, subject, status,
 // then « Justifier » and « Voir plus ». It is portalled (the card clips)
 // and stays while the pointer is on it.
-function MarkPopover({ entry, accent, anchor, onOpen, onEnter, onLeave }) {
+function MarkPopover({ entry, accent, anchor, onOpen, onOpenPlanning, onEnter, onLeave }) {
   const justifiable = Boolean(onOpen) && canJustify(entry)
   const stop = (event) => event.stopPropagation()
   const left = Math.min(Math.max(anchor.x, 8 + POPOVER_WIDTH / 2), window.innerWidth - 8 - POPOVER_WIDTH / 2)
@@ -123,8 +123,8 @@ function MarkPopover({ entry, accent, anchor, onOpen, onEnter, onLeave }) {
         {entry.status !== 'late' && entry.hours > 0 ? <span>{formatDuration(entry.hours)}</span> : null}
         {entry.teacher ? <span className="min-w-0 truncate">{entry.teacher}</span> : null}
       </span>
-      {onOpen ? (
-        <span className="mt-1 flex items-center gap-2">
+      {onOpen || onOpenPlanning ? (
+        <span className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1">
           {justifiable ? (
             <button type="button" onClick={() => onOpen(entry.id, 'justify')} className="lent-button justify-button relative inline-flex h-[30px] cursor-pointer items-center gap-1.5 rounded-full px-3">
               <SmoothSurface />
@@ -132,10 +132,16 @@ function MarkPopover({ entry, accent, anchor, onOpen, onEnter, onLeave }) {
               <span className="font-body text-[13px] font-medium leading-none">Justifier</span>
             </button>
           ) : null}
-          <button type="button" onClick={() => onOpen(entry.id, 'view')} className="inline-flex h-[30px] cursor-pointer items-center gap-1 rounded-full px-2 font-body text-[13px] font-medium leading-none text-text-secondary hover:text-text">
+          {onOpenPlanning ? (
+            <button type="button" onClick={() => onOpenPlanning(entry.date.slice(0, 10))} className="inline-flex h-[30px] cursor-pointer items-center gap-1 rounded-full px-2 font-body text-[13px] font-medium leading-none text-text-secondary hover:text-text">
+              <Icon icon="ph:calendar-blank" className="size-[13px]" aria-hidden="true" />
+              Voir sur le planning
+            </button>
+          ) : null}
+          {onOpen ? <button type="button" onClick={() => onOpen(entry.id, 'view')} className="inline-flex h-[30px] cursor-pointer items-center gap-1 rounded-full px-2 font-body text-[13px] font-medium leading-none text-text-secondary hover:text-text">
             Voir plus
             <Icon icon="ph:arrow-right" className="size-[13px]" aria-hidden="true" />
-          </button>
+          </button> : null}
         </span>
       ) : null}
     </div>,
@@ -146,7 +152,7 @@ function MarkPopover({ entry, accent, anchor, onOpen, onEnter, onLeave }) {
 // The semester line, small. A mark hovered (the nearest to the pointer, as
 // on the page), tapped or focused opens its popover; the rest of the card
 // stays the link.
-function MiniLine({ timeline, entriesById, assigned, onOpen }) {
+function MiniLine({ timeline, entriesById, assigned, onOpen, onOpenPlanning }) {
   const trackRef = useRef(null)
   const closeTimer = useRef(null)
   const [anchor, setAnchor] = useState(null)
@@ -235,7 +241,7 @@ function MiniLine({ timeline, entriesById, assigned, onOpen }) {
           </span>
         ))}
       </div>
-      {shown ? <MarkPopover entry={shown} accent={accentIndexFor(assigned, shown)} anchor={anchor} onOpen={onOpen} onEnter={cancelClose} onLeave={scheduleClose} /> : null}
+      {shown ? <MarkPopover entry={shown} accent={accentIndexFor(assigned, shown)} anchor={anchor} onOpen={onOpen} onOpenPlanning={onOpenPlanning} onEnter={cancelClose} onLeave={scheduleClose} /> : null}
     </div>
   )
 }
@@ -244,7 +250,7 @@ function MiniLine({ timeline, entriesById, assigned, onOpen }) {
 // `status`: 'loading', 'ok', 'empty', 'error' (HomeDraftPage's grades).
 // `onOpen(entryId, 'justify' | 'view')`: « Justifier » / « Voir plus » of a
 // mark's popover, to the Assiduité page (null: the popover has no buttons).
-function WidgetAssiduity({ payload, releve, config, status, onOpen = null }) {
+function WidgetAssiduity({ payload, releve, config, status, onOpen = null, onOpenPlanning = null }) {
   const skeletonsForced = useSkeletonsForced()
   // Read once: the card is redrawn as the page loads, the line stays put.
   const [now] = useState(() => new Date())
@@ -292,7 +298,7 @@ function WidgetAssiduity({ payload, releve, config, status, onOpen = null }) {
           </div>
           <span className="min-w-0 truncate text-[14px] font-medium leading-[1.2] text-text-muted max-md:text-[13px]">{details}</span>
         </div>
-        {timeline ? <div className="min-w-0 flex-1"><MiniLine timeline={timeline} entriesById={entriesById} assigned={assigned} onOpen={onOpen} /></div> : null}
+        {timeline ? <div className="min-w-0 flex-1"><MiniLine timeline={timeline} entriesById={entriesById} assigned={assigned} onOpen={onOpen} onOpenPlanning={onOpenPlanning} /></div> : null}
       </div>
       {soonest ? (
         <span className="status-tag status-tag--error inline-flex min-w-0 items-center gap-1.5 self-start rounded-full px-2.5 py-[6px] font-body text-[13px] font-semibold leading-none text-error">
