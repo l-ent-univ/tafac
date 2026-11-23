@@ -113,7 +113,10 @@ async function prepareNodeBinary() {
 
   const extractDir = path.join(CACHE, distribution.name)
   rmSync(extractDir, { recursive: true, force: true })
-  run('tar', ['-xf', archivePath, '-C', CACHE, distribution.binaryInArchive])
+  // Windows' own tar (it reads the .zip): from a Git Bash PATH, `tar` is GNU
+  // tar, which takes « C: » for a host. No shell, so a path may hold spaces.
+  const tar = IS_WINDOWS ? path.join(process.env.SystemRoot ?? 'C:\\Windows', 'System32', 'tar.exe') : 'tar'
+  run(tar, ['-xf', archivePath, '-C', CACHE, distribution.binaryInArchive], { shell: false })
   mkdirSync(BINARIES, { recursive: true })
   copyFileSync(path.join(CACHE, distribution.binaryInArchive), target)
   if (!IS_WINDOWS) chmodSync(target, 0o755)
