@@ -12,7 +12,7 @@ import PlanningShareButton from './PlanningShareButton'
 import SegmentedControl from './SegmentedControl'
 import SwipePager from './SwipePager'
 import SmoothSurface from './SmoothSurface'
-import Switch from './Switch'
+import Tooltip from './Tooltip'
 
 const compareDays = (left, right) => daysBetween(right, left)
 const stepWeeks = (monday, count) => addDays(monday, 7 * count)
@@ -349,19 +349,17 @@ function PlanningHeader({ titleId, selectedDay, todayKey, view, isWide, columnsF
               « Salles et personnels » staying in the view menu. Left out
               rather than hidden: .button-group's display outranks
               Tailwind's. */}
-          {/* Wide: « Absences » as a labelled switch, apart from the group
-              (a phone has it in the view menu). */}
-          {isWide && onToggleAbsences ? (
-            <span className={`${SECONDARY_BUTTON} gap-2.5 pr-2.5`}>
-              <Icon icon="ph:user-minus" className="size-[17px] shrink-0" aria-hidden="true" />
-              Absences
-              <Switch small checked={Boolean(absencesShown)} onChange={onToggleAbsences} label="Afficher les absences sur le planning" />
-            </span>
-          ) : null}
           {isWide || shareOnPhone ? (
             <div className="button-group" role="group" aria-label="Actions du planning">
               <PlanningShareButton selection={selection} onShare={onShare} />
               <PlanningExportButton selection={selection} from="header" className="max-md:hidden" />
+              {/* « Absences »: tinted while on (a phone has it in the view menu). */}
+              {isWide && onToggleAbsences ? (
+                <button type="button" onClick={onToggleAbsences} aria-label="Absences" aria-pressed={Boolean(absencesShown)} className="button-group-item group">
+                  <Icon icon="ph:user-minus" className="size-[18px] shrink-0" aria-hidden="true" />
+                  <Tooltip title={absencesShown ? 'Masquer les absences' : 'Afficher les absences'} side="bottom-end" className="max-4xl:hidden" />
+                </button>
+              ) : null}
               <PlanningDirectoryButton open={isDirectoryOpen} onOpen={onOpenDirectory} />
             </div>
           ) : null}
