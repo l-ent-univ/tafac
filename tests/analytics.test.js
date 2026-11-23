@@ -367,6 +367,8 @@ test('planning_action keeps only the properties of its action, never a class or 
   assert.deepEqual(keep({ action: 'directory_picked', kind: 'group' }), { action: 'directory_picked', kind: 'group' })
   assert.equal(keep({ action: 'directory_picked' }), null)
   assert.equal(keep({ action: 'directory_picked', kind: 'DUPONT Christophe' }), null)
+  // « Absences »: the toggle only, never what it shows.
+  assert.deepEqual(keep({ action: 'absences_toggled', subject: 'Anglais' }), { action: 'absences_toggled' })
 })
 
 test('page_viewed accepts the Messagerie with its own sources', () => {

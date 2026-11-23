@@ -12,6 +12,7 @@ import PlanningShareButton from './PlanningShareButton'
 import SegmentedControl from './SegmentedControl'
 import SwipePager from './SwipePager'
 import SmoothSurface from './SmoothSurface'
+import Tooltip from './Tooltip'
 
 const compareDays = (left, right) => daysBetween(right, left)
 const stepWeeks = (monday, count) => addDays(monday, 7 * count)
@@ -198,14 +199,17 @@ const PHONE_VIEWS = [
 // its touch area 44px), read out as "Affichage : Jour". Under them,
 // « Salles et personnels » (`onOpenDirectory`, ADE only): always there,
 // where the header's pill goes away from today.
-function PhoneViewMenu({ view, onChangeView, onOpenDirectory = null }) {
+function PhoneViewMenu({ view, onChangeView, onOpenDirectory = null, absencesShown = null, onToggleAbsences = null }) {
   const shown = PHONE_VIEWS.find((choice) => choice.value === view) ?? PHONE_VIEWS[0]
   return (
     <Dropdown
       options={PHONE_VIEWS}
       value={shown.value}
       onChange={onChangeView}
-      actions={HAS_PLANNING_DIRECTORY && onOpenDirectory ? [{ id: 'directory', label: 'Salles et personnels', icon: 'ph:user-list', onSelect: onOpenDirectory }] : []}
+      actions={[
+        ...(onToggleAbsences ? [{ id: 'absences', label: absencesShown ? 'Masquer les absences' : 'Afficher les absences', icon: 'ph:user-minus', onSelect: onToggleAbsences }] : []),
+        ...(HAS_PLANNING_DIRECTORY && onOpenDirectory ? [{ id: 'directory', label: 'Salles et personnels', icon: 'ph:user-list', onSelect: onOpenDirectory }] : []),
+      ]}
       label="Affichage"
       align="end"
       className="shrink-0"
@@ -231,7 +235,10 @@ function PhoneViewMenu({ view, onChangeView, onOpenDirectory = null }) {
 // `onOpenDirectory`: « Salles et personnels » (ADE only), its side panel
 // toggled, or a phone's sheet opened (from the pill, or the view menu
 // away from today); `isDirectoryOpen`: shown.
-function PlanningHeader({ titleId, selectedDay, todayKey, view, isWide, columnsFor, selection, onSelectDay, onOpenDay, onToday, onStep, onChangeView, onShare = null, isDirectoryOpen = false, onOpenDirectory = null }) {
+// `onToggleAbsences`: « Absences », the student's absences drawn on their
+// classes (a button of the group, or on a phone an action of the view menu);
+// null when the student has no « Assiduité » page. `absencesShown`: on.
+function PlanningHeader({ titleId, selectedDay, todayKey, view, isWide, columnsFor, selection, onSelectDay, onOpenDay, onToday, onStep, onChangeView, onShare = null, isDirectoryOpen = false, onOpenDirectory = null, absencesShown = null, onToggleAbsences = null }) {
   const [isPickerOpen, setIsPickerOpen] = useState(false)
   const monday = startOfWeek(selectedDay)
   const dayCount = view === 'twoDays' ? 2 : 1
@@ -333,7 +340,7 @@ function PlanningHeader({ titleId, selectedDay, todayKey, view, isWide, columnsF
           ) : null}
           {/* Wide: "Jour" / "Semaine" / "Liste". Otherwise a menu of the
               phone's views. */}
-          {isWide ? <WideViewSwitch view={view} onChangeView={onChangeView} /> : <PhoneViewMenu view={view} onChangeView={onChangeView} onOpenDirectory={onOpenDirectory} />}
+          {isWide ? <WideViewSwitch view={view} onChangeView={onChangeView} /> : <PhoneViewMenu view={view} onChangeView={onChangeView} onOpenDirectory={onOpenDirectory} absencesShown={absencesShown} onToggleAbsences={onToggleAbsences} />}
           {/* At the row's end, apart from the views, joined in one pill
               (.button-group): « Partager » (the week shown, as an image),
               the .ics export (a wide screen's; a phone's is in the share
@@ -346,6 +353,13 @@ function PlanningHeader({ titleId, selectedDay, todayKey, view, isWide, columnsF
             <div className="button-group" role="group" aria-label="Actions du planning">
               <PlanningShareButton selection={selection} onShare={onShare} />
               <PlanningExportButton selection={selection} from="header" className="max-md:hidden" />
+              {/* « Absences »: tinted while on (a phone has it in the view menu). */}
+              {isWide && onToggleAbsences ? (
+                <button type="button" onClick={onToggleAbsences} aria-label="Absences" aria-pressed={Boolean(absencesShown)} className="button-group-item group">
+                  <Icon icon="ph:user-minus" className="size-[18px] shrink-0" aria-hidden="true" />
+                  <Tooltip title={absencesShown ? 'Masquer les absences' : 'Afficher les absences'} side="bottom-end" className="max-4xl:hidden" />
+                </button>
+              ) : null}
               <PlanningDirectoryButton open={isDirectoryOpen} onOpen={onOpenDirectory} />
             </div>
           ) : null}

@@ -4,12 +4,17 @@ import { Icon } from '@iconify/react'
 import { dayText, durationText, formatTime, relativeDayText } from '../planningDates'
 import { nextOccurrences } from '../planningEvents'
 import { accentStyle } from '../eventAccents'
+import { STATUS_STYLES, canJustify } from '../assiduityDisplay'
 import { FULL_BLOCK_HEIGHT } from '../eventBlockLayout'
 import PlanningEventBlock from './PlanningEventBlock'
+import SmoothSurface from './SmoothSurface'
 import CloseButton from './CloseButton'
 import Tooltip from './Tooltip'
 import { GROUP_CARD_CLASSES, GroupRow } from './GroupCard'
 import { useSheetDrag } from '../useSheetDrag'
+
+// What the class's absence row says, as a row of its details.
+const ABSENCE_TITLES = { unjustified: 'Absence non justifiée', justified: 'Absence justifiée', late: 'Retard' }
 
 function linkHost(href) {
   try {
@@ -26,7 +31,10 @@ function linkHost(href) {
 // takes the planning to its day). `searching`: those weeks are still on
 // their way. `onWrite`: « Écrire au sujet de ce cours » (a mail about it,
 // in the Messagerie), null without the in-app mail page.
-function PlanningEventSheet({ event, accent, events, todayKey, searching, onWrite = null, onClose, onPickDay }) {
+// `absence`: the student's absence in this class, when « Absences » is shown
+// (its status, and « Justifier » through `onJustify(absence)`, null without
+// the in-app Messagerie or when there is nothing to justify).
+function PlanningEventSheet({ event, accent, events, todayKey, searching, absence = null, onJustify = null, onWrite = null, onClose, onPickDay }) {
   const dialogRef = useRef(null)
   const dismiss = useSheetDrag(dialogRef, onClose)
   const scrollRef = useRef(null)
@@ -138,6 +146,25 @@ function PlanningEventSheet({ event, accent, events, todayKey, searching, onWrit
                   <GroupRow icon="ph:clock" title={`De ${formatTime(event.start)} à ${formatTime(event.end)}`} />
                   <GroupRow icon="ph:calendar-blank" title={`${dayText(event.day)} · ${durationText(event.start, event.end)}`} />
                   {event.group ? <GroupRow icon="ph:users-three" title={event.group} /> : null}
+                  {absence ? (
+                    <GroupRow
+                      icon={STATUS_STYLES[absence.status]?.icon ?? 'ph:check-circle'}
+                      title={ABSENCE_TITLES[absence.status] ?? ABSENCE_TITLES.justified}
+                      tone={absence.status === 'unjustified' ? 'error' : null}
+                      detail={absence.status === 'late' ? 'Arrivé en retard à ce cours' : `De ${absence.start} à ${absence.end}`}
+                      trailing={onJustify && canJustify(absence) ? (
+                        <button
+                          type="button"
+                          onClick={() => onJustify(absence)}
+                          className="lent-button justify-button relative inline-flex h-[30px] cursor-pointer items-center gap-1.5 rounded-full px-3 after:absolute after:-inset-[7px]"
+                        >
+                          <SmoothSurface />
+                          <Icon icon="ph:seal-check" className="size-[15px]" aria-hidden="true" />
+                          <span className="font-body text-[13px] font-medium leading-none">Justifier</span>
+                        </button>
+                      ) : null}
+                    />
+                  ) : null}
                   {event.notes ? <GroupRow icon="ph:info" title={event.notes} wrap /> : null}
                   {event.link ? (
                     <GroupRow icon="ph:link" title={event.linkLabel ?? 'Lien'} detail={linkHost(event.link)} href={event.link} />

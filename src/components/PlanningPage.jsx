@@ -11,7 +11,12 @@ import { useHistoryValue } from '../useHistoryValue'
 import { NEW_MARK_DIRECTORY, useNewMark } from '../useNewMark'
 import { classCopyText } from '../contextMenuItems'
 import { prepareCourseMail } from '../courseMail'
+import { absenceOn, findFocusedEvent } from '../planningAbsences'
+import { canJustify } from '../assiduityDisplay'
+import { trackAssiduityAction } from '../analytics'
 import { copyToClipboard, useContextMenu } from '../useContextMenu'
+import JustifyAbsenceSheet from './JustifyAbsenceSheet'
+import PlanningAbsencesLoader from './PlanningAbsencesLoader'
 import PlanningDayPage from './PlanningDayPage'
 import PlanningDirectoryPanel from './PlanningDirectoryPanel'
 import PlanningDirectorySheet from './PlanningDirectorySheet'
@@ -36,6 +41,9 @@ const PHONE_VIEWS = ['day', 'twoDays', 'list']
 const WIDE_VIEW_KEY = 'l-ent:planning-wide-view'
 const WIDE_VIEWS = ['day', 'week', 'list']
 const WIDE_QUERY = '(min-width: 1024px)'
+// « Absences »: the absences marked on the classes (on unless turned off),
+// kept in this browser.
+const ABSENCES_KEY = 'l-ent:planning-absences'
 // « Salles et personnels »' side panel (PlanningDirectoryPanel): narrower
 // than the mail reader by default, a list; dragged from its left edge and
 // stored for the device, the week keeping 560px beside it.
@@ -79,6 +87,14 @@ function scrollToPageTop(element) {
     if (node.scrollTop > 0) node.scrollTo({ top: 0, behavior })
   }
   if (window.scrollY > 0) window.scrollTo({ top: 0, behavior })
+}
+
+function readAbsencesShown() {
+  try {
+    return localStorage.getItem(ABSENCES_KEY) !== '0'
+  } catch {
+    return true
+  }
 }
 
 function storeView(key, value) {
@@ -148,7 +164,14 @@ function useFontsReady() {
 // place of the student's.
 // `onOpenPlanningSettings`: Réglages › Planning, where the student changes
 // their group (offered on the panel's « Formations »).
-function PlanningPage({ selection = null, user = null, showWeekend = false, onOpenAccount = null, initialDay = null, onInitialDayHandled = () => {}, arrivalSource = 'other', onComposeMail = null, onSidePanelOpenChange = null, onOpenPlanningSettings = null }) {
+// `initialFocus`: an absence (« Voir sur le planning », « Accueil »'s line):
+// its class is lit up a moment on its day, handed back with
+// onInitialFocusHandled once taken. `canShowAbsences`: « Absences » is
+// offered (the student has the « Assiduité » page): the absences of the
+// semester drawn on their classes, a class's sheet then offering
+// « Justifier » (`absenceReasons`: the establishment's own, as on that page;
+// it needs `onComposeMail`).
+function PlanningPage({ selection = null, user = null, showWeekend = false, onOpenAccount = null, initialDay = null, onInitialDayHandled = () => {}, initialFocus = null, onInitialFocusHandled = null, canShowAbsences = false, absenceReasons = [], arrivalSource = 'other', onComposeMail = null, onSidePanelOpenChange = null, onOpenPlanningSettings = null }) {
   const now = useNow()
   const todayKey = toDayKey(now)
   const isWide = useWideLayout()
@@ -213,6 +236,58 @@ function PlanningPage({ selection = null, user = null, showWeekend = false, onOp
   // A burst of steps still open is reported as the page goes.
   useEffect(() => flushPlanningNavigation, [])
   useFontsReady()
+
+  // « Absences »: the semester's absences (PlanningAbsencesLoader, asked
+  // only while shown) marked on their classes.
+  const [absencesWanted, setAbsencesWanted] = useState(readAbsencesShown)
+  const showAbsences = canShowAbsences && absencesWanted
+  const [absenceEntries, setAbsenceEntries] = useState([])
+  const toggleAbsences = useCallback(() => {
+    const next = !absencesWanted
+    storeView(ABSENCES_KEY, next ? '1' : '0')
+    if (next) trackPlanningAction('absences_toggled')
+    setAbsencesWanted(next)
+  }, [absencesWanted])
+  // A class's sheet and menu always know its absence; the marks on the
+  // planning itself follow « Absences ».
+  const absenceFor = useMemo(() => (canShowAbsences ? (event) => absenceOn(absenceEntries, event) : null), [canShowAbsences, absenceEntries])
+  const absenceOf = showAbsences ? absenceFor : null
+  // The class lit up (« Voir sur le planning »): looked for among the
+  // events as they come in, once; scrolled to, and let go after a moment.
+  const [highlightId, setHighlightId] = useState(null)
+  useEffect(() => {
+    if (!initialFocus) return
+    const match = findFocusedEvent(events, initialFocus)
+    // Its week still on its way: asked again as the events come in.
+    if (!match && statusOn(initialFocus.date.slice(0, 10)) === 'loading') return
+    if (match) setHighlightId(match.id)
+    onInitialFocusHandled?.()
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialFocus, events, statusOn])
+  useEffect(() => {
+    if (!highlightId) return undefined
+    const reduce = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
+    const frame = window.requestAnimationFrame(() => {
+      document.querySelector(`[data-event-id="${CSS.escape(highlightId)}"]`)?.scrollIntoView({ behavior: reduce ? 'auto' : 'smooth', block: 'center' })
+    })
+    const timer = window.setTimeout(() => setHighlightId(null), 2400)
+    return () => {
+      window.cancelAnimationFrame(frame)
+      window.clearTimeout(timer)
+    }
+  }, [highlightId])
+  const marks = useMemo(() => ({ highlightId, absenceOf }), [highlightId, absenceOf])
+
+  // « Justifier »: the walkthrough over the page (its own history entry), for
+  // the absence of a class; it hands the mail to the Messagerie's composer.
+  // Not offered without the in-app Messagerie.
+  const justifySheet = useHistorySheet('tafacPlanningJustify')
+  const [justifyEntry, setJustifyEntry] = useState(null)
+  const openJustify = onComposeMail ? (absence) => {
+    trackAssiduityAction('justify_opened', { from: 'planning' })
+    setJustifyEntry(absence)
+    justifySheet.open()
+  } : null
 
   const daysRef = useRef(null)
   const [width, setWidth] = useState(0)
@@ -380,8 +455,10 @@ function PlanningPage({ selection = null, user = null, showWeekend = false, onOp
   const eventMenuProps = useContextMenu((id) => {
     const event = events.find((entry) => entry.id === id)
     if (!event) return null
+    const absence = absenceFor?.(event)
     return [
       { id: 'open', label: 'Voir le détail', icon: 'ph:eye', onSelect: () => openSheet(event) },
+      openJustify && absence && canJustify(absence) ? { id: 'justify', label: 'Justifier', icon: 'ph:seal-check', onSelect: () => openJustify(absence) } : null,
       isWeek ? { id: 'day', label: 'Afficher le jour', icon: 'ph:calendar-blank', onSelect: () => openDay(event.day) } : null,
       writeAboutCourse ? { id: 'write', label: 'Écrire au sujet de ce cours', icon: 'ph:envelope-simple', onSelect: () => void writeAboutCourse(event) } : null,
       'separator',
@@ -451,6 +528,8 @@ function PlanningPage({ selection = null, user = null, showWeekend = false, onOp
             onShare={openShare}
             isDirectoryOpen={isWide ? isDirectoryOpen : directorySheet.isOpen}
             onOpenDirectory={isWide ? toggleDirectory : openDirectorySheet}
+            absencesShown={canShowAbsences ? showAbsences : null}
+            onToggleAbsences={canShowAbsences ? toggleAbsences : null}
           />
           {!isWide && viewed ? <PlanningViewedBar viewed={viewed} onChange={openDirectorySheet} onStop={() => showOnPhone(null)} /> : null}
         </div>
@@ -489,6 +568,7 @@ function PlanningPage({ selection = null, user = null, showWeekend = false, onOp
               active={active}
               onOpen={openSheet}
               menuProps={eventMenuProps}
+              marks={marks}
               onRetry={retry}
               onOpenAccount={onOpenAccount}
             />
@@ -504,6 +584,7 @@ function PlanningPage({ selection = null, user = null, showWeekend = false, onOp
               weekBlocks={isWide}
               onOpen={openSheet}
               menuProps={eventMenuProps}
+              marks={marks}
               onRetry={retry}
               onOpenAccount={onOpenAccount}
             />
@@ -518,6 +599,8 @@ function PlanningPage({ selection = null, user = null, showWeekend = false, onOp
           todayKey={todayKey}
           searching={occurrenceWeeks.some((monday) => statusOn(monday) === 'loading')}
           onClose={sheet.close}
+          absence={absenceFor?.(openEvent) ?? null}
+          onJustify={openJustify}
           onWrite={writeAboutCourse ? () => void writeAboutCourse(openEvent) : null}
           onPickDay={(day) => {
             trackPlanningAction('occurrence_opened')
@@ -525,6 +608,10 @@ function PlanningPage({ selection = null, user = null, showWeekend = false, onOp
             setSelectedDay(day)
           }}
         />
+      ) : null}
+      {canShowAbsences ? <PlanningAbsencesLoader onEntries={setAbsenceEntries} /> : null}
+      {justifySheet.isOpen && justifyEntry ? (
+        <JustifyAbsenceSheet entry={justifyEntry} extraReasons={absenceReasons} findsClassTeacher onCompose={onComposeMail} onClose={justifySheet.close} />
       ) : null}
       {shareSheet.isOpen ? (
         <PlanningShareSheet

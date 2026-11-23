@@ -37,7 +37,7 @@ const PLANNING_VIEWS = ['day', 'two_days', 'week', 'list']
 const PLANNING_ACTIONS = [
   'view_changed', 'day_changed', 'week_changed', 'today', 'calendar_picked', 'day_opened',
   'course_opened', 'occurrence_opened', 'retry', 'open_account', 'ics_exported',
-  'share_opened', 'directory_opened', 'directory_picked',
+  'share_opened', 'directory_opened', 'directory_picked', 'absences_toggled',
 ]
 // planning_action's own properties, by action (any other is dropped), and
 // those an action can't go without.
@@ -374,11 +374,11 @@ export const ANALYTICS_EVENTS = {
   },
   // One thing done on « Assiduité »; « Justifier » opened says from where
   // (a row's button, a countdown card, the right-click menu, a mark's
-  // popover on « Accueil »).
+  // popover on « Accueil », a class's sheet or menu on the planning).
   assiduity_action: {
     properties: {
       action: oneOf(...ASSIDUITY_ACTIONS),
-      from: oneOf('row', 'countdown', 'menu', 'home'),
+      from: oneOf('row', 'countdown', 'menu', 'home', 'planning'),
     },
     required: ['action'],
     refine: (props) => {

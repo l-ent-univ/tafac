@@ -15,20 +15,22 @@ export const GROUP_CARD_CLASSES = 'widget-card widget-card-visible m-0 list-none
 // tooltip (a shortened title in full). `compact`: tighter, the icon bare
 // (no box), as a mail's attachments. `menuProps`: its right-click menu's
 // (useContextMenu), on the link or the button. `onClick` on a link
-// or a download is only told of the click (the link still goes).
-export function GroupRow({ icon, title, detail, onClick, href, download, trailing = null, wrap = false, hint, compact = false, menuProps = null }) {
+// or a download is only told of the click (the link still goes). `tone`:
+// 'error' puts the row forward, its icon and title in red (an absence not
+// justified).
+export function GroupRow({ icon, title, detail, onClick, href, download, trailing = null, wrap = false, hint, compact = false, menuProps = null, tone = null }) {
   const trailingIcon = href ? (download ? 'ph:download-simple' : 'ph:arrow-square-out') : onClick ? 'ph:caret-right' : null
   const content = (
     <>
       {icon && compact ? <Icon icon={icon} className="size-[18px] shrink-0 text-text-muted" aria-hidden="true" /> : null}
       {icon && !compact ? (
-        <span className="glass-solid inline-flex size-7 shrink-0 items-center justify-center corners-[8px] text-text-secondary" aria-hidden="true">
+        <span className={`inline-flex size-7 shrink-0 items-center justify-center corners-[8px] ${tone === 'error' ? 'status-tag status-tag--error text-error' : 'glass-solid text-text-secondary'}`} aria-hidden="true">
           <Icon icon={icon} className="size-[15px]" />
         </span>
       ) : null}
       {/* One column no wider than the row: a long unbroken name wraps. */}
       <span className={`planning-row-text grid min-w-0 flex-1 grid-cols-[minmax(0,1fr)] content-center self-stretch mr-3 ${compact ? 'gap-[3px] py-[9px]' : 'gap-[4px] py-[12px]'}`}>
-        <span className={`${wrap ? 'whitespace-pre-line [overflow-wrap:anywhere]' : 'truncate'} font-body ${compact ? 'text-[13.5px]' : 'text-[14px]'} font-semibold leading-[1.2] text-text`}>{title}</span>
+        <span className={`${wrap ? 'whitespace-pre-line [overflow-wrap:anywhere]' : 'truncate'} font-body ${compact ? 'text-[13.5px]' : 'text-[14px]'} font-semibold leading-[1.2] ${tone === 'error' ? 'text-error' : 'text-text'}`}>{title}</span>
         {detail ? <span className={`truncate font-body ${compact ? 'text-[12px]' : 'text-[12.5px]'} font-medium leading-none text-text-muted`}>{detail}</span> : null}
       </span>
       {trailing ? (

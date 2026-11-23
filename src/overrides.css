@@ -7727,7 +7727,7 @@
   }
 }
 
-.button-group-item[aria-expanded="true"] {
+.button-group-item:is([aria-expanded="true"], [aria-pressed="true"]) {
   background-color: rgb(52 18 0 / 0.08);
 }
 
@@ -7757,7 +7757,7 @@
   }
 }
 
-:where([data-theme="dark"]) .button-group-item[aria-expanded="true"] {
+:where([data-theme="dark"]) .button-group-item:is([aria-expanded="true"], [aria-pressed="true"]) {
   background-color: rgb(255 255 255 / 0.1);
 }
 
@@ -9213,6 +9213,44 @@ button.planning-block:active {
 .planning-block:focus-visible {
   outline: 2px solid var(--color-brand);
   outline-offset: 2px;
+}
+
+/* « Voir sur le planning »: the absence's class washed a moment in its
+   colour, as the Assiduité page's row is (assiduity-row-flash), then let go. */
+.widget-card.planning-block.is-highlighted,
+.widget-card.planning-list-card.is-highlighted {
+  animation: planning-class-flash 2.4s ease-out both;
+}
+
+@keyframes planning-class-flash {
+  0%, 45% {
+    background-color: color-mix(in srgb, var(--accent) 34%, var(--color-widget-bg));
+    outline: 1.5px solid var(--accent);
+    outline-offset: -1.5px;
+  }
+}
+
+/* « Absences »: a small round status badge in the grid's blocks' corner (its
+   icon the status' as the Assiduité page's pills, red not justified);
+   the list's cards wear the status tag. */
+.planning-absence-badge {
+  position: absolute;
+  top: 5px;
+  right: 5px;
+  display: inline-flex;
+  width: 18px;
+  height: 18px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 9999px;
+  background: var(--color-widget-bg);
+  color: var(--color-text-secondary);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--color-text) 10%, transparent);
+}
+
+.is-unjustified > .planning-absence-badge {
+  background: var(--color-error-bg);
+  color: var(--color-error);
 }
 
 /* The course's colour, set inline in both themes (--accent, --accent-dark,
