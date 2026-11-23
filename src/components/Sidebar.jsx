@@ -14,6 +14,7 @@ import { SIDEBAR_NEXT_CLASS_ENABLED, useSidebarNextClassShown } from '../sidebar
 import Tooltip from './Tooltip'
 import { MAC_PLATFORMS, macDownloadUrl, resolveMacDownloads, shouldOfferMacApp } from '../macAppDownload'
 import MacAppDownloadModal from './MacAppDownloadModal'
+import { useWindowsAppDownload } from '../useWindowsAppDownload'
 import { buildNavItems, openNavItemLink } from '../navItems'
 import {
   COMPACT_SIDEBAR_WIDTH,
@@ -255,6 +256,27 @@ function MacAppDownloadButton({ compact = false }) {
       </button>
       <MacAppDownloadModal open={isChooserOpen} onClose={closeChooser} installers={download.installers} />
     </>
+  )
+}
+
+// Website on Windows only, once a release has a Windows build: the same
+// round as the Mac's, straight to the installer (no processor to choose).
+function WindowsAppDownloadButton({ compact = false }) {
+  const url = useWindowsAppDownload()
+  if (!url) return null
+  return (
+    <a
+      href={url}
+      className="glass-solid group relative inline-flex shrink-0 items-center justify-center size-8 rounded-full p-0 text-text cursor-pointer no-underline"
+      aria-label="Télécharger Tafac pour Windows"
+    >
+      <Icon icon="ph:download-simple" className="w-4 h-4" aria-hidden="true" />
+      {compact ? (
+        <CompactTooltip title="Tafac pour Windows" detail="Télécharger l’app" />
+      ) : (
+        <Tooltip title="Télécharger Tafac pour Windows" side="top-end" />
+      )}
+    </a>
   )
 }
 
@@ -568,6 +590,7 @@ function Sidebar({
               <Tooltip title="Réglages" side="top" />
             </button>
             <MacAppDownloadButton />
+            <WindowsAppDownloadButton />
           </div>
         ) : null}
       </div>
@@ -659,6 +682,7 @@ function Sidebar({
                   <CompactTooltip title={userName || 'Mon compte'} detail={userSubtitle} />
                 </button>
                 <MacAppDownloadButton compact />
+                <WindowsAppDownloadButton compact />
               </>
             ) : null}
           </div>

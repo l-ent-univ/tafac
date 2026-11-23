@@ -22,6 +22,7 @@ import LandingFaq from './LandingFaq'
 import LandingFooter from './LandingFooter'
 import LandingHeader from './LandingHeader'
 import LandingShowcase from './LandingShowcase'
+import LandingWindowsApp from './LandingWindowsApp'
 import LentButton from './LentButton'
 import PapillonVision from './PapillonVision'
 import UniversityMarquee from './UniversityMarquee'
@@ -133,6 +134,7 @@ function LandingPage({ onLogin }) {
             <p className="m-0 mt-3 max-w-[44ch] text-balance text-[13px] font-semibold leading-snug text-text-secondary font-body">
               {copyText(copy.hero.disclaimer)}
             </p>
+            <LandingWindowsApp className="mt-5" />
             <UniversityMarquee className="mt-10 w-[min(560px,100%)] max-md:mt-8" />
           </div>
         </section>
