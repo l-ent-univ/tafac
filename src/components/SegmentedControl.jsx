@@ -1,5 +1,6 @@
 import { useLayoutEffect, useRef, useState } from 'react'
 import { Icon } from '@iconify/react'
+import { isInHiddenPage } from '../keptPages'
 import SmoothSurface from './SmoothSurface'
 
 // The app's segmented control (.segmented, overrides.css): options side by
@@ -26,6 +27,8 @@ function SegmentedControl({ options, value, onChange, label, kind = 'radio', siz
     const track = trackRef.current
     if (!track) return undefined
     const measure = () => {
+      // Kept behind another page, out of the layout: the thumb stays put.
+      if (isInHiddenPage(track)) return
       const active = optionRefs.current.get(value)
       if (!active) {
         setThumb(null)

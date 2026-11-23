@@ -24,6 +24,8 @@ import SidePanelResizeHandle from './SidePanelResizeHandle'
 import SwipePager from './SwipePager'
 import { createSidePanelSizing, useSidePanelWidth } from '../sidePanelWidth'
 import { onDesktopCommand } from '../desktopMenu'
+import { isInHiddenPage } from '../keptPages'
+import { usePageInterval, usePageReturn, usePageShown } from '../pageVisit'
 
 // The view (one day, two side by side, or the week's list), kept in this
 // browser.
@@ -98,13 +100,11 @@ function useWideLayout() {
   return useSyncExternalStore(subscribeWide, () => window.matchMedia(WIDE_QUERY).matches, () => false)
 }
 
-// The time, once a minute: the now line and what "today" is.
+// The time, once a minute while the page is shown (src/pageVisit.js): the
+// now line and what "today" is.
 function useNow() {
   const [now, setNow] = useState(() => Date.now())
-  useEffect(() => {
-    const timer = window.setInterval(() => setNow(Date.now()), 60 * 1000)
-    return () => window.clearInterval(timer)
-  }, [])
+  usePageInterval(() => setNow(Date.now()), 60 * 1000)
   return now
 }
 
@@ -167,6 +167,18 @@ function PlanningPage({ selection = null, user = null, showWeekend = false, onOp
     onInitialDayHandled()
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [initialDay])
+  // Where the page is kept mounted (the iOS app, src/pageVisit.js), back on
+  // it another day than it was left: today, as a mount opens on, unless a
+  // day is asked. The same day, it is as it was left.
+  const shown = usePageShown()
+  const shownOnRef = useRef(todayKey)
+  useEffect(() => {
+    if (shown) shownOnRef.current = todayKey
+  }, [shown, todayKey])
+  usePageReturn(() => {
+    const today = toDayKey(Date.now())
+    if (!initialDay && today !== shownOnRef.current) setSelectedDay(today)
+  })
   // « Salles et personnels »: a side panel on a wide screen, its button
   // toggling it. Gone with the wide layout (a phone has its sheet).
   const [isDirectoryWanted, setIsDirectoryWanted] = useState(false)
@@ -207,7 +219,10 @@ function PlanningPage({ selection = null, user = null, showWeekend = false, onOp
   useLayoutEffect(() => {
     const element = daysRef.current
     if (!element) return undefined
-    const observer = new ResizeObserver(() => setWidth(element.clientWidth))
+    const observer = new ResizeObserver(() => {
+      // Kept behind another page, out of the layout: the width it had.
+      if (!isInHiddenPage(element)) setWidth(element.clientWidth)
+    })
     observer.observe(element)
     setWidth(element.clientWidth)
     return () => observer.disconnect()

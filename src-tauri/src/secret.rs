@@ -106,17 +106,17 @@ pub fn session_secret(data_dir: &Path) -> std::io::Result<String> {
 }
 
 // Packaged builds, on the systems with a credential store.
-#[cfg(all(not(debug_assertions), any(target_os = "macos", target_os = "linux", windows)))]
+#[cfg(all(not(debug_assertions), any(target_os = "macos", target_os = "ios", target_os = "linux", windows)))]
 fn system_store() -> Option<Box<dyn SecretStore>> {
     Some(Box::new(system::Keychain))
 }
 
-#[cfg(not(all(not(debug_assertions), any(target_os = "macos", target_os = "linux", windows))))]
+#[cfg(not(all(not(debug_assertions), any(target_os = "macos", target_os = "ios", target_os = "linux", windows))))]
 fn system_store() -> Option<Box<dyn SecretStore>> {
     None
 }
 
-#[cfg(all(not(debug_assertions), any(target_os = "macos", target_os = "linux", windows)))]
+#[cfg(all(not(debug_assertions), any(target_os = "macos", target_os = "ios", target_os = "linux", windows)))]
 mod system {
     use super::SecretStore;
 

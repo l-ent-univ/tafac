@@ -36,15 +36,32 @@ use std::sync::{Arc, Mutex, MutexGuard};
 use std::time::{Duration, Instant};
 
 use serde::{Deserialize, Serialize};
-use tauri::webview::{DownloadEvent, NewWindowResponse, PageLoadEvent};
-use tauri::{AppHandle, LogicalPosition, LogicalSize, Manager, Url, Webview, WebviewBuilder, WebviewUrl, Wry};
-use tokio::sync::{oneshot, watch};
+use tauri::webview::PageLoadEvent;
+#[cfg(desktop)]
+use tauri::webview::{DownloadEvent, NewWindowResponse};
+use tauri::{AppHandle, Manager, Url};
+#[cfg(desktop)]
+use tauri::{LogicalPosition, LogicalSize, Webview, WebviewBuilder, WebviewUrl, Wry};
+#[cfg(desktop)]
+use tokio::sync::oneshot;
+use tokio::sync::watch;
 
 use crate::bridge::{self, Bridge};
 use crate::links;
 use crate::moodle_style::{self, Theme, ThemeBody};
 
+#[cfg(desktop)]
 pub const LABEL: &str = "moodle";
+
+// Moodle's view. On the desktop a web view of Tauri's, a child of the
+// window. On iOS Tauri has none to give (a window holds one web view there):
+// the view is a WKWebView of the app's own (moodle_ios.rs, plugins/moodle),
+// which answers to the same names. Everything below is the same for both:
+// what the view may load, how it signs in, what it says to the page.
+#[cfg(desktop)]
+type View = Webview<Wry>;
+#[cfg(target_os = "ios")]
+use crate::moodle_ios::View;
 const POLICY_PATH: &str = "/__ent_auth/moodle/view";
 const LAUNCH_PATH: &str = "/__ent_auth/launch";
 const SESSION_HEADER: &str = "x-tafac-session";
@@ -236,8 +253,14 @@ fn moodle(app: &AppHandle) -> Arc<Moodle> {
     app.state::<Arc<Moodle>>().inner().clone()
 }
 
-fn view(app: &AppHandle) -> Option<Webview<Wry>> {
+#[cfg(desktop)]
+fn view(app: &AppHandle) -> Option<View> {
     app.get_webview(LABEL)
+}
+
+#[cfg(target_os = "ios")]
+fn view(app: &AppHandle) -> Option<View> {
+    View::of(app)
 }
 
 #[derive(Deserialize, Clone, Copy)]
@@ -254,9 +277,15 @@ impl Bounds {
     }
 }
 
-fn place(view: &Webview<Wry>, bounds: Bounds) {
+#[cfg(desktop)]
+fn place(view: &View, bounds: Bounds) {
     let _ = view.set_position(LogicalPosition::new(bounds.x, bounds.y));
     let _ = view.set_size(LogicalSize::new(bounds.width, bounds.height));
+}
+
+#[cfg(target_os = "ios")]
+fn place(view: &View, bounds: Bounds) {
+    view.place(bounds.x, bounds.y, bounds.width, bounds.height);
 }
 
 // The app's own server, asked as the page would (the view can't).
@@ -429,6 +458,7 @@ fn page_loaded(app: &AppHandle, policy: &Policy, event: PageLoadEvent, url: &Url
     }
 }
 
+#[cfg(desktop)]
 fn builder(app: &AppHandle, policy: &Policy, start: Url) -> WebviewBuilder<Wry> {
     let navigation = (app.clone(), policy.clone());
     let new_window = (app.clone(), policy.clone());
@@ -475,7 +505,7 @@ fn builder(app: &AppHandle, policy: &Policy, start: Url) -> WebviewBuilder<Wry> 
     builder
 }
 
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
 fn hooks(app: &AppHandle) -> crate::moodle_native::Hooks {
     let (shown, changed, failed) = (moodle(app), moodle(app), moodle(app));
     crate::moodle_native::Hooks {
@@ -514,6 +544,19 @@ async fn create(app: &AppHandle, window_label: &str, policy: &Policy, bounds: Bo
         });
         return Ok(());
     };
+    let result = make(app, window, policy, bounds, start).await;
+    moodle(app).update(|state| {
+        state.making = false;
+        if result.is_err() {
+            state.phase = Phase::None;
+        }
+    });
+    result
+}
+
+// The view itself, made hidden where the slot is, on its way to `start`.
+#[cfg(desktop)]
+async fn make(app: &AppHandle, window: tauri::Window, policy: &Policy, bounds: Bounds, start: Url) -> Result<(), String> {
     let builder = builder(app, policy, start);
 
     // On the main thread, in one go: the view is made and hidden before it
@@ -525,7 +568,7 @@ async fn create(app: &AppHandle, window_label: &str, policy: &Policy, bounds: Bo
             .add_child(builder, LogicalPosition::new(bounds.x, bounds.y), LogicalSize::new(bounds.width, bounds.height))
             .map(|view| {
                 let _ = view.hide();
-                #[cfg(target_os = "macos")]
+                #[cfg(any(target_os = "macos", windows))]
                 {
                     let handle = handle.clone();
                     crate::moodle_native::install(&view, move || hooks(&handle));
@@ -535,17 +578,115 @@ async fn create(app: &AppHandle, window_label: &str, policy: &Policy, bounds: Bo
             .map_err(|error| error.to_string());
         let _ = reply.send(result);
     });
-    let result = match asked {
+    match asked {
         Ok(()) => made.await.map_err(|error| error.to_string()).and_then(|result| result),
         Err(error) => Err(error.to_string()),
+    }
+}
+
+// iOS: the view is the app's own (moodle_ios.rs). It decides by itself what
+// its page may load, from the university's addresses given here (WebKit
+// wants its answer at once), and tells of the rest: `view_event`.
+#[cfg(target_os = "ios")]
+async fn make(app: &AppHandle, _window: tauri::Window, policy: &Policy, bounds: Bounds, start: Url) -> Result<(), String> {
+    let style = moodle_style::script(policy.home.host_str().unwrap_or_default(), moodle(app).theme().as_ref());
+    let rules = crate::moodle_ios::Rules {
+        home: policy.home.host_str().unwrap_or_default().to_string(),
+        hosts: policy.hosts.clone(),
+        domains: policy.domains.clone(),
     };
-    moodle(app).update(|state| {
-        state.making = false;
-        if result.is_err() {
-            state.phase = Phase::None;
+    View::create(app, rules, (bounds.x, bounds.y, bounds.width, bounds.height), start, style).await
+}
+
+// iOS: what the view tells of itself, in the order it happened.
+#[cfg(target_os = "ios")]
+pub fn view_event(app: &AppHandle, event: crate::moodle_ios::Event) {
+    use crate::moodle_ios::Event;
+    let moodle = moodle(app);
+    let Some(policy) = moodle.lock().policy.clone() else { return };
+    match event {
+        // Its page goes to one of the university's addresses.
+        Event::Going(url) => {
+            let _ = allows(app, &policy, &url);
         }
-    });
-    result
+        // Its page, or a new tab, asks for an address the view doesn't
+        // take: the browser's, or refused. (One it should have taken after
+        // all loads in it.)
+        Event::Asked(url) => {
+            if allows(app, &policy, &url) {
+                if let Some(view) = view(app) {
+                    let _ = view.navigate(url);
+                }
+            }
+        }
+        Event::Started(url) => page_loaded(app, &policy, PageLoadEvent::Started, &url),
+        Event::Finished(url) => page_loaded(app, &policy, PageLoadEvent::Finished, &url),
+        Event::Shown { file } => moodle.update(|state| state.file = file),
+        Event::Changed => moodle.touch(),
+        Event::Failed(address) => moodle.update(|state| {
+            // Back to a page of Moodle's, not to wherever a link led.
+            state.failed = address.filter(|url| policy.is_moodle(url));
+            state.phase = Phase::Failed;
+        }),
+    }
+}
+
+// The page's routes for the view (desktop.rs lists them), the same on iOS
+// (ios.rs): POST /__desktop/moodle/<what>.
+pub const ROUTES: &str = "/__desktop/moodle/";
+
+pub async fn route(app: &AppHandle, window_label: &str, request: &http::Request<Vec<u8>>) -> http::Response<Vec<u8>> {
+    let status = |code: u16| http::Response::builder().status(code).body(Vec::new()).unwrap();
+    match request.uri().path() {
+        "/__desktop/moodle/open" => match serde_json::from_slice::<OpenBody>(request.body()) {
+            Ok(body) => match open(app, window_label, body).await {
+                Ok(()) => status(204),
+                Err(error) => {
+                    eprintln!("[tafac] Moodle view: {error}");
+                    status(400)
+                }
+            },
+            Err(_) => status(400),
+        },
+        "/__desktop/moodle/show" => {
+            if let Ok(bounds) = serde_json::from_slice::<Bounds>(request.body()) {
+                show(app, window_label, bounds);
+            }
+            status(204)
+        }
+        "/__desktop/moodle/bounds" => {
+            if let Ok(place) = serde_json::from_slice::<Bounds>(request.body()) {
+                bounds(app, window_label, place);
+            }
+            status(204)
+        }
+        "/__desktop/moodle/hide" => {
+            hide(app, window_label);
+            status(204)
+        }
+        "/__desktop/moodle/state" => {
+            let asked = serde_json::from_slice::<StateRequest>(request.body()).unwrap_or_default();
+            http::Response::builder()
+                .status(200)
+                .header("content-type", "application/json")
+                .header("cache-control", "no-store")
+                .body(serde_json::to_vec(&state(app, window_label, asked).await).unwrap_or_default())
+                .unwrap()
+        }
+        "/__desktop/moodle/command" => {
+            if let Ok(body) = serde_json::from_slice::<CommandBody>(request.body()) {
+                command(app, window_label, body);
+            }
+            status(204)
+        }
+        "/__desktop/moodle/theme" => {
+            if let Ok(body) = serde_json::from_slice::<ThemeBody>(request.body()) {
+                theme(app, body);
+            }
+            status(204)
+        }
+        _ => status(404),
+    }
 }
 
 #[derive(Deserialize)]
@@ -664,6 +805,10 @@ pub fn bounds(app: &AppHandle, window_label: &str, bounds: Bounds) {
 }
 
 // The keyboard back to the app's page: a hidden view would keep it.
+#[cfg(target_os = "ios")]
+fn focus_page(_app: &AppHandle, _window_label: &str) {}
+
+#[cfg(desktop)]
 fn focus_page(app: &AppHandle, window_label: &str) {
     if let Some(page) = crate::window::page(app, window_label) {
         let _ = page.view.set_focus();
@@ -702,7 +847,8 @@ pub fn page_reloaded(app: &AppHandle, window_label: &str) {
 }
 
 // The view when it is the one on screen in that window (« Imprimer… »).
-pub fn shown_in(app: &AppHandle, window_label: &str) -> Option<Webview<Wry>> {
+#[cfg(desktop)]
+pub fn shown_in(app: &AppHandle, window_label: &str) -> Option<View> {
     let moodle = moodle(app);
     let is_shown = {
         let state = moodle.lock();
@@ -750,8 +896,17 @@ pub struct CommandBody {
     command: Command,
 }
 
-#[cfg(target_os = "macos")]
-fn go(view: &Webview<Wry>, command: Command) {
+#[cfg(target_os = "ios")]
+fn go(view: &View, command: Command) {
+    view.go(match command {
+        Command::Back => "back",
+        Command::Forward => "forward",
+        _ => "stop",
+    });
+}
+
+#[cfg(any(target_os = "macos", windows))]
+fn go(view: &View, command: Command) {
     use crate::moodle_native::Move;
     let to = match command {
         Command::Back => Move::Back,
@@ -761,8 +916,8 @@ fn go(view: &Webview<Wry>, command: Command) {
     crate::moodle_native::go(view, to);
 }
 
-#[cfg(not(target_os = "macos"))]
-fn go(view: &Webview<Wry>, command: Command) {
+#[cfg(all(desktop, not(target_os = "macos"), not(windows)))]
+fn go(view: &View, command: Command) {
     let _ = view.eval(match command {
         Command::Back => "history.back()",
         Command::Forward => "history.forward()",
@@ -775,7 +930,7 @@ fn go(view: &Webview<Wry>, command: Command) {
 // the file: a download link straight to the address would be asked without
 // the session, and Moodle would send its login page instead (seen with a PDF
 // in view).
-fn download(view: &Webview<Wry>) {
+fn download(view: &View) {
     let Ok(url) = view.url() else { return };
     if url.scheme() != "https" {
         return;
@@ -858,15 +1013,20 @@ pub struct StateBody {
     file: bool,
 }
 
-#[cfg(target_os = "macos")]
-async fn reading(view: &Webview<Wry>) -> (bool, bool, bool, String) {
+#[cfg(target_os = "ios")]
+async fn reading(view: &View) -> (bool, bool, bool, String) {
+    view.reading().await
+}
+
+#[cfg(any(target_os = "macos", windows))]
+async fn reading(view: &View) -> (bool, bool, bool, String) {
     let reading = crate::moodle_native::read(view).await;
     (reading.loading, reading.back, reading.forward, reading.title)
 }
 
 // Elsewhere the view doesn't say: the arrows stay on.
-#[cfg(not(target_os = "macos"))]
-async fn reading(_view: &Webview<Wry>) -> (bool, bool, bool, String) {
+#[cfg(all(desktop, not(target_os = "macos"), not(windows)))]
+async fn reading(_view: &View) -> (bool, bool, bool, String) {
     (false, true, true, String::new())
 }
 
@@ -958,6 +1118,14 @@ pub async fn link_target(app: &AppHandle, url: &Url) -> Option<Url> {
 }
 
 // Tells that window's page to show « Moodle » on `target` (src/App.jsx).
+#[cfg(target_os = "ios")]
+pub fn open_in_page(app: &AppHandle, _window_label: &str, target: &Url) -> bool {
+    let Some(page) = app.get_webview_window("main") else { return false };
+    let detail = serde_json::json!({ "command": "moodle", "url": target.as_str() });
+    page.eval(format!("window.dispatchEvent(new CustomEvent('tafac:command', {{ detail: {detail} }}))")).is_ok()
+}
+
+#[cfg(desktop)]
 pub fn open_in_page(app: &AppHandle, window_label: &str, target: &Url) -> bool {
     let Some(page) = crate::window::page(app, window_label).or_else(|| crate::window::page(app, "main")) else { return false };
     let detail = serde_json::json!({ "command": "moodle", "url": target.as_str() });

@@ -71,6 +71,8 @@ export async function createUniversitiesApp({
   analytics,
   appIcons,
   trustProxy,
+  // The apps' remote settings (server/remoteSettings/), or none.
+  remoteSettings = null,
 } = {}) {
   if (!defaultUniversityId) {
     throw new Error('createUniversitiesApp: defaultUniversityId is required.')
@@ -109,8 +111,16 @@ export async function createUniversitiesApp({
     return hostUniversityId(req) ?? defaultUniversityId
   }
 
+  // What the page lays over each university's settings (remote settings).
+  const clientSettings = {}
+
   for (const id of ids) {
-    const config = await loadServerConfig(id)
+    // The university's settings, with the patches of the remote settings
+    // (server/remoteSettings/) when this is an app that reads them.
+    const bundledConfig = await loadServerConfig(id)
+    const patched = remoteSettings?.resolve(id, bundledConfig)
+    const config = patched?.server ?? bundledConfig
+    if (patched?.client) clientSettings[id] = patched.client
     const shared = await loadSharedConfig(id)
     const entry = await loadUniversityDirectoryEntry(id)
 
@@ -210,6 +220,9 @@ export async function createUniversitiesApp({
       session: sessionUniversityId(req),
       host: hostUniversityId(req),
       universities: directory.map(publicEntry),
+      // Patches over the page's own settings, by university (the apps'
+      // remote settings; src/universityBoot.js lays them over client.js).
+      ...(Object.keys(clientSettings).length > 0 ? { settings: clientSettings } : null),
     })
   })
 

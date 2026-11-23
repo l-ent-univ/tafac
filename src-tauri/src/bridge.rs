@@ -6,6 +6,10 @@
 // The bridge also holds the server's cookies (jar.rs), and signs in again
 // with the kept login when an answer says the session is gone (signin.rs):
 // the request is then asked again, and the page gets the second answer.
+//
+// The page's built files (/assets/…) are asked for once and answered from
+// memory after that (assets.rs): WebKit keeps nothing from this scheme, and
+// reads a video a few bytes at a time.
 
 use std::error::Error;
 use std::time::{Duration, Instant};
@@ -13,10 +17,11 @@ use std::time::{Duration, Instant};
 use bytes::Bytes;
 use http::{HeaderMap, HeaderValue, Method};
 use http_body_util::{BodyExt, Full};
-use hyper::header::{CONNECTION, CONTENT_TYPE, COOKIE, HOST, SET_COOKIE, TRANSFER_ENCODING};
+use hyper::header::{CONNECTION, CONTENT_TYPE, COOKIE, HOST, IF_MODIFIED_SINCE, IF_NONE_MATCH, IF_RANGE, RANGE, SET_COOKIE, TRANSFER_ENCODING};
 use hyper_util::rt::TokioIo;
 use tokio::io::{AsyncRead, AsyncWrite};
 
+use crate::assets::{self, Assets};
 use crate::jar::CookieJar;
 use crate::signin::{self, KeptLogin, Outcome, SignIn};
 
@@ -26,6 +31,7 @@ pub struct Bridge {
     pub endpoint: String,
     pub jar: CookieJar,
     pub signin: SignIn,
+    pub assets: Assets,
 }
 
 // How long a request waits for the server to be up (it is starting when the
@@ -50,6 +56,12 @@ pub async fn forward(bridge: &Bridge, request: http::Request<Vec<u8>>) -> http::
     };
     let path = parts.uri.path();
 
+    if assets::is_asset(&outgoing.method, path) {
+        if let Some(response) = asset(bridge, &outgoing, path).await {
+            return response;
+        }
+    }
+
     if outgoing.method == Method::POST && path == signin::LOGIN_PATH {
         let response = send_or_answer(bridge, &outgoing, true).await;
         let university = header(&outgoing.headers, signin::UNIVERSITY_HEADER);
@@ -73,6 +85,30 @@ pub async fn forward(bridge: &Bridge, request: http::Request<Vec<u8>>) -> http::
         return send_or_answer(bridge, &outgoing, true).await;
     }
     response
+}
+
+// One of the page's built files, from memory; the first time, from the
+// server, asked for the whole file whatever part the page wanted. None when
+// the server has no such file to give whole: it answers the request itself.
+async fn asset(bridge: &Bridge, outgoing: &Outgoing, path: &str) -> Option<http::Response<Vec<u8>>> {
+    let range = header(&outgoing.headers, RANGE.as_str());
+    if let Some(file) = bridge.assets.get(path) {
+        return Some(assets::answer(&file, range));
+    }
+    let _one_at_a_time = bridge.assets.fetching.lock().await;
+    if let Some(file) = bridge.assets.get(path) {
+        return Some(assets::answer(&file, range));
+    }
+    let mut headers = outgoing.headers.clone();
+    for name in [RANGE, IF_RANGE, IF_NONE_MATCH, IF_MODIFIED_SINCE] {
+        headers.remove(name);
+    }
+    let whole = Outgoing { method: Method::GET, path: outgoing.path.clone(), headers, body: Bytes::new() };
+    let response = try_forward(bridge, &whole, false).await.ok()?;
+    if response.status() != http::StatusCode::OK {
+        return None;
+    }
+    Some(assets::answer(&bridge.assets.keep(path, response), range))
 }
 
 fn header<'a>(headers: &'a HeaderMap, name: &str) -> Option<&'a str> {

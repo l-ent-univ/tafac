@@ -261,8 +261,11 @@ function PlanningHeader({ titleId, selectedDay, todayKey, view, isWide, columnsF
   return (
     <div className="grid grid-cols-[minmax(0,1fr)] gap-4 max-md:gap-3">
       {/* On a phone, one row: the day chip ("Mardi 13 octobre"), then
-          "Aujourd’hui" and the view button at its end, so nothing wraps. */}
-      <div className="flex items-center gap-x-3 max-md:gap-x-2">
+          "Aujourd’hui" and the view button at its end, so nothing wraps.
+          iOS app: its pills are of the system's glass (src/iosGlass.js);
+          the week's strip under it, swiped by the finger, stays the
+          page's. */}
+      <div data-ios-glass="" className="flex items-center gap-x-3 max-md:gap-x-2">
         {/* Read out only: the row starts with the controls and the day. */}
         <h1 id={titleId} className="sr-only">Planning</h1>
         {/* Wide: a page back and ahead, by the chip (a phone swipes). */}

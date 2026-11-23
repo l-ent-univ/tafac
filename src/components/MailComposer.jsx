@@ -70,6 +70,7 @@ import {
 } from '../mailCompose'
 import { composeOrigin, pickDefaultIdentity, sendFailureText } from '../mailSendPayload'
 import { r } from '../register.js'
+import { usePageShown } from '../pageVisit'
 import SmoothSurface from './SmoothSurface'
 
 // The window a new mail is written in, in the spirit of Apple Mail's: a
@@ -1249,6 +1250,7 @@ function readInitialFields(restore, sendError, kind, message, ownEmails) {
 // Keyed by MailPage: each draft starts afresh.
 function MailComposer({ initialKind = 'new', message = null, sender = null, identities = [], attachmentLimits = null, saver = null, restore = null, sendError = null, canAttachGrades = false, planning = null, ref = null, onClose, onSend }) {
   const isPhone = useSyncExternalStore(subscribePhone, isPhoneNow, () => false)
+  const pageShown = usePageShown()
   const titleId = useId()
   const fieldId = useId()
   const [initialFields] = useState(() => readInitialFields(restore, sendError, initialKind, message, [sender?.email, ...identities.map((identity) => identity.email)]))
@@ -2150,9 +2152,14 @@ function MailComposer({ initialKind = 'new', message = null, sender = null, iden
   // z-30, over the page, the sidebar and the tab bar (it comes after them),
   // but under the app's dialogs (Réglages and the others, z-40 and up): a
   // working window, not a modal one.
+  //
+  // With its page: where the Messagerie stays mounted behind another page
+  // (the iOS app, src/pageVisit.js), the composer is hidden as written, and
+  // back with the page.
   return createPortal(
     <section
       ref={rootRef}
+      hidden={!pageShown}
       className={`mail-composer fixed z-30 flex flex-col overflow-hidden text-text [&_button_svg]:pointer-events-none 4xl:border 4xl:corners-[26px] max-4xl:inset-0 max-4xl:pl-[env(safe-area-inset-left)] max-4xl:pr-[env(safe-area-inset-right)] ${isFullscreen ? 'is-fullscreen 4xl:inset-3' : '4xl:right-6 4xl:bottom-6 4xl:h-[min(580px,calc(100dvh-48px))] 4xl:w-[min(680px,calc(100vw-48px))]'}`}
       role="dialog"
       aria-modal={isPhone || undefined}

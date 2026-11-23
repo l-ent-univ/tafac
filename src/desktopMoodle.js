@@ -88,7 +88,9 @@ export function isSlotCovered(slot, doc = document) {
       const x = rect.left + inset + fx * (rect.width - 2 * inset)
       const y = rect.top + inset + fy * (rect.height - 2 * inset)
       const top = doc.elementFromPoint(x, y)
-      if (top && !slot.contains(top)) return true
+      // iOS: the place of the system's tab bar (MobileTabBar) is over the
+      // slot's bottom on purpose, the bar being see-through.
+      if (top && !slot.contains(top) && !top.closest?.('[data-native-bar]')) return true
     }
   }
   return false

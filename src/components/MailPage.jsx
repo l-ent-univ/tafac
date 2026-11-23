@@ -38,6 +38,9 @@ import SmoothSurface from './SmoothSurface'
 import { Skeleton } from 'skullet/react'
 import { isMacDesktopApp } from '../desktopApp'
 import { onDesktopCommand } from '../desktopMenu'
+import { isInHiddenPage } from '../keptPages'
+import { usePageReturn, usePageShown } from '../pageVisit'
+import { usePullRefresh } from '../usePullRefresh'
 import { SAMPLE_MAIL_ROWS, useSkeletonsForced } from '../skeletonSamples'
 
 // The composer and its editor (Tiptap) load the first time one opens: most
@@ -738,7 +741,10 @@ function MailPage({ onReaderOpenChange, sender = null, composeRequest = null, on
   useEffect(() => {
     const sentinel = headerSentinelRef.current
     if (!sentinel) return undefined
-    const observer = new IntersectionObserver(([entry]) => setIsHeaderStuck(!entry.isIntersecting))
+    const observer = new IntersectionObserver(([entry]) => {
+      // Kept behind another page, out of the layout: as it was.
+      if (!isInHiddenPage(sentinel)) setIsHeaderStuck(!entry.isIntersecting)
+    })
     observer.observe(sentinel)
     return () => observer.disconnect()
   }, [])
@@ -815,10 +821,15 @@ function MailPage({ onReaderOpenChange, sender = null, composeRequest = null, on
     await Promise.all([loadMail({ background: true, fresh: true }), loadFolders(), minimumSpin])
     setIsRefreshing(false)
   }, [isRefreshing, loadMail, loadFolders])
+  // Pulled down (the iOS app): the same refresh as the button's.
+  usePullRefresh(refresh)
 
   // A look at the folders every NEW_MAIL_CHECK_MS while the page is shown,
-  // and as soon as it's shown again.
+  // and as soon as it's shown again. Not while it is kept behind another
+  // page (the iOS app, src/pageVisit.js): back on it, see below.
+  const shown = usePageShown()
   useEffect(() => {
+    if (!shown) return undefined
     function checkIfShown() {
       if (document.visibilityState === 'visible') void loadFolders()
     }
@@ -828,7 +839,7 @@ function MailPage({ onReaderOpenChange, sender = null, composeRequest = null, on
       window.clearInterval(intervalId)
       document.removeEventListener('visibilitychange', checkIfShown)
     }
-  }, [loadFolders])
+  }, [loadFolders, shown])
 
   // Another folder: the list shown stays, dimmed, until the new one's first
   // page replaces it at once (isFolderSwitching); its search starts over,
@@ -964,7 +975,7 @@ function MailPage({ onReaderOpenChange, sender = null, composeRequest = null, on
   }, [loadMail, loadFolders])
 
   useEffect(() => {
-    if (state.status === 'loading') return undefined
+    if (!shown || state.status === 'loading') return undefined
 
     function refreshIfStale() {
       if (document.visibilityState !== 'visible') return
@@ -980,7 +991,23 @@ function MailPage({ onReaderOpenChange, sender = null, composeRequest = null, on
       window.clearInterval(intervalId)
       document.removeEventListener('visibilitychange', refreshIfStale)
     }
-  }, [loadMail, loadFolders, state.status])
+  }, [loadMail, loadFolders, state.status, shown])
+
+  // Back on the page where it is kept mounted (the iOS app): what its
+  // mount does for an arrival. The mail its entry names opens (« Accueil »'s
+  // « Mails récents »; without one, the page is as it was left), and the
+  // mailbox is looked at as when the window is shown again: the folders,
+  // and the list behind the one shown if it is stale.
+  usePageReturn(() => {
+    const { mail } = readHistoryNav()
+    if (mail && mail !== openIdRef.current) {
+      autoOpenedIdRef.current = null
+      trackMailAction('mail_opened', { from: arrivalSource === 'dashboard_card' ? 'widget' : 'history' })
+      setOpenId(mail)
+    }
+    void loadFolders()
+    if (state.status !== 'loading' && Date.now() - lastLoadAtRef.current >= MAIL_REFRESH_MS) void loadMail({ background: true })
+  })
 
   // A step back when the reader has its entry (forward reopens it);
   // popstate then closes it.
@@ -1907,7 +1934,7 @@ function MailPage({ onReaderOpenChange, sender = null, composeRequest = null, on
           takes the section's top padding inside (a negative margin back), so
           it keeps it when stuck: at 4xl 33px, level with the reader's
           toolbar (the panel's 12px inset, 1px border and 20px padding). */}
-      <div className={`gd-header ${hasOpenedMail ? 'mail-pop-in' : ''} sticky top-0 z-20 -mx-6 -mt-4 grid gap-4 px-6 pt-4 pb-4 max-md:-mx-3 max-md:-mt-5 max-md:px-3 max-md:pt-5 4xl:mt-0 4xl:pt-[33px] ${isHeaderStuck ? 'is-stuck' : ''}`}>
+      <div className={`gd-header mail-list-header ${hasOpenedMail ? 'mail-pop-in' : ''} sticky top-[var(--status-bar)] z-20 -mx-6 -mt-4 grid gap-4 px-6 pt-4 pb-4 max-md:-mx-3 max-md:-mt-5 max-md:px-3 max-md:pt-5 4xl:mt-0 4xl:pt-[33px] ${isHeaderStuck ? 'is-stuck' : ''}`}>
       {/* The other pages' tinted top, its own layer behind (as the
           planning's): the band clips its spread to its height, which would
           cut the pills' tooltips hanging under it. */}
@@ -1920,8 +1947,11 @@ function MailPage({ onReaderOpenChange, sender = null, composeRequest = null, on
           named group (search): a plain one would also show the refresh
           button's tooltip whenever the row is hovered. */}
       {/* Above the folder pills (z-10): the refresh button's glass makes its
-          own stacking context, so its tooltip couldn't rise over them. */}
-      <div className="group/search relative z-10 flex min-w-0 items-center" data-searching={query ? '' : undefined}>
+          own stacking context, so its tooltip couldn't rise over them.
+          iOS app: the row's two buttons are of the system's glass
+          (src/iosGlass.js); the field is a field, the folders' pills change
+          width as one is picked: the page's. */}
+      <div data-ios-glass="" className="group/search relative z-10 flex min-w-0 items-center" data-searching={query ? '' : undefined}>
         {/* Folded away too while a mail is open beside the list (from 4xl):
             the reader takes the room, the search and the button keep theirs.
             Still read out (folded, not removed). */}

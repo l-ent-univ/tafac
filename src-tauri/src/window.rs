@@ -15,6 +15,17 @@
 // capabilities/default.json. The window is no narrower than the sidebar's
 // layout (the 4xl breakpoint, 1024px): the phone's layout has no sidebar.
 //
+// Windows 11: Mica, the material of the system's own apps (Settings,
+// Explorer), behind the title bar and the sidebar. The title bar is drawn
+// over the page, 48px high as in Fluent apps (tauri-plugin-decorum: the
+// system's one removed, a band that moves the window, the three buttons in
+// Segoe Fluent Icons; src/overrides.css sets its height and look). Hovering
+// maximise opens Snap Layouts (decorum presses Win+Z for it). The page is told
+// before it runs (window.__TAFAC_MICA__, read by src/desktopApp.js: <html
+// data-desktop-windows>) and leaves the material showing where its sidebar
+// is, the rest on a solid layer with a rounded corner, as in Settings.
+// Windows 10 has no Mica: the window stays as elsewhere.
+//
 // Elsewhere, every window opens hidden, painted in the app's background
 // colour (light or dark, as the system is), then shown: no white flash
 // before the page.
@@ -33,7 +44,9 @@ const MIN_SIZE: (f64, f64) = (380.0, 560.0);
 const TRAFFIC_LIGHTS: (f64, f64) = (18.0, 22.0);
 
 pub fn style<'a, R: Runtime, M: Manager<R>>(builder: WebviewWindowBuilder<'a, R, M>) -> WebviewWindowBuilder<'a, R, M> {
-    let builder = builder.min_inner_size(MIN_SIZE.0, MIN_SIZE.1).visible(false);
+    // Files dropped on the page are the page's (the composer's attachments,
+    // its drop sheets): Tauri's own handler would take them before it.
+    let builder = builder.min_inner_size(MIN_SIZE.0, MIN_SIZE.1).visible(false).disable_drag_drop_handler();
     #[cfg(target_os = "macos")]
     let builder = {
         use tauri::utils::config::WindowEffectsConfig;
@@ -51,12 +64,41 @@ pub fn style<'a, R: Runtime, M: Manager<R>>(builder: WebviewWindowBuilder<'a, R,
                 interactive: false,
             })
     };
+    #[cfg(windows)]
+    let builder = if has_mica() {
+        use tauri::utils::config::WindowEffectsConfig;
+        use tauri::window::{Effect, EffectState};
+        builder
+            .transparent(true)
+            .effects(WindowEffectsConfig {
+                effects: vec![Effect::Mica],
+                state: Some(EffectState::FollowsWindowActiveState),
+                radius: None,
+                color: None,
+                interactive: false,
+            })
+            .initialization_script("window.__TAFAC_MICA__ = true")
+    } else {
+        builder
+    };
     builder
+}
+
+// Mica: Windows 11 (build 22000) and later.
+#[cfg(windows)]
+fn has_mica() -> bool {
+    windows_version::OsVersion::current().build >= 22000
 }
 
 // After build(): the window on screen (elsewhere than on macOS, painted in
 // the app's background colour first).
-pub fn show<R: Runtime>(window: &WebviewWindow<R>) -> tauri::Result<()> {
+pub fn show(window: &WebviewWindow) -> tauri::Result<()> {
+    #[cfg(windows)]
+    if has_mica() {
+        use tauri_plugin_decorum::WebviewWindowExt;
+        window.create_overlay_titlebar()?;
+        return window.show();
+    }
     #[cfg(not(target_os = "macos"))]
     {
         // --color-bg in both themes (src/tokens.css, index.html's theme-color).
@@ -67,6 +109,19 @@ pub fn show<R: Runtime>(window: &WebviewWindow<R>) -> tauri::Result<()> {
         window.set_background_color(Some(color))?;
     }
     window.show()
+}
+
+// Windows: no service worker in the app's web view. The page comes from the
+// app, which updates it; one left by an earlier version (the website's,
+// registered before the page left it out: PwaUpdateManager) keeps serving
+// that version's page, and WebView2 never reads the app's /sw.js again to
+// replace it. Removed with its caches (Chromium keeps them in the same
+// folder) before the first window, so before the web view starts. Cookies
+// and storage stay: the student stays signed in.
+#[cfg(windows)]
+pub fn remove_service_workers<R: Runtime>(app: &AppHandle<R>) {
+    let Ok(data) = app.path().app_local_data_dir() else { return };
+    let _ = std::fs::remove_dir_all(data.join("EBWebView").join("Default").join("Service Worker"));
 }
 
 // One of the app's windows and the page in it (its web view has the window's

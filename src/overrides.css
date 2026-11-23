@@ -1134,6 +1134,285 @@
   filter: brightness(0) invert(1);
 }
 
+/* « Accueil »'s header on a phone (HomePhoneHeader).
+
+   The photo, to the screen's edges at full strength, fading down into the
+   page. It is behind the page: it goes up at half the page's speed, fade
+   and all, so the greeting and what follows slide up over it and it lingers
+   at the top of the screen. The browser moves it itself (a scroll-driven
+   animation: nothing runs in the page); where it can't, and for whoever
+   asked for less motion, the photo scrolls with the page.
+
+   It always ends in a fade: its own, and its frame's, which is the header's
+   box and fades out along its bottom edge. Whatever part of the photo gets
+   there fades too, at any point of the scroll; and it never shows over the
+   cards below. */
+/* The header starts at the page's top edge (the section's own padding
+   taken back). With a photo it also goes up behind the status bar, where
+   the page runs under it (the iOS app, --status-bar; 0 elsewhere): the
+   photo starts at the screen's edge, what is to be read or pressed stays
+   below the bar. */
+.home-phone-header {
+  margin-top: -12px;
+  padding-top: 16px;
+}
+
+.home-phone-header[data-photo] {
+  margin-top: calc(-12px - var(--status-bar));
+  padding-top: calc(16px + var(--status-bar));
+}
+
+.home-phone-photo-frame {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+  -webkit-mask-image: linear-gradient(to bottom, black calc(100% - 96px), transparent 100%);
+  mask-image: linear-gradient(to bottom, black calc(100% - 96px), transparent 100%);
+}
+
+.home-phone-photo {
+  position: absolute;
+  inset: 0 0 auto;
+  height: calc(200px + var(--status-bar));
+  background-size: cover;
+  background-position: center;
+  -webkit-mask-image: linear-gradient(to bottom, black 22%, transparent 86%);
+  mask-image: linear-gradient(to bottom, black 22%, transparent 86%);
+}
+
+@supports (animation-timeline: scroll()) {
+  @media (prefers-reduced-motion: no-preference) {
+    .home-phone-photo {
+      animation: home-phone-photo-behind linear both;
+      animation-timeline: scroll(root block);
+      animation-range: 0 400px;
+      will-change: transform;
+    }
+  }
+}
+
+@keyframes home-phone-photo-behind {
+  to {
+    transform: translate3d(0, 200px, 0);
+  }
+}
+
+/* Beside the sidebar (HomePhoneHeader's `wide`): from the column's top
+   (the section's 20px taken back), and the page scrolls in
+   its column (.app-column, App.jsx), not the window: the parallax follows
+   that scroll by its name (not `nearest`: the photo's frame, which clips
+   it, would be the one found), still at half its speed. */
+.home-phone-header-wide,
+.home-phone-header-wide[data-photo] {
+  margin-top: -20px;
+  padding-top: 20px;
+}
+
+.home-phone-header-wide .home-phone-photo {
+  height: 220px;
+  background-position: center 40%;
+  -webkit-mask-image: linear-gradient(to bottom, black 30%, transparent 92%);
+  mask-image: linear-gradient(to bottom, black 30%, transparent 92%);
+}
+
+@supports (animation-timeline: scroll()) {
+  @media (prefers-reduced-motion: no-preference) {
+    .home-phone-header-wide .home-phone-photo {
+      animation-name: home-phone-photo-behind-wide;
+      animation-timeline: --app-column;
+      animation-range: 0 440px;
+    }
+  }
+}
+
+.app-column {
+  scroll-timeline: --app-column block;
+}
+
+@keyframes home-phone-photo-behind-wide {
+  to {
+    transform: translate3d(0, 220px, 0);
+  }
+}
+
+/* On the website, the photo on to the window's left edge, under the
+   floating sidebar (12px from the edges, above the column): the header
+   reaches over the column's padding that keeps the page clear of it, and
+   gives it back to its text. */
+.home-phone-header-under-sidebar {
+  margin-left: calc(-24px - var(--sidebar-width, 280px) - 12px);
+  padding-left: calc(24px + var(--sidebar-width, 280px) + 12px);
+}
+
+/* Behind the status bar (the iOS app): a haze of the page's colour over the
+   photo's top, for the clock to read on any photo, light or dark as the
+   theme and so as the clock is. As tall as the bar and half again: nothing
+   where there is no bar over the photo. */
+.home-phone-photo-haze {
+  position: absolute;
+  inset: 0 0 auto;
+  height: calc(var(--status-bar) * 1.5);
+  background: linear-gradient(to bottom, color-mix(in srgb, var(--color-bg) 62%, transparent), transparent);
+}
+
+/* ── iOS app · status bar ──
+   On a phone the app's web view covers the whole screen and never changes
+   size (src-tauri/src/ios_chrome.rs): the page runs behind the status bar,
+   and each screen draws its own top there, as an app does. --status-bar is
+   the bar's height (0 in a browser, in the installed web app, in the
+   desktop app and on a tablet, where the web view stays below the bar), and
+   --app-h the screen's height below it, which the sheets and dialogs size
+   themselves on.
+
+   - The pages start below the bar (the column's padding). A page's tinted
+     band spreads its colour up behind the bar; « Accueil »'s photo goes up
+     there (.home-phone-header).
+   - What sticks to the top sticks below the bar (.planning-top, the mail
+     list's header, Mes notes' way back: top: var(--status-bar)).
+   - What scrolls up passes behind the bar under a veil (.ios-status-veil).
+   - A dialog keeps below the bar, its backdrop still covering it.
+   - The screens before the dashboard (sign-in, first set-up) start below
+     the bar, in their own colour. */
+:root {
+  --status-bar: 0px;
+  --app-h: 100dvh;
+}
+
+:root[data-ios-app] {
+  --status-bar: env(safe-area-inset-top, 0px);
+  --app-h: calc(100dvh - env(safe-area-inset-top, 0px));
+}
+
+/* No zoom in the app (src/desktopApp.js): the page pans, nothing more. */
+:root[data-ios-app] {
+  touch-action: pan-x pan-y;
+}
+
+:root[data-ios-app] .app-column {
+  padding-top: var(--status-bar);
+}
+
+/* The band's colour is a spread clipped to its height (.page-top-band):
+   here it shows above it too, up to the screen's edge. */
+:root[data-ios-app] .dashboard-no-wallpaper .page-top-band {
+  clip-path: inset(calc(-1 * var(--status-bar)) -100vmax -1px);
+}
+
+:root[data-ios-app] main:not(:has(.app-column, .login-right-panel)),
+:root[data-ios-app] .login-right-panel {
+  padding-top: var(--status-bar);
+}
+
+/* The centred dialogs (their backdrop is the layer itself, padded): the
+   bar's height more at the top. The sheets hang from the bottom and stop
+   below the bar by their height (--app-h). */
+:root[data-ios-app] .weather-modal-backdrop {
+  padding-top: calc(20px + var(--status-bar));
+}
+
+@media (width < 40rem) {
+  :root[data-ios-app] .weather-modal-backdrop {
+    padding-top: calc(14px + var(--status-bar));
+  }
+}
+
+/* A control of the page's under the system's glass (src/iosGlass.js): its
+   own drawing is off, the element still in its place: a finger on the
+   glass is a finger on it. By a filter, not its opacity: that one is the
+   control's own to say (a disabled one's), and is read for the glass. No
+   highlight of WebKit's own over the glass. */
+[data-ios-glass-on] {
+  filter: opacity(0) !important;
+  transition: none !important;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* The mail reader's bar, at the screen's foot: just over the system's tab
+   bar, which is lower than the page's own was. */
+@media (width < 1024px) {
+  :root[data-ios-app] .mail-toolbar-veil {
+    bottom: calc(env(safe-area-inset-bottom, 0px) + 56px);
+  }
+}
+
+/* What scrolls up passes behind the status bar: a veil of the page's
+   colour, frosted, comes over the bar as the page scrolls, and is gone at
+   its top, where the page's own top shows (a photo, a band's colour).
+   Where the browser can't follow the scroll in CSS it is always there. It
+   ends in a fade a little below the bar, and is as tall as the bar is.
+   Not where the page's top stays stuck under the bar in its own colour
+   (the planning, the mail's list). */
+.ios-status-veil {
+  position: fixed;
+  inset: 0 0 auto;
+  z-index: 35;
+  height: calc(var(--status-bar) * 1.3);
+  pointer-events: none;
+  background-color: color-mix(in srgb, var(--color-bg) 82%, transparent);
+  -webkit-backdrop-filter: blur(14px);
+  backdrop-filter: blur(14px);
+  -webkit-mask-image: linear-gradient(to bottom, black 72%, transparent);
+  mask-image: linear-gradient(to bottom, black 72%, transparent);
+}
+
+.dashboard-no-wallpaper:has(.app-column > :not([hidden]) :is(.planning-top, .mail-list-header)) .ios-status-veil {
+  display: none;
+}
+
+@supports (animation-timeline: scroll()) {
+  .ios-status-veil {
+    animation: ios-status-veil-in linear both;
+    animation-timeline: scroll(root block);
+    animation-range: 24px 140px;
+  }
+}
+
+@keyframes ios-status-veil-in {
+  from {
+    opacity: 0;
+  }
+}
+
+/* The logos straight on the photo: the wordmark and the university's logo
+   in white, with a soft shadow, for them to read on any photo (the
+   chocolate mark keeps its colours). Without a photo, their own colours:
+   the wordmark's are LogoBut1's (white in dark mode), the university's
+   logo is inverted in dark mode unless it has a dark version of its own. */
+.home-phone-header[data-photo] :is(.home-phone-wordmark, .home-phone-uni) {
+  filter: brightness(0) invert(1) drop-shadow(0 1px 2px rgb(0 0 0 / 0.5)) drop-shadow(0 0 10px rgb(0 0 0 / 0.35));
+}
+
+:where([data-theme="dark"]) .home-phone-header:not([data-photo]) .home-phone-uni:not(.is-themed) {
+  filter: invert(1);
+}
+
+/* The account button over the photo: frosted, light or dark as the theme.
+   With the student's photo in it: a white ring. */
+.home-phone-glass {
+  border: 1px solid rgb(255 255 255 / 0.45);
+  background-color: rgb(255 255 255 / 0.6);
+  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(12px);
+}
+
+:where([data-theme="dark"]) .home-phone-glass {
+  border-color: rgb(255 255 255 / 0.15);
+  background-color: rgb(0 0 0 / 0.45);
+}
+
+.home-phone-portrait {
+  border: 2px solid rgb(255 255 255 / 0.85);
+  box-shadow: 0 2px 8px rgb(0 0 0 / 0.25);
+}
+
+/* The greeting and the day's sentence, which the photo passes behind as
+   the page scrolls: a glow in the page's colour keeps them readable. Not
+   on the icons, which are buttons. */
+.home-phone-text :is(h1, p, a) {
+  text-shadow: 0 0 2px var(--color-bg), 0 0 12px var(--color-bg), 0 0 24px var(--color-bg);
+}
+
 /* The header logo is whitened for the photo; on the plain page it would vanish. */
 .dashboard-no-wallpaper .header-university-logo {
   filter: none;
@@ -2045,6 +2324,23 @@
   animation: page-switch-veil-out 320ms ease-out backwards;
 }
 
+/* iOS app: a page switch as the system's tab bar makes one. The page comes
+   up to its size from a little smaller, around the middle of the screen,
+   while the veil clears a little faster: a short fade and a touch of scale,
+   no rise. A page is kept behind the others once visited (KeptPage) and
+   comes back where it was scrolled to (--page-scroll, useKeptPages.js):
+   the middle of the screen is that far down it. Back from display:none
+   the effect plays again; the animations inside the page are ended as it
+   shows (settleAnimations), so nothing in it arrives twice. */
+:root[data-ios-app] .app-column > .page-enter {
+  transform-origin: 50% calc(var(--page-scroll, 0px) + 45vh);
+  animation: page-enter-ios 300ms cubic-bezier(0.2, 0.8, 0.2, 1) backwards;
+}
+
+:root[data-ios-app] .page-switch-veil {
+  animation-duration: 240ms;
+}
+
 .account-modal-layout-panel {
   animation: account-modal-layout-in 360ms cubic-bezier(0.22, 1, 0.36, 1) both;
 }
@@ -2222,6 +2518,12 @@
 @keyframes page-enter-in {
   from {
     transform: translateY(6px);
+  }
+}
+
+@keyframes page-enter-ios {
+  from {
+    transform: scale(0.965);
   }
 }
 
@@ -6713,8 +7015,7 @@
 /* Phones: the header buttons float over the photo in the glass material,
    like the tab bar. */
 @media (width < 1024px) {
-  .header-account-btn,
-  .header-logout-btn {
+  .header-account-btn {
     background-color: var(--glass-fill);
     border-color: var(--glass-edge);
     outline: 1px solid var(--glass-outer);
@@ -6724,13 +7025,11 @@
     box-shadow: var(--glass-shadow);
   }
 
-  .header-account-btn:active:not(:disabled),
-  .header-logout-btn:active:not(:disabled) {
+  .header-account-btn:active:not(:disabled) {
     background-color: rgb(255 255 255 / 0.75);
   }
 
-  :where([data-theme="dark"]) .header-account-btn:active:not(:disabled),
-  :where([data-theme="dark"]) .header-logout-btn:active:not(:disabled) {
+  :where([data-theme="dark"]) .header-account-btn:active:not(:disabled) {
     background-color: rgb(255 255 255 / 0.14);
   }
 }
@@ -8503,7 +8802,7 @@
    month's calendar can hang out of it. */
 .planning-top {
   position: sticky;
-  top: 0;
+  top: var(--status-bar);
   z-index: 20;
 }
 
@@ -10455,9 +10754,14 @@ div:has(> .justify-ticket) {
    rubber band past the ends of anything that scrolls (the page's column,
    the mail list, the planning, carousels: in the app the page itself
    rarely scrolls, its columns do), and no link or picture dragged out of
-   the window (its address is tafac://, of no use anywhere else). */
+   the window (its address is tafac://, of no use anywhere else). On
+   macOS on everything that scrolls; elsewhere only on the page itself:
+   Chromium (WebView2 on Windows) also stops scroll chaining there, so a
+   wheel over a widget that scrolls (the planning's grid, a carousel) would
+   never scroll the page around it. */
 :root[data-desktop-app],
-:root[data-desktop-app] * {
+:root[data-desktop-app] body,
+:root[data-desktop-macos] * {
   overscroll-behavior: none;
 }
 
@@ -10469,7 +10773,8 @@ div:has(> .justify-ticket) {
   cursor: default;
 }
 
-/* macOS (data-desktop-macos): the sidebar is the window's own, on the
+/* macOS (data-desktop-macos) and Windows 11 (data-desktop-windows, on
+   Mica, below): the sidebar is the window's own, on the
    system's sidebar material (src-tauri/src/window.rs puts it behind the
    page, the window being see-through). Flush with the window's edges, full
    height, see-through, a hairline on its right, the window's buttons in its
@@ -10479,28 +10784,28 @@ div:has(> .justify-ticket) {
    after it (its margin, not its padding: the top band's spread stops at
    the column's edge) and paints the page's background, and the page
    behind it is clear. */
-:root[data-desktop-macos]:has(.sidebar-panel),
-:root[data-desktop-macos]:has(.sidebar-panel) body,
-:root[data-desktop-macos] main:has(.sidebar-panel) {
+:root:is([data-desktop-macos], [data-desktop-windows]):has(.sidebar-panel),
+:root:is([data-desktop-macos], [data-desktop-windows]):has(.sidebar-panel) body,
+:root:is([data-desktop-macos], [data-desktop-windows]) main:has(.sidebar-panel) {
   background: transparent;
 }
 
-:root[data-desktop-macos] .app-column {
+:root:is([data-desktop-macos], [data-desktop-windows]) .app-column {
   margin-left: calc(var(--sidebar-width, 280px) + 12px);
   padding-left: 0;
   background-color: var(--color-bg);
 }
 
-:root[data-desktop-macos] {
+:root:is([data-desktop-macos], [data-desktop-windows]) {
   /* macOS' separator colour: a hairline between the material and the page. */
   --desktop-separator: rgb(0 0 0 / 0.1);
 }
 
-:root[data-desktop-macos]:where([data-theme="dark"]) {
+:root:is([data-desktop-macos], [data-desktop-windows]):where([data-theme="dark"]) {
   --desktop-separator: rgb(255 255 255 / 0.1);
 }
 
-:root[data-desktop-macos] .sidebar-panel {
+:root:is([data-desktop-macos], [data-desktop-windows]) .sidebar-panel {
   top: 0;
   left: 0;
   bottom: 0;
@@ -10512,7 +10817,7 @@ div:has(> .justify-ticket) {
   outline: none;
 }
 
-:root[data-desktop-macos] .sidebar-panel:not(.sidebar-peek) {
+:root:is([data-desktop-macos], [data-desktop-windows]) .sidebar-panel:not(.sidebar-peek) {
   background-color: transparent;
   box-shadow: none;
   -webkit-backdrop-filter: none;
@@ -10520,7 +10825,7 @@ div:has(> .justify-ticket) {
 }
 
 /* Folded: its 40px column of icons in the middle, under the buttons. */
-:root[data-desktop-macos] .sidebar-panel--compact {
+:root:is([data-desktop-macos], [data-desktop-windows]) .sidebar-panel--compact {
   padding-inline: 28px;
 }
 
@@ -10530,41 +10835,148 @@ div:has(> .justify-ticket) {
    material shows there, and the panel over it is see-through. The page
    under it is hidden rather than blurred, as under a Mac sidebar laid over
    a window's content. The folded strip's icons, under the panel, go. */
-:root[data-desktop-macos] .sidebar-panel.sidebar-peek {
+:root:is([data-desktop-macos], [data-desktop-windows]) .sidebar-panel.sidebar-peek {
   width: calc(var(--sidebar-width) + 12px);
   background-color: transparent;
 }
 
-:root[data-desktop-macos] .sidebar-panel.sidebar-peek.is-open {
+:root:is([data-desktop-macos], [data-desktop-windows]) .sidebar-panel.sidebar-peek.is-open {
   width: calc(var(--sidebar-full-width, 280px) + 12px);
 }
 
-:root[data-desktop-macos] .sidebar-peek ~ .app-column {
+:root:is([data-desktop-macos], [data-desktop-windows]) .sidebar-peek ~ .app-column {
   clip-path: inset(-100vmax -100vmax -100vmax 0);
   transition: clip-path 260ms cubic-bezier(0.32, 0.72, 0, 1);
 }
 
-:root[data-desktop-macos] .sidebar-peek.is-open ~ .app-column {
+:root:is([data-desktop-macos], [data-desktop-windows]) .sidebar-peek.is-open ~ .app-column {
   clip-path: inset(-100vmax -100vmax -100vmax calc(var(--sidebar-full-width, 280px) - var(--sidebar-width)));
   transition: clip-path 340ms cubic-bezier(0.32, 0.72, 0, 1);
 }
 
-:root[data-desktop-macos] .sidebar-panel--compact > * {
+:root:is([data-desktop-macos], [data-desktop-windows]) .sidebar-panel--compact > * {
   transition: opacity 120ms ease-out;
 }
 
-:root[data-desktop-macos] .sidebar-panel--compact:has(~ .sidebar-peek.is-open) {
+:root:is([data-desktop-macos], [data-desktop-windows]) .sidebar-panel--compact:has(~ .sidebar-peek.is-open) {
   border-right-color: transparent;
 }
 
-:root[data-desktop-macos] .sidebar-panel--compact:has(~ .sidebar-peek.is-open) > * {
+:root:is([data-desktop-macos], [data-desktop-windows]) .sidebar-panel--compact:has(~ .sidebar-peek.is-open) > * {
   opacity: 0;
 }
 
 @media (prefers-reduced-motion: reduce) {
-  :root[data-desktop-macos] .sidebar-peek ~ .app-column,
-  :root[data-desktop-macos] .sidebar-panel--compact > * {
+  :root:is([data-desktop-macos], [data-desktop-windows]) .sidebar-peek ~ .app-column,
+  :root:is([data-desktop-macos], [data-desktop-windows]) .sidebar-panel--compact > * {
     transition: none;
+  }
+}
+
+/* Windows 11 (data-desktop-windows): as in Settings. The title bar is drawn
+   over the page (tauri-plugin-decorum, src-tauri/src/window.rs): a 48px band
+   on the Mica, the app's name on its left, the window's buttons on its
+   right. The sidebar starts below it, on the Mica too, with no hairline
+   beside it. The page is on a solid layer under the band, its top-left
+   corner rounded, a 1px stroke (Fluent's card stroke) on its edges. */
+:root[data-desktop-windows] {
+  --desktop-titlebar-height: 48px;
+  --desktop-separator: rgb(0 0 0 / 0.0578);
+  --desktop-caption-hover: rgb(0 0 0 / 0.0373);
+}
+
+:root[data-desktop-windows]:where([data-theme="dark"]) {
+  --desktop-separator: rgb(255 255 255 / 0.0698);
+  --desktop-caption-hover: rgb(255 255 255 / 0.0605);
+}
+
+/* The band and its buttons (decorum sets 32px and its own colours inline
+   or in a style it adds: the !important wins over them). Fluent's caption
+   buttons, square (the band's height on each side), a light wash on hover, red behind
+   the close button's white cross. */
+:root[data-desktop-windows] [data-tauri-decorum-tb] {
+  height: var(--desktop-titlebar-height) !important;
+  align-items: stretch !important;
+  z-index: 100 !important;
+}
+
+:root[data-desktop-windows] [data-tauri-decorum-tb] > [data-tauri-drag-region] {
+  display: flex;
+  align-items: center;
+  padding-left: 16px;
+}
+
+:root[data-desktop-windows] [data-tauri-decorum-tb] > [data-tauri-drag-region]::before {
+  content: "Tafac";
+  font: 400 12px/16px "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif;
+  color: var(--color-text);
+  pointer-events: none;
+}
+
+/* The app's icon before its name, 16px as in Fluent apps: the rounded
+   one (src-tauri/icons/icon.ico at 32px), inline so the band needs no
+   file of its own. */
+:root[data-desktop-windows] [data-tauri-decorum-tb] > [data-tauri-drag-region]::after {
+  content: "";
+  order: -1;
+  width: 16px;
+  height: 16px;
+  margin-right: 12px;
+  background: url("data:image/png;base64,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") center / contain no-repeat;
+  pointer-events: none;
+}
+
+:root[data-desktop-windows] .decorum-tb-btn {
+  width: var(--desktop-titlebar-height) !important;
+  height: var(--desktop-titlebar-height) !important;
+  color: var(--color-text) !important;
+}
+
+:root[data-desktop-windows] .decorum-tb-btn:hover {
+  background-color: var(--desktop-caption-hover) !important;
+}
+
+:root[data-desktop-windows] #decorum-tb-close:hover {
+  background-color: #c42b1c !important;
+  color: #fff !important;
+}
+
+:root[data-desktop-windows] .sidebar-panel {
+  padding-top: calc(var(--desktop-titlebar-height) + 8px);
+  border-right: 0;
+}
+
+:root[data-desktop-windows] .app-column {
+  margin-top: var(--desktop-titlebar-height);
+  height: calc(100vh - var(--desktop-titlebar-height));
+  border-top: 1px solid var(--desktop-separator);
+  border-left: 1px solid var(--desktop-separator);
+  border-top-left-radius: 8px;
+}
+
+/* The right side panels and the full-screen composer: below the band, not
+   under its buttons. */
+:root[data-desktop-windows] :is(.mail-reader-panel, .side-panel, .mail-composer.is-fullscreen) {
+  top: calc(var(--desktop-titlebar-height) + 12px);
+}
+
+:root[data-desktop-windows] .mail-composer.is-fullscreen {
+  top: var(--desktop-titlebar-height);
+}
+
+/* Narrower than the sidebar's layout (4xl): the window can be, unlike on
+   macOS. No sidebar there: the page takes the window below the band. */
+@media (width < 1024px) {
+  :root[data-desktop-windows] body {
+    padding-top: var(--desktop-titlebar-height);
+  }
+
+  :root[data-desktop-windows] .app-column {
+    margin-top: 0;
+    height: auto;
+    margin-left: 0;
+    border: 0;
+    border-radius: 0;
   }
 }
 
@@ -10713,10 +11125,10 @@ div:has(> .justify-ticket) {
   }
 }
 
-/* « Moodle » in the desktop app (src/components/MoodlePage.jsx): the page
-   beside the sidebar, the whole height; Moodle's own web view lies over
-   its slot (src-tauri/src/moodle.rs). */
-:root[data-desktop-app] .moodle-page {
+/* « Moodle » in the apps, desktop and iOS (src/components/MoodlePage.jsx):
+   the page beside the sidebar, the whole height; Moodle's own web view lies
+   over its slot (src-tauri/src/moodle.rs). */
+:root:is([data-desktop-app], [data-ios-app]) .moodle-page {
   position: fixed;
   inset: 0 0 0 calc(var(--sidebar-width, 280px) + 12px);
   z-index: 1;
@@ -10724,7 +11136,7 @@ div:has(> .justify-ticket) {
 }
 
 /* The view starts right at the sidebar's edge, a hairline along its top. */
-:root[data-desktop-app] .moodle-slot {
+:root:is([data-desktop-app], [data-ios-app]) .moodle-slot {
   border-top: 0.5px solid var(--desktop-separator, var(--color-border));
 }
 
@@ -10741,18 +11153,46 @@ div:has(> .justify-ticket) {
   --tw-translate-x: 0;
 }
 
-/* Without the sidebar (Windows and Linux, a narrow window): the whole
-   width, above the tab bar. */
+/* Without the sidebar (a phone; Windows and Linux, a narrow window): the
+   whole width, above the tab bar. */
 @media (max-width: 1023.98px) {
-  :root[data-desktop-app] .moodle-page {
+  :root:is([data-desktop-app], [data-ios-app]) .moodle-page {
     left: 0;
     bottom: calc(env(safe-area-inset-bottom) + 84px);
   }
 }
 
+/* Windows: « Moodle » (fixed to the window, not in .app-column) below the
+   band as well, with the column's edge and corner: its toolbar under the
+   band would be the band's (drag and buttons), not the page's. After the
+   rules above, which it overrides. */
+:root[data-desktop-windows] .moodle-page {
+  top: var(--desktop-titlebar-height);
+  border-top: 1px solid var(--desktop-separator);
+  border-left: 1px solid var(--desktop-separator);
+  border-top-left-radius: 8px;
+  overflow: hidden;
+}
+
+@media (width < 1024px) {
+  :root[data-desktop-windows] .moodle-page {
+    border: 0;
+    border-radius: 0;
+  }
+}
+
+/* iOS: down to the screen's edge, behind the system's tab bar, which is
+   see-through: Moodle's page shows through it and scrolls clear of it
+   (src-tauri/plugins/moodle). */
+@media (max-width: 1023.98px) {
+  :root[data-ios-app] .moodle-page {
+    bottom: 0;
+  }
+}
+
 /* A page of Moodle's is loading: a line along the toolbar's bottom edge,
    a stretch of it passing from left to right. */
-:root[data-desktop-app] .moodle-loading {
+:root:is([data-desktop-app], [data-ios-app]) .moodle-loading {
   position: absolute;
   inset: auto 0 0 0;
   height: 2px;
@@ -10760,7 +11200,7 @@ div:has(> .justify-ticket) {
   pointer-events: none;
 }
 
-:root[data-desktop-app] .moodle-loading::before {
+:root:is([data-desktop-app], [data-ios-app]) .moodle-loading::before {
   content: "";
   position: absolute;
   inset: 0 auto 0 0;
@@ -10780,7 +11220,7 @@ div:has(> .justify-ticket) {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  :root[data-desktop-app] .moodle-loading::before {
+  :root:is([data-desktop-app], [data-ios-app]) .moodle-loading::before {
     width: 100%;
     animation: none;
     opacity: 0.5;
@@ -10796,5 +11236,23 @@ div:has(> .justify-ticket) {
 
   :root[data-desktop-app] .moodle-toolbar {
     display: none !important;
+  }
+}
+
+/* ── « Tafac pour Mac » (MacAppDownloadModal) ──
+   The download button's chip name slides in when the pick changes. */
+.mac-choice-name {
+  display: inline-block;
+  animation: mac-choice-name 380ms cubic-bezier(0.32, 0.72, 0, 1);
+}
+
+@keyframes mac-choice-name {
+  from { opacity: 0; transform: translateY(6px); filter: blur(3px); }
+  to { opacity: 1; transform: none; filter: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mac-choice-name {
+    animation: none;
   }
 }

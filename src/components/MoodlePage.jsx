@@ -8,10 +8,12 @@ import { reportSessionExpired } from '../entApi'
 import { INITIAL_MOODLE_STATE, askMoodle, isSlotCovered, readMoodleState, readMoodleTheme, sameMoodleState, sameMoodleTheme, slotBounds } from '../desktopMoodle'
 import { r } from '../register'
 
-// « Moodle » in the desktop app: Moodle itself, inside the window, next to
-// the sidebar. Not an iframe (Moodle refuses to be framed): the app lays a
-// web view of its own over this page's slot (src-tauri/src/moodle.rs) and
-// keeps it there as the slot moves. The page keeps the toolbar above it.
+// « Moodle » in the apps: Moodle itself, inside the window, next to the
+// sidebar (on a phone: the whole width, above the tab bar). Not an iframe
+// (Moodle refuses to be framed): the app lays a web view of its own over
+// this page's slot (src-tauri/src/moodle.rs; on iOS a view of the app's own,
+// moodle_ios.rs) and keeps it there as the slot moves. The page keeps the
+// toolbar above it.
 //
 // The view is native, so it sits over everything the page draws: while a
 // sheet, a dialog or a menu is over the slot, it hides, and comes back

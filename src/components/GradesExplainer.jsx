@@ -581,7 +581,7 @@ function ExplainerDialog({ ues, onClose }) {
       <div className="weather-modal-backdrop absolute inset-0 bg-backdrop animate-modal-backdrop-in" onClick={dismiss} aria-hidden="true" />
       <section
         ref={dialogRef}
-        className="glass-solid glass--quiet modal-surface gx-dialog relative flex h-[min(700px,calc(100dvh-40px))] w-[min(560px,100%)] flex-col overflow-hidden corners-[22px] border text-text outline-none animate-modal-card-in max-sm:h-[calc(100dvh-12px)] max-sm:rounded-b-none max-sm:border-b-0"
+        className="glass-solid glass--quiet modal-surface gx-dialog relative flex h-[min(700px,calc(var(--app-h)-40px))] w-[min(560px,100%)] flex-col overflow-hidden corners-[22px] border text-text outline-none animate-modal-card-in max-sm:h-[calc(var(--app-h)-12px)] max-sm:rounded-b-none max-sm:border-b-0"
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}

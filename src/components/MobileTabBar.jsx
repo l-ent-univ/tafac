@@ -1,8 +1,9 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Icon, iconLoaded, loadIcons } from '@iconify/react'
 import { track } from '../analytics'
 import { useChangelog } from '../changelogStore'
 import { getMobileTabItems, openNavItemLink } from '../navItems'
+import { hasNativeTabBar, useIosTabBar } from '../iosTabBar'
 
 // How long the "unavailable" bubble stays above a greyed-out tab.
 const NOTICE_DURATION_MS = 3200
@@ -49,6 +50,8 @@ function getTabSizeClasses(count) {
 // shown wherever the desktop sidebar isn't. Home first, then the same
 // shortcuts as the sidebar (grades, planning, mail, Moodle); a greyed-out tab
 // explains itself in a bubble instead of a hover tooltip.
+// In the iOS app the bar is the system's (src/iosTabBar.js): same tabs, same
+// presses, and the page only keeps the bar's place and the bubble.
 function MobileTabBar({ establishment, gradesSupported = true, activePage = 'home', showAssiduity = false, onNavigatePage }) {
   const shortcuts = pickShortcuts(getMobileTabItems(establishment, { gradesSupported }), showAssiduity)
   const items = [HOME_TAB, ...shortcuts].map((item) => (
@@ -59,6 +62,8 @@ function MobileTabBar({ establishment, gradesSupported = true, activePage = 'hom
   const iconKey = iconNames.join(',')
   const [noticeItem, setNoticeItem] = useState(null)
   const { unseenIds } = useChangelog()
+  const isNative = hasNativeTabBar()
+  const slotRef = useRef(null)
   // Icons come from the Iconify API on first use: the bar stays hidden until
   // all of them are in, so it never shows blank tabs (and stays hidden if
   // they can't load at all).
@@ -84,10 +89,6 @@ function MobileTabBar({ establishment, gradesSupported = true, activePage = 'hom
     const timeoutId = window.setTimeout(() => setNoticeItem(null), NOTICE_DURATION_MS)
     return () => window.clearTimeout(timeoutId)
   }, [noticeItem])
-
-  if (shortcuts.length === 0 || !areIconsReady) {
-    return null
-  }
 
   const handleSelect = (event, item) => {
     if (item.selected) {
@@ -115,9 +116,30 @@ function MobileTabBar({ establishment, gradesSupported = true, activePage = 'hom
     }
   }
 
+  useIosTabBar({
+    slotRef,
+    // The bar's own icons, as below: the system's bar draws them too.
+    items: items.map((item) => ({ ...item, tabIcon: getTabIcon(item), tabIconSelected: TAB_ICONS[item.id] ?? item.iconActive ?? item.icon })),
+    newIds: items.filter((item) => item.announcedBy && unseenIds.includes(item.announcedBy)).map((item) => item.id),
+    onPress: (id) => {
+      const item = items.find((candidate) => candidate.id === id)
+      if (item) handleSelect({ preventDefault() {} }, item)
+    },
+    enabled: shortcuts.length > 0,
+  })
+
+  // The system's bar waits for its icons itself (src/iosTabBar.js).
+  if (shortcuts.length === 0 || (!isNative && !areIconsReady)) {
+    return null
+  }
+
   return (
+    // iOS app: where the system's bar really is. It lies along the screen's
+    // bottom edge, 49 points and the safe area tall, its pill (62 points)
+    // from its top: lower than the page's own. Higher, its place took the
+    // presses of what the page puts just over the bar (the mail's toolbar).
     <nav
-      className="4xl:hidden pointer-events-none fixed inset-x-0 bottom-[calc(env(safe-area-inset-bottom)+14px)] z-30 flex flex-col items-center gap-2 px-4"
+      className={`4xl:hidden pointer-events-none fixed inset-x-0 z-30 flex flex-col items-center gap-2 px-4 ${isNative ? 'bottom-[calc(env(safe-area-inset-bottom)_-_13px)]' : 'bottom-[calc(env(safe-area-inset-bottom)+14px)]'}`}
       aria-label="Raccourcis"
     >
       {noticeItem ? (
@@ -128,6 +150,9 @@ function MobileTabBar({ establishment, gradesSupported = true, activePage = 'hom
           ) : null}
         </p>
       ) : null}
+      {/* iOS app: where the system's bar is. It takes presses, so what the
+          page puts over it is told from the page under it. */}
+      {isNative ? <div ref={slotRef} data-native-bar="" className="pointer-events-auto h-[62px] w-full" aria-hidden="true" /> : (
       <div className={`mobile-tab-bar pointer-events-auto flex items-center gap-1 rounded-full p-1.5 animate-modal-card-in ${items.length >= WIDE_BAR_MIN_TABS ? 'w-full max-w-[420px]' : 'max-w-full'}`}>
         {items.map((item) => {
           const className = `mobile-tab-bar-item flex h-[54px] ${tabSizeClasses} flex-col items-center justify-center gap-[3px] rounded-full border-0 text-text no-underline cursor-pointer transition-[background-color,box-shadow,outline-color,transform] duration-200 ease-out active:scale-[0.94] ${item.selected ? 'mobile-tab-bar-item--selected' : 'bg-transparent'} ${item.disabled ? 'opacity-45' : ''}`
@@ -179,6 +204,7 @@ function MobileTabBar({ establishment, gradesSupported = true, activePage = 'hom
           )
         })}
       </div>
+      )}
     </nav>
   )
 }

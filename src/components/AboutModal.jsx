@@ -340,7 +340,7 @@ function AboutModal({
       role="presentation"
     >
       <section
-        className="glass-solid glass--quiet modal-surface w-[min(440px,100%)] sm:w-[min(880px,100%)] max-h-[calc(100dvh-40px)] overflow-y-auto overscroll-contain modal-corners [--modal-inset:21px] [--modal-inner-radius:20px] border text-[var(--color-text)] animate-modal-card-in max-sm:max-h-[calc(100dvh-28px)]"
+        className="glass-solid glass--quiet modal-surface w-[min(440px,100%)] sm:w-[min(880px,100%)] max-h-[calc(var(--app-h)-40px)] overflow-y-auto overscroll-contain modal-corners [--modal-inset:21px] [--modal-inner-radius:20px] border text-[var(--color-text)] animate-modal-card-in max-sm:max-h-[calc(var(--app-h)-28px)]"
         role="dialog"
         aria-modal="true"
         aria-labelledby="about-modal-title"

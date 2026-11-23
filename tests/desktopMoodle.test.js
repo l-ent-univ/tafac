@@ -80,6 +80,13 @@ test('anything else that takes a press over the slot covers it', () => {
   assert.equal(isSlotCovered(slot, doc), true)
 })
 
+test('the place of the system’s tab bar over the slot doesn’t cover it', () => {
+  // iOS: the bar is see-through, the view runs behind it.
+  const bar = { closest: (selector) => (selector === '[data-native-bar]' ? bar : null) }
+  const { slot, doc } = fakePage({ top: (x, y) => (y > 700 ? bar : null) })
+  assert.equal(isSlotCovered(slot, doc), false)
+})
+
 test('what only pokes over the slot’s edge doesn’t cover it', () => {
   // The sidebar's handle, centred on the slot's left edge (300): 10px in.
   const handle = { isHandle: true }

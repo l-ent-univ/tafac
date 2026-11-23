@@ -734,6 +734,7 @@ function AccountModal({
   initialSectionId = null,
   onClose,
   onManageAccount,
+  onLogout,
   onYearChange,
   onTdChange,
   onTpChange,
@@ -916,6 +917,15 @@ function AccountModal({
             ) : null}
 
             <SchoolCertificateGroup />
+
+            {/* Signing out: only here, on every screen (as in the iOS app). */}
+            {typeof onLogout === 'function' ? (
+              <SettingsGroup>
+                <button type="button" className={PRESSABLE_ROW_CLASSES} onClick={onLogout}>
+                  <RowText icon="ph:sign-out" label="Se déconnecter" />
+                </button>
+              </SettingsGroup>
+            ) : null}
           </>
         )
 
@@ -1112,7 +1122,7 @@ function AccountModal({
       role="presentation"
     >
       <section
-        className="glass-solid glass--quiet modal-surface account-modal-card flex h-[600px] w-[min(780px,100%)] max-h-[calc(100vh-40px)] flex-col overflow-hidden modal-corners [--modal-inset:21px] [--modal-inner-radius:20px] max-sm:[--modal-inset:14px] border text-[var(--color-text)] animate-modal-card-in max-sm:h-[calc(100dvh-28px)] max-sm:max-h-none"
+        className="glass-solid glass--quiet modal-surface account-modal-card flex h-[600px] w-[min(780px,100%)] max-h-[calc(var(--app-h)-40px)] flex-col overflow-hidden modal-corners [--modal-inset:21px] [--modal-inner-radius:20px] max-sm:[--modal-inset:14px] border text-[var(--color-text)] animate-modal-card-in max-sm:h-[calc(var(--app-h)-28px)] max-sm:max-h-none"
         role="dialog"
         aria-modal="true"
         aria-labelledby="account-modal-title"

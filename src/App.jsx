@@ -21,8 +21,9 @@ import WelcomeFromLent from './components/WelcomeFromLent'
 import { settingsTransfer } from './settingsTransferBoot'
 import { appendPreviewToken, findProfilePhotoCandidate } from './profilePhoto'
 import { DEMO_CREDENTIALS, DEMO_SESSION_MODE, DEMO_SIGNATURE_LOGIN } from './demoAccount'
-import { isDesktopApp, isMacDesktopApp } from './desktopApp'
+import { isDesktopApp, isIosApp, isMacDesktopApp, isMicaDesktopApp, isNativeApp } from './desktopApp'
 import { syncWindowTheme } from './desktopWindowTheme'
+import { syncIosAppearance } from './iosApp'
 import { onDesktopCommand, syncDesktopMenu } from './desktopMenu'
 import { signatureLogin } from './mailSignatureChoice'
 import { storeBrowserPasswordCredential } from './browserCredentials'
@@ -62,6 +63,7 @@ import PlanningPage from './components/PlanningPage'
 import MailPage from './components/MailPage'
 import AssiduityPage from './components/AssiduityPage'
 import HomeDraftPage from './components/HomeDraftPage'
+import KeptPage from './components/KeptPage'
 import LoadingDots from './components/LoadingDots'
 import PageLoading from './components/PageLoading'
 import { listWallpaperFolderImages, resolveHeroImage } from './heroImage'
@@ -69,7 +71,9 @@ import { WALLPAPER_FOLDERS, effectiveWallpaperChoice, wallpaperChoiceAnalyticsVa
 import { useWallpaperTint } from './useWallpaperTint'
 import { getStoredPalette, getStoredTheme, persistPalette, persistTheme, watchTheme } from './theme'
 import MobileTabBar from './components/MobileTabBar'
-import { buildNavItems, getMobileTabItems } from './navItems'
+import { buildNavItems, getMobileTabItems, openNavItemLink } from './navItems'
+import { toDayKey } from './planningDates'
+import { useKeptPages } from './useKeptPages'
 import MoodlePage from './components/MoodlePage'
 import { getHomeWidgets } from './dashboardWidgets'
 import { bindHistorySession, readHistoryNav, writeHistoryNav } from './appHistory'
@@ -911,11 +915,11 @@ function reportSettingsTransfer() {
 
 const LOGIN_PATH = '/login'
 
-// Installed app (PWA or desktop) and arrivals from the old l'ent address skip
-// the landing page.
+// Installed app (PWA, desktop or iOS) and arrivals from the old l'ent address
+// skip the landing page.
 function shouldOpenOnLogin() {
   return settingsTransfer.arrived
-    || isDesktopApp()
+    || isNativeApp()
     || window.matchMedia('(display-mode: standalone)').matches
     || window.navigator.standalone === true
 }
@@ -1962,10 +1966,14 @@ function App() {
     images: listWallpaperFolderImages(id, establishment),
     today: resolveHeroImage(establishment, new Date(), heroOffset, id),
   })).filter((folder) => folder.images.length > 0), [establishment, heroOffset])
+  // Never picked: the establishment's folder when it names one
+  // (defaultWallpaperFolder), else the university's.
+  const defaultWallpaperFolder = universityConfig.establishments?.byId?.[establishment]?.defaultWallpaperFolder ?? null
   const activeWallpaper = useMemo(() => effectiveWallpaperChoice(wallpaperChoice, {
     hasCustom: Boolean(customBackground),
     folderImages: (id) => wallpaperFolders.find((folder) => folder.id === id)?.images ?? [],
-  }), [customBackground, wallpaperChoice, wallpaperFolders])
+    preferredFolder: defaultWallpaperFolder,
+  }), [customBackground, defaultWallpaperFolder, wallpaperChoice, wallpaperFolders])
   const heroImage = useMemo(() => {
     if (activeWallpaper.folder === 'custom') return { src: customBackground, position: null, credit: null }
     const folder = wallpaperFolders.find((entry) => entry.id === activeWallpaper.folder)
@@ -2042,7 +2050,7 @@ function App() {
   )
   // « Accueil » (HomeDraftPage), every university: the page shown when no
   // other is.
-  // « Moodle » in the desktop app (MoodlePage): Moodle in the window.
+  // « Moodle » in the apps (MoodlePage): Moodle in the window.
   const isMoodlePage = activePage === 'moodle' && hasMoodlePage
   const isHomePage = !isGradesPage && !isPlanningPage && !isMailPage && !isAssiduityPage && !isMoodlePage
   // The « Accueil » band's tint (--page-top-band, overrides.css): the
@@ -2107,7 +2115,8 @@ function App() {
 
   useEffect(() => watchTheme(theme, palette), [theme, palette])
   useEffect(() => {
-    if (isMacDesktopApp()) syncWindowTheme(theme)
+    if (isMacDesktopApp() || isMicaDesktopApp()) syncWindowTheme(theme)
+    syncIosAppearance(theme)
   }, [theme])
 
   const handleThemeChange = useCallback((nextTheme) => {
@@ -2168,34 +2177,51 @@ function App() {
     topBarObserverRef.current = observer
   }, [])
 
+  // iOS app: a page visited stays mounted behind the one shown, as a
+  // native tab's (src/keptPages.js), for this account and the pages there
+  // are: signed out, or with other pages, the hidden ones go.
+  const pagesOnOffer = useMemo(
+    () => ['home', ...getMobileTabItems(establishment, { gradesSupported }).map((item) => item.page).filter(Boolean)],
+    [establishment, gradesSupported],
+  )
+  const { pages: keptPages, leave: leaveKeptPage } = useKeptPages({
+    owner: isIosApp() && sessionState.authenticated ? `${universityConfig.id}:${sessionState.user ?? ''}` : null,
+    offer: pagesOnOffer,
+    page: shownPage,
+    columnRef: dashboardColumnElementRef,
+  })
+
   // Shows a page at its top, once it's rendered. Wide screens scroll the
-  // column itself, narrower ones the window.
+  // column itself, narrower ones the window. In the iOS app the page left
+  // keeps its scroll and the one shown comes back where it was left
+  // (useKeptPages), unless asked `fromTop`.
   // `source`: how « Mes notes » or the planning was reached
   // (src/gradesAnalytics.js, src/planningAnalytics.js).
-  const showPage = useCallback((page, source = 'other') => {
+  const showPage = useCallback((page, source = 'other', { fromTop = false } = {}) => {
     if (page === 'grades') setGradesArrivalSource(source)
     if (page === 'planning') setPlanningArrivalSource(source)
     if (page === 'mail') setMailArrivalSource(source)
     if (page === 'assiduity') setAssiduityArrivalSource(source)
     setActivePage(page)
     setHasSwitchedPage(true)
+    if (leaveKeptPage(page, { fromTop })) return
     window.requestAnimationFrame(() => {
       dashboardColumnElementRef.current?.scrollTo({ top: 0 })
       window.scrollTo({ top: 0 })
     })
-  }, [])
+  }, [leaveKeptPage])
 
   // Sidebar / tab bar page switch: a new history entry. `source` says where
   // from, for « Mes notes »'s and the planning's page_viewed ('nav',
-  // 'tabbar'…).
-  const handleNavigatePage = useCallback((page, source = 'other') => {
+  // 'tabbar'…). `options`: showPage's.
+  const handleNavigatePage = useCallback((page, source = 'other', options = undefined) => {
     if (page !== activePageRef.current) writeHistoryNav({ page })
     // « Moodle » from the sidebar or the tab bar: counted as its link is
     // where Moodle opens in a tab (navItems.js).
-    if (page === 'moodle' && (source === 'nav' || source === 'tabbar')) {
-      track('app_opened', { app: 'moodle', source: source === 'nav' ? 'sidebar' : 'tabbar', in_app: true })
+    if (page === 'moodle' && (source === 'nav' || source === 'tabbar' || source === 'home_icon')) {
+      track('app_opened', { app: 'moodle', source: source === 'nav' ? 'sidebar' : source, in_app: true })
     }
-    showPage(page, source)
+    showPage(page, source, options)
   }, [showPage])
 
   // Signed in again after an expired session that kept a mail: on to the
@@ -2226,8 +2252,11 @@ function App() {
   // class's day (today without one).
   const [pendingPlanningDay, setPendingPlanningDay] = useState(null)
   const handleOpenPlanningDay = useCallback((day) => {
-    setPendingPlanningDay(day ?? null)
-    handleNavigatePage('planning', 'dashboard_card')
+    // iOS app: a planning kept from an earlier visit is on the day it was
+    // left on, so today is said too; either way the day is seen from the
+    // page's top.
+    setPendingPlanningDay(day ?? (isIosApp() ? toDayKey(Date.now()) : null))
+    handleNavigatePage('planning', 'dashboard_card', { fromTop: true })
   }, [handleNavigatePage])
   const clearPendingPlanningDay = useCallback(() => setPendingPlanningDay(null), [])
   // The webmail's app in the app lists ('tile'): the mail page rather than
@@ -2263,8 +2292,24 @@ function App() {
     handleNavigatePage('moodle', source)
   }, [handleNavigatePage])
   const clearPendingMoodleTarget = useCallback(() => setPendingMoodleTarget(null), [])
+  // « Accueil »'s icons on a phone (HomePhoneHeader). Moodle's: its page
+  // where it is one (the apps), else its link, as the tab bar's; none where
+  // the university has no Moodle. The apps': « Toutes les applications »,
+  // the drawer of the app list, which opens on each new request.
+  const moodleNavItem = useMemo(
+    () => buildNavItems(establishment, { gradesSupported }).find((item) => item.id === 'moodle') ?? null,
+    [establishment, gradesSupported],
+  )
+  const handleOpenMoodleFromIcon = useMemo(() => {
+    if (!moodleNavItem) return null
+    return moodleNavItem.page
+      ? () => handleOpenMoodlePage('home_icon')
+      : () => openNavItemLink(moodleNavItem, 'home_icon')
+  }, [moodleNavItem, handleOpenMoodlePage])
+  const [allAppsRequest, setAllAppsRequest] = useState(0)
+  const handleOpenAllApps = useCallback(() => setAllAppsRequest((request) => request + 1), [])
   useEffect(() => {
-    if (!isDesktopApp() || !hasMoodlePage) return undefined
+    if (!isNativeApp() || !hasMoodlePage) return undefined
     return onDesktopCommand(({ command, url }) => {
       if (command === 'moodle' && typeof url === 'string') handleOpenMoodlePage('link', url)
     })
@@ -3072,7 +3117,6 @@ function App() {
             ].filter(Boolean).join(' ') || sessionState.account?.name || sessionState.givenName || sessionState.user}
             userSubtitle={HAS_PERSONAL_PLANNING ? null : selectedTp?.label ?? selectedTp?.tpLabel ?? selectedTp?.tdLabel ?? selectedTp?.yearLabel ?? null}
             profilePhotoSrc={profilePhotoSrc}
-            onLogout={handleHeaderAction}
             onAccountClick={handleOpenAccountModal}
             favoritesSlotRef={setFavoritesSlotEl}
             hasPendingUpdate={hasPendingUpdate}
@@ -3098,7 +3142,7 @@ function App() {
                 the « Accueil » page's band, which runs up behind it (its
                 wallpaper too): see-through and above it, its height for the
                 band to know (--top-bar-height). */}
-            <div ref={topBarRef} className={`${isHomePage ? 'max-md:relative max-md:z-10 max-md:!bg-transparent' : 'max-md:hidden'} 4xl:hidden`}>
+            <div ref={topBarRef} className="max-md:hidden 4xl:hidden">
               <AppHeader
                 onNavigatePage={sessionState.authenticated ? handleNavigatePage : undefined}
                 authenticated={sessionState.authenticated}
@@ -3136,7 +3180,9 @@ function App() {
                 establishment={establishment}
                 canUseServerLaunch={sessionState.canUseServerLaunch}
                 favoritesPortalTarget={isSidebarViewport ? favoritesSlotEl : null}
-                homeAppsPortalTarget={isHomePage ? homeAppsSlotEl : null}
+                homeAppsPortalTarget={isHomePage || keptPages.home ? homeAppsSlotEl : null}
+                homeAppsShown={isHomePage}
+                homeDrawerRequest={allAppsRequest}
                 showDescriptions={showAppDescriptions}
                 onOpenGradesPage={hasGradesPage ? handleOpenGradesPage : null}
                 onOpenPlanningPage={hasPlanningPage ? handleOpenPlanningPage : null}
@@ -3144,9 +3190,17 @@ function App() {
                 onOpenMoodlePage={hasMoodlePage ? handleOpenMoodlePage : null}
               />
             </div>
-            {isHomePage ? (
-              <div className="page-enter flex-1 min-h-0 4xl:flex-none 4xl:min-h-0">
+            {/* Each page in its place (KeptPage): there while it's shown and,
+                in the iOS app, kept behind the others once it was. */}
+            {isHomePage || keptPages.home ? (
+              <KeptPage key={keptPages.home?.key} kept={keptPages.home} shown={isHomePage}>
                 <HomeDraftPage
+                  showUniversityLogo={showUniversityLogo}
+                  logoSource={logoSource}
+                  profilePhotoSrc={profilePhotoSrc}
+                  onOpenAccount={handleOpenAccountModal}
+                  onOpenAllApps={handleOpenAllApps}
+                  onOpenMoodle={handleOpenMoodleFromIcon}
                   userName={sessionState.givenName ?? sessionState.user}
                   sessionUser={sessionState.user}
                   establishment={establishment}
@@ -3167,23 +3221,24 @@ function App() {
                   onOpenMailPage={hasMailPage ? handleOpenMailPage : null}
                   appsSlotRef={setHomeAppsSlotEl}
                 />
-              </div>
+              </KeptPage>
             ) : null}
-            {isGradesPage ? (
-              <div className="page-enter flex-1 min-h-0 4xl:flex-none 4xl:min-h-0">
+            {isGradesPage || keptPages.grades ? (
+              <KeptPage key={keptPages.grades?.key} kept={keptPages.grades} shown={isGradesPage}>
                 <GradesPage user={sessionState.user} arrivalSource={gradesArrivalSource} initialGradeRequest={pendingGradeRequest} onInitialGradeRequestHandled={clearPendingGradeRequest} onComposeMail={hasMailPage ? handleComposeMail : null} />
-              </div>
+              </KeptPage>
             ) : null}
-            {isPlanningPage ? (
-              <div className="page-enter flex-1 min-h-0 4xl:flex-none 4xl:min-h-0">
+            {isPlanningPage || keptPages.planning ? (
+              <KeptPage key={keptPages.planning?.key} kept={keptPages.planning} shown={isPlanningPage}>
                 <PlanningPage selection={selectedTp} user={sessionState.user} showWeekend={showPlanningWeekend} onOpenAccount={handleOpenAccountModal} initialDay={pendingPlanningDay} onInitialDayHandled={clearPendingPlanningDay} arrivalSource={planningArrivalSource} onComposeMail={hasMailPage ? handleComposeMail : null} onSidePanelOpenChange={handlePlanningSidePanelOpenChange} onOpenPlanningSettings={handleOpenPlanningSettings} />
-              </div>
+              </KeptPage>
             ) : null}
-            {isAssiduityPage ? (
-              <div className="page-enter flex-1 min-h-0 4xl:flex-none 4xl:min-h-0">
+            {isAssiduityPage || keptPages.assiduity ? (
+              <KeptPage key={keptPages.assiduity?.key} kept={keptPages.assiduity} shown={isAssiduityPage}>
                 <AssiduityPage arrivalSource={assiduityArrivalSource} onComposeMail={hasMailPage ? handleComposeMail : null} absenceReasons={universityConfig.establishments?.byId?.[establishment]?.absenceReasons} findsClassTeacher={hasPlanningPage} />
-              </div>
+              </KeptPage>
             ) : null}
+            {/* Not kept: its native view keeps Moodle's own state. */}
             {isMoodlePage ? (
               <MoodlePage
                 target={pendingMoodleTarget}
@@ -3192,10 +3247,10 @@ function App() {
                 onHistoryChange={setMoodleHistory}
               />
             ) : null}
-            {isMailPage ? (
-              <div className="page-enter flex-1 min-h-0 4xl:flex-none 4xl:min-h-0">
+            {isMailPage || keptPages.mail ? (
+              <KeptPage key={keptPages.mail?.key} kept={keptPages.mail} shown={isMailPage}>
                 <MailPage onReaderOpenChange={handleMailReaderOpenChange} sender={mailSender} composeRequest={pendingMailCompose} onComposeRequestHandled={clearPendingMailCompose} arrivalSource={mailArrivalSource} canAttachGrades={hasGradesPage} planning={mailPlanning} />
-              </div>
+              </KeptPage>
             ) : null}
             {/* The build line and « À propos »: on « Accueil » only (its
                 photo's credit is in its band). */}
@@ -3210,6 +3265,9 @@ function App() {
               <div key={activePage} aria-hidden="true" className="page-switch-veil pointer-events-none absolute inset-0 z-20" />
             ) : null}
           </div>
+          {/* iOS app: over the status bar once the page has scrolled under
+              it (overrides.css, « iOS app · status bar »). */}
+          {isIosApp() ? <div className="ios-status-veil" aria-hidden="true" /> : null}
           <MobileTabBar
             establishment={establishment}
             gradesSupported={gradesSupported}
@@ -3228,6 +3286,7 @@ function App() {
         initialSectionId={accountModalSection}
         onClose={handleCloseAccountModal}
         onManageAccount={sessionState.user === DEMO_CREDENTIALS.username || !manageAccountUrl ? null : handleManageAccount}
+        onLogout={handleHeaderAction}
         onYearChange={handleAccountModalYearChange}
         onTdChange={handleAccountModalTdChange}
         onTpChange={handleAccountModalTpChange}
