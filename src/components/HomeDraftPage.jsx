@@ -402,7 +402,7 @@ function HomeDraftPage({
                 role={onOpenAssiduity ? 'link' : undefined}
                 tabIndex={onOpenAssiduity ? 0 : undefined}
                 aria-label={onOpenAssiduity ? 'Assiduité, voir la page' : undefined}
-                onClick={onOpenAssiduity ?? undefined}
+                onClick={onOpenAssiduity ? () => onOpenAssiduity() : undefined}
                 onKeyDown={onOpenAssiduity ? (event) => {
                   if (event.key !== 'Enter' && event.key !== ' ') return
                   if (event.target !== event.currentTarget) return
@@ -410,7 +410,7 @@ function HomeDraftPage({
                   onOpenAssiduity()
                 } : undefined}
               >
-                <WidgetAssiduity payload={grades.payload} releve={grades.releve} config={grades.config} status={grades.status} />
+                <WidgetAssiduity payload={grades.payload} releve={grades.releve} config={grades.config} status={grades.status} onOpen={onOpenAssiduity ? (id, action) => onOpenAssiduity({ id, action }) : null} />
               </div>
             ) : null}
           </div>

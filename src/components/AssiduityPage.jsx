@@ -556,7 +556,10 @@ function AbsenceHistory({ entries, filter, onFilter, subject, onClearSubject, hi
 // the teacher of an absence's class (Cc) when ScoDoc names none.
 // `arrivalSource`: how the student got here, for the anonymous analytics
 // (src/assiduityAnalytics.js); the page mounts once per arrival.
-function AssiduityPage({ arrivalSource = 'other', onComposeMail = null, absenceReasons = [], findsClassTeacher = false }) {
+// `initialRequest`: { id, action: 'justify' | 'view' }, an absence picked on
+// « Accueil »'s line (WidgetAssiduity): its « Justifier » walkthrough, or
+// its place in the list; handled once the absences are in.
+function AssiduityPage({ arrivalSource = 'other', onComposeMail = null, absenceReasons = [], findsClassTeacher = false, initialRequest = null, onInitialRequestHandled = null }) {
   // Dev: the debug panel can hold the page on its first load (loadingDebug.js).
   const simulateLoading = useLoadingSimulated()
   const { base, semesters, activeId, selectSemester, entry, releve, config } = useScodocReleve()
@@ -662,6 +665,13 @@ function AssiduityPage({ arrivalSource = 'other', onComposeMail = null, absenceR
     setJustifyEntry(item)
     justifySheet.open()
   } : null), [onComposeMail, justifySheet])
+  useEffect(() => {
+    const requested = initialRequest ? entriesById.get(initialRequest.id) : null
+    if (!requested) return
+    if (initialRequest.action === 'justify' && openJustify && canJustify(requested)) openJustify(requested, 'home')
+    else pickEntry(requested.id)
+    onInitialRequestHandled?.()
+  }, [initialRequest, entriesById, openJustify, pickEntry, onInitialRequestHandled])
   // Anonymous analytics of the walkthrough (justify_step): `opened` and
   // `closed` follow the sheet itself, however it closes (its buttons,
   // Escape, Back, the mail written), `closed` with the furthest step
