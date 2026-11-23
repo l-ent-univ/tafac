@@ -150,6 +150,7 @@ function PlanningEventSheet({ event, accent, events, todayKey, searching, absenc
                     <GroupRow
                       icon={STATUS_STYLES[absence.status]?.icon ?? 'ph:check-circle'}
                       title={ABSENCE_TITLES[absence.status] ?? ABSENCE_TITLES.justified}
+                      tone={absence.status === 'unjustified' ? 'error' : null}
                       detail={absence.status === 'late' ? 'Arrivé en retard à ce cours' : `De ${absence.start} à ${absence.end}`}
                       trailing={onJustify && canJustify(absence) ? (
                         <button
