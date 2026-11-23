@@ -93,7 +93,7 @@ function PlanningEventBlock({ event, accent, variant, stackFirst = false, width,
       </span>
       {absence ? (
         // « Absent » spelled out where the block has the room, else its icon.
-        height >= 56
+        height >= 80
           ? <AbsenceTag status={absence.status} className="absolute right-[6px] bottom-[6px] h-5! px-1.5!" />
           : <span className="planning-absence-badge" aria-hidden="true"><Icon icon={STATUS_STYLES[absence.status]?.icon ?? 'ph:check-circle'} style={{ width: 11, height: 11 }} /></span>
       ) : null}
