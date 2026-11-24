@@ -180,15 +180,19 @@ function WidgetNextClasses({
         <div ref={boxRef} className="flex min-h-0 min-w-0 flex-1 flex-col">{body}</div>
       </div>
       {onOpenPlanningDay ? (
+        // A real button, the app's secondary one (glass-solid, as the
+        // sidebar's and the assiduity card's). Labels in <span>s: the global
+        // `button { font: inherit }` (index.css) outranks utilities on the
+        // button itself.
         <button
           type="button"
           onClick={() => onOpenPlanningDay(day?.dayKey ?? null)}
-          className="relative inline-flex shrink-0 cursor-pointer items-center gap-1 self-start border-0 bg-transparent p-0 font-body text-base font-medium leading-[1.06] text-text-muted underline-offset-2 transition-colors duration-150 hover:text-text hover:underline max-md:text-[15px]"
+          className="glass-solid relative inline-flex h-[30px] shrink-0 cursor-pointer items-center gap-1 self-start rounded-full border pl-3 pr-2.5 text-text transition-[background-color] duration-150 hover:bg-brand-subtle"
         >
-          Afficher plus
+          <span className="font-body text-[13px] font-medium leading-none">Afficher plus</span>
           {/* The classes of the day left out of the card. */}
-          {hiddenCount > 0 ? <span className="tabular-nums">· {hiddenCount} cours</span> : null}
-          <Icon icon="ph:arrow-up-right" className="size-4" aria-hidden="true" />
+          {hiddenCount > 0 ? <span className="font-body text-[13px] font-medium leading-none tabular-nums text-text-secondary">· {hiddenCount} cours</span> : null}
+          <Icon icon="ph:arrow-up-right" className="size-[14px]" aria-hidden="true" />
         </button>
       ) : null}
     </article>

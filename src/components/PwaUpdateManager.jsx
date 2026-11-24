@@ -3,6 +3,7 @@ import { useRegisterSW } from 'virtual:pwa-register/react'
 import RefreshedPrompt from './RefreshedPrompt'
 import { flushAnalytics, track } from '../analytics'
 import { APP_NAME } from '../seo'
+import { isNativeApp } from '../desktopApp'
 
 const LOCAL_PWA_HOSTS = new Set(['localhost', '127.0.0.1', '0.0.0.0', '::1'])
 const LOCAL_PWA_RESET_KEY = 'l-ent:local-pwa-reset'
@@ -251,7 +252,11 @@ function ProductionPwaManager({ forceOpen, onForceOpenChange, onUpdateAvailable,
 export default function PwaUpdateManager({ forceOpen = false, onForceOpenChange, onUpdateAvailable, onApplyHandlerChange }) {
   const isLocalRuntime = typeof window !== 'undefined' && isLocalPwaHost(window.location.hostname)
 
-  if (isLocalRuntime) {
+  // The apps (desktop, iOS) load the page from the app itself, which
+  // updates them: a service worker would keep serving the page of an
+  // earlier version after an update. None registered, and one left by an
+  // earlier version removed, as on localhost.
+  if (isLocalRuntime || isNativeApp()) {
     return (
       <LocalPwaManager
         forceOpen={forceOpen}

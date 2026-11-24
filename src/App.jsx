@@ -21,7 +21,7 @@ import WelcomeFromLent from './components/WelcomeFromLent'
 import { settingsTransfer } from './settingsTransferBoot'
 import { appendPreviewToken, findProfilePhotoCandidate } from './profilePhoto'
 import { DEMO_CREDENTIALS, DEMO_SESSION_MODE, DEMO_SIGNATURE_LOGIN } from './demoAccount'
-import { isDesktopApp, isIosApp, isMacDesktopApp, isNativeApp } from './desktopApp'
+import { isDesktopApp, isIosApp, isMacDesktopApp, isMicaDesktopApp, isNativeApp } from './desktopApp'
 import { syncWindowTheme } from './desktopWindowTheme'
 import { syncIosAppearance } from './iosApp'
 import { onDesktopCommand, syncDesktopMenu } from './desktopMenu'
@@ -1420,7 +1420,26 @@ function App() {
 
     async function hydrateProfile() {
       try {
-        const storedSelection = getStoredTpSelection(sessionState.user)
+        let storedSelection = getStoredTpSelection(sessionState.user)
+
+        // A personal timetable (planning.personal): a group picked in the tree
+        // (an ADE id, digits) before the student's own timetable was offered,
+        // or while it couldn't be found, gives way to it once the tree offers
+        // it (« Mon emploi du temps », an id without digits). Mon compte has
+        // no « Mon groupe » to change it there.
+        if (storedSelection && universityConfig.planning?.personal === true && /\d/.test(String(storedSelection.resourceId ?? ''))) {
+          const personalSelection = await getAdeTree()
+            .then((response) => response?.tree?.defaultSelection ?? null)
+            .catch(() => null)
+          if (cancelled) {
+            return
+          }
+          if (personalSelection?.resourceId && !/\d/.test(String(personalSelection.resourceId))) {
+            persistTpSelection(personalSelection, sessionState.user)
+            clearAdeTimetableCache()
+            storedSelection = getStoredTpSelection(sessionState.user) ?? personalSelection
+          }
+        }
 
         if (storedSelection) {
           if (cancelled) {
@@ -1966,10 +1985,14 @@ function App() {
     images: listWallpaperFolderImages(id, establishment),
     today: resolveHeroImage(establishment, new Date(), heroOffset, id),
   })).filter((folder) => folder.images.length > 0), [establishment, heroOffset])
+  // Never picked: the establishment's folder when it names one
+  // (defaultWallpaperFolder), else the university's.
+  const defaultWallpaperFolder = universityConfig.establishments?.byId?.[establishment]?.defaultWallpaperFolder ?? null
   const activeWallpaper = useMemo(() => effectiveWallpaperChoice(wallpaperChoice, {
     hasCustom: Boolean(customBackground),
     folderImages: (id) => wallpaperFolders.find((folder) => folder.id === id)?.images ?? [],
-  }), [customBackground, wallpaperChoice, wallpaperFolders])
+    preferredFolder: defaultWallpaperFolder,
+  }), [customBackground, defaultWallpaperFolder, wallpaperChoice, wallpaperFolders])
   const heroImage = useMemo(() => {
     if (activeWallpaper.folder === 'custom') return { src: customBackground, position: null, credit: null }
     const folder = wallpaperFolders.find((entry) => entry.id === activeWallpaper.folder)
@@ -2111,7 +2134,7 @@ function App() {
 
   useEffect(() => watchTheme(theme, palette), [theme, palette])
   useEffect(() => {
-    if (isMacDesktopApp()) syncWindowTheme(theme)
+    if (isMacDesktopApp() || isMicaDesktopApp()) syncWindowTheme(theme)
     syncIosAppearance(theme)
   }, [theme])
 
@@ -2396,7 +2419,14 @@ function App() {
     setShowPlanningWeekend(show)
   }, [sessionState.user])
   // « Accueil »'s « Assiduité » card: the page, as a dashboard card.
-  const handleOpenAssiduityFromCard = useCallback(() => handleNavigatePage('assiduity', 'dashboard_card'), [handleNavigatePage])
+  // `request`: { id, action } from a mark's popover (« Justifier » opens the
+  // walkthrough, « Voir plus » the absence in the list), handed to the page.
+  const [pendingAssiduityRequest, setPendingAssiduityRequest] = useState(null)
+  const handleOpenAssiduityFromCard = useCallback((request = null) => {
+    setPendingAssiduityRequest(request)
+    handleNavigatePage('assiduity', 'dashboard_card')
+  }, [handleNavigatePage])
+  const clearPendingAssiduityRequest = useCallback(() => setPendingAssiduityRequest(null), [])
   const handleAssiduityTabChange = useCallback((show) => {
     persistAssiduityTab(show, sessionState.user)
     setShowAssiduityTab(show)
@@ -3113,7 +3143,6 @@ function App() {
             ].filter(Boolean).join(' ') || sessionState.account?.name || sessionState.givenName || sessionState.user}
             userSubtitle={HAS_PERSONAL_PLANNING ? null : selectedTp?.label ?? selectedTp?.tpLabel ?? selectedTp?.tdLabel ?? selectedTp?.yearLabel ?? null}
             profilePhotoSrc={profilePhotoSrc}
-            onLogout={handleHeaderAction}
             onAccountClick={handleOpenAccountModal}
             favoritesSlotRef={setFavoritesSlotEl}
             hasPendingUpdate={hasPendingUpdate}
@@ -3214,6 +3243,7 @@ function App() {
                   onOpenGradesPage={hasGradesPage ? handleOpenGradesPage : null}
                   showAssiduity={hasAssiduityPage}
                   onOpenAssiduity={hasAssiduityPage ? handleOpenAssiduityFromCard : null}
+                  assiduityJustifies={hasMailPage}
                   onOpenPlanningPage={hasPlanningPage ? handleOpenPlanningPage : null}
                   onOpenMailPage={hasMailPage ? handleOpenMailPage : null}
                   appsSlotRef={setHomeAppsSlotEl}
@@ -3232,7 +3262,7 @@ function App() {
             ) : null}
             {isAssiduityPage || keptPages.assiduity ? (
               <KeptPage key={keptPages.assiduity?.key} kept={keptPages.assiduity} shown={isAssiduityPage}>
-                <AssiduityPage arrivalSource={assiduityArrivalSource} onComposeMail={hasMailPage ? handleComposeMail : null} absenceReasons={universityConfig.establishments?.byId?.[establishment]?.absenceReasons} findsClassTeacher={hasPlanningPage} />
+                <AssiduityPage arrivalSource={assiduityArrivalSource} initialRequest={pendingAssiduityRequest} onInitialRequestHandled={clearPendingAssiduityRequest} onComposeMail={hasMailPage ? handleComposeMail : null} absenceReasons={universityConfig.establishments?.byId?.[establishment]?.absenceReasons} findsClassTeacher={hasPlanningPage} />
               </KeptPage>
             ) : null}
             {/* Not kept: its native view keeps Moodle's own state. */}

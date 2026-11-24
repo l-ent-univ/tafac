@@ -17,7 +17,6 @@ import { isInHiddenPage } from '../keptPages'
 import { usePageReturn, usePageVisit } from '../pageVisit'
 import { NEXT_CLASS_LOOKAHEAD_DAYS, buildNextClassCacheEntryKey, buildResourceIdsFromSelection } from '../upcomingClasses'
 import useDailyBriefing from '../useDailyBriefing'
-import { coverSourceRect, pickCreditInk } from '../wallpaperInk'
 import GradesLaunchCard from './GradesLaunchCard'
 import MailLaunchCard from './MailLaunchCard'
 import PlanningLaunchCard from './PlanningLaunchCard'
@@ -31,7 +30,6 @@ import WidgetRecentMail from './WidgetRecentMail'
 import { Skeleton } from 'skullet/react'
 import { useSkeletonsForced } from '../skeletonSamples'
 import { r } from '../register.js'
-import HomeIcon from './HomeIcon'
 import HomePhoneHeader from './HomePhoneHeader'
 import { homeIconActions } from '../homeIconActions'
 import { usePhoneViewport } from '../usePhoneViewport'
@@ -176,103 +174,15 @@ function AveragePlaceholder() {
   )
 }
 
-// "rgb(r, g, b)" or "color(srgb r g b)" (a color-mix(), computed) → [r, g, b].
-function parseCssColor(value) {
-  const rgb = /rgba?\(([^)]+)\)/.exec(value)
-  if (rgb) return rgb[1].split(/[\s,/]+/).slice(0, 3).map(Number)
-  const srgb = /color\(srgb ([^)]+)\)/.exec(value)
-  if (srgb) return srgb[1].split(/\s+/).slice(0, 3).map((channel) => Number(channel) * 255)
-  return null
-}
-
-// 'light' or 'dark': the credit's ink, from the photo's pixels under it
-// (wallpaperInk.js), as drawn: its opacity over the band's tint. Read again
-// when the band or the credit changes size (it moves under the greeting
-// when the line is full) or the theme changes; white if the pixels can't
-// be read.
-function useCreditInk(src, position, layerRef, creditRef) {
-  const [ink, setInk] = useState('light')
-  useEffect(() => {
-    const layer = layerRef.current
-    if (!src || !layer) return undefined
-    let cancelled = false
-    const image = new Image()
-    image.decoding = 'async'
-    const measure = () => {
-      if (cancelled || !image.naturalWidth) return
-      const box = layer.getBoundingClientRect()
-      const credit = creditRef.current?.getBoundingClientRect()
-      if (!box.width || !box.height || !credit?.width) return
-      const rect = coverSourceRect({
-        imageWidth: image.naturalWidth,
-        imageHeight: image.naturalHeight,
-        boxWidth: box.width,
-        boxHeight: box.height,
-        position,
-        area: {
-          left: credit.left - box.left,
-          top: credit.top - box.top,
-          width: credit.width,
-          height: credit.height,
-        },
-      })
-      try {
-        const canvas = document.createElement('canvas')
-        canvas.width = 24
-        canvas.height = 4
-        const context = canvas.getContext('2d', { willReadFrequently: true })
-        context.drawImage(image, rect.x, rect.y, rect.width, rect.height, 0, 0, canvas.width, canvas.height)
-        const { data } = context.getImageData(0, 0, canvas.width, canvas.height)
-        const sum = [0, 0, 0]
-        for (let index = 0; index < data.length; index += 4) {
-          sum[0] += data[index]
-          sum[1] += data[index + 1]
-          sum[2] += data[index + 2]
-        }
-        const count = data.length / 4
-        const opacity = Number(getComputedStyle(layer).opacity) || 1
-        const backdrop = parseCssColor(getComputedStyle(layer.parentElement).backgroundColor) ?? [255, 255, 255]
-        setInk(pickCreditInk(sum.map((channel) => channel / count), opacity, backdrop))
-      } catch {
-        setInk('light')
-      }
-    }
-    image.addEventListener('load', measure)
-    image.src = src
-    const resize = new ResizeObserver(measure)
-    resize.observe(layer)
-    if (creditRef.current) resize.observe(creditRef.current)
-    const themeChange = new MutationObserver(measure)
-    themeChange.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme', 'class'] })
-    const scheme = window.matchMedia('(prefers-color-scheme: dark)')
-    scheme.addEventListener('change', measure)
-    return () => {
-      cancelled = true
-      image.removeEventListener('load', measure)
-      resize.disconnect()
-      themeChange.disconnect()
-      scheme.removeEventListener('change', measure)
-    }
-  }, [src, position, layerRef, creditRef])
-  return ink
-}
-
 // A line whose characters come into focus one after the other
 // (.blur-in-char: opacity and blur, composited, a few ms apart, once).
 // Read out whole: the characters are hidden from screen readers, the
 // line carries the text. Keyed by its text, a new sentence plays again.
-// Behind it, a soft blur of the band's tint: beside a long name the line
-// runs over the photo, and stays readable.
-// The greeting and the briefing reach over the photo's faded edge (a long
-// name, a narrow band): a halo of the band's tint behind their letters
-// keeps them readable whatever the photo holds there.
-const BAND_TEXT_CLASSES = '[text-shadow:0_0_2px_var(--page-top-band,var(--color-bg)),0_0_10px_var(--page-top-band,var(--color-bg)),0_0_20px_var(--page-top-band,var(--color-bg))]'
-
 const BLUR_IN_STEP_MS = 12
 const BLUR_IN_MAX_DELAY_MS = 600
 function BlurInText({ text }) {
   return (
-    <p className="relative isolate m-0 text-[15px] font-medium leading-[1.35] text-text-secondary before:pointer-events-none before:absolute before:-inset-x-3 before:-inset-y-1.5 before:-z-10 before:rounded-full before:bg-[var(--page-top-band,var(--color-bg))] before:opacity-85 before:blur-[10px]" aria-label={text}>
+    <p className="relative isolate m-0 text-[15px] font-medium leading-[1.35] text-text-secondary" aria-label={text}>
       {Array.from(text, (character, index) => (
         <span
           key={index}
@@ -321,6 +231,9 @@ function HomeDraftPage({
   // card opens it.
   showAssiduity = false,
   onOpenAssiduity = null,
+  // « Justifier » from the card's marks: where the page can (the Messagerie
+  // writes the mail).
+  assiduityJustifies = false,
   appsSlotRef = null,
   // The header on a phone (HomePhoneHeader): the logos as the student set
   // them, their photo and Mon compte, and what its icons open besides the
@@ -372,12 +285,9 @@ function HomeDraftPage({
   const [gridBoxRef, twoColumns] = useMinWidth(600, anyCard)
   const place = layoutHomeCards(useDrawnCards(gridRef))
   const cellClasses = (id) => `${CELL_CLASSES} ${PLACE_CLASSES[place[id]] ?? ''}`
-  const wallpaperRef = useRef(null)
-  const creditRef = useRef(null)
-  const creditInk = useCreditInk(wallpaper?.src ?? null, wallpaper?.position ?? null, wallpaperRef, creditRef)
-  const credit = wallpaper?.src ? wallpaper.credit : null
   const greeting = buildGreeting(displayName)
-  // A phone has its own header (HomePhoneHeader) instead of the band.
+  // « Accueil »'s header (HomePhoneHeader), its wide variant beside the
+  // sidebar.
   const isPhone = usePhoneViewport()
   const phoneIcons = homeIconActions({
     allApps: onOpenAllApps,
@@ -389,88 +299,20 @@ function HomeDraftPage({
 
   return (
     <section className="home-draft-page w-full grid pt-4 px-6 pb-6 4xl:pt-5 max-md:px-3 max-md:pt-3 max-md:pb-5" aria-labelledby="home-draft-title">
-      {isPhone ? (
-        <HomePhoneHeader
-          greeting={greeting}
-          briefing={!briefing.loading && briefing.text ? <BlurInText key={briefing.text} text={briefing.text} /> : null}
-          briefingPending={briefing.loading}
-          wallpaper={wallpaper}
-          icons={phoneIcons}
-          establishment={establishment}
-          showUniversityLogo={showUniversityLogo}
-          logoSource={logoSource}
-          userName={displayName}
-          profilePhotoSrc={profilePhotoSrc}
-          onOpenAccount={onOpenAccount}
-        />
-      ) : (
-      <div className={`page-top-band @container/band flex flex-col gap-4 min-h-[160px] -mx-6 -mt-4 px-6 pt-4 4xl:-mt-5 4xl:pt-5 max-md:-mx-3 max-md:gap-3 max-md:px-3 pb-6 max-md:pb-4 max-md:mt-[calc(-12px-var(--top-bar-height,0px))] max-md:pt-[calc(20px+var(--top-bar-height,0px))] max-md:min-h-[calc(136px+var(--top-bar-height,0px))]`}>
-        {/* The wallpaper, when on: the band's right half and more, fading
-            into the tint under the greeting; on a narrow band (a wide
-            sidebar), a bit over half, so the briefing stays on the tint.
-            On a phone the band runs up
-            behind the app's top bar (App's --top-bar-height), the photo
-            with it. Under the notch on the right too (landscape), as the
-            band's tint is. */}
-        {wallpaper?.src ? (
-          <div
-            ref={wallpaperRef}
-            aria-hidden="true"
-            className="pointer-events-none absolute inset-y-0 right-[calc(-1*env(safe-area-inset-right))] w-[70%] md:@max-[860px]/band:w-[55%] bg-cover bg-[center_40%] opacity-90 [mask-image:linear-gradient(to_right,transparent,black_55%)] dark:opacity-70 max-md:w-full max-md:opacity-50 max-md:[mask-image:linear-gradient(to_right,transparent,black_80%)]"
-            style={{
-              backgroundImage: `url("${wallpaper.src}")`,
-              ...(wallpaper.position ? { backgroundPosition: wallpaper.position } : null),
-            }}
-          />
-        ) : null}
-        <div className="relative">
-          <ServiceNotice />
-        </div>
-        <div className="relative mt-auto grid gap-1 min-w-0">
-          {/* On arrival the icons come into focus one after the other
-              (.home-icon-deal), each turning once as it lands (HomeIcon).
-              Hovered, an icon grows a little with a springy overshoot,
-              turns under the pointer and comes over its neighbours. */}
-          <div className="mb-2 flex items-center gap-1.5" aria-hidden="true">
-            {GREETING_ICONS.map(({ src, rotate }, index) => (
-              <span
-                key={src}
-                className="home-icon-deal relative shrink-0 hover:z-10"
-                style={{ '--i': index, '--r': `${rotate}deg`, transform: 'rotate(var(--r))' }}
-              >
-                <HomeIcon
-                  src={src}
-                  size={36}
-                  order={index}
-                  className="block size-9 select-none transition-transform duration-[450ms] ease-[cubic-bezier(0.34,1.8,0.5,1)] hover:scale-[1.15] motion-reduce:transition-none max-md:size-[30px]"
-                />
-              </span>
-            ))}
-          </div>
-          {/* The day's briefing beside the greeting, on its baseline, then
-              the photo's credit at the line's end; each goes under when the
-              line is full (a phone, a long sentence). */}
-          <div className={`flex min-w-0 flex-wrap items-baseline gap-x-3 gap-y-1 ${BAND_TEXT_CLASSES}`}>
-            <h1 id="home-draft-title" className="m-0 min-w-0 truncate text-2xl font-bold leading-[1.15] max-md:text-[26px] max-md:tracking-[-0.01em]" title={greeting}>{greeting}</h1>
-            {/* No loading state: the sentence comes in once it's known, its
-                characters blurring into focus one after the other. */}
-            {!briefing.loading && briefing.text ? <BlurInText key={briefing.text} text={briefing.text} /> : null}
-            {/* White or black after the photo under it (useCreditInk). */}
-            {credit?.author ? (
-              <a
-                ref={creditRef}
-                className={`ml-auto max-w-[240px] shrink-0 truncate font-body text-[11px] font-medium leading-4 no-underline opacity-80 transition-opacity duration-150 hover:opacity-100 ${creditInk === 'light' ? 'text-white [text-shadow:0_1px_2px_rgb(0_0_0/0.35)]' : 'text-black [text-shadow:0_1px_2px_rgb(255_255_255/0.35)]'}`}
-                href={credit.url || undefined}
-                target="_blank"
-                rel="noreferrer"
-              >
-                Photo : {credit.author}{credit.license ? `, ${credit.license}` : ''}
-              </a>
-            ) : null}
-          </div>
-        </div>
-      </div>
-      )}
+      <HomePhoneHeader
+        wide={!isPhone}
+        greeting={greeting}
+        briefing={!briefing.loading && briefing.text ? <BlurInText key={briefing.text} text={briefing.text} /> : null}
+        briefingPending={briefing.loading}
+        wallpaper={wallpaper}
+        icons={phoneIcons}
+        establishment={establishment}
+        showUniversityLogo={showUniversityLogo}
+        logoSource={logoSource}
+        userName={displayName}
+        profilePhotoSrc={profilePhotoSrc}
+        onOpenAccount={onOpenAccount}
+      />
       {/* A page just launched (the Messagerie, the Planning, « Mes notes »):
           a compact card under the band until it's seen. One at a time, the
           newest first: the others render nothing (LaunchCard). */}
@@ -555,23 +397,25 @@ function HomeDraftPage({
               </div>
             ) : null}
             {showAssiduityCard ? (
-              // The card opens « Assiduité » (Enter or Space too), as
-              // « Moyenne » opens « Mes notes ».
+              // A click on the card opens « Assiduité », as « Moyenne » opens
+              // « Mes notes ». Not a link itself: its marks are buttons, so
+              // the keyboard's way to the page is the card's title
+              // (WidgetAssiduity's Header).
               <div
                 data-card="assiduity"
-                className={`${cellClasses('assiduity')} ${onOpenAssiduity ? 'cursor-pointer rounded-[31px] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-text' : ''}`}
-                role={onOpenAssiduity ? 'link' : undefined}
-                tabIndex={onOpenAssiduity ? 0 : undefined}
-                aria-label={onOpenAssiduity ? 'Assiduité, voir la page' : undefined}
-                onClick={onOpenAssiduity ?? undefined}
-                onKeyDown={onOpenAssiduity ? (event) => {
-                  if (event.key !== 'Enter' && event.key !== ' ') return
-                  if (event.target !== event.currentTarget) return
-                  event.preventDefault()
-                  onOpenAssiduity()
-                } : undefined}
+                className={`${cellClasses('assiduity')} ${onOpenAssiduity ? 'cursor-pointer' : ''}`}
+                onClick={onOpenAssiduity ? () => onOpenAssiduity() : undefined}
               >
-                <WidgetAssiduity payload={grades.payload} releve={grades.releve} config={grades.config} status={grades.status} />
+                <WidgetAssiduity
+                  payload={grades.payload}
+                  releve={grades.releve}
+                  config={grades.config}
+                  status={grades.status}
+                  onOpen={onOpenAssiduity ? (id, action) => onOpenAssiduity({ id, action }) : null}
+                  justifies={assiduityJustifies}
+                  onOpenPage={onOpenAssiduity ? () => onOpenAssiduity() : null}
+                  onOpenPlanning={onOpenPlanningDay}
+                />
               </div>
             ) : null}
           </div>

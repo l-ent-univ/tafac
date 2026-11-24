@@ -27,6 +27,9 @@ mod moodle;
 mod moodle_ios;
 #[cfg(target_os = "macos")]
 mod moodle_native;
+#[cfg(windows)]
+#[path = "moodle_native_windows.rs"]
+mod moodle_native;
 mod moodle_style;
 mod remote_settings;
 #[cfg(desktop)]

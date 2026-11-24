@@ -1,5 +1,6 @@
-// Desktop app on macOS: the sidebar's material (src-tauri/src/window.rs) is
-// light or dark as the window is, so the window takes the app's theme.
+// Desktop app on macOS and on Windows 11: the sidebar's material (the Mac's
+// sidebar material, Mica; src-tauri/src/window.rs) is light or dark as the
+// window is, so the window takes the app's theme.
 // « Clair » or « Sombre » sets it; « Automatique » leaves it to the system
 // (null): set there, it would also fix the page's prefers-color-scheme, and
 // « Automatique » would stop following the system.

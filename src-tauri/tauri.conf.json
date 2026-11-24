@@ -30,6 +30,14 @@
         "appPosition": { "x": 180, "y": 170 },
         "applicationFolderPosition": { "x": 480, "y": 170 }
       }
+    },
+    "windows": {
+      "nsis": {
+        "installerIcon": "icons/installer.ico",
+        "headerImage": "icons/nsis-header.bmp",
+        "sidebarImage": "icons/nsis-sidebar.bmp",
+        "languages": ["French"]
+      }
     }
   },
   "plugins": {

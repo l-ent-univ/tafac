@@ -4,9 +4,12 @@
 //   'drupal': the entry page renders with the `user-logged-in` body class,
 //     which Drupal core adds for every signed-in user. A lapsed session
 //     redirects to the CAS instead (the portal forces the login).
+//   'isorbonne': Sorbonne Nouvelle's own JSF portal (iSorbonne). The entry
+//     page (/ENT/secure/index.xhtml) shows the logout link and the tiles when
+//     signed in; a lapsed session redirects to the CAS.
 import { decodeEntities } from '../src/mailText.js'
 
-export const PORTAL_KINDS = ['uportal', 'drupal']
+export const PORTAL_KINDS = ['uportal', 'drupal', 'isorbonne']
 
 export function resolvePortalKind(auth) {
   const kind = auth?.portal ?? 'uportal'
@@ -139,4 +142,100 @@ export function isDrupalSignedInPage(status, html) {
 
   const body = html.match(/<body\b[^>]*\bclass\s*=\s*["']([^"']*)["']/i)
   return Boolean(body && /(?:^|\s)user-logged-in(?:\s|$)/.test(body[1]))
+}
+
+// iSorbonne (Sorbonne Nouvelle): signed in when the page has the logout link
+// and the tiles' form. The portal writes the link relative (logout.xhtml);
+// a page saved by a browser has it absolute.
+const ISORBONNE_LOGOUT_HREF = String.raw`href="(?:[^"]*/)?logout\.xhtml"`
+
+export function isIsorbonneSignedInPage(status, html) {
+  return status === 200
+    && typeof html === 'string'
+    && new RegExp(ISORBONNE_LOGOUT_HREF, 'i').test(html)
+    && /\bid="portalForm"/.test(html)
+}
+
+// Signed-in page of a non-uPortal portal, by its kind.
+export function isPortalSignedInPage(kind, status, html) {
+  return kind === 'isorbonne' ? isIsorbonneSignedInPage(status, html) : isDrupalSignedInPage(status, html)
+}
+
+// Name in iSorbonne's logout link, « Nom Prénom » (family name first).
+// shortcut: the last word is taken as the given name, so a two-word given
+// name loses its first word to the family name; upgrade if the portal ever
+// shows the two fields apart.
+export function parseIsorbonneName(html) {
+  if (typeof html !== 'string') {
+    return null
+  }
+
+  const link = html.match(new RegExp(String.raw`<a\b[^>]*${ISORBONNE_LOGOUT_HREF}[^>]*>([\s\S]*?)</a>`, 'i'))
+  const name = link ? stripTags(link[1]) : ''
+  if (!name) {
+    return null
+  }
+
+  const words = name.split(' ')
+  const givenName = words.pop()
+  const familyName = words.join(' ')
+  return {
+    name: familyName ? `${givenName} ${familyName}` : givenName,
+    given_name: givenName,
+    family_name: familyName || null,
+  }
+}
+
+const ISORBONNE_DESCRIPTION_MAX = 160
+
+// Tiles of the iSorbonne page: the category buttons (input.toglem, id
+// t<category>), then one div.tuile per tool, in the category of its t<id>
+// class, with its link (a.links), its label (id portalForm:p<tool>) and an
+// optional help text (div#infos<tool>, long HTML: only its start is kept).
+// Returns the Drupal catalogue's shape: [{ title, tools }].
+export function parseIsorbonneCatalogue(html, portalOrigin) {
+  if (typeof html !== 'string') {
+    return []
+  }
+
+  const sections = new Map()
+  for (const [tag] of html.matchAll(/<input\b[^>]*\btoglem\b[^>]*>/gi)) {
+    const id = readAttribute(tag, 'id')
+    const title = readAttribute(tag, 'value').trim()
+    if (/^t\d+$/.test(id) && title) {
+      sections.set(id, { title, tools: [] })
+    }
+  }
+
+  for (const block of html.split(/(?=<div\b[^>]*\bclass="tuile\b)/i).slice(1)) {
+    const category = block.match(/^<div\b[^>]*\bclass="[^"]*\b(t\d+)\b/i)?.[1]
+    const link = block.match(/<a\b[^>]*\bclass="links"[^>]*>/i)
+    const label = block.match(/<label\b[^>]*\bid="portalForm:p(\d+)"[^>]*>([\s\S]*?)<\/label>/i)
+    const section = sections.get(category)
+    if (!section || !link || !label) {
+      continue
+    }
+
+    let href = ''
+    try {
+      href = new URL(readAttribute(link[0], 'href'), portalOrigin).toString()
+    } catch {
+      continue
+    }
+
+    const title = stripTags(label[2]).replace(/\s*:$/, '')
+    if (!title || !/^https?:\/\//i.test(href)) {
+      continue
+    }
+
+    const infos = block.match(new RegExp(`<div\\b[^>]*\\bid="infos${label[1]}"[^>]*>([\\s\\S]*?)</div>`, 'i'))
+    let description = infos ? stripTags(infos[1]) : ''
+    if (description.length > ISORBONNE_DESCRIPTION_MAX) {
+      description = `${description.slice(0, ISORBONNE_DESCRIPTION_MAX).replace(/\s+\S*$/, '')}…`
+    }
+
+    section.tools.push({ id: label[1], title, description, href })
+  }
+
+  return [...sections.values()].filter((section) => section.tools.length > 0)
 }

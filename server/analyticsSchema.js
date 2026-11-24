@@ -373,11 +373,12 @@ export const ANALYTICS_EVENTS = {
     },
   },
   // One thing done on « Assiduité »; « Justifier » opened says from where
-  // (a row's button, a countdown card, the right-click menu).
+  // (a row's button, a countdown card, the right-click menu, a mark's
+  // popover on « Accueil »).
   assiduity_action: {
     properties: {
       action: oneOf(...ASSIDUITY_ACTIONS),
-      from: oneOf('row', 'countdown', 'menu'),
+      from: oneOf('row', 'countdown', 'menu', 'home'),
     },
     required: ['action'],
     refine: (props) => {

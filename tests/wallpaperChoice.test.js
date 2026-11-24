@@ -15,6 +15,15 @@ const folderImages = (folder) => folders[folder] ?? []
 const DAILY_UNIVERSITY = { folder: 'university', image: null }
 const noUniversityPhotos = (folder) => (folder === 'tafac' ? folders.tafac : [])
 
+test('an establishment can start on Tafac\'s photo of the day', () => {
+  assert.deepEqual(effectiveWallpaperChoice(null, { folderImages, preferredFolder: 'tafac' }), { folder: 'tafac', image: null })
+  // A choice made, or their own image, still wins.
+  assert.deepEqual(effectiveWallpaperChoice({ folder: 'university', image: null }, { folderImages, preferredFolder: 'tafac' }), DAILY_UNIVERSITY)
+  assert.deepEqual(effectiveWallpaperChoice(null, { hasCustom: true, folderImages, preferredFolder: 'tafac' }), { folder: 'custom', image: null })
+  // A folder unknown or without photos: the usual default.
+  assert.deepEqual(effectiveWallpaperChoice(null, { folderImages, preferredFolder: 'elsewhere' }), DAILY_UNIVERSITY)
+})
+
 test('normalizeWallpaperChoice keeps known folders and drops the rest', () => {
   assert.deepEqual(normalizeWallpaperChoice({ folder: 'tafac', image: '/tafac/lake.webp' }), { folder: 'tafac', image: '/tafac/lake.webp' })
   assert.deepEqual(normalizeWallpaperChoice({ folder: 'university' }), { folder: 'university', image: null })

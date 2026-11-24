@@ -39,9 +39,20 @@ export function isMacDesktopApp() {
   }
 }
 
+// The desktop app on Windows 11: Mica behind the window (src-tauri/src/
+// window.rs, which says so before the page runs). Not on Windows 10.
+export function isMicaDesktopApp(win = window) {
+  try {
+    return isDesktopApp() && win.__TAFAC_MICA__ === true
+  } catch {
+    return false
+  }
+}
+
 // On <html>, for the CSS (src/overrides.css): data-desktop-app (pointer,
-// scrolling and dragging like an app's) and, on macOS, data-desktop-macos
-// (the sidebar on the system's material, room for the window's buttons).
+// scrolling and dragging like an app's), on macOS data-desktop-macos (the
+// sidebar on the system's material, room for the window's buttons) and on
+// Windows 11 data-desktop-windows (the sidebar on Mica).
 // The iOS app gets data-ios-app instead, and no zoom: an app's screens
 // don't pinch or double-tap larger (the viewport says so, which the app's
 // web view follows where Safari wouldn't; overrides.css stops the gestures
@@ -56,4 +67,5 @@ export function markDesktopApp(root = document.documentElement) {
   if (!isDesktopApp()) return
   root.setAttribute('data-desktop-app', '')
   if (isMacDesktopApp()) root.setAttribute('data-desktop-macos', '')
+  if (isMicaDesktopApp()) root.setAttribute('data-desktop-windows', '')
 }

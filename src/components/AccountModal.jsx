@@ -1032,9 +1032,7 @@ function AccountModal({
 
             <SchoolCertificateGroup />
 
-            <CardWithImage displayInfo={displayInfo} photoSrc={profilePhotoSrc} formation={planningSelection?.programLabel ?? ''} />
-            {/* Signing out: here on a phone, whose header has no button for
-                it (the sidebar has its own on a wide screen). */}
+            {/* Signing out: only here, on every screen (as in the iOS app). */}
             {typeof onLogout === 'function' ? (
               <SettingsGroup>
                 <button type="button" className={PRESSABLE_ROW_CLASSES} onClick={onLogout}>
