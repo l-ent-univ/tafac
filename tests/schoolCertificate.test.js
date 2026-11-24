@@ -8,7 +8,9 @@ import {
   extractVaadinAppId,
   findButtonIdByCaption,
   findCertificateDownloads,
+  findStudentIdentity,
   openCertificateDownload,
+  openStudentIdentity,
   parseInitialUi,
 } from '../server/schoolCertificate.js'
 
@@ -116,4 +118,58 @@ test('the demo certificate is a PDF', () => {
   assert.ok(pdf.startsWith('%PDF-1.4'))
   assert.ok(pdf.includes('2026-2027'))
   assert.ok(pdf.trimEnd().endsWith('%%EOF'))
+})
+
+// « Etat-civil », MonDossierWeb's home view, as recorded (Labels, their
+// HTML closing tag cut short), with a made-up student.
+const ETAT_CIVIL_STATE = {
+  305: { caption: 'Etat-civil', styles: ['selected'] },
+  308: { caption: 'Inscriptions' },
+  359: { text: 'Etat-civil', styles: ['h1'] },
+  363: { caption: 'Généralités' },
+  365: { contentMode: 'HTML', text: '<b>X0001</b', caption: 'Dossier' },
+  366: { contentMode: 'HTML', text: '<b>0A1B2C3D4E5</b', caption: 'INE/INES' },
+  367: { contentMode: 'HTML', text: '<b>JANE DOE</b', caption: 'Prénom et Nom' },
+  368: { contentMode: 'HTML', text: '<a href="mailto:jane.doe@example.org">jane.doe@example.org</a>', caption: 'Email' },
+  370: { contentMode: 'HTML', text: '<b>14/03/2005</b', caption: 'Date de naissance' },
+  371: { contentMode: 'HTML', text: '<b>SAINT-MALO</b', caption: 'À' },
+  372: { contentMode: 'HTML', text: '<b>ILLE ET VILAINE</b', caption: 'Département ou Pays' },
+  380: { contentMode: 'HTML', text: '<b>2023</b', caption: 'Année' },
+  390: { text: '00.00.00.00.00', caption: 'Portable', enabled: false },
+}
+
+test('reads the student card fields off « Etat-civil »', () => {
+  assert.deepEqual(findStudentIdentity(ETAT_CIVIL_STATE), {
+    studentNumber: 'X0001',
+    nationalNumber: '0A1B2C3D4E5',
+    birthDate: '14/03/2005',
+    birthPlace: 'SAINT-MALO',
+  })
+  // A field the view doesn't show is empty; no numbers at all is "unavailable".
+  assert.equal(findStudentIdentity({ 365: { text: '<b>X0001</b', caption: 'Dossier' } }).birthDate, '')
+  assert.throws(() => findStudentIdentity({ 305: { caption: 'Etat-civil' } }), SchoolCertificateUnavailableError)
+})
+
+test('openStudentIdentity stops after the UI opens: no click', async () => {
+  const calls = []
+  const init = JSON.stringify({
+    'v-uiId': 3,
+    uidl: JSON.stringify({ 'Vaadin-Security-Key': 'csrf-token', syncId: 0, clientId: 0, state: ETAT_CIVIL_STATE }),
+  })
+  const identity = await openStudentIdentity({
+    origin: 'https://mdw.example/',
+    jar: {},
+    now: () => 1000,
+    followRedirectChain: async (url) => {
+      calls.push(['page', url])
+      return { response: { ok: true, text: async () => PAGE_HTML } }
+    },
+    fetchWithJar: async (url, jar, options) => {
+      calls.push([options.method, url])
+      return { ok: true, text: async () => init }
+    },
+  })
+
+  assert.deepEqual(calls, [['page', 'https://mdw.example/'], ['POST', 'https://mdw.example/?v-1000']])
+  assert.equal(identity.studentNumber, 'X0001')
 })

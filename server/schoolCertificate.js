@@ -8,6 +8,8 @@
 //                               answer lists one FileDownloader per year
 //   4. GET  /APP/connector/…  → the PDF of the most recent year
 // Nothing is stored: the PDF is streamed back to the student.
+// Step 2's UI opens on « Etat-civil »: the student card's numbers and birth
+// are read off it there (openStudentIdentity), with no click.
 
 // Matches what Vaadin's client sends; the values only size the UI.
 const BROWSER_DETAILS = {
@@ -120,9 +122,10 @@ export function describeSchoolYear(download) {
   return download?.filename.match(/\d{4}-\d{4}/)?.[0] ?? null
 }
 
-// Steps 1 to 3. `followRedirectChain` and `fetchWithJar` are the server's
+// Steps 1 and 2: a live UI, opened on « Etat-civil » (MonDossierWeb's
+// home). `followRedirectChain` and `fetchWithJar` are the server's
 // cookie-jar helpers (entAuthApp.js), passed in so tests can fake them.
-export async function openCertificateDownload({ origin, jar, menuCaption = 'Inscriptions', followRedirectChain, fetchWithJar, now = Date.now }) {
+async function openMonDossierWebUi({ origin, jar, followRedirectChain, fetchWithJar, now }) {
   const rootUrl = `${origin.replace(/\/$/, '')}/`
   const page = await followRedirectChain(rootUrl, jar, { headers: { Accept: 'text/html,application/xhtml+xml,*/*' } })
   const html = await page.response.text()
@@ -137,7 +140,59 @@ export async function openCertificateDownload({ origin, jar, menuCaption = 'Insc
     headers: { 'Content-Type': 'application/x-www-form-urlencoded', Accept: 'application/json', Referer: rootUrl },
     body: buildBrowserDetailsBody(appId, rootUrl, now()),
   })
-  const ui = parseInitialUi(await initResponse.text())
+  return { rootUrl, ui: parseInitialUi(await initResponse.text()) }
+}
+
+// A Label's text as shown: its HTML ("<b>RENNES</b", the closing tag cut
+// short as MonDossierWeb sends it) as plain text.
+function labelText(html) {
+  return String(html ?? '')
+    .replace(/<\/?[a-z][^>]*>?/gi, '')
+    .replace(/&nbsp;/g, ' ')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/&amp;/g, '&')
+    .replace(/\s+/g, ' ')
+    .trim()
+}
+
+// The « Etat-civil » view's Labels, by caption, as the student card's fields.
+// A field missing there is ''.
+const IDENTITY_CAPTIONS = {
+  studentNumber: 'dossier',
+  nationalNumber: 'ine/ines',
+  birthDate: 'date de naissance',
+  birthPlace: 'à',
+}
+
+export function findStudentIdentity(state) {
+  const byCaption = new Map()
+  for (const value of Object.values(state ?? {})) {
+    if (typeof value?.caption !== 'string' || typeof value?.text !== 'string') continue
+    const caption = value.caption.trim().toLowerCase()
+    if (!byCaption.has(caption)) byCaption.set(caption, labelText(value.text))
+  }
+
+  const identity = Object.fromEntries(
+    Object.entries(IDENTITY_CAPTIONS).map(([key, caption]) => [key, byCaption.get(caption) ?? '']),
+  )
+  if (!identity.studentNumber && !identity.nationalNumber) {
+    throw new SchoolCertificateUnavailableError('No « Etat-civil » in MonDossierWeb.')
+  }
+  return identity
+}
+
+// Steps 1 and 2: the student's numbers and birth, read off the home view.
+export async function openStudentIdentity({ origin, jar, followRedirectChain, fetchWithJar, now = Date.now }) {
+  const { ui } = await openMonDossierWebUi({ origin, jar, followRedirectChain, fetchWithJar, now })
+  return findStudentIdentity(ui.state)
+}
+
+// Steps 1 to 3.
+export async function openCertificateDownload({ origin, jar, menuCaption = 'Inscriptions', followRedirectChain, fetchWithJar, now = Date.now }) {
+  const { rootUrl, ui } = await openMonDossierWebUi({ origin, jar, followRedirectChain, fetchWithJar, now })
 
   const menuButtonId = findButtonIdByCaption(ui.state, menuCaption)
   if (!menuButtonId) {

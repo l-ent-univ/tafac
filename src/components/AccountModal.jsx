@@ -3,7 +3,7 @@ import { Icon } from '@iconify/react'
 import universityConfig from '@university'
 import { openChangelog, useChangelog } from '../changelogStore'
 import { getPillIds } from '../changelogState'
-import { downloadSchoolCertificate, getCachedSchoolCertificateStatus, getSchoolCertificateStatus } from '../entApi'
+import { downloadSchoolCertificate, getCachedSchoolCertificateStatus, getCachedStudentIdentity, getSchoolCertificateStatus, getStudentIdentity } from '../entApi'
 import { usePlanningExport } from '../usePlanningExport'
 import { saveStudentCard } from '../studentCardImage'
 import { AboutPage } from './AboutModal'
@@ -25,6 +25,7 @@ import WallpaperSwitchGlow from './WallpaperSwitchGlow'
 import { SIDEBAR_NEXT_CLASS_ENABLED, setSidebarNextClassShown, useSidebarNextClassShown } from '../sidebarNextClassPref'
 import Rennes1StudentCard from './StudentCards/Rennes1StudentCard'
 import Rennes2StudentCard from './StudentCards/Rennes2StudentCard'
+import StudentCardZoom from './StudentCards/StudentCardZoom'
 
 // Also the debug menu's toggles (src/components/debug/).
 export { Switch }
@@ -223,12 +224,37 @@ function CardWithImage({ displayInfo, photoSrc, formation = '' }) {
     }
   }, [])
   const year = certificateStatus?.schoolYear?.replace('-', '/') ?? ''
+  // N° étudiant, INE, birth date and place: MonDossierWeb's « Etat-civil ».
+  const [identity, setIdentity] = useState(getCachedStudentIdentity)
+  useEffect(() => {
+    let isCancelled = false
+    void getStudentIdentity().then((nextIdentity) => {
+      if (!isCancelled) setIdentity(nextIdentity)
+    })
+    return () => {
+      isCancelled = true
+    }
+  }, [])
   const StudentCard = STUDENT_CARDS[universityConfig.id] ?? null
   const cardRef = useRef(null)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
+  // The card's aspect ratio while it's enlarged, else null.
+  const [zoomed, setZoomed] = useState(null)
 
   if (!StudentCard) return null
+
+  const cardProps = {
+    firstName: displayInfo.firstName,
+    lastName: displayInfo.lastName,
+    photoSrc,
+    year,
+    formation,
+    studentNumber: identity?.studentNumber ?? '',
+    nationalNumber: identity?.nationalNumber ?? '',
+    birthDate: identity?.birthDate ?? '',
+    birthPlace: identity?.birthPlace ?? '',
+  }
 
   // The card as shown as a PNG.
   const handleDownload = async () => {
@@ -267,21 +293,24 @@ function CardWithImage({ displayInfo, photoSrc, formation = '' }) {
         ) : null}
       </div>
 
-      <div ref={cardRef}>
-        <StudentCard
-          className="w-full"
-          firstName={displayInfo.firstName}
-          lastName={displayInfo.lastName}
-          photoSrc={photoSrc}
-          year={year}
-          formation={formation}
-          // TODO
-          // studentNumber=""
-          // nationalNumber=""
-          // birthDate=""
-          // birthPlace=""
-        />
-      </div>
+      {/* A click enlarges it (StudentCardZoom). */}
+      <button
+        ref={cardRef}
+        type="button"
+        className="block w-full cursor-zoom-in border-0 bg-transparent p-0 transition-transform duration-[160ms] hover:scale-[1.01] active:scale-[0.99] focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-text"
+        onClick={(event) => {
+          const { width, height } = event.currentTarget.getBoundingClientRect()
+          setZoomed(height ? width / height : 1.6)
+        }}
+        aria-label="Agrandir la carte étudiante"
+      >
+        <StudentCard className="block w-full" {...cardProps} />
+      </button>
+      {zoomed ? (
+        <StudentCardZoom originRef={cardRef} aspect={zoomed} onClose={() => setZoomed(null)}>
+          <StudentCard className="block w-full" {...cardProps} />
+        </StudentCardZoom>
+      ) : null}
     </div>
   )
 }

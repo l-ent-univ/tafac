@@ -1,6 +1,7 @@
 import { useId } from 'react'
+import universityLogo from '../../assets/uni_logos/univ-rennes2-blue.svg'
 
-// Placeholder logo (blue square with a "2") until `logoSrc` is passed.
+// Placeholder logo (blue square with a "2") when `logoSrc` is null.
 function FallbackLogo({ x, y }) {
   return (
     <g transform={`translate(${x} ${y})`}>
@@ -11,7 +12,7 @@ function FallbackLogo({ x, y }) {
 }
 
 /**
- * Student card, model 2 (light card, photo on the right, the President's signature).
+ * Student card, model 2 (light card, photo on the right, the university's logo in blue).
  * Every value comes from the props; the fields always show, even when empty.
  */
 export default function Rennes2StudentCard({
@@ -25,7 +26,7 @@ export default function Rennes2StudentCard({
   formation = '',
   socialSecurityNote = '',
   photoSrc = null,
-  logoSrc = null,
+  logoSrc = universityLogo,
   className = '',
 }) {
   const uid = useId().replace(/:/g, '')
@@ -98,22 +99,12 @@ export default function Rennes2StudentCard({
         </g>
       )}
 
-      {/* The President + logo + signature */}
-      <text x="648" y="330" fontSize="22" fill="#333">le Président</text>
+      {/* Logo, under the photo */}
       {logoSrc ? (
-        <image href={logoSrc} x="640" y="390" width="70" height="70" preserveAspectRatio="xMinYMid meet" />
+        <image href={logoSrc} x="640" y="318" width="184" height="174" preserveAspectRatio="xMidYMid meet" />
       ) : (
-        <FallbackLogo x={640} y={398} />
+        <FallbackLogo x={704} y={377} />
       )}
-      <path
-        d="M718 440 C 745 430, 775 420, 790 402 C 800 392, 795 380, 786 392 C 772 412, 770 440, 786 440 C 800 440, 810 418, 824 408 C 836 400, 826 436, 842 422"
-        fill="none"
-        stroke="#1ba9d6"
-        strokeWidth="4"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-      <path d="M700 452 C 740 444, 800 440, 836 446" fill="none" stroke="#1ba9d6" strokeWidth="3" strokeLinecap="round" />
     </svg>
   )
 }
