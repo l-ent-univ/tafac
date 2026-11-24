@@ -1,0 +1,175 @@
+/* ── Widget row layout with paired list cards ──
+   When both list cards (mail + deadlines) actually render, the row lays out
+   from its own width (sidebar or not) instead of viewport breakpoints. If
+   either renders nothing (no session, feature off server-side), :has() stops
+   matching and the row falls back to the default card flow. These rules are
+   unlayered, so they win over the cards' Tailwind flex utilities.
+   ≥ 1712px : one row, natural card widths (default flex bases).
+   760–1711 : greeting · next class · grade share row 1 in thirds,
+              mail | deadlines share row 2 in halves.
+   496–759  : rows of two (greeting | next class when they fit, grade |
+              mail), then deadlines full width.
+   < 496    : phone layout (max-xs utilities and "Phone layout" below). */
+
+.widget-row {
+  container: widget-row / inline-size;
+}
+
+.widget-lists {
+  display: contents;
+}
+
+@container widget-row (min-width: 496px) and (max-width: 759.98px) {
+  /* Greeting | next class in halves when both fit their min widths,
+     stacked otherwise; grade never joins their row. */
+  .widget-row:has(.recent-mail-widget):has(.moodle-deadlines-widget) > .widget-card {
+    flex: 1 1 0;
+    min-width: 260px;
+  }
+
+  .widget-row:has(.recent-mail-widget):has(.moodle-deadlines-widget) .next-class-widget {
+    flex: 1 1 0;
+    min-width: 320px;
+  }
+
+  .widget-row:has(.recent-mail-widget):has(.moodle-deadlines-widget) .latest-grade-widget,
+  .widget-row:has(.recent-mail-widget):has(.moodle-deadlines-widget) .recent-mail-widget {
+    flex: 1 1 calc(50% - 6px);
+    min-width: 0;
+  }
+
+  .widget-row:has(.recent-mail-widget):has(.moodle-deadlines-widget) .moodle-deadlines-widget {
+    flex: 1 1 100%;
+    min-width: 0;
+  }
+}
+
+@container widget-row (min-width: 760px) and (max-width: 1711.98px) {
+  .widget-row:has(.recent-mail-widget):has(.moodle-deadlines-widget) > .widget-card,
+  .widget-row:has(.recent-mail-widget):has(.moodle-deadlines-widget) > .contents > .widget-card {
+    flex: 1 1 0;
+    min-width: 0;
+  }
+
+  .widget-row:has(.recent-mail-widget):has(.moodle-deadlines-widget) .widget-lists {
+    display: flex;
+    flex: 1 1 100%;
+    gap: 12px;
+    min-width: 0;
+  }
+
+  .widget-row:has(.recent-mail-widget):has(.moodle-deadlines-widget) .widget-lists > .widget-card {
+    flex: 1 1 0;
+    min-width: 0;
+  }
+}
+
+/* ── Widget row layout with one list card ──
+   With mail or deadlines alone (the other hidden or not rendering), the
+   cards' natural widths (280 · 380 · 280 · 360) leave the row half empty
+   and the next class looks shrunk: from 760px of row they fill it instead,
+   in those proportions. The group holding the grade and the list card
+   (.widget-row-group) dissolves so they flow with the others.
+   ≥ 1336px : one row (the natural widths and their gaps fit; from 1044px
+              without the greeting).
+   760–1335 : greeting · next class · grade share row 1, the list card takes
+              row 2 alone. Not on the landing, whose preview row lays out its own way. */
+
+@container widget-row (min-width: 760px) {
+  .widget-row:not(.landing-scroll-cards):not(:has(.recent-mail-widget):has(.moodle-deadlines-widget)) .widget-row-group {
+    display: contents;
+  }
+
+  .widget-row:not(.landing-scroll-cards):not(:has(.recent-mail-widget):has(.moodle-deadlines-widget)) .widget-card {
+    min-width: 0;
+  }
+
+  .widget-row:not(.landing-scroll-cards):not(:has(.recent-mail-widget):has(.moodle-deadlines-widget)) .greeting-card,
+  .widget-row:not(.landing-scroll-cards):not(:has(.recent-mail-widget):has(.moodle-deadlines-widget)) .latest-grade-widget {
+    flex: 28 1 0;
+  }
+
+  .widget-row:not(.landing-scroll-cards):not(:has(.recent-mail-widget):has(.moodle-deadlines-widget)) .next-class-widget {
+    flex: 38 1 0;
+  }
+
+  .widget-row:not(.landing-scroll-cards):not(:has(.recent-mail-widget):has(.moodle-deadlines-widget)) .recent-mail-widget,
+  .widget-row:not(.landing-scroll-cards):not(:has(.recent-mail-widget):has(.moodle-deadlines-widget)) .moodle-deadlines-widget {
+    flex: 36 1 0;
+  }
+}
+
+@container widget-row (min-width: 760px) and (max-width: 1335.98px) {
+  .widget-row:not(.landing-scroll-cards):not(:has(.recent-mail-widget):has(.moodle-deadlines-widget)):has(.greeting-card) .recent-mail-widget,
+  .widget-row:not(.landing-scroll-cards):not(:has(.recent-mail-widget):has(.moodle-deadlines-widget)):has(.greeting-card) .moodle-deadlines-widget {
+    flex-basis: 100%;
+  }
+}
+
+/* Without the greeting, three cards: one row from 1044px. */
+@container widget-row (min-width: 760px) and (max-width: 1043.98px) {
+  .widget-row:not(.landing-scroll-cards):not(:has(.recent-mail-widget):has(.moodle-deadlines-widget)):not(:has(.greeting-card)) .recent-mail-widget,
+  .widget-row:not(.landing-scroll-cards):not(:has(.recent-mail-widget):has(.moodle-deadlines-widget)):not(:has(.greeting-card)) .moodle-deadlines-widget {
+    flex-basis: 100%;
+  }
+}
+
+/* ── Phone layout (max-xs) ──
+   Compact greeting, then next class | grade in halves (max-xs utilities on
+   the cards), then mail and deadlines side by side in a swipeable strip: one
+   card in view, the next one peeking at the screen edge as the hint. The
+   strip bleeds into the column padding (12px) so cards scroll edge to edge,
+   and pads 8px vertically so the shadows and intro rise aren't clipped. A
+   lone card (the other one rendering nothing) takes the full width and
+   drops the pager (WidgetListStrip). */
+
+.widget-lists-pager {
+  display: none;
+}
+
+@media (width < 520px) {
+  .widget-lists {
+    display: flex;
+    flex: 0 0 calc(100% + 24px);
+    gap: 8px;
+    margin: -8px -12px;
+    padding: 8px 12px;
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+    scroll-snap-type: x mandatory;
+    scroll-padding-inline: 12px;
+    scrollbar-width: none;
+  }
+
+  .widget-lists::-webkit-scrollbar {
+    display: none;
+  }
+
+  .widget-lists:empty {
+    display: none;
+  }
+
+  .widget-lists > .widget-card {
+    flex: 0 0 calc(100% - 36px);
+    scroll-snap-align: start;
+  }
+
+  .widget-lists > .widget-card:only-child {
+    flex-basis: 100%;
+  }
+
+  /* A thin 20px row tucked under the strip, with the section gap below
+     pulled in so Favoris follows closely. Its 32px dot buttons reach into
+     the strip's bottom padding (no card loses taps) and the gap below. */
+  .widget-lists-pager {
+    display: flex;
+    flex: 1 1 100%;
+    height: 20px;
+    margin-top: -4px;
+    margin-bottom: -18px;
+  }
+
+  .widget-lists:not(:has(> .widget-card ~ .widget-card)) + .widget-lists-pager {
+    display: none;
+  }
+}

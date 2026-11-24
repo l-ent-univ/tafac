@@ -1,0 +1,19 @@
+/* ── Weather gradient inner (uses inline CSS variable) ── */
+
+.weather-widget-inner {
+  background: var(--weather-gradient, transparent), var(--color-widget-bg);
+}
+
+:where([data-theme="dark"]) .weather-widget-inner {
+  background: var(--weather-gradient-dark, transparent), var(--color-widget-bg);
+}
+
+/* ── Greeting wave icon ── */
+
+.greeting-icon {
+  transform-origin: 70% 70%;
+}
+
+.widget-card-visible .greeting-icon {
+  animation: wave 1s ease-in-out 0.4s;
+}

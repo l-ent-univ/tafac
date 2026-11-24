@@ -1,0 +1,27 @@
+/* ── "Compte aussi dans" (Mes notes, a UE's view) ──
+   Each link carries its UE as a little ribbon: the UE's colour with a lit
+   top edge and a shadow tinted with its dark shade (--ue-shade, as on
+   UeBadge); the arrow nudges on hover. */
+
+.ue-also-tag {
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.35),
+    inset 0 -1px 0 rgb(0 0 0 / 0.12),
+    -1px 2px 4px -1px color-mix(in srgb, var(--ue-shade) 55%, transparent);
+}
+
+.ue-also-arrow {
+  transition: transform 150ms ease;
+}
+
+.ue-also-link:hover .ue-also-arrow,
+.ue-also-link:focus-visible .ue-also-arrow {
+  transform: translateX(2px);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ue-also-link:hover .ue-also-arrow,
+  .ue-also-link:focus-visible .ue-also-arrow {
+    transform: none;
+  }
+}

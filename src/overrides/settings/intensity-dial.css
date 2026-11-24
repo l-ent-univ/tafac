@@ -1,0 +1,450 @@
+/* ── The intensity dial (PalettePicker's IntensityDial) ──
+   A small instrument under the pick's swatch: a knob in a ring, eleven
+   marks around it from 7 o'clock to 4 (a notch each, 5 at the top), a star
+   past the last, an LCD under it. The dial carries its hue (--dial-hue),
+   how far up the scale it is (--dial-level, 0 at 1 to 1 at 10) and the
+   knob's angle (--dial-turn); everything it draws comes from those. Its
+   colours are its own, like a course's: the colour being set is the data.
+   Fixed, in a portal (z-index over the settings). */
+@property --dial-level {
+  syntax: '<number>';
+  inherits: true;
+  initial-value: 0;
+}
+
+.palette-dial {
+  --dial-hue: 0;
+  --dial-level: 0;
+  --dial-turn: 0deg;
+  /* The panel pales to the card at 1 and fills with the hue at 10. */
+  --dial-top: oklch(calc(0.95 - 0.21 * var(--dial-level)) calc(0.01 + 0.12 * var(--dial-level)) var(--dial-hue));
+  --dial-bottom: oklch(calc(0.985 - 0.135 * var(--dial-level)) calc(0.004 + 0.066 * var(--dial-level)) var(--dial-hue));
+  --dial-ring: oklch(calc(0.84 - 0.21 * var(--dial-level)) calc(0.06 + 0.15 * var(--dial-level)) var(--dial-hue));
+  --dial-dot: oklch(calc(0.7 - 0.13 * var(--dial-level)) calc(0.13 + 0.09 * var(--dial-level)) var(--dial-hue));
+  /* A lit mark: a white tube, its halo the hue on the pale panel and white
+     once the panel is the hue. */
+  --dial-glow: color-mix(in oklch, #ffffff calc(var(--dial-level) * 100%), oklch(0.7 0.2 var(--dial-hue)));
+  --dial-mark: oklch(0.4 0.03 var(--dial-hue) / 0.24);
+  --dial-halo: oklch(0.76 0.15 var(--dial-hue) / calc(0.55 * var(--dial-level)));
+  --dial-knob: linear-gradient(#ffffff, #e8e8ea);
+  --dial-knob-edge: rgb(255 255 255 / 0.95);
+  --dial-knurl: rgb(0 0 0 / 0.17);
+  --dial-eleven: linear-gradient(oklch(0.72 0.15 var(--dial-hue)), oklch(0.82 0.09 calc(var(--dial-hue) - 45)));
+  --dial-haze: rgb(255 255 255 / 0.5);
+  position: fixed;
+  z-index: 80;
+  width: 208px;
+  height: 208px;
+  overflow: hidden;
+  border-radius: 20px;
+  background: linear-gradient(var(--dial-top), var(--dial-bottom));
+  box-shadow:
+    0 0 0 1px rgb(0 0 0 / 0.06),
+    0 2px 6px rgb(0 0 0 / 0.1),
+    0 18px 44px -12px rgb(0 0 0 / 0.36),
+    0 0 calc(36px * var(--dial-level)) var(--dial-halo);
+  transform-origin: var(--dial-origin, 50% 0);
+  animation: palette-dial-in 180ms cubic-bezier(0.16, 1, 0.3, 1);
+  transition: --dial-level 240ms ease, box-shadow 320ms ease;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+@supports (corner-shape: superellipse(1.3)) {
+  .palette-dial {
+    border-radius: calc(20px / 0.853);
+    corner-shape: superellipse(1.3);
+  }
+}
+
+:root[data-theme="dark"] .palette-dial {
+  --dial-top: oklch(calc(0.3 + 0.2 * var(--dial-level)) calc(0.025 + 0.125 * var(--dial-level)) var(--dial-hue));
+  --dial-bottom: oklch(calc(0.24 + 0.12 * var(--dial-level)) calc(0.02 + 0.09 * var(--dial-level)) var(--dial-hue));
+  --dial-ring: oklch(calc(0.42 + 0.22 * var(--dial-level)) calc(0.07 + 0.15 * var(--dial-level)) var(--dial-hue));
+  --dial-dot: oklch(calc(0.74 + 0.06 * var(--dial-level)) calc(0.14 + 0.06 * var(--dial-level)) var(--dial-hue));
+  --dial-glow: color-mix(in oklch, #ffffff calc(var(--dial-level) * 70%), oklch(0.74 0.2 var(--dial-hue)));
+  --dial-mark: rgb(255 255 255 / 0.2);
+  --dial-halo: oklch(0.7 0.17 var(--dial-hue) / calc(0.5 * var(--dial-level)));
+  --dial-knob: linear-gradient(#5b5b61, #38383d);
+  --dial-knob-edge: rgb(255 255 255 / 0.24);
+  --dial-knurl: rgb(0 0 0 / 0.4);
+  --dial-eleven: linear-gradient(oklch(0.58 0.17 var(--dial-hue)), oklch(0.68 0.12 calc(var(--dial-hue) - 45)));
+  --dial-haze: rgb(255 255 255 / 0.26);
+  box-shadow:
+    0 0 0 1px rgb(255 255 255 / 0.08),
+    0 2px 6px rgb(0 0 0 / 0.4),
+    0 18px 44px -12px rgb(0 0 0 / 0.7),
+    0 0 calc(36px * var(--dial-level)) var(--dial-halo);
+}
+
+.palette-dial[data-state="closing"] {
+  animation: palette-dial-out 140ms ease-in forwards;
+  pointer-events: none;
+}
+
+@keyframes palette-dial-in {
+  from {
+    opacity: 0;
+    transform: translateY(-6px) scale(0.9);
+    filter: blur(6px);
+  }
+}
+
+@keyframes palette-dial-out {
+  to {
+    opacity: 0;
+    transform: translateY(-4px) scale(0.96);
+  }
+}
+
+/* At 11 the panel runs from the hue to its neighbour and glows outward. */
+.palette-dial::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: var(--dial-eleven);
+  opacity: 0;
+  transition: opacity 420ms ease;
+}
+
+.palette-dial[data-eleven]::before {
+  opacity: 1;
+}
+
+.palette-dial[data-eleven] {
+  box-shadow:
+    0 0 0 1px rgb(0 0 0 / 0.06),
+    0 2px 6px rgb(0 0 0 / 0.1),
+    0 18px 44px -12px rgb(0 0 0 / 0.36),
+    0 0 46px 4px oklch(0.78 0.16 var(--dial-hue) / 0.62);
+}
+
+/* The whole panel turns the knob: the pointer's angle around its centre. */
+.palette-dial-face {
+  position: absolute;
+  inset: 0;
+  outline: none;
+  cursor: grab;
+  touch-action: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.palette-dial[data-dragging] .palette-dial-face {
+  cursor: grabbing;
+}
+
+.palette-dial-ring,
+.palette-dial-knob,
+.palette-dial-haze,
+.palette-dial-cloud {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  border-radius: 50%;
+  translate: -50% -50%;
+  pointer-events: none;
+}
+
+.palette-dial-ring {
+  width: 110px;
+  height: 110px;
+  background: var(--dial-ring);
+  box-shadow:
+    inset 0 1px 2px rgb(0 0 0 / 0.2),
+    0 1px 0 rgb(255 255 255 / 0.3);
+}
+
+.palette-dial-face:focus-visible .palette-dial-ring {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 3px;
+}
+
+/* The knob's body keeps its light from above; only its rim and its dot
+   turn (palette-dial-turn). */
+.palette-dial-knob {
+  width: 98px;
+  height: 98px;
+  background: var(--dial-knob);
+  box-shadow:
+    0 0 0 1px rgb(0 0 0 / 0.07),
+    0 2px 2px rgb(0 0 0 / 0.16),
+    0 9px 12px -3px rgb(0 0 0 / 0.34),
+    inset 0 1px 0 var(--dial-knob-edge),
+    inset 0 -3px 6px rgb(0 0 0 / 0.07);
+}
+
+.palette-dial-turn {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  rotate: var(--dial-turn);
+  transition: rotate 420ms var(--palette-settle);
+}
+
+/* The knurled rim: eighty ridges. */
+.palette-dial-turn::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: repeating-conic-gradient(var(--dial-knurl) 0 1.5deg, transparent 1.5deg 4.5deg);
+  -webkit-mask: radial-gradient(circle closest-side, transparent 0 85%, #000 87% 97%, transparent 99%);
+  mask: radial-gradient(circle closest-side, transparent 0 85%, #000 87% 97%, transparent 99%);
+}
+
+.palette-dial-turn::after {
+  content: '';
+  position: absolute;
+  top: 10px;
+  left: 50%;
+  width: 10px;
+  height: 10px;
+  margin-left: -5px;
+  border-radius: 50%;
+  background: var(--dial-dot);
+  box-shadow: inset 0 1px 1px rgb(0 0 0 / 0.22);
+}
+
+/* A mark: centred on the knob, turned to its notch, then out to the scale.
+   Its size changes about its own centre, so 11 fattens it in place. */
+.palette-dial-mark {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 2.5px;
+  height: 9px;
+  border-radius: 999px;
+  background: var(--dial-mark);
+  translate: -50% -50%;
+  transform: rotate(var(--mark-turn)) translateY(-70px);
+  transition:
+    background-color 160ms ease,
+    box-shadow 200ms ease,
+    width 520ms var(--palette-settle),
+    height 520ms var(--palette-settle);
+  pointer-events: none;
+}
+
+.palette-dial-mark[data-top] {
+  height: 13px;
+  transform: rotate(var(--mark-turn)) translateY(-72px);
+}
+
+.palette-dial-mark[data-lit] {
+  background: #ffffff;
+  box-shadow:
+    0 0 0 0.75px var(--dial-glow),
+    0 0 5px 1px var(--dial-glow),
+    0 0 11px 1px color-mix(in srgb, var(--dial-glow) 55%, transparent);
+}
+
+.palette-dial[data-eleven] .palette-dial-mark {
+  width: 11px;
+  height: 19px;
+  box-shadow:
+    0 0 8px 2px rgb(255 255 255 / 0.85),
+    0 0 18px 4px oklch(0.9 0.1 var(--dial-hue) / 0.7);
+  transition-delay: 0ms, 0ms, calc(var(--mark-index) * 16ms), calc(var(--mark-index) * 16ms);
+}
+
+.palette-dial[data-eleven] .palette-dial-mark[data-top] {
+  height: 23px;
+}
+
+/* The star, a notch past 10: where 11 is. */
+.palette-dial-star {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 13px;
+  height: 13px;
+  color: var(--dial-mark);
+  translate: -50% -50%;
+  transform: rotate(135deg) translateY(-73px) rotate(-120deg);
+  transition: color 200ms ease, transform 560ms var(--palette-settle), filter 320ms ease;
+  pointer-events: none;
+}
+
+.palette-dial[data-eleven] .palette-dial-star {
+  color: #ffffff;
+  transform: rotate(135deg) translateY(-73px) rotate(-120deg) scale(1.75);
+  filter: drop-shadow(0 0 3px #ffffff) drop-shadow(0 0 9px #ffffff);
+}
+
+/* 11's light: a haze that stays behind the marks, a cloud that swells out
+   of the knob once, and the specks (a burst, then a few that keep
+   drifting off the ring). */
+.palette-dial-haze {
+  width: 196px;
+  height: 196px;
+  background: radial-gradient(circle closest-side, var(--dial-haze) 50%, transparent 100%);
+  opacity: 0;
+  transition: opacity 520ms ease;
+}
+
+.palette-dial[data-eleven] .palette-dial-haze {
+  opacity: 1;
+}
+
+.palette-dial-cloud {
+  width: 200px;
+  height: 200px;
+  background: radial-gradient(circle closest-side, rgb(255 255 255 / 0.95) 40%, rgb(255 255 255 / 0) 100%);
+  animation: palette-dial-cloud 1300ms cubic-bezier(0.2, 0.7, 0.2, 1) both;
+}
+
+@keyframes palette-dial-cloud {
+  from {
+    opacity: 0;
+    transform: scale(0.4);
+  }
+
+  18% {
+    opacity: 0.9;
+  }
+
+  to {
+    opacity: 0;
+    transform: scale(1.5);
+  }
+}
+
+.palette-dial-specks {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.palette-dial-speck {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: var(--speck-size);
+  height: var(--speck-size);
+  border-radius: 50%;
+  background: #ffffff;
+  opacity: 0;
+  translate: -50% -50%;
+  animation: palette-dial-burst var(--speck-time) var(--speck-delay) cubic-bezier(0.12, 0.7, 0.2, 1) both;
+}
+
+.palette-dial-speck[data-tone="0"] {
+  background: oklch(0.6 0.22 var(--dial-hue));
+}
+
+.palette-dial-speck[data-tone="1"] {
+  background: oklch(0.86 0.07 calc(var(--dial-hue) - 50));
+}
+
+.palette-dial-speck[data-drift] {
+  animation: palette-dial-drift var(--speck-time) var(--speck-delay) ease-out infinite both;
+}
+
+@keyframes palette-dial-burst {
+  from {
+    opacity: 0;
+    transform: rotate(var(--speck-turn)) translateY(-50px) scale(0.3);
+  }
+
+  12% {
+    opacity: 1;
+  }
+
+  60% {
+    opacity: 0.9;
+  }
+
+  to {
+    opacity: 0;
+    transform: rotate(var(--speck-turn)) translateY(calc(-56px - var(--speck-reach))) scale(1);
+  }
+}
+
+@keyframes palette-dial-drift {
+  from {
+    opacity: 0;
+    transform: rotate(var(--speck-turn)) translateY(-58px) scale(0.4);
+  }
+
+  25% {
+    opacity: 0.95;
+  }
+
+  to {
+    opacity: 0;
+    transform: rotate(var(--speck-turn)) translateY(calc(-58px - var(--speck-reach))) scale(1);
+  }
+}
+
+/* The LCD: two seven-segment digits, every segment faintly there. Its
+   backlight comes on at 11. */
+.palette-dial-lcd {
+  position: absolute;
+  bottom: 12px;
+  left: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 2.5px;
+  box-sizing: border-box;
+  width: 40px;
+  height: 22px;
+  padding: 0 7px;
+  border-radius: 6px;
+  background: #d5dac7;
+  box-shadow:
+    inset 0 0 0 1px rgb(40 50 30 / 0.22),
+    inset 0 1px 2px rgb(40 50 30 / 0.26),
+    0 1px 0 rgb(255 255 255 / 0.35);
+  translate: -50% 0;
+  transition: background-color 320ms ease, box-shadow 320ms ease;
+  pointer-events: none;
+}
+
+.palette-dial[data-eleven] .palette-dial-lcd {
+  background: #c6f6e8;
+  box-shadow:
+    inset 0 0 0 1px rgb(40 90 80 / 0.26),
+    0 0 10px 1px rgb(190 255 238 / 0.85);
+}
+
+.palette-dial-digit {
+  width: 8px;
+  height: 14px;
+  flex-shrink: 0;
+  overflow: visible;
+  transform: skewX(-6deg);
+}
+
+.palette-dial-digit polygon {
+  fill: rgb(20 28 14 / 0.08);
+}
+
+.palette-dial-digit polygon[data-on] {
+  fill: #141a10;
+}
+
+/* Reduced motion: the dial shows and the knob turns without springing, and
+   11 keeps its light without the burst. The page's own glide between
+   notches is off in tokens.css. */
+@media (prefers-reduced-motion: reduce) {
+  .palette-swatch,
+  .palette-swatch::after,
+  .palette-dial,
+  .palette-dial-turn,
+  .palette-dial-mark,
+  .palette-dial-star {
+    transition: none;
+  }
+
+  .palette-swatch-edit,
+  .palette-dial,
+  .palette-dial[data-state="closing"] {
+    animation: none;
+  }
+
+  .palette-dial-cloud,
+  .palette-dial-specks {
+    display: none;
+  }
+}

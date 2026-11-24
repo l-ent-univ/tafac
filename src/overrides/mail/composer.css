@@ -1,0 +1,327 @@
+/* ── Mail composer (MailComposer) ──
+   From 1024px a window floating over the page's bottom right (often over
+   the reader's panel, as light as it): solid white, the solid glass's
+   edges, a lit top rim and a deep drop, so it reads as lifted off the
+   page; below, a sheet over the whole screen sliding up, as iOS Mail's. */
+.mail-composer {
+  background-color: var(--surface-card);
+  animation: mail-composer-sheet-in 380ms cubic-bezier(0.32, 0.72, 0, 1) both;
+}
+
+:where([data-theme="dark"]) .mail-composer {
+  background-color: #1f1f1f;
+}
+
+@media (min-width: 1024px) {
+  .mail-composer {
+    border-color: var(--glass-solid-edge);
+    outline: 1px solid color-mix(in srgb, var(--ink) 14%, transparent);
+    outline-offset: 0;
+    box-shadow:
+      inset 0 1px 0 rgb(255 255 255 / 0.9),
+      0 1px 2px rgb(52 18 0 / 0.08),
+      0 8px 16px -6px rgb(52 18 0 / 0.14),
+      0 32px 72px -16px rgb(52 18 0 / 0.38);
+  }
+
+  :where([data-theme="dark"]) .mail-composer {
+    outline-color: rgb(255 255 255 / 0.12);
+    box-shadow:
+      inset 0 1px 0 rgb(255 255 255 / 0.08),
+      0 1px 2px rgb(0 0 0 / 0.4),
+      0 8px 16px -6px rgb(0 0 0 / 0.5),
+      0 32px 72px -16px rgb(0 0 0 / 0.85);
+  }
+
+  .mail-composer {
+    transform-origin: 100% 100%;
+    animation: mail-composer-window-in 260ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+  }
+}
+
+@keyframes mail-composer-window-in {
+  from {
+    opacity: 0;
+    transform: translateY(16px) scale(0.97);
+  }
+}
+
+@keyframes mail-composer-sheet-in {
+  from {
+    transform: translateY(100%);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mail-composer {
+    animation: none;
+  }
+}
+
+/* Its fields: the row shows nothing on focus (the caret says it), not
+   index.css's square ring; same for the text. */
+.mail-composer-input:focus-visible,
+.mail-composer-body:focus,
+.mail-composer-body:focus-visible {
+  outline: none;
+}
+
+/* The composer's grades drawer (MailGradePicker): it slides up from the
+   composer's foot, at any width. */
+.mail-grade-drawer {
+  animation: gd-sheet-in 360ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mail-grade-drawer {
+    animation: none;
+  }
+}
+
+/* A recipient token selected (focused, MailComposer's RecipientToken) shows
+   it by its filled pill: no ring around it as well. */
+.mail-recipient-token:focus-visible {
+  outline: none;
+}
+
+/* The composer going full screen and back (MailComposer, from 1024 px): a
+   view transition as a UE's tile opening full page (.ue-morph, .ue-card:
+   the frame grows, its content cross-fades unscaled; its own frame further
+   down, after the UE's). */
+@media (min-width: 1024px) {
+  .mail-composer {
+    view-transition-name: mail-composer;
+    view-transition-class: ue-morph ue-card;
+  }
+}
+
+/* The automatic signature in the composer's text (MailSignatureView): the
+   « — » above it, the name, the group, the establishment, then the
+   logos, in the muted colour of a quote, not typed into. */
+.mail-composer-signature {
+  display: grid;
+  justify-items: start;
+  gap: 1px;
+  margin: 14px 0 6px;
+  font-size: 14px;
+  line-height: 1.45;
+  color: var(--color-text-muted);
+  user-select: none;
+}
+
+.mail-composer-signature-rule {
+  margin-bottom: 2px;
+}
+
+.mail-composer-signature-name {
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+.mail-composer-signature-logos {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-top: 8px;
+}
+
+.mail-composer-signature-logos img {
+  height: 32px;
+  width: auto;
+}
+
+/* The student's own signature (« Partage », « Personnalisée »): in the
+   text's colour, as the mail sent has it (server/mailSignature.js); a hint
+   in its place when there's none. */
+.mail-composer-signature--own {
+  color: var(--color-text);
+}
+
+.mail-composer-signature-hint {
+  color: var(--color-text-muted);
+  font-style: italic;
+  font-synthesis-style: auto;
+}
+
+/* A webmail signature's HTML (MailSignatureHtml), in the composer and in
+   Réglages: its blocks and lists as a mail shows them, links underlined.
+   In the dark theme its colours give way to the theme's (a black text
+   was unreadable); the mail sent keeps them. */
+.mail-signature-html {
+  overflow-wrap: anywhere;
+  font-synthesis-style: auto;
+}
+
+.mail-signature-html p,
+.mail-signature-html div {
+  margin: 0;
+}
+
+.mail-signature-html ul,
+.mail-signature-html ol {
+  margin: 0.25em 0;
+  padding-left: 1.5em;
+}
+
+.mail-signature-html ul {
+  list-style: disc;
+}
+
+.mail-signature-html ol {
+  list-style: decimal;
+}
+
+.mail-signature-html a {
+  color: inherit;
+  text-decoration: underline;
+  text-decoration-color: color-mix(in srgb, currentColor 35%, transparent);
+  text-underline-offset: 2px;
+}
+
+:where([data-theme="dark"]) .mail-signature-html [style] {
+  color: inherit !important;
+}
+
+/* « Signature automatique » beside the composer's switch, while it's on: a
+   light passing over the word now and then (a gradient clipped to the
+   text), as the app's skeletons shimmer. Still with reduced motion. */
+.mail-signature-shimmer {
+  background-image: linear-gradient(100deg, var(--color-text-muted) 0%, var(--color-text-muted) 38%, var(--color-text) 50%, var(--color-text-muted) 62%, var(--color-text-muted) 100%);
+  background-size: 300% 100%;
+  background-position: 100% 0;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: mail-signature-shimmer 3.2s ease-in-out infinite;
+}
+
+@keyframes mail-signature-shimmer {
+  0% {
+    background-position: 100% 0;
+  }
+  55%,
+  100% {
+    background-position: 0% 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mail-signature-shimmer {
+    animation: none;
+    background: none;
+    color: var(--color-text-muted);
+  }
+}
+
+/* The text being written: Tailwind's reset takes the lists' markers, the
+   headings' sizes and the paragraphs' gaps away, given back here (as a mail
+   shows them once received). */
+.mail-composer-body {
+  overflow-wrap: anywhere;
+  caret-color: var(--color-text);
+  /* The app loads Inter upright only and turns synthesis off (index.css):
+     italic text would stay upright. Here the browser may slant it. */
+  font-synthesis-style: auto;
+}
+
+.mail-composer-body p,
+.mail-composer-body div {
+  margin: 0;
+}
+
+.mail-composer-body ul,
+.mail-composer-body ol {
+  margin: 0.25em 0;
+  padding-left: 1.5em;
+}
+
+.mail-composer-body ul {
+  list-style: disc;
+}
+
+.mail-composer-body ol {
+  list-style: decimal;
+}
+
+.mail-composer-body h2 {
+  margin: 0.2em 0;
+  font-family: inherit;
+  font-size: 1.5em;
+  font-weight: 700;
+  line-height: 1.25;
+}
+
+.mail-composer-body h3 {
+  margin: 0.2em 0;
+  font-family: inherit;
+  font-size: 1.2em;
+  font-weight: 600;
+  line-height: 1.3;
+}
+
+/* The mail answered: its text as written (its own line breaks), under a
+   rule, muted. The line naming it (« Le …, … a écrit : ») keeps its breaks
+   too: a forward's lists the original's headers. */
+.mail-composer-body blockquote {
+  margin: 0.4em 0 0;
+  padding-left: 12px;
+  border-left: 2px solid rgb(52 18 0 / 0.16);
+  color: var(--color-text-muted);
+  white-space: pre-wrap;
+}
+
+:where([data-theme="dark"]) .mail-composer-body blockquote {
+  border-left-color: rgb(255 255 255 / 0.2);
+}
+
+/* A highlight's text stays dark on its light colour, the dark theme's
+   light text being unreadable on it (as in the sent mail, mailSend.js). A
+   chosen text colour sits inside the highlight and keeps its own. */
+.mail-composer-body mark {
+  /* Over the « color: inherit » Tiptap writes on the mark itself. */
+  color: #1f1f1f !important;
+  border-radius: 3px;
+  padding-inline: 1px;
+}
+
+.mail-composer-body .mail-composer-quote-header {
+  color: var(--color-text-muted);
+  white-space: pre-wrap;
+}
+
+/* A summary box (src/mailSummaryNode.js): a light card of label and value
+   rows, as the sent mail has it (server/mailSend.js). Not typed into: a
+   click selects it whole (its outline), Backspace takes it out. */
+.mail-composer-body table[data-mail-summary] {
+  margin: 4px 0 12px;
+  padding: 6px 0;
+  border-collapse: separate;
+  border-spacing: 0;
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  background: var(--color-bg-subtle);
+  font-size: 14px;
+  line-height: 1.45;
+  cursor: default;
+  user-select: none;
+}
+
+.mail-composer-body table[data-mail-summary] th {
+  padding: 4px 18px 4px 14px;
+  text-align: left;
+  vertical-align: top;
+  font-weight: 500;
+  color: var(--color-text-muted);
+  white-space: nowrap;
+}
+
+.mail-composer-body table[data-mail-summary] td {
+  padding: 4px 14px 4px 0;
+  vertical-align: top;
+  font-weight: 600;
+}
+
+.mail-composer-body table[data-mail-summary].ProseMirror-selectednode {
+  outline: 2px solid var(--color-text);
+  outline-offset: 2px;
+}

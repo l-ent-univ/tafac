@@ -1,0 +1,14 @@
+/* ── Sidebar: floating frosted panel ── */
+
+/* In the glass material (its tokens), quiet: a large surface. */
+.sidebar-panel {
+  background-color: var(--glass-fill);
+  border-color: var(--glass-quiet-edge);
+  outline: 1px solid var(--glass-quiet-outer);
+  outline-offset: 0;
+  -webkit-backdrop-filter: var(--glass-blur);
+  backdrop-filter: var(--glass-blur);
+  box-shadow: var(--glass-quiet-shadow);
+  /* Eases between frosted and solid when a page drops the wallpaper. */
+  transition: background-color 280ms ease-out, border-color 280ms ease-out, box-shadow 280ms ease-out;
+}

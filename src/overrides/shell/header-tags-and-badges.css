@@ -1,0 +1,122 @@
+/* ── Header refreshed tag depth ── */
+
+.header-refreshed-tag {
+  box-shadow:
+    0 2px 8px -2px rgba(0, 0, 0, 0.06),
+    0 0 0 1px rgba(0, 0, 0, 0.06);
+}
+
+:where([data-theme="dark"]) .header-refreshed-tag {
+  border-color: rgba(255, 255, 255, 0.08);
+  box-shadow:
+    0 2px 8px -2px rgba(0, 0, 0, 0.2),
+    0 0 0 1px rgba(255, 255, 255, 0.06);
+}
+
+/* Phones: the header buttons float over the photo in the glass material,
+   like the tab bar. */
+@media (width < 1024px) {
+  .header-account-btn {
+    background-color: var(--glass-fill);
+    border-color: var(--glass-edge);
+    outline: 1px solid var(--glass-outer);
+    outline-offset: 0;
+    -webkit-backdrop-filter: var(--glass-blur);
+    backdrop-filter: var(--glass-blur);
+    box-shadow: var(--glass-shadow);
+  }
+
+  .header-account-btn:active:not(:disabled) {
+    background-color: rgb(255 255 255 / 0.75);
+  }
+
+  :where([data-theme="dark"]) .header-account-btn:active:not(:disabled) {
+    background-color: rgb(255 255 255 / 0.14);
+  }
+}
+
+/* ── « Nouveautés » pill (src/components/ChangelogPill.jsx) ──
+   Solid glass; on phones, floating over the photo, the glass itself, like
+   the header buttons above it. The dot
+   uses the unread-mail blue: something new, nothing urgent. */
+
+.changelog-pill {
+  background-color: var(--glass-solid-fill);
+  border-color: var(--glass-solid-edge);
+  outline: 1px solid var(--glass-solid-outer);
+  outline-offset: 0;
+  box-shadow: var(--glass-solid-shadow);
+}
+
+.changelog-pill:hover {
+  background-color: var(--glass-solid-fill-hover);
+}
+
+.changelog-new-dot {
+  background-color: #1a73e8;
+}
+
+:where([data-theme="dark"]) .changelog-new-dot {
+  background-color: #5b9dff;
+}
+
+@media (width < 1024px) {
+  .changelog-pill {
+    background-color: var(--glass-fill);
+    -webkit-backdrop-filter: var(--glass-blur);
+    backdrop-filter: var(--glass-blur);
+  }
+}
+
+/* ── "New" on a nav item (Sidebar, MobileTabBar) ──
+   While its launch entry is unseen (navItems' `announcedBy`): a « Nouveau »
+   pill in the sidebar, a dot on the tab's icon, both in the « Nouveautés »
+   blue. The dot breathes out a few times, then stays still. */
+
+.nav-new-badge {
+  background-color: rgb(26 115 232 / 0.1);
+  color: #1559b8;
+}
+
+:where([data-theme="dark"]) .nav-new-badge {
+  background-color: rgb(91 157 255 / 0.16);
+  color: #9cc2ff;
+}
+
+/* Cut out of the tab bar's glass, so it reads on the icon's stroke. */
+.mobile-tab-bar-new-dot {
+  box-shadow: 0 0 0 2px rgb(252 251 248 / 0.95);
+}
+
+:where([data-theme="dark"]) .mobile-tab-bar-new-dot {
+  box-shadow: 0 0 0 2px rgb(40 40 40 / 0.95);
+}
+
+.nav-new-pulse {
+  position: relative;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .nav-new-pulse::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    corner-shape: inherit;
+    background: inherit;
+    animation: nav-new-pulse 2.2s cubic-bezier(0.2, 0.8, 0.2, 1) 0.6s 6 backwards;
+  }
+}
+
+@keyframes nav-new-pulse {
+  from {
+    opacity: 0.7;
+    transform: scale(1);
+  }
+
+  70%,
+  to {
+    opacity: 0;
+    transform: scale(2.8);
+  }
+}

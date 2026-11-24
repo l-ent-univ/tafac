@@ -1,0 +1,35 @@
+/* ── App icon depth + gradient stroke ── */
+
+.app-icon {
+  position: relative;
+}
+
+.app-icon::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  corner-shape: inherit;
+  border: 1px solid transparent;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.9), transparent 70%) border-box;
+  -webkit-mask:
+    linear-gradient(#fff 0 0) padding-box,
+    linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask:
+    linear-gradient(#fff 0 0) padding-box,
+    linear-gradient(#fff 0 0);
+  mask-composite: exclude;
+  pointer-events: none;
+}
+
+:where([data-theme="dark"]) .app-icon::after {
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.12), transparent 70%) border-box;
+}
+
+/* Automatic icon tiles: colours come from the server's palette as custom
+   properties (AvailableApplications.jsx), with a variant for dark mode. */
+.app-icon--auto {
+  background-color: var(--app-tile-bg);
+  color: var(--app-tile-fg);
+}

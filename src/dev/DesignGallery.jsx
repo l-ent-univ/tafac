@@ -470,7 +470,7 @@ function radiusStyle(value) {
 function ShapesSection({ audit }) {
   return (
     <Section id="formes" title="Formes" intro="Coins et ombres. Les classes nommées d’abord, puis chaque valeur écrite à la main dans le code">
-      <Demo title="Coins nommés" file="src/overrides.css">
+      <Demo title="Coins nommés" file="src/overrides/base/corners.css">
         <Variant label="card-corners"><span className="block size-20 card-corners border border-line bg-card" /></Variant>
         <Variant label="card-corners-sm"><span className="block size-20 card-corners-sm border border-line bg-card" /></Variant>
         <Variant label="modal-corners"><span className="block size-20 modal-corners border border-line bg-card" /></Variant>
@@ -528,7 +528,7 @@ function MaterialsSection({ photo }) {
   return (
     <Section id="matieres" title="Matières" intro="Les surfaces composées : verre sur le fond d’écran, carte pleine, matière des boutons secondaires, groupe de boutons, piste du contrôle segmenté">
       <Grid min={360}>
-        <Demo title="Verre (.widget-card) sur photo" file="src/overrides.css" fixedSurface="page" stageClassName="bg-cover! bg-center! border-0!">
+        <Demo title="Verre (.widget-card) sur photo" file="src/overrides/widgets/card.css" fixedSurface="page" stageClassName="bg-cover! bg-center! border-0!">
           <span className="absolute inset-0 rounded-[inherit] bg-cover bg-center" style={{ backgroundImage: photo ? `url(${photo})` : 'linear-gradient(135deg,#7aa2ff,#ffb38a)' }} />
           <div className="widget-card widget-card-visible relative card-corners border bg-widget-bg p-5 text-ink">
             <p className="m-0 font-body text-[15px] font-semibold">Prochain cours</p>

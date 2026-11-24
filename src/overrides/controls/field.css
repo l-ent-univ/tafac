@@ -1,0 +1,61 @@
+/* ── Field (.field) ──
+   The app's text fields, in the soft style (no primary colour in them):
+   a white fill (the card's: white in light, the dark card in dark), a
+   faint hairline and a thin, firmer stroke outside it (half a pixel,
+   --field-outer), a
+   breath of shade inside the top edge, no rim, no gradient. Hover firms the hairline; focus firms the
+   outer stroke (that's the focus indicator: no ring, no outline). On an <input> or <textarea>, or on a wrapper holding one
+   (the mail search: :focus-within). Red when aria-invalid. In the
+   components layer: a caller's utilities (a width, a red border) win. */
+@layer components {
+  .field {
+    --field-fill: var(--surface-card);
+    --field-edge: color-mix(in srgb, var(--color-text) 12%, transparent);
+    --field-inset: rgb(52 18 0 / 0.05);
+    --field-outer: color-mix(in srgb, var(--color-text) 22%, transparent);
+    border: 1px solid var(--field-edge);
+    background-color: var(--field-fill);
+    box-shadow: inset 0 1px 1px var(--field-inset), 0 0 0 0.5px var(--field-outer);
+    transition: border-color 150ms ease, box-shadow 150ms ease, background-color 150ms ease;
+  }
+
+  .field:hover:not(:disabled) {
+    --field-edge: color-mix(in srgb, var(--color-text) 20%, transparent);
+  }
+
+  .field:is(:focus, :focus-within) {
+    --field-outer: color-mix(in srgb, var(--color-text) 60%, transparent);
+    outline: none;
+  }
+
+  .field[aria-invalid="true"],
+  .field:has([aria-invalid="true"]) {
+    --field-edge: var(--danger);
+    --field-outer: var(--danger);
+  }
+
+  .field:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+  }
+
+  :where([data-theme="dark"]) .field {
+    --field-edge: rgb(255 255 255 / 0.1);
+    --field-inset: rgb(0 0 0 / 0.25);
+    --field-outer: rgb(0 0 0 / 0.7);
+  }
+
+  :where([data-theme="dark"]) .field:hover:not(:disabled) {
+    --field-edge: rgb(255 255 255 / 0.16);
+  }
+
+  :where([data-theme="dark"]) .field:is(:focus, :focus-within) {
+    --field-outer: rgb(255 255 255 / 0.5);
+  }
+}
+
+/* index.css outlines every focused input (unlayered): a field's focus is
+   its own darker hairline and ring. */
+:is(input, textarea).field:focus-visible {
+  outline: none;
+}

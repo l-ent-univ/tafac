@@ -1,0 +1,132 @@
+/* ── Glass (the shared material) ──
+   Everything that blurs what's behind it shares one material: a
+   translucent fill over a blur, a thin dark stroke outside (an outline
+   at offset 0: it follows the corners and leaves shadows be), a white rim
+   inside, bright along the top and fading down the sides to the bottom
+   (the 1px border, a colour per side), and a close, sharp shadow. The
+   tokens below are the material; .glass applies them all; a component
+   with rules of its own reads the tokens (the cards, the sidebar, the tab
+   bar, the landing header…). .glass--menu: a denser fill, so a menu's
+   text reads over anything. */
+:root {
+  --glass-fill: var(--material-glass);
+  --glass-fill-strong: color-mix(in srgb, var(--surface-page) 86%, transparent);
+  --glass-blur: blur(20px) saturate(1.5);
+  --glass-outer: rgb(0 0 0 / 0.14);
+  --glass-rim-top: rgb(255 255 255 / 0.85);
+  --glass-rim-side: rgb(255 255 255 / 0.45);
+  --glass-rim-bottom: rgb(255 255 255 / 0.2);
+  --glass-edge: var(--glass-rim-top) var(--glass-rim-side) var(--glass-rim-bottom);
+  --glass-shadow: 0 1px 1px rgb(0 0 0 / 0.08), 0 2px 4px -1px rgb(0 0 0 / 0.12);
+  /* Quiet: the same material for large surfaces (cards, the sidebar,
+     modals, sheets), where the full strokes add up to too much. */
+  --glass-quiet-outer: rgb(0 0 0 / 0.06);
+  --glass-quiet-edge: rgb(255 255 255 / 0.6) rgb(255 255 255 / 0.25) rgb(255 255 255 / 0.1);
+  --glass-quiet-shadow: 0 1px 2px rgb(0 0 0 / 0.04), 0 2px 6px -2px rgb(0 0 0 / 0.06);
+}
+
+/* Dark: a rim of one colour per side would show its corners (where the
+   top's colour stops and the sides' starts, a sharp diagonal on a round
+   edge). The border is one faint colour all round, and the bright top is
+   an inner shadow 1px down: it thins out along the curve, a fade from the
+   top to the sides. */
+:root:where([data-theme="dark"]) {
+  --glass-fill-strong: color-mix(in srgb, var(--surface-raised) 88%, transparent);
+  --glass-outer: rgb(0 0 0 / 0.5);
+  --glass-rim-top: rgb(255 255 255 / 0.06);
+  --glass-rim-side: rgb(255 255 255 / 0.06);
+  --glass-rim-bottom: rgb(255 255 255 / 0.06);
+  --glass-shadow: inset 0 1px 0 rgb(255 255 255 / 0.14), 0 1px 1px rgb(0 0 0 / 0.3), 0 2px 4px -1px rgb(0 0 0 / 0.35);
+  --glass-quiet-outer: rgb(0 0 0 / 0.3);
+  --glass-quiet-edge: rgb(255 255 255 / 0.035);
+  --glass-quiet-shadow: inset 0 1px 0 rgb(255 255 255 / 0.065), 0 1px 2px rgb(0 0 0 / 0.25), 0 2px 6px -2px rgb(0 0 0 / 0.3);
+}
+
+.glass {
+  border: 1px solid;
+  border-color: var(--glass-edge);
+  background-color: var(--glass-fill);
+  outline: 1px solid var(--glass-outer);
+  outline-offset: 0;
+  box-shadow: var(--glass-shadow);
+  -webkit-backdrop-filter: var(--glass-blur);
+  backdrop-filter: var(--glass-blur);
+}
+
+.glass--menu {
+  --glass-fill: var(--glass-fill-strong);
+  /* A row under the pointer: white (the card's colour), a faint hairline
+     and a soft shadow, lifted off the menu; the old blue-grey hover was
+     lost on the glass. */
+  --color-context-hover: var(--surface-card);
+}
+
+:where([data-theme="dark"]) .glass--menu {
+  --color-context-hover: rgb(255 255 255 / 0.1);
+}
+
+.glass--menu :is(.context-menu-item, .favorites-context-action):is(:hover, :focus-visible):not(:disabled) {
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--color-text) 7%, transparent),
+    0 1px 2px rgb(0 0 0 / 0.06);
+}
+
+:where([data-theme="dark"]) .glass--menu :is(.context-menu-item, .favorites-context-action):is(:hover, :focus-visible):not(:disabled) {
+  box-shadow: 0 0 0 1px rgb(255 255 255 / 0.06);
+}
+
+/* A large surface of either material: the quiet strokes. */
+:is(.glass, .glass-solid).glass--quiet {
+  border-color: var(--glass-quiet-edge);
+  outline-color: var(--glass-quiet-outer);
+  box-shadow: var(--glass-quiet-shadow);
+}
+
+/* Solid glass: the material as it reads over a white card, always: the
+   same stroke, rim and shadow on an opaque fill, no blur. For surfaces
+   with nothing to see through (a notice, a pill, Réglages' cards, the
+   cards without wallpaper). A button or a link of it darkens a touch on
+   hover. */
+:root {
+  --glass-solid-fill: color-mix(in srgb, var(--surface-page) 66%, var(--surface-card));
+  --glass-solid-fill-hover: color-mix(in srgb, var(--glass-solid-fill), var(--ink) 4%);
+  /* Its strokes: between the glass' full ones and the quiet ones. */
+  --glass-solid-outer: rgb(0 0 0 / 0.1);
+  --glass-solid-edge: rgb(255 255 255 / 0.75) rgb(255 255 255 / 0.35) rgb(255 255 255 / 0.15);
+  --glass-solid-shadow: 0 1px 1px rgb(0 0 0 / 0.06), 0 2px 4px -1px rgb(0 0 0 / 0.09);
+}
+
+:root:where([data-theme="dark"]) {
+  --glass-solid-fill: color-mix(in srgb, var(--surface-card) 90%, var(--surface-page));
+  --glass-solid-fill-hover: color-mix(in srgb, var(--glass-solid-fill), var(--ink) 6%);
+  --glass-solid-outer: rgb(0 0 0 / 0.4);
+  /* One colour all round, the top's light an inner shadow (as the glass'
+     above). */
+  --glass-solid-edge: rgb(255 255 255 / 0.05);
+  --glass-solid-shadow: inset 0 1px 0 rgb(255 255 255 / 0.1), 0 1px 1px rgb(0 0 0 / 0.28), 0 2px 4px -1px rgb(0 0 0 / 0.32);
+}
+
+.glass-solid {
+  border: 1px solid;
+  border-color: var(--glass-solid-edge);
+  background-color: var(--glass-solid-fill);
+  outline: 1px solid var(--glass-solid-outer);
+  outline-offset: 0;
+  box-shadow: var(--glass-solid-shadow);
+  transition: background-color 150ms ease;
+}
+
+@media (hover: hover) {
+  :is(button, a).glass-solid:hover:not(:disabled) {
+    background-color: var(--glass-solid-fill-hover);
+  }
+}
+
+/* The outer stroke is an outline: keyboard focus gets its own ring back
+   (a component's own :focus-visible rule, further down, still wins). Only
+   on what can be tabbed to: a dialog focused when it opens
+   (tabindex="-1") keeps its stroke. */
+:is(.glass, .glass-solid, .material, .widget-card):is(button, a[href], input, textarea, select, [tabindex]:not([tabindex="-1"])):focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}

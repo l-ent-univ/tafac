@@ -1,0 +1,63 @@
+/* ── Smooth surface (SmoothSurface) ──
+   The button's look drawn on Lisse's smoothed shape, under its content
+   (the button isolated, the SVG at z-index -1). Once it's mounted, the
+   button's own background, shadows and ::before rim make way. The SVG
+   reads --surface-* from the button: the face, its outer stroke (2px
+   masked to the outside of the shape: its outer 1px only, even over a
+   see-through face), the shade, the rim and, as a filter
+   on the whole shape, the drop shadow. */
+.smooth-surface-pending {
+  display: none;
+}
+
+.smooth-surface {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: -1;
+  overflow: visible;
+  pointer-events: none;
+  filter: var(--surface-drop, none);
+  transition: filter 220ms ease;
+}
+
+/* Transparent where a host sets no colours: never the SVG's black. */
+.smooth-surface-face {
+  fill: var(--surface-face, transparent);
+  transition: fill 150ms ease;
+}
+
+/* Its colour: a gradient in the SVG, --surface-edge-top to -bottom
+   (--surface-edge for both by default). */
+.smooth-surface-edge {
+  fill: none;
+  stroke-width: 2px;
+}
+
+.smooth-surface-rim {
+  opacity: var(--surface-rim-opacity, 0);
+  transition: opacity 220ms ease;
+}
+
+:active > .smooth-surface,
+:active > .smooth-surface .smooth-surface-rim {
+  transition-duration: 80ms;
+}
+
+:is(.lent-button, .material, .switch, .segmented, .segmented-thumb):has(> .smooth-surface) {
+  isolation: isolate;
+  border-color: transparent;
+  background: none;
+  box-shadow: none;
+}
+
+:is(.lent-button, .material):has(> .smooth-surface)::before {
+  display: none;
+}
+
+/* The rainbow's wash, in the same shape: over the border box, as the
+   surface (the material's border is 1px). */
+:has(> .smooth-surface) > .material-wash-frame {
+  inset: -1px;
+  clip-path: var(--smooth-clip, none);
+}

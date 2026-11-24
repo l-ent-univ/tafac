@@ -1,0 +1,43 @@
+/* ── Page top band (dashboard, Mes notes) ──
+   The top of a page (the dashboard's greeting and widgets, the grades'
+   title, cards and notices) on a faint warm band set apart from the rest by
+   a hairline; the white cards lift off it. Only without the wallpaper: over
+   the photo it would hide it.
+   The band runs to both edges of the window, under the floating sidebar:
+   its colour is also a huge box-shadow spread, clipped to its own height
+   (+1px for the hairline). A shadow never makes the page scroll sideways,
+   as a wider box would. Solid colours (the tint mixed into the page's), so
+   the spread matches the box.
+   The hairline is its own 1px layer just under the band, widened the same
+   way and clipped to its height: as a second shadow of the band it would
+   sit under the band's own spread and never show. */
+
+/* The colours sit on the page's root (not the band) so the phone top bar
+   can take the band's tint too ("Mes notes · phone"). */
+.dashboard-no-wallpaper {
+  --page-top-band: color-mix(in srgb, var(--color-brand) 5%, var(--color-bg));
+  --page-top-line: color-mix(in srgb, var(--color-brand) 14%, var(--color-bg));
+}
+
+.dashboard-no-wallpaper .page-top-band {
+  position: relative;
+  background: var(--page-top-band);
+  box-shadow: 0 0 0 100vmax var(--page-top-band);
+  clip-path: inset(0 -100vmax -1px);
+}
+
+.dashboard-no-wallpaper .page-top-band::after {
+  content: "";
+  position: absolute;
+  inset: auto 0 -1px;
+  height: 1px;
+  background: var(--page-top-line);
+  box-shadow: 0 0 0 100vmax var(--page-top-line);
+  clip-path: inset(0 -100vmax);
+  pointer-events: none;
+}
+
+:where([data-theme="dark"]) .dashboard-no-wallpaper {
+  --page-top-band: color-mix(in srgb, #ffffff 4%, var(--color-bg));
+  --page-top-line: color-mix(in srgb, #ffffff 11%, var(--color-bg));
+}

@@ -1,0 +1,305 @@
+/* ── Launch cards (src/components/LaunchCard.jsx) ──
+   A compact widget card under the dashboard's widgets while a launch is
+   unseen. Its stage is a light sky blue (the « Nouveautés » blue, washed
+   out) under the page's own drawing and the simulator's springs
+   (--dial-spring, --fly-spring above), the page's icon standing on the
+   stage's floor, so it looks like what it opens.
+   The beats, from mount:
+     0      the card rises in
+     120ms  the drawing comes in, piece by piece
+     160ms  the words rise in, then the button (--delay)
+     760ms  the page's icon pops up on the floor, a ring ripples out
+     1150ms the drawing's last move (below, per card)
+     1900ms the button's arrow nudges twice
+   Reduced motion: the final frame, as is. */
+
+.launch-card {
+  animation: launch-card-in 640ms var(--fly-spring) backwards;
+}
+
+.launch-card-stage {
+  background:
+    radial-gradient(120% 95% at 50% 100%, #f3f8ff 0%, #e2edfc 55%, #d2e3f9 100%);
+  box-shadow: inset 0 0 0 1px rgb(26 115 232 / 0.1);
+}
+
+:where([data-theme="dark"]) .launch-card-stage {
+  background:
+    radial-gradient(120% 95% at 50% 100%, #2b3d58 0%, #213149 55%, #1a273a 100%);
+  box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.06);
+}
+
+/* The page's icon on the card's own surface. */
+.launch-card-hub {
+  background-color: #ffffff;
+  color: var(--color-text);
+  box-shadow: 0 1px 2px rgb(21 54 99 / 0.2), 0 6px 14px -6px rgb(21 54 99 / 0.45);
+  animation: launch-card-pop 620ms var(--dial-spring) 760ms backwards;
+}
+
+:where([data-theme="dark"]) .launch-card-hub {
+  background-color: #1c1c1c;
+  color: var(--color-text);
+  box-shadow: 0 1px 2px rgb(0 0 0 / 0.4), 0 6px 14px -6px rgb(0 0 0 / 0.7);
+}
+
+.launch-card-ripple {
+  border: 2px solid currentColor;
+  opacity: 0;
+  animation: ue-reveal-ripple 1000ms cubic-bezier(0.2, 0.8, 0.2, 1) 860ms;
+}
+
+.launch-card-rise {
+  animation: ue-reveal-rise 480ms cubic-bezier(0.2, 0.8, 0.2, 1) var(--delay, 0ms) backwards;
+}
+
+.launch-card-cta-arrow {
+  animation: launch-card-nudge 900ms ease-in-out 1900ms;
+}
+
+/* Between the widgets' band and the apps (the dashboard's grid gap
+   above it, a little tighter); closing, the card fades back, then its room
+   folds up so the apps slide into place rather than jump. */
+.launch-card-slot {
+  display: grid;
+  grid-template-rows: 1fr;
+  margin: -12px 0 28px;
+  transition: grid-template-rows 300ms cubic-bezier(0.4, 0, 0.2, 1) 180ms, margin 300ms cubic-bezier(0.4, 0, 0.2, 1) 180ms;
+}
+
+.launch-card-slot.is-leaving {
+  grid-template-rows: 0fr;
+  margin: 0;
+}
+
+.launch-card-slot.is-leaving > div {
+  overflow: hidden;
+}
+
+.launch-card-slot.is-leaving .launch-card {
+  animation: launch-card-out 220ms cubic-bezier(0.4, 0, 1, 1) forwards;
+}
+
+@media (width < 768px) {
+  .launch-card-slot {
+    margin: -12px 0 20px;
+  }
+}
+
+/* On « Accueil », right under the band: its room above, folding up with it. */
+.home-draft-page .launch-card-slot {
+  margin: 24px 0 0;
+}
+
+.home-draft-page .launch-card-slot.is-leaving {
+  margin: 0;
+}
+
+@media (width < 768px) {
+  .home-draft-page .launch-card-slot {
+    margin-top: 16px;
+  }
+}
+
+@keyframes launch-card-in {
+  from {
+    opacity: 0;
+    transform: translateY(14px) scale(0.97);
+  }
+}
+
+@keyframes launch-card-out {
+  to {
+    opacity: 0;
+    transform: scale(0.97);
+  }
+}
+
+/* `transform` only: the centring is Tailwind's `translate`, left alone. */
+@keyframes launch-card-pop {
+  from {
+    opacity: 0;
+    transform: scale(0.3);
+  }
+}
+
+@keyframes launch-card-nudge {
+  0%,
+  50%,
+  100% {
+    transform: none;
+  }
+
+  25%,
+  75% {
+    transform: translateX(4px);
+  }
+}
+
+/* « Mes notes » (GradesLaunchCard): the simulator's dial, its top half
+   standing on the floor. It swings in from a quarter turn back, its
+   ribbons fanning out of the centre one after the other; at 1150ms a
+   shimmer sweeps over the ribbons as the dial springs one UE on (the
+   final frame has it turned). */
+
+.grades-launch-turn {
+  transform-box: view-box;
+  transform-origin: 60px 60px;
+  transform: rotate(var(--dial-rotation, 0deg));
+  animation: ue-dial-spin-in 1100ms var(--dial-spring) 120ms backwards;
+}
+
+.grades-launch-step {
+  transform-box: view-box;
+  transform-origin: 60px 60px;
+  transform: rotate(var(--dial-step, 0deg));
+  animation: grades-launch-step 1000ms var(--dial-spring) 1200ms backwards;
+}
+
+.grades-launch-ribbon {
+  transform-box: view-box;
+  transform-origin: 60px 60px;
+  animation: grades-launch-ribbon-in 720ms var(--fly-spring) calc(140ms + var(--i, 0) * 70ms) backwards;
+}
+
+.grades-launch-shimmer {
+  opacity: 0;
+  stroke-dasharray: 0.22 2;
+  stroke-dashoffset: 0.22;
+  animation: grades-launch-shimmer 1200ms cubic-bezier(0.45, 0, 0.3, 1) 1150ms;
+}
+
+@keyframes grades-launch-step {
+  from {
+    transform: none;
+  }
+}
+
+/* A wide band of light, along the ribbons from left to right. */
+@keyframes grades-launch-shimmer {
+  0% {
+    opacity: 0;
+    stroke-dashoffset: 0.22;
+  }
+
+  15%,
+  80% {
+    opacity: 0.55;
+  }
+
+  100% {
+    opacity: 0;
+    stroke-dashoffset: -1;
+  }
+}
+
+@keyframes grades-launch-ribbon-in {
+  from {
+    opacity: 0;
+    transform: scale(0.5);
+  }
+}
+
+/* The Planning (PlanningLaunchCard): a few days of the page's grid, its
+   classes (.planning-accent-fill, .latest-grade-wash as on the page's
+   blocks) dropping into place one after the other; at 1150ms the "now"
+   line draws across today in the brand colour, faint over the rest of the
+   week, as on the page (.planning-now-line). */
+
+.planning-launch-hour {
+  background: var(--color-border);
+}
+
+.planning-launch-block {
+  border-color: var(--color-border);
+  box-shadow: 0 1px 2px rgb(21 54 99 / 0.12);
+  animation: planning-launch-block-in 720ms var(--fly-spring) calc(140ms + var(--i, 0) * 70ms) backwards;
+}
+
+:where([data-theme="dark"]) .planning-launch-block {
+  box-shadow: 0 1px 2px rgb(0 0 0 / 0.35);
+}
+
+/* The title, as a line. */
+.planning-launch-title {
+  background: var(--color-text);
+  opacity: 0.5;
+}
+
+.planning-launch-now {
+  z-index: 1;
+  background: var(--color-brand);
+  transform-origin: left center;
+  animation: planning-launch-now 700ms cubic-bezier(0.2, 0.8, 0.2, 1) 1150ms backwards;
+}
+
+.planning-launch-now.is-faint {
+  opacity: 0.25;
+}
+
+.planning-launch-now-dot {
+  background: var(--color-brand);
+}
+
+@keyframes planning-launch-block-in {
+  from {
+    opacity: 0;
+    transform: translateY(-8px) scale(0.85);
+  }
+}
+
+@keyframes planning-launch-now {
+  from {
+    transform: scaleX(0);
+  }
+}
+
+/* « Messagerie » (MailLaunchCard): the message list's rows slide in from
+   the right one after the other (a soft overshoot), then the first one's
+   unread dot pops in the brand colour. */
+
+.mail-launch-row {
+  border-color: var(--color-border);
+  box-shadow: 0 1px 2px rgb(21 54 99 / 0.12);
+  animation: mail-launch-row-in 700ms var(--fly-spring) calc(140ms + var(--i, 0) * 110ms) backwards;
+}
+
+:where([data-theme="dark"]) .mail-launch-row {
+  box-shadow: 0 1px 2px rgb(0 0 0 / 0.35);
+}
+
+.mail-launch-line {
+  background: var(--color-text);
+  opacity: 0.55;
+}
+
+.mail-launch-line.is-faint {
+  opacity: 0.22;
+}
+
+.mail-launch-unread {
+  background: var(--color-brand);
+  animation: launch-card-pop 520ms var(--dial-spring) 780ms backwards;
+}
+
+@keyframes mail-launch-row-in {
+  from {
+    opacity: 0;
+    transform: translateX(26px) scale(0.94);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .launch-card,
+  .launch-card :is(.launch-card-hub, .launch-card-rise, .launch-card-cta-arrow, .grades-launch-turn, .grades-launch-step, .grades-launch-ribbon, .planning-launch-block, .planning-launch-now, .mail-launch-row, .mail-launch-unread) {
+    animation: none;
+  }
+
+  .launch-card :is(.launch-card-ripple, .grades-launch-shimmer) {
+    display: none;
+  }
+
+  .launch-card-slot {
+    transition: none;
+  }
+}

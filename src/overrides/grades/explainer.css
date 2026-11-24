@@ -1,0 +1,197 @@
+/* ── Grades explainer (Mes notes › « Comment ça marche ? ») ──
+   The schemas' resting styles are their final state: each animation only
+   says where a piece comes from (`from` keyframes, `both` fill), so with
+   reduced motion they simply show finished. `--d` staggers the pieces. */
+
+.gx-stage {
+  background: #f3f1eb;
+  /* Carved in (as .engraved): the schemas sit in a well. */
+  box-shadow:
+    inset 0 1px 3px rgb(52 18 0 / 0.12),
+    inset 0 0 0 1px color-mix(in srgb, var(--ink) 6%, transparent);
+}
+
+:where([data-theme="dark"]) .gx-stage {
+  background: #141414;
+  box-shadow:
+    inset 0 1px 3px rgb(0 0 0 / 0.6),
+    inset 0 0 0 1px rgb(255 255 255 / 0.03);
+}
+
+/* The schemas' cards, on the stage's tint: solid glass (its tokens: the
+   lit edge, the outer stroke, the close shadow). */
+.gx-card {
+  border: 1px solid;
+  border-color: var(--glass-solid-edge);
+  background-color: var(--glass-solid-fill);
+  outline: 1px solid var(--glass-solid-outer);
+  outline-offset: 0;
+  box-shadow: var(--glass-solid-shadow);
+}
+
+/* Phosphor-like coin, as next to a UE's ECTS on the tiles. */
+.gx-coin {
+  display: inline-block;
+  flex-shrink: 0;
+  width: 10px;
+  height: 7px;
+  border-radius: 50%;
+  box-shadow: inset 0 -1.5px 0 rgb(0 0 0 / 0.28);
+}
+
+.gx-success {
+  color: var(--color-success-text);
+}
+
+/* Wide dialogs show the schemas a size up; phones keep them 1:1. */
+@media (min-width: 600px) {
+  .gx-figure {
+    zoom: 1.12;
+  }
+}
+
+.gx-step {
+  animation: gx-fade 220ms ease-out both;
+}
+
+.gx-rise {
+  animation: gx-rise 480ms cubic-bezier(0.2, 0.8, 0.2, 1) var(--d, 0ms) both;
+}
+
+.gx-fade {
+  animation: gx-fade 360ms ease-out var(--d, 0ms) both;
+}
+
+.gx-drop {
+  display: inline-block;
+  animation: gx-drop 560ms cubic-bezier(0.34, 1.4, 0.64, 1) var(--d, 0ms) both;
+}
+
+.gx-pop {
+  animation: gx-pop 420ms cubic-bezier(0.34, 1.4, 0.64, 1) var(--d, 0ms) both;
+}
+
+/* Lines drawn from the subject to the UE (pathLength="1"). */
+.gx-draw {
+  stroke-dasharray: 1;
+  animation: gx-draw 720ms cubic-bezier(0.45, 0, 0.2, 1) var(--d, 0ms) both;
+}
+
+/* Beads running along the lines, toward the UE: the grades feeding it. */
+.gx-flow {
+  stroke: var(--color-widget-bg);
+  stroke-opacity: 0.9;
+  stroke-dasharray: 0.001 0.1;
+  animation:
+    gx-fade 400ms ease-out var(--d, 0ms) both,
+    gx-flow 1.8s linear var(--d, 0ms) infinite;
+}
+
+.gx-fill-x {
+  transform-origin: left center;
+  animation: gx-fill-x var(--dur, 900ms) cubic-bezier(0.3, 0.7, 0.2, 1) var(--d, 0ms) both;
+}
+
+/* « Sur cette page »: the mock-up's numbered spots light up one after the
+   other (2 s each, `--i`), with the matching line of the list. */
+.gx-spot-number,
+.gx-tip-number {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  background: var(--color-text);
+  color: var(--color-bg);
+  font-family: var(--font-body);
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.gx-spot-number {
+  position: absolute;
+  top: -11px;
+  right: -13px;
+  box-shadow: 0 0 0 2px var(--color-widget-bg);
+}
+
+.gx-tip-number {
+  margin-top: 2px;
+}
+
+.gx-spot::before {
+  content: "";
+  position: absolute;
+  inset: -4px;
+  border-radius: 999px;
+  box-shadow: 0 0 0 2px var(--color-text);
+  opacity: 0;
+  pointer-events: none;
+  animation: gx-spot 8s ease-in-out calc(var(--i) * 2s + 600ms) infinite;
+}
+
+.gx-tip {
+  animation: gx-tip 8s ease-in-out calc(var(--i) * 2s + 600ms) infinite;
+}
+
+.gx-dot:focus-visible {
+  outline-offset: 0;
+}
+
+@keyframes gx-rise {
+  from { opacity: 0; transform: translateY(8px); }
+}
+
+@keyframes gx-fade {
+  from { opacity: 0; }
+}
+
+@keyframes gx-drop {
+  from { opacity: 0; transform: translateY(-16px) rotate(-8deg) scale(0.9); }
+}
+
+@keyframes gx-pop {
+  from { opacity: 0; transform: scale(0.4); }
+}
+
+@keyframes gx-draw {
+  from { stroke-dashoffset: 1; }
+}
+
+@keyframes gx-flow {
+  from { stroke-dashoffset: 0.1; }
+  to { stroke-dashoffset: 0; }
+}
+
+@keyframes gx-fill-x {
+  from { transform: scaleX(0); }
+}
+
+@keyframes gx-spot {
+  0%, 22%, 100% { opacity: 0; transform: scale(1.25); }
+  4%, 18% { opacity: 1; transform: scale(1); }
+}
+
+@keyframes gx-tip {
+  0%, 22%, 100% { background: transparent; }
+  4%, 18% { background: var(--color-brand-subtle); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .gx-root,
+  .gx-root * {
+    animation: none !important;
+  }
+
+  .gx-root *::before {
+    animation: none !important;
+  }
+
+  .gx-flow,
+  .gx-replay {
+    display: none;
+  }
+}

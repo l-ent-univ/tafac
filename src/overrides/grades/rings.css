@@ -1,0 +1,168 @@
+/* ── ECTS ring ("Crédits ECTS" card) ──
+   Colours from the Figma card; the arc fills in once on mount. */
+
+.ects-ring-track {
+  stroke: #d9d9d9;
+}
+
+.ects-ring-arc {
+  stroke: #611a00;
+  animation: ects-ring-fill 900ms cubic-bezier(0.16, 1, 0.3, 1) backwards;
+}
+
+:where([data-theme="dark"]) .ects-ring-track {
+  stroke: rgb(255 255 255 / 0.12);
+}
+
+:where([data-theme="dark"]) .ects-ring-arc {
+  stroke: var(--color-text);
+}
+
+@keyframes ects-ring-fill {
+  from {
+    stroke-dashoffset: var(--ects-ring-length);
+  }
+}
+
+/* Behind the ring, faint: the credits as piles of coins drawn as the UE
+   coin (UeSubjectsList's CoinIcon), the UE's colour with a thin outline;
+   credits still to earn are dashed outlines. They drop onto their piles
+   once on mount. A secondary layer: the ring stays the reading. */
+
+.ects-piles {
+  opacity: 0.2;
+  -webkit-mask-image: linear-gradient(to bottom, transparent 4%, #000 55%);
+  mask-image: linear-gradient(to bottom, transparent 4%, #000 55%);
+}
+
+:where([data-theme="dark"]) .ects-piles {
+  opacity: 0.26;
+}
+
+.ects-coin-line {
+  stroke: color-mix(in srgb, var(--color-text) 45%, transparent);
+  stroke-width: 0.8;
+}
+
+.ects-coin--due .ects-coin-line {
+  stroke-dasharray: 2 2;
+}
+
+.ects-coin-shine {
+  stroke: rgb(255 255 255 / 0.45);
+  stroke-width: 0.8;
+}
+
+.ects-coin {
+  animation: ects-coin-drop 520ms cubic-bezier(0.34, 1.4, 0.5, 1) backwards;
+}
+
+@keyframes ects-coin-drop {
+  from {
+    opacity: 0;
+    transform: translateY(-26px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ects-ring-arc,
+  .ects-coin {
+    animation: none;
+  }
+}
+
+/* ── UE ring ("UE validées" card) ──
+   One segment per UE in ScoDoc's colour (--ue-color): filled once validated,
+   grey with an outline below 10, filled but faded without an average yet.
+   Textured as the buttons: an edge in a deeper shade of the UE's colour, a
+   white rim inside lit from the top of the ring (WidgetUes' gradient), a
+   close, sharp shadow under the ring. A pending segment (faded) stays
+   flat. Segments grow in one after the other. */
+
+.ue-ring {
+  filter: drop-shadow(0 0.5px 0.5px rgb(0 0 0 / 0.1)) drop-shadow(0 1px 1.5px rgb(0 0 0 / 0.07));
+}
+
+:where([data-theme="dark"]) .ue-ring {
+  filter: drop-shadow(0 0.5px 0.5px rgb(0 0 0 / 0.4)) drop-shadow(0 1px 1.5px rgb(0 0 0 / 0.3));
+}
+
+.ue-ring-group {
+  transform-box: view-box;
+  transform-origin: 50% 50%;
+  transition: opacity 150ms ease-out;
+  animation: ue-ring-segment-in 520ms cubic-bezier(0.16, 1, 0.3, 1) backwards;
+}
+
+.ue-ring-segment {
+  stroke-width: 0.75;
+  stroke-linejoin: round;
+  cursor: default;
+  outline: none;
+}
+
+.ue-ring-segment--validated {
+  fill: var(--ue-color);
+  stroke: color-mix(in oklab, var(--ue-color), black 20%);
+}
+
+.ue-ring-segment--below {
+  fill: #ececec;
+  stroke: var(--ue-color);
+}
+
+:where([data-theme="dark"]) .ue-ring-segment--below {
+  fill: rgb(255 255 255 / 0.08);
+}
+
+/* No grade yet: the UE's colour, faded (fill-opacity, so the hover dimming
+   on `opacity` still applies on top). */
+.ue-ring-segment--pending {
+  fill: var(--ue-color);
+  fill-opacity: 0.25;
+  stroke: none;
+}
+
+/* The rim: 1.6 wide on the edge, clipped to the segment (its inner half). */
+.ue-ring-rim {
+  fill: none;
+  stroke-width: 1.6;
+  stroke-linejoin: round;
+  pointer-events: none;
+}
+
+.ue-ring-rim-top {
+  stop-color: #fff;
+  stop-opacity: 0.45;
+}
+
+.ue-ring-rim-bottom {
+  stop-color: #fff;
+  stop-opacity: 0.06;
+}
+
+:where([data-theme="dark"]) .ue-ring-rim-top {
+  stop-opacity: 0.28;
+}
+
+:where([data-theme="dark"]) .ue-ring-rim-bottom {
+  stop-opacity: 0.04;
+}
+
+/* Hovering or focusing a segment dims the others. */
+.ue-ring:has(.ue-ring-group.is-active) .ue-ring-group:not(.is-active) {
+  opacity: 0.4;
+}
+
+@keyframes ue-ring-segment-in {
+  from {
+    opacity: 0;
+    transform: scale(0.82);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ue-ring-group {
+    animation: none;
+  }
+}

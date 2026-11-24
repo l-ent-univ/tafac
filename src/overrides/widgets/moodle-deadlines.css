@@ -1,0 +1,62 @@
+/* ── Moodle deadlines widget ── */
+
+.moodle-deadlines-widget {
+  --widget-delay: 280ms;
+}
+
+.moodle-deadlines-widget.cursor-pointer:hover {
+  background-color: var(--color-bg-subtle);
+}
+
+.moodle-deadlines-widget .deadline-corner-link {
+  opacity: 0;
+  transition: opacity 150ms ease;
+}
+
+.moodle-deadlines-widget:hover .deadline-corner-link {
+  opacity: 0.45;
+}
+
+.moodle-deadlines-widget .deadline-corner-link:hover,
+.moodle-deadlines-widget .deadline-corner-link:focus-visible {
+  opacity: 1;
+}
+
+/* Urgency palette: amber = due within 48 h, red = overdue. The count is a
+   tag (.lent-button--tag) in those colours. */
+.lent-button.deadline-pill {
+  --lent-button-fill: #f59e0b;
+  --lent-button-ink: #2b1600;
+}
+
+.lent-button.deadline-pill.deadline-pill-overdue {
+  --lent-button-fill: #dc2626;
+  --lent-button-ink: #ffffff;
+}
+
+.deadline-due-soon {
+  color: #b45309;
+}
+
+.deadline-due-overdue {
+  color: var(--color-error);
+}
+
+.deadline-submitted-icon {
+  color: var(--color-success-text);
+  opacity: 0.75;
+}
+
+:where([data-theme="dark"]) .lent-button.deadline-pill {
+  --lent-button-fill: #fbbf24;
+  --lent-button-ink: #0f0f0f;
+}
+
+:where([data-theme="dark"]) .lent-button.deadline-pill.deadline-pill-overdue {
+  --lent-button-fill: #f87171;
+  --lent-button-ink: #0f0f0f;
+}
+
+:where([data-theme="dark"]) .deadline-due-soon {
+  color: #fbbf24;
+}

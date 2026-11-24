@@ -1,0 +1,141 @@
+/* ── Button group (the planning header's actions) ──
+   Icon buttons joined in one pill of the material (white, a white edge, a
+   soft warm shadow; the dark theme's own), hairlines between them. A
+   segment lightens under the pointer, its icon gives under the press, and
+   one whose panel is open (aria-expanded) stays tinted. Gone when empty. */
+.button-group {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  padding: 2px;
+  /* Solid glass (its tokens). */
+  border: 1px solid;
+  border-color: var(--glass-solid-edge);
+  border-radius: 9999px;
+  background-color: var(--glass-solid-fill);
+  outline: 1px solid var(--glass-solid-outer);
+  outline-offset: 0;
+  box-shadow: var(--glass-solid-shadow);
+}
+
+.button-group:empty {
+  display: none;
+}
+
+/* The mail reader's close button: the side panel's, wide screens only (a
+   phone's reader has its back button). Here, not as a utility: the group's
+   display above would win over `max-4xl:hidden`. */
+@media (max-width: 1023.98px) {
+  .mail-toolbar-close {
+    display: none;
+  }
+}
+
+.button-group > * + * {
+  margin-left: 1px;
+}
+
+.button-group > * + *::before {
+  content: '';
+  position: absolute;
+  top: 10px;
+  bottom: 10px;
+  left: -1px;
+  width: 1px;
+  background-color: rgb(52 18 0 / 0.1);
+  pointer-events: none;
+  transition: opacity 150ms ease;
+}
+
+/* No hairline against a selected (or hovered) segment: on either side. A
+   segment may sit in a wrapper (the export's, for its notice). */
+.button-group > :is([aria-expanded="true"], :has(> [aria-expanded="true"]))::before,
+.button-group > :is([aria-expanded="true"], :has(> [aria-expanded="true"])) + *::before {
+  opacity: 0;
+}
+
+@media (hover: hover) {
+  .button-group > :is(.button-group-item:hover:not(:disabled), :has(> .button-group-item:hover:not(:disabled)))::before,
+  .button-group > :is(.button-group-item:hover:not(:disabled), :has(> .button-group-item:hover:not(:disabled))) + *::before {
+    opacity: 0;
+  }
+}
+
+.button-group-item {
+  position: relative;
+  display: inline-flex;
+  width: 40px;
+  height: 36px;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  border-radius: 9999px;
+  background-color: transparent;
+  color: var(--color-text);
+  cursor: pointer;
+  transition: background-color 150ms ease;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.button-group-item > svg {
+  transition: scale 100ms ease-out;
+}
+
+.button-group-item:active:not(:disabled) > svg {
+  scale: 0.86;
+}
+
+@media (hover: hover) {
+  .button-group-item:hover:not(:disabled) {
+    background-color: rgb(52 18 0 / 0.05);
+  }
+}
+
+.button-group-item[aria-expanded="true"] {
+  background-color: rgb(52 18 0 / 0.08);
+}
+
+.button-group-item:focus-visible {
+  outline: 2px solid var(--color-text-30);
+  outline-offset: -2px;
+}
+
+.button-group-item:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+@media (max-width: 1023px) {
+  .button-group {
+    padding: 1px;
+  }
+}
+
+:where([data-theme="dark"]) .button-group > * + *::before {
+  background-color: rgb(255 255 255 / 0.1);
+}
+
+@media (hover: hover) {
+  :where([data-theme="dark"]) .button-group-item:hover:not(:disabled) {
+    background-color: rgb(255 255 255 / 0.07);
+  }
+}
+
+:where([data-theme="dark"]) .button-group-item[aria-expanded="true"] {
+  background-color: rgb(255 255 255 / 0.1);
+}
+
+/* A room's model (RoomIcon): the badge palette's ink alone, no tile. */
+.room-icon {
+  color: var(--app-tile-fg);
+}
+
+:where([data-theme="dark"]) .room-icon {
+  color: var(--app-tile-fg-dark);
+}
+
+:where([data-theme="dark"]) .app-icon--auto {
+  background-color: var(--app-tile-bg-dark);
+  color: var(--app-tile-fg-dark);
+}

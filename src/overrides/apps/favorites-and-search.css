@@ -1,0 +1,33 @@
+/* ── Favorites strip scrollbar hide ── */
+
+.favorites-scroll-hide {
+  scrollbar-width: none;
+}
+
+.favorites-scroll-hide::-webkit-scrollbar {
+  display: none;
+}
+
+/* ── Favorite search highlight pulse ── */
+
+.favorite-search-highlight {
+  --favorite-highlight-rgb: 17 24 39;
+  animation: favorite-highlight-pulse 1.5s ease-in-out infinite;
+}
+
+:where([data-theme="dark"]) .favorite-search-highlight {
+  --favorite-highlight-rgb: 255 255 255;
+}
+
+@keyframes favorite-highlight-pulse {
+  0%, 100% { box-shadow: 0 0 0 2px rgb(var(--favorite-highlight-rgb) / 0.15); }
+  50% { box-shadow: 0 0 0 2px rgb(var(--favorite-highlight-rgb) / 0.4); }
+}
+
+/* ── App search input focus override ── */
+
+.app-search-input,
+.app-search-input:focus,
+.app-search-input:focus-visible {
+  outline: none !important;
+}

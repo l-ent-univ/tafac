@@ -1,0 +1,19 @@
+/* ── A class's sheet (PlanningEventSheet) ──
+   Its cards (the class's block, its rows) are widget cards, which are glass
+   unless the page has no wallpaper; the sheet sits in a portal, outside the
+   page, on its own plain colour: solid cards there, as on the page, with a
+   warm hairline (the sheet is lighter than the page) so they stand out.
+   The mail reader's panel (its attachments' card) likewise. */
+.planning-sheet .widget-card,
+.mail-reader-panel .widget-card,
+.side-panel .widget-card {
+  --color-widget-bg: var(--glass-solid-fill);
+  --color-bg-subtle: var(--glass-solid-fill-hover);
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+
+/* The sheet already wears the course's wash: its block stays plain. */
+.planning-sheet .planning-block > .latest-grade-wash {
+  display: none;
+}

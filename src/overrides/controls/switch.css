@@ -1,0 +1,64 @@
+/* ── Switch (Switch) ──
+   Two styles, by the rule of the system: the strokes (a dark edge, a
+   white rim, a sharp shadow) only where the primary colour fills the
+   component; elsewhere the soft one (a fill, a faint hairline, a whisper
+   of shadow, no rim, no gradient).
+   On, the track is the ink and takes the strokes: a dark edge, a shade
+   inside its top edge, the light catching its bottom edge. Off, it's
+   soft: ink at 30 %, a faint hairline. The thumb is always soft: a white
+   knob, a faint hairline, a soft shadow. On the smooth pill once
+   SmoothSurface is in (till then the same in CSS). While its thumb is
+   dragged (Switch), the track shows the side it would settle on
+   (data-shown), not the value yet. */
+.switch {
+  --switch-fill: color-mix(in srgb, var(--color-text) 30%, transparent);
+  --switch-edge: color-mix(in srgb, var(--color-text) 10%, transparent);
+  --switch-well: rgb(0 0 0 / 0);
+  --surface-face: var(--switch-fill);
+  --surface-edge: var(--switch-edge);
+  --surface-shade-top: rgb(0 0 0 / 0);
+  --surface-shade-bottom: rgb(0 0 0 / 0);
+  --surface-press: var(--switch-well);
+  --surface-rim-top: 0;
+  --surface-rim-mid: 0.04;
+  --surface-rim-bottom: 0.16;
+  --surface-rim-opacity: 0;
+  --surface-drop: none;
+  background-color: var(--switch-fill);
+  box-shadow: 0 0 0 1px var(--switch-edge), inset 0 1px 2px var(--switch-well);
+  transition: background-color 150ms ease, box-shadow 150ms ease;
+}
+
+.switch:is([aria-checked="true"]:not([data-shown]), [data-shown="on"]) {
+  --switch-fill: var(--color-text);
+  --switch-edge: color-mix(in oklab, var(--color-text), black 40%);
+  --switch-well: rgb(0 0 0 / 0.3);
+  --surface-rim-opacity: 1;
+}
+
+.switch-thumb {
+  --switch-thumb-edge: color-mix(in srgb, var(--color-text) 10%, transparent);
+  background-color: var(--color-widget-bg);
+  box-shadow:
+    0 0 0 1px var(--switch-thumb-edge),
+    0 1px 1px rgb(52 18 0 / 0.12),
+    0 1px 3px rgb(52 18 0 / 0.12);
+}
+
+:where([data-theme="dark"]) .switch {
+  --switch-edge: rgb(255 255 255 / 0.08);
+}
+
+:where([data-theme="dark"]) .switch:is([aria-checked="true"]:not([data-shown]), [data-shown="on"]) {
+  --switch-edge: rgb(0 0 0 / 0.7);
+  --switch-well: rgb(0 0 0 / 0.25);
+  --surface-rim-bottom: 0.3;
+}
+
+:where([data-theme="dark"]) .switch-thumb {
+  --switch-thumb-edge: rgb(0 0 0 / 0.35);
+  box-shadow:
+    0 0 0 1px var(--switch-thumb-edge),
+    0 1px 1px rgb(0 0 0 / 0.35),
+    0 1px 3px rgb(0 0 0 / 0.3);
+}

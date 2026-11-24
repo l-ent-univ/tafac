@@ -1,0 +1,49 @@
+/* ── Desktop app: printing (Fichier › Imprimer…, ⌘P) ──
+   The page in view without the app around it (sidebar, resize handles,
+   side panels), at its full length (on screen the column scrolls, a print
+   would stop at the window's height), its colours kept (the planning's
+   blocks). A mail open in the reader prints alone, as in Mail. */
+@media print {
+  :root[data-desktop-app] {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  :root[data-desktop-app] :is(.sidebar-panel, .side-panel, .mail-toolbar-veil, [role="separator"], .desktop-update-note),
+  :root[data-desktop-app] :has(> [role="separator"]) {
+    display: none !important;
+  }
+
+  :root[data-desktop-app] :is(.dashboard-no-wallpaper, .app-column) {
+    height: auto !important;
+    min-height: 0 !important;
+    overflow: visible !important;
+    margin-left: 0 !important;
+    padding-left: 0 !important;
+  }
+
+  :root[data-desktop-app] :has(> .mail-reader-panel) {
+    padding: 0 !important;
+  }
+
+  :root[data-desktop-app] :has(> .mail-reader-panel) > :not(.mail-reader-panel) {
+    display: none !important;
+  }
+
+  /* The week can't be cut across pages (one block, its classes placed in
+     it), and 06:00–22:00 under the header is taller than a page: a little
+     smaller, it fits on one. */
+  :root[data-desktop-app] .planning-page {
+    zoom: 0.8;
+  }
+
+  :root[data-desktop-app] .mail-reader-panel {
+    position: static !important;
+    width: auto !important;
+    overflow: visible !important;
+    border: 0 !important;
+    padding: 0 !important;
+    background: none !important;
+    animation: none !important;
+  }
+}

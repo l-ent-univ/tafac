@@ -1,0 +1,6 @@
+/* ── Widget card visibility ── */
+
+.widget-card-visible {
+  opacity: 1;
+  transform: none;
+}

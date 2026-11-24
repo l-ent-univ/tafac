@@ -1,0 +1,292 @@
+/* ── UE dial (the "Simuler" sheet) ──
+   The UE ring, large and cut by the sheet's bottom edge: the arrows turn it
+   to bring a UE to the top. Its segments are UE ribbons (UeBadge). */
+.ue-dial-turn {
+  transform: rotate(var(--dial-rotation, 0deg));
+  transition: transform 800ms var(--dial-spring);
+  animation: ue-dial-spin-in 1000ms var(--dial-spring) backwards;
+  /* Its own layer, turned by the compositor: nothing repainted. */
+  will-change: transform;
+  isolation: isolate;
+}
+
+/* A shadow layer: offset as the dial stands, its ring blurred before it's
+   turned. --dx, --dy, --blur in the dial's 120-unit box. */
+.ue-dial-shadow {
+  transform: translate(calc(var(--dx) * 100% / 120), calc(var(--dy) * 100% / 120));
+}
+
+.ue-dial-shadow > .ue-dial-turn {
+  filter: blur(calc(var(--blur) * 100cqw / 120));
+}
+
+/* Under the hand: it follows the pointer, no easing. */
+.ue-dial.is-dragging .ue-dial-turn {
+  transition: none;
+}
+
+/* As the sheet opens, the dial swings in from a quarter turn back and
+   springs past its place before settling (a damped spring, as linear());
+   it settles the same way after an arrow or a drag. */
+.ue-dial,
+.ue-picked,
+.ue-reveal,
+.launch-card {
+  --dial-spring: linear(0.000, 0.034, 0.124, 0.249, 0.394, 0.544, 0.688, 0.817, 0.928, 1.016, 1.083, 1.128, 1.153, 1.163, 1.159, 1.146, 1.127, 1.103, 1.079, 1.055, 1.034, 1.015, 1.000, 0.988, 0.980, 0.976, 0.974, 0.974, 0.976, 0.979, 0.982, 0.986, 0.990, 0.994, 0.997, 1.000, 1.002, 1.003, 1.004, 1.004, 1);
+  --fly-spring: linear(0.000, 0.027, 0.096, 0.189, 0.294, 0.401, 0.505, 0.600, 0.685, 0.759, 0.822, 0.873, 0.915, 0.947, 0.972, 0.990, 1.003, 1.011, 1.016, 1.019, 1.020, 1.019, 1.018, 1.016, 1.014, 1.012, 1.010, 1.008, 1.006, 1.005, 1.004, 1.003, 1.002, 1.001, 1.001, 1.000, 1.000, 1.000, 1.000, 1.000, 1);
+}
+
+@keyframes ue-dial-spin-in {
+  from {
+    transform: rotate(calc(var(--dial-rotation, 0deg) - 90deg));
+  }
+  to {
+    transform: rotate(var(--dial-rotation, 0deg));
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ue-dial-turn {
+    transition: none;
+    animation: none;
+  }
+}
+
+/* Once a UE is picked: the dial fades out from where it stands, and its
+   segment, now the UE's badge, flies from the dial into the corner with a
+   gentler spring (start: --fly-x/-y/-s, set from the segment's box). */
+.ue-dial-leave {
+  transform-origin: 50% 100%;
+  animation: ue-dial-leave 320ms cubic-bezier(0.4, 0, 1, 1) forwards;
+}
+
+/* Mounted anew where it leaves from: no swinging in again. */
+.ue-dial-leave .ue-dial-turn {
+  animation: none;
+}
+
+@keyframes ue-dial-leave {
+  to {
+    opacity: 0;
+    transform: scale(0.94);
+  }
+}
+
+.ue-picked-fly {
+  transform-origin: 50% 50%;
+  animation: ue-picked-fly 760ms var(--fly-spring) backwards;
+}
+
+@keyframes ue-picked-fly {
+  from {
+    transform: translate(var(--fly-x, 0), var(--fly-y, 0)) scale(var(--fly-s, 1));
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ue-dial-leave {
+    animation-duration: 1ms;
+  }
+
+  .ue-picked-fly {
+    animation: none;
+  }
+}
+
+/* ── The simulator's reveal (GradeSimulatorReveal) ──
+   The gauge's ribbon, knob and number move frame by frame from JS; these
+   are the beats around them, keyed on the step's phase (data-phase: intro,
+   move, settled) and its tone (data-tone: up or down, see
+   describeUeOutcome). Whatever waits for the verdict keeps its room from
+   the start, invisible, so nothing below it moves. */
+.ue-reveal-track {
+  color: var(--color-text);
+  opacity: 0.08;
+  animation: ue-reveal-fade 420ms ease-out backwards;
+}
+
+/* The pass mark: lights up (and pops) once the ribbon reaches it. */
+.ue-reveal-pass {
+  color: var(--color-text-50);
+  transform-box: fill-box;
+  transform-origin: 50% 100%;
+  transition: color 200ms ease;
+}
+
+.ue-reveal-pass.is-lit {
+  color: var(--color-text);
+  animation: ue-reveal-bump 560ms var(--dial-spring);
+}
+
+.ue-reveal-ends {
+  fill: var(--color-text-50);
+}
+
+/* The average as it was, marked as the ribbon leaves it. */
+.ue-reveal-was {
+  color: var(--color-text-50);
+  opacity: 0;
+  transition: opacity 260ms ease;
+}
+
+.ue-reveal:not([data-phase="intro"]) .ue-reveal-was {
+  opacity: 1;
+}
+
+/* Going down, what the UE gives up: faint, under the ribbon as it draws
+   back. */
+.ue-reveal-lost {
+  opacity: 0;
+  transition: opacity 260ms ease;
+}
+
+.ue-reveal:not([data-phase="intro"]) .ue-reveal-lost {
+  opacity: 0.26;
+}
+
+/* The number, its caption and the knob, once the sweep starts
+   (INTRO_START). */
+.ue-reveal-readout,
+.ue-reveal-knob {
+  animation: ue-reveal-fade 240ms ease-out 260ms backwards;
+}
+
+/* The number: muted while it's the average as it is. */
+.ue-reveal-number {
+  color: var(--color-text-50);
+  transform-origin: 50% 70%;
+  transition: color 300ms ease;
+}
+
+.ue-reveal:not([data-phase="intro"]) .ue-reveal-number {
+  color: var(--color-text);
+}
+
+.ue-reveal[data-phase="settled"]:is([data-tone="crossed"], [data-tone="up"], [data-tone="closer"]) .ue-reveal-number {
+  animation: ue-reveal-bump 620ms var(--dial-spring);
+}
+
+.ue-reveal-caption {
+  animation: ue-reveal-rise 300ms cubic-bezier(0.2, 0.8, 0.2, 1) backwards;
+}
+
+/* Settled: a ring ripples out of the knob, and going up a gleam runs
+   along the ribbon. */
+.ue-reveal-ripple {
+  opacity: 0;
+  transform-box: fill-box;
+  transform-origin: center;
+}
+
+.ue-reveal:not([data-tone="same"])[data-phase="settled"] .ue-reveal-ripple {
+  animation: ue-reveal-ripple 900ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.ue-reveal-gleam {
+  opacity: 0;
+  stroke-dasharray: 0.14 2;
+  stroke-dashoffset: 0.14;
+}
+
+.ue-reveal[data-phase="settled"] .ue-reveal-gleam {
+  animation: ue-reveal-gleam 1100ms cubic-bezier(0.45, 0, 0.3, 1) 160ms;
+}
+
+/* The verdict: the words and the semester card rise in, one after the
+   other (--delay). */
+.ue-reveal-later {
+  opacity: 0;
+}
+
+.ue-reveal[data-phase="settled"] .ue-reveal-later {
+  opacity: 1;
+  animation: ue-reveal-rise 480ms cubic-bezier(0.2, 0.8, 0.2, 1) var(--delay, 0ms) backwards;
+}
+
+.ue-reveal-footer {
+  animation: ue-reveal-rise 360ms cubic-bezier(0.2, 0.8, 0.2, 1) 420ms backwards;
+}
+
+@keyframes ue-reveal-fade {
+  from {
+    opacity: 0;
+  }
+}
+
+@keyframes ue-reveal-rise {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+}
+
+@keyframes ue-reveal-bump {
+  from {
+    transform: scale(1.12);
+  }
+}
+
+@keyframes ue-reveal-ripple {
+  from {
+    opacity: 0.75;
+    transform: scale(0.8);
+  }
+
+  to {
+    opacity: 0;
+    transform: scale(2.8);
+  }
+}
+
+@keyframes ue-reveal-gleam {
+  0% {
+    opacity: 0;
+    stroke-dashoffset: 0.14;
+  }
+
+  15%,
+  80% {
+    opacity: 0.6;
+  }
+
+  100% {
+    opacity: 0;
+    stroke-dashoffset: -1;
+  }
+}
+
+/* Reduced motion: the final state, faded in, nothing else. */
+@media (prefers-reduced-motion: reduce) {
+  .ue-reveal {
+    animation: ue-reveal-fade 320ms ease-out backwards;
+  }
+
+  .ue-reveal-footer {
+    animation-name: ue-reveal-fade;
+  }
+
+  .ue-reveal :is(.ue-reveal-track, .ue-reveal-readout, .ue-reveal-knob, .ue-reveal-caption, .ue-reveal-pass, .ue-reveal-number, .ue-reveal-later) {
+    animation: none !important;
+  }
+
+  .ue-reveal :is(.ue-reveal-ripple, .ue-reveal-gleam) {
+    display: none;
+  }
+}
+
+/* The simulator's grade fields (.field: their focus its firmer stroke):
+   one holding a grade typed in, and its evaluation card, take the brand
+   tint, so what's made up stands apart from what's real. */
+.simulation-input {
+  transition: border-color 150ms ease, background-color 150ms ease;
+}
+
+.simulation-input--set {
+  border-color: color-mix(in srgb, var(--color-brand) 32%, transparent);
+  background-color: color-mix(in srgb, var(--color-brand) 9%, var(--color-widget-bg));
+}
+
+.subject-evaluation--simulated {
+  border-color: color-mix(in srgb, var(--color-brand) 22%, transparent);
+  background-color: color-mix(in srgb, var(--color-brand) 4%, var(--color-widget-bg));
+}

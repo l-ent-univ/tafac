@@ -1,0 +1,53 @@
+/* ── Service cards ── */
+
+.app-card {
+  background-color: transparent;
+  border-color: transparent;
+  box-shadow: none;
+  transition:
+    scale 120ms ease,
+    background-color 160ms ease,
+    box-shadow 160ms ease,
+    border-color 160ms ease;
+}
+
+.app-card:hover,
+.app-card:focus-visible,
+.app-card--active {
+  background-color: var(--color-widget-bg);
+  border-color: var(--color-border);
+  box-shadow: 0 6px 18px -8px var(--color-shadow);
+}
+
+.app-card:focus-visible {
+  outline: 2px solid var(--color-brand);
+  outline-offset: 2px;
+}
+
+.app-card:active {
+  scale: 0.99;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .app-card {
+    transition: none;
+  }
+
+  .app-card:active {
+    scale: none;
+  }
+}
+
+/* Keep the dragged-over favorites flat while reordering. */
+.is-dragging .app-card:hover {
+  background-color: transparent;
+  border-color: transparent;
+  box-shadow: none;
+}
+
+/* ── App card favorite star overrides ── */
+
+.app-card-action:hover {
+  background: var(--color-brand-subtle);
+  opacity: 1 !important;
+}

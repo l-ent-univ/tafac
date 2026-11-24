@@ -1,0 +1,207 @@
+/* ── Landing header (LandingHeader) ──
+   Fixed at the top. On the sky at first: as wide as the page, nothing
+   behind it. Once the page scrolls (or the menu opens, data-floating), it
+   narrows into a frosted pill: its links' own pill fades into it and the
+   Papillon line folds away. The burger's menu drops from under it, plain
+   white (dark grey in dark mode). */
+.landing-header {
+  --landing-header-glass: rgb(255 255 255 / 0.72);
+  --landing-header-menu: #fff;
+  --landing-header-edge: rgb(255 255 255 / 0.8);
+}
+
+:where([data-theme="dark"]) .landing-header {
+  --landing-header-glass: rgb(28 28 28 / 0.72);
+  --landing-header-menu: #1c1c1c;
+  --landing-header-edge: rgb(255 255 255 / 0.1);
+}
+
+.landing-header-papillon-fold {
+  display: grid;
+  grid-template-rows: 1fr;
+  transition:
+    grid-template-rows 500ms cubic-bezier(0.16, 1, 0.3, 1),
+    opacity 300ms ease;
+}
+
+.landing-header[data-floating] .landing-header-papillon-fold {
+  grid-template-rows: 0fr;
+  opacity: 0;
+}
+
+/* At rest, as wide as the hero's content (1240px, LandingPage) plus the
+   bar's own 16px each side: the logo lines up with the title and the text
+   below it, wherever the screen is wider. */
+.landing-header-bar {
+  width: min(100%, 1272px);
+  border-color: transparent;
+  background-color: transparent;
+  transition:
+    width 600ms cubic-bezier(0.16, 1, 0.3, 1),
+    translate 600ms cubic-bezier(0.16, 1, 0.3, 1),
+    background-color 400ms ease,
+    border-color 400ms ease,
+    box-shadow 400ms ease,
+    backdrop-filter 400ms ease;
+}
+
+.landing-header[data-floating] .landing-header-bar {
+  width: min(100%, 1040px);
+  translate: 0 4px;
+  border-color: var(--glass-edge);
+  background-color: var(--glass-fill-strong);
+  outline: 1px solid var(--glass-outer);
+  outline-offset: 0;
+  box-shadow: var(--glass-shadow);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+}
+
+.landing-header-nav {
+  border-color: var(--glass-edge);
+  background-color: var(--glass-fill);
+  outline: 1px solid var(--glass-outer);
+  outline-offset: 0;
+  box-shadow: var(--glass-shadow);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+  transition:
+    background-color 400ms ease,
+    border-color 400ms ease;
+}
+
+.landing-header[data-floating] .landing-header-nav {
+  border-color: transparent;
+  background-color: transparent;
+  outline-color: transparent;
+  box-shadow: none;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+.landing-header-menu {
+  /* Solid glass (its tokens), a deeper drop: it hangs over the page. */
+  border-color: var(--glass-solid-edge);
+  background-color: var(--glass-solid-fill);
+  outline: 1px solid var(--glass-solid-outer);
+  outline-offset: 0;
+  box-shadow:
+    var(--glass-solid-shadow),
+    0 24px 48px -20px rgb(52 18 0 / 0.35);
+  opacity: 0;
+  translate: 0 -8px;
+  scale: 0.98;
+  transform-origin: 50% 0;
+  visibility: hidden;
+  transition:
+    opacity 250ms ease,
+    translate 350ms cubic-bezier(0.16, 1, 0.3, 1),
+    scale 350ms cubic-bezier(0.16, 1, 0.3, 1),
+    visibility 0s linear 350ms;
+}
+
+.landing-header-menu[data-open] {
+  opacity: 1;
+  translate: 0 0;
+  scale: 1;
+  visibility: visible;
+  transition-delay: 0s;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .landing-header-bar,
+  .landing-header-papillon-fold,
+  .landing-header-menu {
+    transition-duration: 0s;
+  }
+}
+
+/* The FAQ's answers open and close smoothly, where the browser can animate
+   a <details> to its content's height (::details-content); elsewhere they
+   just show. */
+@supports selector(::details-content) {
+  @media (prefers-reduced-motion: no-preference) {
+    .landing-faq {
+      interpolate-size: allow-keywords;
+    }
+
+    .landing-faq details::details-content {
+      block-size: 0;
+      overflow: clip;
+      transition:
+        block-size 300ms cubic-bezier(0.16, 1, 0.3, 1),
+        content-visibility 300ms allow-discrete;
+    }
+
+    .landing-faq details[open]::details-content {
+      block-size: auto;
+    }
+  }
+}
+
+/* The widgets can be grabbed (useDragToPlay): they follow the pointer
+   closely, raised over the rest, then spring back home with a bounce. */
+.landing-drag {
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+  transition: transform 650ms cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.landing-drag[data-dragging] {
+  z-index: 10;
+  cursor: grabbing;
+  transition: transform 90ms ease-out;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .landing-drag {
+    transition: transform 200ms ease-out;
+  }
+}
+
+/* The landing's app icon comes in with the title: it drops and tilts into
+   place with a little bounce. */
+/* The landing's first screen, on the hero film's grey (#eee, decoded
+   #f0f0f0 by browsers): the film's edges vanish into it. The dark theme
+   keeps its page colour (its light text on that grey would be unreadable):
+   the film then stands as a grey panel on the right. */
+.landing-first {
+  --landing-first-bg: #f0f0f0;
+  --landing-marquee-fade: var(--landing-first-bg);
+  background-color: var(--landing-first-bg);
+}
+
+/* The dark theme's film is rendered on its near-black (#0f0f0f on screen). */
+:where([data-theme="dark"]) .landing-first {
+  --landing-first-bg: var(--color-bg);
+}
+
+/* The landing's first words come up as the page opens. */
+.landing-cta {
+  animation: landing-cta-in 700ms cubic-bezier(0.16, 1, 0.3, 1) 100ms both;
+}
+
+@keyframes landing-cta-in {
+  from {
+    opacity: 0;
+    transform: translateY(12px) scale(0.96);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .landing-marquee-track {
+    animation: none;
+  }
+
+  .landing-cta {
+    animation-name: landing-cta-fade;
+    animation-duration: 300ms;
+  }
+}
+
+@keyframes landing-cta-fade {
+  from {
+    opacity: 0;
+  }
+}

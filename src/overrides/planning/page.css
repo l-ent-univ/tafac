@@ -1,0 +1,627 @@
+/* ── Planning page (PlanningPage) ──
+   The iOS app's planning screen, laid out as it is (HourGridView,
+   EventBlock) and drawn in the site's style: Mes notes' title band, the
+   brand colour for the selection and now, the widget cards and their
+   colour wash for the classes. */
+
+/* The header and the hours share one centred column; from the sidebar's
+   breakpoint (the week's), the page's whole width, as Mes notes'. */
+.planning-column {
+  width: 100%;
+  max-width: 760px;
+  margin-inline: auto;
+}
+
+@media (width >= 1024px) {
+  .planning-column {
+    max-width: none;
+  }
+}
+
+/* The page's top stays on top as the hours scroll under it. The band is
+   its own layer behind (clipped to its height, see .page-top-band), so the
+   month's calendar can hang out of it. */
+.planning-top {
+  position: sticky;
+  top: var(--status-bar);
+  z-index: 20;
+}
+
+.planning-page .planning-top > .page-top-band {
+  position: absolute;
+  inset: 0;
+}
+
+.planning-letters,
+.planning-pills {
+  display: flex;
+  justify-content: space-between;
+  padding-inline: 5px;
+}
+
+.planning-letters {
+  height: 18px;
+  color: var(--color-text-muted);
+  font-family: var(--font-body);
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 18px;
+}
+
+.planning-letters > span {
+  width: 35px;
+  text-align: center;
+}
+
+/* The week strip, grown by 12px on every side so the pills keep their
+   shadow and bounce inside the pager's clip. */
+.planning-strip {
+  margin: -6px -12px -12px;
+}
+
+.planning-strip .swipe-pager-page {
+  padding: 12px;
+}
+
+.planning-pills {
+  position: relative;
+  height: 35px;
+}
+
+/* A day: a chip on the band, as the semester chip on a phone. */
+.planning-pill {
+  position: relative;
+  z-index: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 35px;
+  height: 35px;
+  padding: 0;
+  /* Solid glass (its tokens); white under the pointer. */
+  border: 1px solid;
+  border-color: var(--glass-solid-edge);
+  border-radius: 999px;
+  background: var(--glass-solid-fill);
+  outline: 1px solid var(--glass-solid-outer);
+  outline-offset: 0;
+  box-shadow: var(--glass-solid-shadow);
+  color: var(--color-text);
+  font-family: var(--font-display);
+  font-size: 16px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+  transition: color 250ms ease, background-color 250ms ease, border-color 250ms ease, transform 100ms ease-out;
+}
+
+@media (hover: hover) {
+  .planning-pill:not(.is-selected, .is-filled):hover {
+    background: var(--surface-card);
+  }
+}
+
+.planning-pill:active {
+  transform: scale(0.96);
+}
+
+.planning-pill:focus-visible {
+  outline: 2px solid var(--color-brand);
+  outline-offset: 2px;
+}
+
+.planning-pill.is-selected {
+  border-color: transparent;
+  background: transparent;
+  outline-color: transparent;
+  box-shadow: none;
+  color: var(--color-bg);
+}
+
+/* Today: a dot under its number (in the page's colour once selected). */
+.planning-pill.is-today::after {
+  content: "";
+  position: absolute;
+  bottom: 4px;
+  left: 50%;
+  width: 4px;
+  height: 4px;
+  margin-left: -2px;
+  border-radius: 999px;
+  background: currentColor;
+}
+
+/* The week's days over their columns (wide screens): the weekday over the
+   date's pill, the whole header a button opening the day. */
+.planning-week-heads {
+  display: grid;
+}
+
+.planning-week-head {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 14px;
+
+  @supports (corner-shape: superellipse(1.3)) {
+    border-radius: calc(14px / 0.853);
+    corner-shape: superellipse(1.3);
+  }
+  background: transparent;
+  cursor: pointer;
+}
+
+.planning-week-head:focus-visible {
+  outline: 2px solid var(--color-brand);
+  outline-offset: 2px;
+}
+
+.planning-week-weekday {
+  height: 18px;
+  color: var(--color-text-muted);
+  font-family: var(--font-body);
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 18px;
+}
+
+@media (hover: hover) {
+  .planning-week-head:hover .planning-pill:not(.is-filled) {
+    background: var(--surface-card);
+  }
+
+  .planning-week-head:hover .planning-week-weekday {
+    color: var(--color-text);
+  }
+}
+
+.planning-week-head:active .planning-pill {
+  transform: scale(0.96);
+}
+
+/* The selected day, filled as the strip's capsule (the tags' material:
+   below). */
+.planning-pill.is-filled {
+  border-color: transparent;
+  outline-color: transparent;
+  color: var(--color-bg);
+}
+
+.planning-pill.is-today.is-filled {
+  border-color: transparent;
+}
+
+/* The selected days' capsule: fades in where a new day is picked, grows
+   when the view changes (a spring). */
+.planning-selection {
+  position: absolute;
+  top: 0;
+  height: 35px;
+  margin-left: 5px;
+  border-radius: 999px;
+  animation: planning-fade-in 250ms ease-out;
+  transition: width 450ms cubic-bezier(0.34, 1.3, 0.64, 1);
+}
+
+@keyframes planning-fade-in {
+  from { opacity: 0; }
+}
+
+/* The month's calendar, in the menu panel's rows' colours (Dropdown). */
+.planning-picker-arrow {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border: 0;
+  border-radius: 10px;
+
+  @supports (corner-shape: superellipse(1.3)) {
+    border-radius: calc(10px / 0.853);
+    corner-shape: superellipse(1.3);
+  }
+  background: transparent;
+  color: var(--color-brand);
+  cursor: pointer;
+}
+
+.planning-picker-arrow:hover {
+  background: var(--color-context-hover);
+}
+
+.planning-picker-day {
+  position: relative;
+  justify-self: center;
+  width: 38px;
+  height: 38px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--color-text);
+  font-family: var(--font-body);
+  font-size: 15px;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+}
+
+.planning-picker-day:hover {
+  background: var(--color-context-hover);
+}
+
+.planning-picker-day.is-today {
+  font-weight: 700;
+}
+
+.planning-picker-day.is-today::after {
+  content: "";
+  position: absolute;
+  bottom: 5px;
+  left: 50%;
+  width: 4px;
+  height: 4px;
+  margin-left: -2px;
+  border-radius: 999px;
+  background: currentColor;
+}
+
+.planning-picker-day.is-selected {
+  color: var(--color-bg);
+}
+
+/* A day or an arrow under the pointer: white, outlined by a faint hairline
+   and a soft shadow, or it vanishes on the light page and menu. */
+@media (hover: hover) {
+  .planning-picker-day:not(.is-selected):hover,
+  .planning-picker-arrow:hover {
+    box-shadow:
+      0 0 0 1px color-mix(in srgb, var(--color-text) 9%, transparent),
+      0 1px 2px rgb(0 0 0 / 0.06);
+  }
+
+  :where([data-theme="dark"]) :is(.planning-picker-day:not(.is-selected):hover, .planning-picker-arrow:hover) {
+    box-shadow: 0 0 0 1px rgb(255 255 255 / 0.08);
+  }
+}
+
+/* The Planning's selections (the strip's capsule, the week heading's
+   filled day, the calendar's picked day): the tags' material
+   (.lent-button--tag), in their own CSS so they keep their letters and
+   behaviour. A dark edge (the brand deepened), a white highlight inside
+   the top edge (it follows the curve), a close, sharp shadow. */
+.planning-selection,
+.planning-pill.is-filled,
+.planning-picker-day.is-selected,
+.planning-now-mark {
+  --planning-tag-edge: color-mix(in oklab, var(--color-brand), black 30%);
+  --planning-tag-rim: rgb(255 255 255 / 0.22);
+  background: var(--color-brand);
+  box-shadow:
+    0 0 0 0.5px var(--planning-tag-edge),
+    inset 0 1px 0 var(--planning-tag-rim),
+    0 1px 1px rgb(52 18 0 / 0.22),
+    0 2px 3px -1px rgb(52 18 0 / 0.22);
+}
+
+:where([data-theme="dark"]) :is(.planning-selection, .planning-pill.is-filled, .planning-picker-day.is-selected, .planning-now-mark) {
+  --planning-tag-edge: rgb(0 0 0 / 0.6);
+  --planning-tag-rim: rgb(255 255 255 / 0.8);
+  box-shadow:
+    0 0 0 0.5px var(--planning-tag-edge),
+    inset 0 1px 0 var(--planning-tag-rim),
+    0 1px 1px rgb(0 0 0 / 0.5),
+    0 2px 3px -1px rgb(0 0 0 / 0.5);
+}
+
+/* Pages swiped sideways (SwipePager): the page and its neighbours in a row,
+   clipped (the strip's pages are padded for their pills' shadows). */
+.swipe-pager {
+  overflow: hidden;
+  touch-action: pan-y;
+}
+
+.swipe-pager-track {
+  display: flex;
+  will-change: transform;
+}
+
+.swipe-pager-page {
+  flex: 0 0 100%;
+  min-width: 0;
+}
+
+/* A new view settles in from slightly larger. */
+.planning-pager {
+  animation: planning-view-in 500ms cubic-bezier(0.25, 1.15, 0.5, 1);
+}
+
+@keyframes planning-view-in {
+  from {
+    opacity: 0;
+    transform: scale(1.03);
+  }
+}
+
+/* A day keeps its cards' shadows to itself: the neighbour's don't bleed in
+   at the edge. */
+.planning-pager .swipe-pager-page {
+  clip-path: inset(-40px 0);
+}
+
+.planning-page-day {
+  position: relative;
+}
+
+/* The hours: labels centred on hairlines (no half hours). */
+.planning-grid {
+  position: absolute;
+  inset: 0;
+  transition: opacity 250ms ease;
+}
+
+.planning-grid.is-bare {
+  opacity: 0;
+}
+
+.planning-hour {
+  position: absolute;
+  left: 0;
+  right: 0;
+  display: flex;
+  align-items: center;
+  height: 10px;
+}
+
+.planning-hour-label {
+  flex: none;
+  width: 50px;
+  color: var(--color-text-muted);
+  font-family: var(--font-body);
+  font-size: 12.5px;
+  font-weight: 500;
+  line-height: 10px;
+  font-variant-numeric: tabular-nums;
+}
+
+.planning-hour-line,
+.planning-day-divider {
+  background: var(--color-border);
+}
+
+.planning-hour-line {
+  flex: 1;
+  height: 1px;
+}
+
+.planning-day-divider {
+  position: absolute;
+  width: 1px;
+}
+
+/* A class: a widget card (its no-wallpaper surface, border and shadow)
+   under its course's wash (.latest-grade-wash). It doesn't rise in like
+   the dashboard's cards; pressed, it settles. */
+.planning-block {
+  display: block;
+  overflow: hidden;
+  padding: 0;
+  text-align: left;
+  transition: transform 320ms cubic-bezier(0.25, 1.2, 0.5, 1), background-color 150ms ease;
+  will-change: auto;
+}
+
+button.planning-block {
+  cursor: pointer;
+}
+
+@media (hover: hover) {
+  .widget-card:is(button.planning-block):hover {
+    background-color: color-mix(in srgb, var(--accent) 13%, var(--color-widget-bg));
+  }
+}
+
+button.planning-block:active {
+  transform: scale(0.975);
+  transition-duration: 100ms;
+  transition-timing-function: ease-out;
+}
+
+.planning-block:focus-visible {
+  outline: 2px solid var(--color-brand);
+  outline-offset: 2px;
+}
+
+/* The course's colour, set inline in both themes (--accent, --accent-dark,
+   eventAccents.js): an inline variable wins over any stylesheet, so the
+   theme picks through its own one. */
+.planning-accent-fill {
+  background: var(--accent);
+}
+
+:where([data-theme="dark"]) .planning-accent-fill {
+  background: var(--accent-dark);
+}
+
+/* An event's bar: its colour vivid at the top (deepened, more saturated),
+   lightening the further down it runs. */
+.planning-bar.planning-accent-fill,
+.planning-list-bar.planning-accent-fill,
+.sidebar-next-class-bar.planning-accent-fill {
+  background: linear-gradient(
+    to bottom,
+    color-mix(in oklch, var(--accent), black 6%) 0%,
+    var(--accent) 35%,
+    color-mix(in oklch, var(--accent) 40%, white) 100%
+  );
+}
+
+:where([data-theme="dark"]) :is(.planning-bar, .planning-list-bar, .sidebar-next-class-bar).planning-accent-fill {
+  background: linear-gradient(
+    to bottom,
+    var(--accent-dark) 0%,
+    color-mix(in oklch, var(--accent-dark) 80%, white) 40%,
+    color-mix(in oklch, var(--accent-dark) 45%, white) 100%
+  );
+}
+
+.planning-bar {
+  position: absolute;
+  border-radius: 999px;
+}
+
+.planning-block-info {
+  position: absolute;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.planning-block-title {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  color: var(--color-text);
+  font-family: var(--font-body);
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.planning-block-meta {
+  display: flex;
+  min-width: 0;
+}
+
+.planning-block-meta--row {
+  align-items: center;
+}
+
+.planning-block-meta--stacked {
+  flex-direction: column;
+}
+
+.planning-block-label {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  min-width: 0;
+  color: var(--color-text-muted);
+}
+
+.planning-block-meta--row .planning-block-label:last-child {
+  flex: 1;
+}
+
+.planning-block-symbol {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+}
+
+.planning-block-label-text {
+  overflow: hidden;
+  font-family: var(--font-body);
+  font-weight: 500;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.planning-block-divider {
+  flex: none;
+  width: 1px;
+  background: var(--color-border);
+}
+
+/* Now: a "Maint." pill over the hours and a line across today, in the
+   brand colour (as the grade sheet's "you" marker). */
+.planning-now {
+  position: absolute;
+  left: 0;
+  z-index: 2;
+  height: 22px;
+  pointer-events: none;
+}
+
+.planning-now-mark {
+  position: absolute;
+  top: 0;
+  /* 2px in from the edge: its edge and shadow would be cut by the week's
+     clip (the swipe pager); over the line's start. */
+  left: 2px;
+  z-index: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 22px;
+  border-radius: 999px;
+  background: var(--color-brand);
+  color: var(--color-bg);
+  font-family: var(--font-body);
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 16px;
+}
+
+.planning-now-line {
+  position: absolute;
+  top: 10.5px;
+  right: 0;
+  height: 1px;
+  background: var(--color-brand);
+}
+
+/* The week's line over the days before today, faint. */
+.planning-now-line.is-faint {
+  right: auto;
+  opacity: 0.25;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .planning-pager,
+  .planning-selection,
+  .planning-note {
+    animation: none;
+  }
+
+  .planning-selection,
+  .planning-block {
+    transition: none;
+  }
+}
+
+/* The rows of a class's sheet (PlanningEventSheet): one card, the rows
+   parted by a hairline from the text's edge, as the iOS GroupCard. A link
+   row hovers (or presses) as a rounded fill inside the card's padding; the
+   hairlines on either side of it give way, so the fill isn't cut. */
+.planning-row + .planning-row .planning-row-text,
+li + li > .planning-row .planning-row-text {
+  border-top: 1px solid var(--color-border);
+}
+
+@media (hover: hover) {
+  .planning-row.is-link:hover {
+    background-color: var(--surface-card);
+    box-shadow:
+      0 0 0 1px color-mix(in srgb, var(--color-text) 9%, transparent),
+      0 1px 2px rgb(0 0 0 / 0.06);
+  }
+
+  li:has(> .planning-row.is-link:hover) + li > .planning-row .planning-row-text,
+  .planning-row.is-link:hover .planning-row-text {
+    border-top-color: transparent;
+  }
+}
+
+.planning-row.is-link:active {
+  background-color: var(--surface-card);
+}
+
+li:has(> .planning-row.is-link:active) + li > .planning-row .planning-row-text,
+.planning-row.is-link:active .planning-row-text {
+  border-top-color: transparent;
+}

@@ -1,0 +1,22 @@
+/* ── Mes notes · phones and tablets ──
+   Below 4xl (1024px, where the sidebar takes over from the top bar): the
+   band's tint also runs up behind the top bar (logo, account buttons), so
+   the coloured top starts at the top of the screen rather than under the
+   logo. Everything in the page column above the shown page's band takes its
+   colour (the top bar, an update notice…); the hidden page kept mounted
+   doesn't count, and a page without its band (a UE open full page) leaves
+   the bar plain. */
+
+@media (width < 1024px) {
+  .dashboard-no-wallpaper .app-column > :has(~ :not([hidden]) .page-top-band) {
+    background: var(--page-top-band);
+  }
+}
+
+/* On a phone the update notice floats over the tab bar (its dock is fixed,
+   out of the column's flow): no band colour behind it. */
+@media (width < 48rem) {
+  .dashboard-no-wallpaper .app-column > .update-notice-dock:has(~ :not([hidden]) .page-top-band) {
+    background: none;
+  }
+}

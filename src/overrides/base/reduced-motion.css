@@ -1,0 +1,33 @@
+/* ── Reduced motion ── */
+
+@media (prefers-reduced-motion: reduce) {
+  .widget-card {
+    opacity: 1;
+    transform: none;
+    transition: none;
+  }
+
+  .weather-modal-backdrop,
+  .weather-modal-card,
+  .account-modal-card,
+  .changelog-pill,
+  .changelog-backdrop,
+  .changelog-sheet {
+    animation: none;
+  }
+
+  .changelog-pill:active {
+    transform: none;
+  }
+
+  .favorites-strip-item,
+  .badge-placeholder,
+  .text-placeholder-shimmer,
+  .context-menu,
+  .favorites-context-menu,
+  .favorites-context-action {
+    animation: none;
+    transition: none;
+    transform: none;
+  }
+}

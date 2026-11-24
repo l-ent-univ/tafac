@@ -1,0 +1,137 @@
+/* ── Concentric modal corners ──
+   A modal holding cards or lists rounds its corners on theirs: the cards'
+   radius plus the inset between them (--modal-inner-radius and
+   --modal-inset, set on the modal), so the two curves run parallel instead
+   of the card's corner bulging towards the modal's. .modal-corners on the
+   modal, .modal-inner-corners on its cards (20px outside a modal, the
+   settings cards' own), .modal-corners-bottom on a footer flush with its
+   bottom edge, inside its 1px border. In the round-corner units of
+   corners-*: the superellipse scales them all alike. In the components
+   layer, so a sheet's utilities (max-sm:rounded-b-none) still win. */
+@layer components {
+  .modal-corners {
+    --modal-radius: calc(var(--modal-inner-radius, 20px) + var(--modal-inset, 24px));
+    border-radius: var(--modal-radius);
+  }
+
+  .modal-inner-corners {
+    border-radius: var(--modal-inner-radius, 20px);
+  }
+
+  /* A row inside one of those cards (the simulator's subjects), inset by
+     --modal-nested-inset: the same rule one level down. */
+  .modal-nested-corners {
+    border-radius: calc(var(--modal-inner-radius, 20px) - var(--modal-nested-inset, 8px));
+  }
+
+  .modal-corners-bottom {
+    border-bottom-left-radius: calc(var(--modal-radius) - 1px);
+    border-bottom-right-radius: calc(var(--modal-radius) - 1px);
+  }
+
+  @supports (corner-shape: superellipse(1.3)) {
+    .modal-corners {
+      border-radius: calc(var(--modal-radius) / 0.853);
+      corner-shape: superellipse(1.3);
+    }
+
+    .modal-inner-corners {
+      border-radius: calc(var(--modal-inner-radius, 20px) / 0.853);
+      corner-shape: superellipse(1.3);
+    }
+
+    .modal-nested-corners {
+      border-radius: calc((var(--modal-inner-radius, 20px) - var(--modal-nested-inset, 8px)) / 0.853);
+      corner-shape: superellipse(1.3);
+    }
+
+    .modal-corners-bottom {
+      border-bottom-left-radius: calc((var(--modal-radius) - 1px) / 0.853);
+      border-bottom-right-radius: calc((var(--modal-radius) - 1px) / 0.853);
+      corner-shape: superellipse(1.3);
+    }
+  }
+}
+
+/* ── Widget corners ──
+   The cards' corners: a smooth curve (corner-shape: superellipse(1.3)) where
+   the browser draws it (Chrome, Edge), else the round corner closest to it
+   (0.85 × its radius: Safari, Firefox), the same shape within a quarter of a
+   pixel. card-corners for the widgets, card-corners-sm for the smaller cards
+   (app tiles, Planning's list, the grades' notice). Inner layers follow with
+   border-radius and corner-shape: inherit (rounded-[inherit] below). */
+
+.card-corners {
+  border-radius: 31px;
+}
+
+.card-corners-sm {
+  border-radius: 22px;
+}
+
+@media (width < 48rem) {
+  .card-corners {
+    border-radius: 27px;
+  }
+
+  .card-corners-sm {
+    border-radius: 20px;
+  }
+}
+
+@supports (corner-shape: superellipse(1.3)) {
+  .card-corners,
+  .card-corners-sm {
+    corner-shape: superellipse(1.3);
+  }
+
+  .card-corners {
+    border-radius: 36px;
+  }
+
+  .card-corners-sm {
+    border-radius: 26px;
+  }
+
+  @media (width < 48rem) {
+    .card-corners {
+      border-radius: 32px;
+    }
+
+    .card-corners-sm {
+      border-radius: 24px;
+    }
+  }
+}
+
+/* A row inset 8px in a card (Assiduité's subjects, the card's p-2): its
+   corners concentric with the card's, its radius less the inset, the same
+   curve. */
+.card-inset-corners {
+  border-radius: 23px;
+}
+
+@media (width < 48rem) {
+  .card-inset-corners {
+    border-radius: 19px;
+  }
+}
+
+@supports (corner-shape: superellipse(1.3)) {
+  .card-inset-corners {
+    corner-shape: superellipse(1.3);
+    border-radius: 28px;
+  }
+
+  @media (width < 48rem) {
+    .card-inset-corners {
+      border-radius: 24px;
+    }
+  }
+}
+
+/* A layer that takes its parent's corners takes its curve too: corner-shape
+   isn't inherited by itself. */
+.rounded-\[inherit\] {
+  corner-shape: inherit;
+}

@@ -1,0 +1,210 @@
+/* ── Planning states (PlanningNote) ──
+   What a day or a page without classes says: no class, on its way, ADE
+   not answering, no group chosen. */
+
+/* In full (a page without any class): as the pages' empty states, the
+   icon in a soft disc over the title, why, and the way out. */
+.planning-note {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  animation: planning-fade-in 250ms ease-out;
+}
+
+.planning-note:focus {
+  outline: none;
+}
+
+.planning-note.is-full {
+  gap: 10px;
+  padding-inline: 8px;
+}
+
+.planning-note-disc {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 52px;
+  height: 52px;
+  margin-bottom: 2px;
+  border-radius: 999px;
+  background: var(--color-brand-subtle);
+  color: var(--color-text);
+}
+
+.planning-note-action:focus-visible,
+.planning-note-link:focus-visible {
+  outline: 2px solid var(--color-brand);
+  outline-offset: 2px;
+}
+
+.planning-note-action:active {
+  transform: scale(0.98);
+}
+
+/* A column's, beside days with classes: muted, at 10:30, its way out a
+   small link under it. */
+.planning-note.is-compact {
+  gap: 2px;
+  min-height: 36px;
+  color: var(--color-text-muted);
+  font-family: var(--font-body);
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 18px;
+}
+
+.planning-note-line {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+/* In a week's narrow column, the icon over the text. */
+.planning-note.is-stacked {
+  font-size: 13px;
+}
+
+.planning-note.is-stacked .planning-note-line {
+  flex-direction: column;
+  gap: 4px;
+}
+
+.planning-note-link {
+  padding: 4px 6px;
+  border: 0;
+  border-radius: 8px;
+
+  @supports (corner-shape: superellipse(1.3)) {
+    border-radius: calc(8px / 0.853);
+    corner-shape: superellipse(1.3);
+  }
+  background: transparent;
+  color: var(--color-brand);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+@media (hover: hover) {
+  .planning-note-link:hover {
+    background: var(--surface-card);
+    box-shadow:
+      0 0 0 1px color-mix(in srgb, var(--color-text) 9%, transparent),
+      0 1px 2px rgb(0 0 0 / 0.06);
+  }
+}
+
+/* Planning list view
+   The week as an agenda (PlanningListView): each day's heading over its
+   classes' cards, in the grid's blocks' look. In the pager, its pages are
+   grown by 12px on the sides (as the week strip) so the cards keep their
+   shadows, and only the page in view sets the height: a long week next
+   door leaves no blank under a short one (it shows as it slides in). */
+.planning-pager.is-list {
+  margin-inline: -12px;
+}
+
+.planning-pager.is-list .swipe-pager-track {
+  align-items: flex-start;
+}
+
+.planning-pager.is-list .swipe-pager-page {
+  padding-inline: 12px;
+  clip-path: inset(-40px 0 -100vh);
+}
+
+.planning-pager.is-list .swipe-pager-page[inert] {
+  height: 0;
+}
+
+.planning-list {
+  display: grid;
+  gap: 24px;
+  padding-bottom: 28px;
+}
+
+/* A day: its heading over its cards; on a wide screen, in a column left
+   of them, as an agenda's. */
+.planning-list-day {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+}
+
+@media (width >= 1024px) {
+  .planning-list {
+    gap: 28px;
+  }
+
+  .planning-list-day {
+    grid-template-columns: 220px minmax(0, 1fr);
+    gap: 24px;
+  }
+}
+
+.planning-list-bar {
+  flex: none;
+  width: 6px;
+  border-radius: 999px;
+}
+
+/* Pressed, a card settles, as a block does. */
+.planning-list-card {
+  transition: transform 320ms cubic-bezier(0.25, 1.2, 0.5, 1), background-color 150ms ease;
+  will-change: auto;
+}
+
+@media (hover: hover) {
+  .widget-card.planning-list-card:hover {
+    background-color: color-mix(in srgb, var(--accent) 13%, var(--color-widget-bg));
+  }
+}
+
+.planning-list-card:active {
+  transform: scale(0.985);
+  transition-duration: 100ms;
+  transition-timing-function: ease-out;
+}
+
+.planning-list-card:focus-visible {
+  outline: 2px solid var(--color-brand);
+  outline-offset: 2px;
+}
+
+/* Today or the picked day without a class: a line in the grid's notes'
+   words and colour. A week without any: its note (PlanningNote), centred. */
+.planning-list-free {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  color: var(--color-text-muted);
+  font-family: var(--font-body);
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 18px;
+}
+
+.planning-list-note {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 220px;
+}
+
+@media (width >= 1024px) {
+  .planning-list-free {
+    min-height: 44px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .planning-list-card {
+    transition: none;
+  }
+}

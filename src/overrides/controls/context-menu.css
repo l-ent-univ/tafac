@@ -1,0 +1,36 @@
+/* ── Context menu (ContextMenu) ──
+   Grows from the pointer (--context-origin-*, set by ContextMenu); a
+   destructive action (Supprimer) in red, its icon too. */
+
+.context-menu {
+  transform-origin: var(--context-origin-x, 0) var(--context-origin-y, 0);
+}
+
+/* A place a long press opens the menu of (useContextMenu): no callout,
+   no text selection starting under the finger. */
+@media (hover: none) {
+  [data-menu-press] {
+    -webkit-touch-callout: none;
+    -webkit-user-select: none;
+    user-select: none;
+  }
+}
+
+/* The dropdowns' (Dropdown, the planning's header), in the older look. */
+.favorites-context-menu {
+  transform-origin: var(--favorites-context-origin-x, 24px)
+    var(--favorites-context-origin-y, 24px);
+}
+
+/* A colour menu's « Automatique » / « Aucun »: a dot crossed out. */
+.context-menu-swatch--none {
+  background: linear-gradient(135deg, transparent calc(50% - 0.75px), #d1342f calc(50% - 0.75px), #d1342f calc(50% + 0.75px), transparent calc(50% + 0.75px)), var(--color-widget-bg);
+}
+
+.context-menu-item--destructive {
+  color: #d1342f;
+}
+
+:where([data-theme="dark"]) .context-menu-item--destructive {
+  color: #ff6b63;
+}

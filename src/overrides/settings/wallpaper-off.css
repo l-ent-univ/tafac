@@ -1,0 +1,18 @@
+/* ── Wallpaper off (Réglages › Apparence) ──
+   Nothing behind the cards to see through: drop the blur, solid glass
+   (its fill; the glass' stroke, rim and shadow stay). */
+
+.dashboard-no-wallpaper .widget-card {
+  --color-widget-bg: var(--glass-solid-fill);
+  --color-bg-subtle: var(--glass-solid-fill-hover);
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+
+/* Close to the page colour: a warm hairline and a deeper shadow keep it
+   standing apart from the page. */
+.dashboard-no-wallpaper .sidebar-panel {
+  background-color: var(--material-sidebar-solid);
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}

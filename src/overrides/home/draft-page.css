@@ -1,0 +1,54 @@
+/* ── « Accueil » icon row (HomeDraftPage) ──
+   On arrival each icon comes into focus: from a little to the right,
+   slightly small, untilted and blurred, it slides to its place and settles
+   on its tilt, one after the other (45ms apart), on a long ease-out. Short
+   and on six small images, the blur stays cheap. Each icon carries its
+   index (--i) and tilt (--r). */
+
+.home-icon-deal {
+  animation: home-icon-deal 700ms cubic-bezier(0.16, 1, 0.3, 1) backwards;
+  animation-delay: calc(60ms + var(--i) * 45ms);
+}
+
+@keyframes home-icon-deal {
+  from {
+    opacity: 0;
+    filter: blur(6px);
+    transform: translateX(14px) rotate(0deg) scale(0.86);
+  }
+  to {
+    opacity: 1;
+    filter: blur(0);
+    transform: rotate(var(--r));
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .home-icon-deal {
+    animation: none;
+  }
+}
+
+/* ── « Accueil » briefing (HomeDraftPage's BlurInText) ──
+   Each character of the day's sentence comes into focus in turn: from
+   transparent and blurred to sharp, opacity and filter only, once (no fill
+   left behind). Its delay (--delay) set per character, capped. Shown as is
+   when motion is reduced. */
+
+.blur-in-char {
+  animation: blur-in-char 420ms cubic-bezier(0.2, 0.8, 0.2, 1) backwards;
+  animation-delay: var(--delay, 0ms);
+}
+
+@keyframes blur-in-char {
+  from {
+    opacity: 0;
+    filter: blur(4px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .blur-in-char {
+    animation: none;
+  }
+}

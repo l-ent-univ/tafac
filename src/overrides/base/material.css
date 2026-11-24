@@ -1,0 +1,206 @@
+/* ── Material ──
+   The surface of Mes notes' "Simuler" button, for the app's secondary
+   buttons (SECONDARY_BUTTON) and Material.jsx: white like the cards, lifted
+   by a shadow that deepens on hover, pressed in on a tap. Optionally a
+   rainbow (Material's `rainbow`): colours washed softly up from the bottom
+   edge and drifting slowly back and forth (--material-wash, set by
+   Material; the brand's by default), so it reads as the way into something
+   to play with. With a mouse, the wash also leans towards the pointer
+   (--material-shift, -1 to 1, set by Material).
+   As a button or a link, it takes the primary button's edge (.lent-button)
+   and its smooth shape (SmoothSurface): below. --material-ring is that
+   edge's outer stroke, none on a field or a tile. The face and the lift
+   are variables, set per state, read by the CSS look and the smooth one
+   alike (--material-drop: the lift as a filter, for the smooth shape).
+   Its look is solid glass's (.glass-solid, its tokens at the top): the same
+   fill, the same dark stroke outside and white rim inside, lit at the top
+   and fading down, so a secondary button and a pill of solid glass side by
+   side are one material. What's its own: the lift that deepens on hover,
+   the press, the wash, the smooth shape. */
+.material {
+  --material-wash: linear-gradient(100deg, var(--color-brand), #e9b44c, var(--color-brand));
+  --material-ring: 0 0 0 0 transparent;
+  --material-face: var(--glass-solid-fill);
+  --material-near: 0 1px 1px rgb(52 18 0 / 0.05);
+  --material-far: 0 1px 3px rgb(52 18 0 / 0.07);
+  --material-drop: drop-shadow(0 1px 0.5px rgb(52 18 0 / 0.05)) drop-shadow(0 1px 1.5px rgb(52 18 0 / 0.07));
+  /* Solid glass's top light, inside (dark: the rim's place, see its tokens). */
+  --material-inset: 0 0 0 0 transparent;
+  border: 1px solid;
+  border-color: var(--glass-solid-edge);
+  outline: 1px solid var(--glass-solid-outer);
+  outline-offset: 0;
+  background-color: var(--material-face);
+  box-shadow: var(--material-ring), var(--material-near), var(--material-far), var(--material-inset);
+  transition: box-shadow 150ms ease, transform 100ms ease-out;
+}
+
+.material:active:not(:disabled) {
+  transform: scale(0.96);
+}
+
+/* Clips the wash, wider than the surface so it has room to lean, and fades
+   it out towards the top: a tint rising from the bottom, not a fill. */
+.material-wash-frame {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  overflow: hidden;
+  opacity: 0.26;
+  -webkit-mask-image: linear-gradient(to top, #000 0%, transparent 95%);
+  mask-image: linear-gradient(to top, #000 0%, transparent 95%);
+  transition: opacity 150ms ease;
+}
+
+.material-wash {
+  position: absolute;
+  inset: 0 -30%;
+  background-image: var(--material-wash);
+  background-size: 300% 100%;
+  translate: calc(var(--material-shift, 0) * 18%) 0;
+  transition: translate 600ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .material-wash {
+    animation: material-wash-drift 9s ease-in-out infinite alternate;
+  }
+}
+
+@keyframes material-wash-drift {
+  from {
+    background-position: 0% 50%;
+  }
+
+  to {
+    background-position: 100% 50%;
+  }
+}
+
+@media (hover: hover) {
+  .material:hover:not(:disabled) {
+    --material-near: 0 1px 1px rgb(52 18 0 / 0.07);
+    --material-far: 0 2px 4px rgb(52 18 0 / 0.09);
+    --material-drop: drop-shadow(0 1px 0.5px rgb(52 18 0 / 0.07)) drop-shadow(0 2px 2px rgb(52 18 0 / 0.09));
+  }
+
+  .material:hover .material-wash-frame {
+    opacity: 0.38;
+  }
+}
+
+:where([data-theme="dark"]) .material {
+  --material-near: 0 1px 1px rgb(0 0 0 / 0.3);
+  --material-far: 0 1px 3px rgb(0 0 0 / 0.3);
+  --material-drop: drop-shadow(0 1px 0.5px rgb(0 0 0 / 0.3)) drop-shadow(0 1px 1.5px rgb(0 0 0 / 0.3));
+  --material-inset: inset 0 1px 0 rgb(255 255 255 / 0.1);
+}
+
+/* A button or a link of the material: solid glass's edge, drawn as the
+   primary button draws its own. A 1px dark stroke outside (--material-ring,
+   in the shadow so it takes no room; solid glass's outer stroke) and a 1px
+   white rim inside over the border's place, bright at the top and fading
+   down (::before, a gradient masked to a ring: one gradient, so no stop at
+   the corners). The stroke and the rim draw the edge: the border and the
+   outline go. --surface-*: what SmoothSurface draws, from the same values. */
+:is(button, a).material {
+  --material-button-edge: var(--glass-solid-outer);
+  --material-rim-top: 0.75;
+  --material-rim-mid: 0.35;
+  --material-rim-bottom: 0.15;
+  --material-rim-opacity: 1;
+  --material-inset: 0 0 0 0 transparent;
+  --material-shade-top: rgb(255 255 255 / 0);
+  --material-shade-bottom: rgb(255 255 255 / 0);
+  --material-ring: 0 0 0 1px var(--material-button-edge);
+  --surface-face: var(--material-face);
+  --surface-edge: var(--material-button-edge);
+  --surface-shade-top: var(--material-shade-top);
+  --surface-shade-bottom: var(--material-shade-bottom);
+  --surface-rim-top: var(--material-rim-top);
+  --surface-rim-mid: var(--material-rim-mid);
+  --surface-rim-bottom: var(--material-rim-bottom);
+  --surface-rim-opacity: var(--material-rim-opacity);
+  --surface-drop: var(--material-drop);
+  border-color: transparent;
+  outline: none;
+  background-image: linear-gradient(180deg, var(--material-shade-top) 30%, var(--material-shade-bottom));
+}
+
+/* Under the pointer, the fill darkens a touch, as a button of solid glass. */
+@media (hover: hover) {
+  :is(button, a).material:hover:not(:disabled) {
+    --material-face: var(--glass-solid-fill-hover);
+  }
+}
+
+/* Positioned for the rim, in the components layer so a caller's absolute
+   or fixed (a utility) still wins. Disabled, it fades, keeps no lift and
+   doesn't press: the same layer, so a caller's disabled:… still wins. */
+@layer components {
+  /* The text colour too: a caller's text-… (text-brand, text-error) wins. */
+  .material {
+    color: var(--color-text);
+  }
+
+  :is(button, a).material {
+    position: relative;
+  }
+
+  .material:disabled,
+  .material[aria-disabled="true"] {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+}
+
+.material:disabled,
+.material[aria-disabled="true"] {
+  --material-near: 0 0 0 0 transparent;
+  --material-far: 0 0 0 0 transparent;
+  --material-drop: drop-shadow(0 0 0 transparent) drop-shadow(0 0 0 transparent);
+}
+
+:is(button, a).material::before {
+  content: '';
+  position: absolute;
+  inset: -1px;
+  padding: 1px;
+  border-radius: inherit;
+  background: linear-gradient(180deg, rgb(255 255 255 / var(--material-rim-top)) 0%, rgb(255 255 255 / var(--material-rim-mid)) 42%, rgb(255 255 255 / var(--material-rim-bottom)) 100%);
+  opacity: var(--material-rim-opacity);
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask: linear-gradient(#000 0 0) content-box exclude, linear-gradient(#000 0 0);
+  pointer-events: none;
+  transition: opacity 220ms ease;
+}
+
+:is(button, a).material:active:not(:disabled)::before {
+  transition-duration: 80ms;
+}
+
+/* Dark: solid glass's dark stroke and its faint rim, lit at the top: the
+   light fades down the sides into the stroke, no grey outline. */
+:where([data-theme="dark"]) :is(button, a).material {
+  --material-rim-top: 0.16;
+  --material-rim-mid: 0.06;
+  --material-rim-bottom: 0.04;
+}
+
+/* In the mail reader's white panel the white edge would vanish: a hairline
+   instead, so its fields still read as lifted (its buttons have their
+   stroke). */
+.mail-reader-panel .material:not(button, a),
+.side-panel .material:not(button, a) {
+  border-color: rgb(52 18 0 / 0.1);
+}
+
+:where([data-theme="dark"]) .mail-reader-panel .material:not(button, a),
+:where([data-theme="dark"]) .side-panel .material:not(button, a) {
+  border-color: rgb(255 255 255 / 0.08);
+}
+
+:where([data-theme="dark"]) .material-wash-frame {
+  opacity: 0.34;
+}

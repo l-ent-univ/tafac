@@ -1,0 +1,302 @@
+/* ── Landing showcase (LandingShowcase) ──
+   The tab list wears the app's phone tab bar (.mobile-tab-bar), its tabs
+   sharing it equally; the selected one's lens slides under the tab picked
+   (--tab-index of --tab-count, inside the bar's 6px padding and 4px gaps). */
+.landing-tabs-lens {
+  --tab-width: calc((100% - 12px - (var(--tab-count) - 1) * 4px) / var(--tab-count));
+  /* The selected tab's solid glass (.mobile-tab-bar-item--selected): its
+     border and outer stroke need lines to colour, as a tab has (their
+     colours its own). */
+  border-width: 1px;
+  border-style: solid;
+  outline-width: 1px;
+  outline-style: solid;
+  outline-offset: 0;
+  box-sizing: border-box;
+  top: 6px;
+  bottom: 6px;
+  left: calc(6px + var(--tab-index) * (var(--tab-width) + 4px));
+  width: var(--tab-width);
+  transition: left 420ms cubic-bezier(0.32, 0.72, 0, 1);
+}
+
+/* Pinned (src/landingShowcaseScroll.js): on screens tall and wide enough
+   for a whole panel, the section stays on screen while the page scrolls
+   along its track, one stretch per tab, under the floating header, a little
+   tighter to fit; on laptops under 820px, without the intro and with a
+   smaller preview. The same media query as PINNED_QUERY. */
+@media (width >= 1024px) and (height >= 700px) {
+  .landing-showcase-track {
+    --showcase-step: 70svh;
+    height: calc(100svh + (var(--tab-count) - 1) * var(--showcase-step));
+  }
+
+  /* Its content from the top, under the header (centred, it left a band
+     of blank above the title as the section came in, on top of the
+     section's own padding, dropped here). */
+  .landing-showcase:has(> * > .landing-showcase-track) {
+    padding-top: 0;
+    margin-top: -48px;
+  }
+
+  .landing-showcase-track .landing-showcase-pin {
+    position: sticky;
+    top: 0;
+    justify-content: flex-start;
+    min-height: 100svh;
+    padding-block: 92px 12px;
+  }
+
+  .landing-showcase-track .landing-tabs {
+    margin-top: 24px;
+  }
+
+  .landing-showcase-track .landing-showcase-panels {
+    margin-top: 32px;
+  }
+
+  /* The scroll places the panels, frame by frame (placePanels: their
+     opacity and translate inline), and the lens with them (--tab-progress
+     on it): nothing of their own to ease. */
+  .landing-showcase-track .landing-showcase-panel {
+    transition: none;
+    will-change: opacity, translate;
+  }
+
+  .landing-showcase-track .landing-tabs-lens {
+    left: calc(6px + var(--tab-progress, var(--tab-index)) * (var(--tab-width) + 4px));
+    transition: none;
+  }
+}
+
+@media (width >= 1024px) and (700px <= height < 820px) {
+  .landing-showcase-track .landing-showcase-intro {
+    display: none;
+  }
+
+  .landing-showcase-track .landing-showcase-stage {
+    zoom: 0.8;
+  }
+}
+
+/* The lens is the selected tab's: no hover tint over it. */
+.landing-tabs .mobile-tab-bar-item[aria-selected="true"] {
+  background-color: transparent;
+}
+
+/* The panels one over the other, the section as tall as the tallest (each
+   its own height, from the top), so nothing moves when a tab is picked: the
+   selected one shows, the others stay in the page faded out (and inert:
+   LandingShowcase). */
+.landing-showcase-panels {
+  display: grid;
+  align-items: start;
+}
+
+/* A panel: its title and list on the left, the preview on the right; on
+   narrower screens the preview between the title and the list. */
+.landing-showcase-panel {
+  grid-area: 1 / 1;
+  display: grid;
+  grid-template-columns: minmax(0, 380px) minmax(0, 1fr);
+  grid-template-areas:
+    "head preview"
+    "items preview";
+  grid-template-rows: auto 1fr;
+  column-gap: 56px;
+  row-gap: 24px;
+  align-items: start;
+}
+
+.landing-showcase-head {
+  grid-area: head;
+  align-self: end;
+}
+
+.landing-showcase-items {
+  grid-area: items;
+}
+
+.landing-showcase-frame {
+  grid-area: preview;
+  align-self: center;
+}
+
+@media (width < 1024px) {
+  .landing-showcase-panel {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas:
+      "head"
+      "preview"
+      "items";
+    grid-template-rows: auto;
+    row-gap: 24px;
+    max-width: 640px;
+    margin-inline: auto;
+  }
+}
+
+/* Each preview on a plain colour, the hero film's grey (a lifted grey in
+   the dark theme, off the page's near-black); as tall on every tab, so the
+   page doesn't jump when one is picked (on phones, as tall as its
+   preview). */
+.landing-showcase-frame {
+  background-color: #f0f0f0;
+  box-shadow: 0 1px 3px rgb(52 18 0 / 0.08), 0 28px 64px -30px rgb(52 18 0 / 0.4);
+}
+
+:where([data-theme="dark"]) .landing-showcase-frame {
+  background-color: #1a1a1a;
+  box-shadow: 0 1px 3px rgb(0 0 0 / 0.4), 0 28px 64px -30px rgb(0 0 0 / 0.8);
+}
+
+.landing-showcase-stage {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  align-content: center;
+  min-height: 500px;
+  padding: 28px;
+}
+
+@media (width < 1024px) {
+  .landing-showcase-stage {
+    min-height: 0;
+    padding: 24px;
+  }
+}
+
+@media (width < 1024px) {
+  .landing-showcase-stage {
+    padding: 14px;
+  }
+}
+
+/* « Assiduité »: the semester's totals and its line one over the other,
+   each across the frame (the page sets them side by side, the totals no
+   wider than 443px: too narrow here for both). */
+.landing-preview-assiduity .widget-card {
+  max-width: none;
+  flex-basis: 100%;
+}
+
+/* The mail list, solid as the mail page is; the composer of « Écrire au
+   sujet de cette note » over it as the app's composer window is over the
+   page (.mail-composer). */
+.landing-preview-sheet {
+  background-color: var(--color-bg);
+  border-color: rgb(255 255 255 / 0.8);
+  box-shadow: 0 1px 3px rgb(52 18 0 / 0.06), 0 10px 28px -14px rgb(52 18 0 / 0.16);
+}
+
+:where([data-theme="dark"]) .landing-preview-sheet {
+  background-color: #141414;
+  border-color: rgb(255 255 255 / 0.08);
+  box-shadow: 0 1px 3px rgb(0 0 0 / 0.3);
+}
+
+.landing-preview-composer {
+  background-color: #ffffff;
+  border-color: rgb(52 18 0 / 0.08);
+  box-shadow: 0 1px 3px rgb(52 18 0 / 0.08), 0 32px 80px -20px rgb(52 18 0 / 0.36);
+}
+
+:where([data-theme="dark"]) .landing-preview-composer {
+  background-color: #1c1c1c;
+  border-color: rgb(255 255 255 / 0.1);
+  box-shadow: 0 1px 3px rgb(0 0 0 / 0.4), 0 32px 80px -20px rgb(0 0 0 / 0.8);
+}
+
+/* The tab picked: the last panel fades out as the picked one rises into its
+   place (a beat later, so the two don't blend). With reduced motion they
+   simply swap, and the lens jumps. */
+.landing-showcase-panel:not([data-selected]) {
+  opacity: 0;
+  translate: 0 10px;
+  visibility: hidden;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .landing-showcase-panel {
+    transition: opacity 360ms ease-out 90ms, translate 480ms cubic-bezier(0.16, 1, 0.3, 1) 90ms, visibility 0s 90ms;
+  }
+
+  .landing-showcase-panel:not([data-selected]) {
+    transition: opacity 180ms ease-in, translate 180ms ease-in, visibility 0s 180ms;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .landing-tabs-lens {
+    transition: none;
+  }
+}
+
+/* The security section's mails part (SecurityShowcase): its points come in
+   one by one once the card is on screen. */
+@media (prefers-reduced-motion: no-preference) {
+  .security-mail-point {
+    opacity: 0;
+    translate: 0 16px;
+  }
+
+  .security-mail[data-revealed] .security-mail-point {
+    animation: landing-feature-in 600ms cubic-bezier(0.16, 1, 0.3, 1) calc(var(--reveal-index) * 90ms + 150ms) both;
+  }
+}
+
+/* The landing's last card (free, the team, the contact) rises in once on
+   screen (LandingContact: data-revealed). */
+@media (prefers-reduced-motion: no-preference) {
+  .landing-contact {
+    opacity: 0;
+    translate: 0 28px;
+    scale: 0.97;
+  }
+
+  .landing-contact[data-revealed] {
+    animation: landing-contact-in 900ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  }
+}
+
+@keyframes landing-contact-in {
+  to {
+    opacity: 1;
+    translate: 0 0;
+    scale: 1;
+  }
+}
+
+/* The glow at the end of the landing page (behind the last block and the
+   footer), from the bottom: Papillon's green, Tafac's yellow and sky. Static. */
+.landing-papillon-glow {
+  background:
+    radial-gradient(70% 85% at 50% 100%, rgb(41 148 122 / 0.3), transparent 70%),
+    radial-gradient(45% 60% at 12% 100%, rgb(250 204 21 / 0.22), transparent 70%),
+    radial-gradient(45% 60% at 88% 100%, rgb(86 136 175 / 0.28), transparent 70%);
+}
+
+:where([data-theme="dark"]) .landing-papillon-glow {
+  background:
+    radial-gradient(70% 85% at 50% 100%, rgb(41 148 122 / 0.4), transparent 70%),
+    radial-gradient(45% 60% at 12% 100%, rgb(250 204 21 / 0.16), transparent 70%),
+    radial-gradient(45% 60% at 88% 100%, rgb(86 136 175 / 0.32), transparent 70%);
+}
+
+/* The floating widgets drift up and down, each at its own pace
+   (FloatingWidgets: --float-duration, --float-delay, --float-distance);
+   `translate` only, so their `rotate` stays. */
+@media (prefers-reduced-motion: no-preference) {
+  .landing-float {
+    animation: landing-float var(--float-duration, 6s) ease-in-out var(--float-delay, 0s) infinite alternate;
+  }
+}
+
+@keyframes landing-float {
+  from {
+    translate: 0 0;
+  }
+
+  to {
+    translate: 0 var(--float-distance, -14px);
+  }
+}

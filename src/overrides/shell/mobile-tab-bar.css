@@ -1,0 +1,49 @@
+/* ── Mobile tab bar: floating pill in the glass material ── */
+
+.mobile-tab-bar {
+  background-color: var(--glass-fill);
+  border: 1px solid;
+  border-color: var(--glass-edge);
+  outline: 1px solid var(--glass-outer);
+  outline-offset: 0;
+  -webkit-backdrop-filter: var(--glass-blur);
+  backdrop-filter: var(--glass-blur);
+  box-shadow: var(--glass-shadow);
+}
+
+.mobile-tab-bar-item:active {
+  background-color: rgb(255 255 255 / 0.55);
+}
+
+/* Touchscreens keep :hover after a tap; only real pointers get it. */
+@media (hover: hover) {
+  .mobile-tab-bar-item:hover {
+    background-color: rgb(255 255 255 / 0.55);
+  }
+
+  :where([data-theme="dark"]) .mobile-tab-bar-item:hover {
+    background-color: rgb(255 255 255 / 0.1);
+  }
+}
+
+.mobile-tab-bar-item:focus-visible {
+  outline: 2px solid rgb(52 18 0 / 0.35);
+  outline-offset: -2px;
+}
+
+/* Selected tab: a lens of solid glass behind the icon and label, as the
+   sidebar's selected row (its outer stroke, lit top rim, close shadow). */
+.mobile-tab-bar-item {
+  border: 1px solid transparent;
+  outline: 1px solid transparent;
+  outline-offset: 0;
+}
+
+.mobile-tab-bar-item--selected,
+.mobile-tab-bar-item--selected:hover,
+.mobile-tab-bar-item--selected:active {
+  border-color: var(--glass-solid-edge);
+  background-color: var(--glass-solid-fill);
+  outline-color: var(--glass-solid-outer);
+  box-shadow: var(--glass-solid-shadow);
+}

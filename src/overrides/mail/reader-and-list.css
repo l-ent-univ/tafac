@@ -1,0 +1,428 @@
+/* The mail reader's side panel (MailPage, from 4xl), and the planning's
+   (PlanningDirectoryPanel): solid glass, quiet (a large surface), sliding
+   in from the right edge and back out. */
+.mail-reader-panel,
+.side-panel {
+  --mail-panel-bg: var(--glass-solid-fill);
+  background-color: var(--mail-panel-bg);
+  border-color: var(--glass-quiet-edge);
+  outline: 1px solid var(--glass-quiet-outer);
+  outline-offset: 0;
+  box-shadow: var(--glass-quiet-shadow);
+  animation: mail-reader-panel-in 340ms cubic-bezier(0.32, 0.72, 0, 1) both;
+}
+
+.mail-reader-panel.is-closing,
+.side-panel.is-closing {
+  animation: mail-reader-panel-out 240ms cubic-bezier(0.32, 0.72, 0, 1) both;
+}
+
+@keyframes mail-reader-panel-in {
+  from {
+    opacity: 0;
+    transform: translateX(calc(100% + 12px));
+  }
+}
+
+@keyframes mail-reader-panel-out {
+  to {
+    opacity: 0;
+    transform: translateX(calc(100% + 12px));
+  }
+}
+
+/* A mail coming into the reader (another one picked in the list, or its
+   header once loaded): a short fade. */
+.mail-reader-enter {
+  animation: mail-reader-enter 220ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+
+@keyframes mail-reader-enter {
+  from {
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mail-reader-enter {
+    animation: none;
+  }
+}
+
+/* The mail list's rows coming and going (MailPage, useListTransitions):
+   their height opening from or shutting to nothing (a one-row grid from
+   1fr to 0fr, clipped vertically only: the hover tint bleeds sideways) as
+   they fade, the rows below sliding along. */
+.mail-row-enter,
+.mail-row-exit {
+  display: grid;
+  overflow: visible clip;
+}
+
+.mail-row-enter > *,
+.mail-row-exit > * {
+  min-height: 0;
+}
+
+.mail-row-enter {
+  animation: mail-row-in 300ms cubic-bezier(0.32, 0.72, 0, 1) both;
+}
+
+.mail-row-exit {
+  animation: mail-row-out 260ms cubic-bezier(0.32, 0.72, 0, 1) both;
+}
+
+@keyframes mail-row-in {
+  from {
+    grid-template-rows: 0fr;
+    opacity: 0;
+  }
+  to {
+    grid-template-rows: 1fr;
+  }
+}
+
+@keyframes mail-row-out {
+  from {
+    grid-template-rows: 1fr;
+  }
+  to {
+    grid-template-rows: 0fr;
+    opacity: 0;
+    border-bottom-color: transparent;
+  }
+}
+
+/* Still a (near-instant) animation: a gone row's end removes it. */
+@media (prefers-reduced-motion: reduce) {
+  .mail-row-enter,
+  .mail-row-exit {
+    animation-duration: 1ms;
+  }
+}
+
+/* A mail row swiped sideways (SwipeableRow, on a touch screen): the row
+   slides over (vertical pans stay the page's, pinches too), its actions
+   filling the room it leaves on either side. Clipped only while they show,
+   to the row's rounded tint: at rest a selected row still runs 1px over
+   the line below it. No long-press callout or text selection on the row,
+   the long press being its menu. */
+.mail-swipe {
+  position: relative;
+  border-radius: 10px;
+}
+
+.mail-swipe.is-revealed {
+  overflow: hidden;
+}
+
+.mail-swipe-content {
+  touch-action: pan-y pinch-zoom;
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+.mail-swipe.is-revealed .mail-swipe-content {
+  will-change: transform;
+}
+
+.mail-swipe-actions {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  display: flex;
+  width: 0;
+  overflow: hidden;
+}
+
+/* Listed from the edge inwards: the first at the row's edge. */
+.mail-swipe-actions--leading {
+  left: 0;
+}
+
+.mail-swipe-actions--trailing {
+  right: 0;
+  flex-direction: row-reverse;
+}
+
+/* Each shares the room; a full swipe (or a removing one tapped) gives it
+   all to one, the others folding away, its label kept by the row's edge. */
+.mail-swipe-action {
+  display: flex;
+  flex: 1 1 0;
+  min-width: 0;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  padding: 0;
+  border: 0;
+  color: #ffffff;
+  cursor: pointer;
+  transition: flex-grow 220ms cubic-bezier(0.32, 0.72, 0, 1);
+}
+
+.mail-swipe-action:focus-visible {
+  outline: 2px solid #ffffff;
+  outline-offset: -4px;
+}
+
+.mail-swipe-actions[data-expanding] > .mail-swipe-action:not([data-expanded]) {
+  flex-grow: 0;
+}
+
+.mail-swipe-action-inner {
+  transition: opacity 120ms ease;
+}
+
+.mail-swipe-actions[data-expanding] > .mail-swipe-action:not([data-expanded]) .mail-swipe-action-inner {
+  opacity: 0;
+}
+
+.mail-swipe-actions--trailing > .mail-swipe-action[data-expanded] {
+  justify-content: flex-start;
+}
+
+.mail-swipe-actions--leading > .mail-swipe-action[data-expanded] {
+  justify-content: flex-end;
+}
+
+.mail-swipe-action-inner {
+  display: flex;
+  flex: 0 0 76px;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding-inline: 4px;
+  text-align: center;
+}
+
+/* A button narrower than its label (the row partly open, or folding away
+   beside a full swipe) shows its icon alone: no label cut off on both
+   sides, running into the next one. */
+.mail-swipe-action {
+  container-type: inline-size;
+}
+
+.mail-swipe-action-label {
+  transition: opacity 120ms ease;
+}
+
+@container (max-width: 64px) {
+  .mail-swipe-action-label {
+    opacity: 0;
+  }
+}
+
+/* Crossing the full-swipe point: the icon gives a little jump, the snap a
+   haptic would be. */
+.mail-swipe-action[data-expanded] .mail-swipe-action-icon {
+  animation: mail-swipe-snap 280ms cubic-bezier(0.32, 0.72, 0, 1);
+}
+
+@keyframes mail-swipe-snap {
+  40% {
+    transform: scale(1.22);
+  }
+}
+
+.mail-swipe-action--blue {
+  background-color: #1a73e8;
+}
+
+.mail-swipe-action--orange {
+  background-color: #f0932b;
+}
+
+.mail-swipe-action--red {
+  background-color: #d1342f;
+}
+
+.mail-swipe-action--gray {
+  background-color: #8e8e93;
+}
+
+:where([data-theme="dark"]) .mail-swipe-action--blue {
+  background-color: #2f7cf0;
+}
+
+:where([data-theme="dark"]) .mail-swipe-action--red {
+  background-color: #e5443d;
+}
+
+:where([data-theme="dark"]) .mail-swipe-action--gray {
+  background-color: #636366;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mail-swipe-action {
+    transition: none;
+  }
+
+  .mail-swipe-action[data-expanded] .mail-swipe-action-icon {
+    animation: none;
+  }
+}
+
+/* The reader panel's toolbar, held at its top (MailPage, from 4xl): the
+   mail scrolling under it fades into the panel's colour behind the pills,
+   up to the panel's edge, instead of showing between them. */
+@media (min-width: 1024px) {
+  .mail-toolbar-veil::before {
+    content: '';
+    position: absolute;
+    inset: -20px -20px -16px;
+    z-index: -1;
+    background: linear-gradient(to bottom, var(--mail-panel-bg) 62%, transparent);
+    pointer-events: none;
+  }
+}
+
+/* The mail search's input: the field around it shows the focus (rounded,
+   MailSearchField), not index.css's square ring on the input itself. */
+.mail-search-input:focus-visible {
+  outline: none;
+}
+
+/* The mail list swapped for another folder's (keyed by folder): a short
+   fade in, from the dimmed list it replaces. Backwards only: once played
+   it lets go of the opacity, so the next switch's dimming eases. */
+.mail-list-swap {
+  animation: mail-reader-enter 220ms ease-out backwards;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mail-list-swap {
+    animation: none;
+  }
+}
+
+/* The mail page's refresh button while it reloads: its arrows turn. */
+.mail-refresh-spin {
+  animation: mail-refresh-spin 700ms cubic-bezier(0.45, 0, 0.25, 1) infinite;
+}
+
+@keyframes mail-refresh-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mail-refresh-spin {
+    animation-duration: 1.6s;
+  }
+}
+
+/* On a phone (the reader in the list's place, under 1024px), as iOS pushes
+   a screen: a mail opened slides in from the right, the list back from the
+   left (its block shown again replays it). The desktop's panel has its own
+   slide. Backwards only: no transform left on them once played. */
+@media (max-width: 1023px) {
+  .mail-push-in {
+    animation: mail-push-in 360ms cubic-bezier(0.32, 0.72, 0, 1) backwards;
+  }
+
+  .mail-pop-in {
+    animation: mail-pop-in 320ms cubic-bezier(0.32, 0.72, 0, 1) backwards;
+  }
+}
+
+@keyframes mail-push-in {
+  from {
+    opacity: 0;
+    transform: translateX(32px);
+  }
+}
+
+@keyframes mail-pop-in {
+  from {
+    opacity: 0;
+    transform: translateX(-24px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mail-push-in,
+  .mail-pop-in {
+    animation: none;
+  }
+}
+
+/* The mail page's skeletons and loading dots (the list, a mail, a search):
+   none for a quick answer, faded in past a short wait, so they don't flash. */
+.mail-skeleton-delayed {
+  animation: mail-skeleton-in 220ms ease-out 180ms both;
+}
+
+@keyframes mail-skeleton-in {
+  from {
+    opacity: 0;
+  }
+}
+
+/* The mail page's notice coming and going (MailToast): rising in with a
+   little spring, sinking back out. */
+.mail-toast-in {
+  animation: mail-toast-in 420ms cubic-bezier(0.34, 1.4, 0.64, 1) both;
+}
+
+.mail-toast-out {
+  animation: mail-toast-out 220ms cubic-bezier(0.4, 0, 1, 1) both;
+}
+
+@keyframes mail-toast-in {
+  from {
+    opacity: 0;
+    transform: translateY(18px) scale(0.94);
+  }
+}
+
+@keyframes mail-toast-out {
+  to {
+    opacity: 0;
+    transform: translateY(12px) scale(0.96);
+  }
+}
+
+/* Still animations (near-instant): the way out's end removes it. */
+@media (prefers-reduced-motion: reduce) {
+  .mail-toast-in,
+  .mail-toast-out {
+    animation-duration: 1ms;
+  }
+}
+
+/* The mail page's notice (MailToast): the stroke round « Annuler », drawn
+   over the time left to undo; its end closes the notice. The rect sits
+   inside the 28px pill, its stroke on the edge. */
+.mail-toast-ring {
+  x: 0.75px;
+  y: 0.75px;
+  width: calc(100% - 1.5px);
+  height: calc(100% - 1.5px);
+  rx: 13.25px;
+  stroke-dasharray: 1;
+  stroke-dashoffset: 1;
+  animation: mail-toast-ring var(--toast-duration, 6s) linear forwards;
+}
+
+.mail-toast:hover .mail-toast-ring {
+  animation-play-state: paused;
+}
+
+@keyframes mail-toast-ring {
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+/* Still a (near-instant) animation: its end unmounts the closed panel. */
+@media (prefers-reduced-motion: reduce) {
+  .mail-reader-panel,
+  .mail-reader-panel.is-closing,
+  .side-panel,
+  .side-panel.is-closing {
+    animation-duration: 1ms;
+  }
+}

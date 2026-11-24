@@ -1,0 +1,101 @@
+/* ── Semester switch (Mes notes) ──
+   The new semester's content fades in, rising a few pixels: enough to see
+   it changed, notably when stepping through semesters with the wheel. No
+   transform left once done (it would trap the UE view's fixed layers). */
+
+.semester-fade {
+  animation: semester-fade 300ms cubic-bezier(0.2, 0.8, 0.2, 1) backwards;
+}
+
+@keyframes semester-fade {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .semester-fade {
+    animation-name: semester-fade-plain;
+  }
+
+  @keyframes semester-fade-plain {
+    from {
+      opacity: 0;
+    }
+  }
+}
+
+/* ── "Dernières notes" → the grade (Mes notes) ──
+   A card's background brightens under the pointer (no lift); the
+   evaluation it opens flashes once in the UE's view so the eye finds it:
+   its card takes a tint and a ring of the ink colour, then lets them go
+   (inside the card: an outer glow would be cut by the panel, which clips
+   to open and close). */
+
+.latest-grade-card {
+  transition: background-color 160ms ease;
+}
+
+@media (hover: hover) {
+  .latest-grade-card:hover {
+    background-color: var(--color-bg-subtle);
+  }
+}
+
+.subject-evaluation.is-flashing {
+  animation: evaluation-flash 1.8s ease-out both;
+}
+
+@keyframes evaluation-flash {
+  0%, 35% {
+    background-color: color-mix(in srgb, var(--color-brand) 9%, var(--color-widget-bg));
+    border-color: color-mix(in srgb, var(--color-brand) 35%, transparent);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .latest-grade-card {
+    transition: none;
+  }
+}
+
+/* ── Grades notices (Mes notes) ──
+   Jury decision and department message under the cards: they rise in
+   gently. Mounted already visible (widget-card-visible), so the widget
+   cards' own transition never plays for them. */
+
+.grades-notice {
+  animation: grades-notice-in 420ms cubic-bezier(0.16, 1, 0.3, 1) backwards;
+}
+
+@keyframes grades-notice-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+}
+
+/* The jury decision's card washed in its coin's colour, strongest by the
+   coin, like the "Dernières notes" cards' UE wash. */
+.grades-notice-tint {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  border-radius: inherit;
+  corner-shape: inherit;
+  opacity: 0.14;
+  pointer-events: none;
+  -webkit-mask-image: linear-gradient(to right, #000 0%, rgb(0 0 0 / 0.3) 100%);
+  mask-image: linear-gradient(to right, #000 0%, rgb(0 0 0 / 0.3) 100%);
+}
+
+:where([data-theme="dark"]) .grades-notice-tint {
+  opacity: 0.22;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .grades-notice {
+    animation: none;
+  }
+}

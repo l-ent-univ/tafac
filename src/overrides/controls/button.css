@@ -1,0 +1,190 @@
+/* ── Primary button (LentButton) ──
+   The brand colour on a close, sharp shadow (1–3 px, little blur) that
+   lifts a touch on hover. Its edge gives
+   it depth: a 1px dark stroke outside (--lent-button-edge, the fill
+   deepened) and a 1px white stroke inside, bright at the top and fading
+   down (--lent-button-rim-*), as light catching a raised rim.
+   Pressed, it sinks: down a pixel and a little smaller, fast (80 ms), its
+   drop shadow gone, a shade inside its top edge and the rim faded, as
+   pushed into the page. Let go, it springs back up past its place and
+   settles (320 ms).
+   Any filled button takes it with the class: --lent-button-fill (and
+   -hover, -ink) for another colour than the brand, .lent-button--danger for
+   the red of what can't be undone. Disabled, it fades and lies flat; a
+   caller's own disabled:… utilities still win (components layer).
+   Its shape: a smooth pill (SmoothSurface, an SVG of Lisse's smoothed
+   corners) once mounted; till then, and without JS, the same look in CSS
+   on round corners (background, box-shadow, ::before). Both read the
+   variables below, set per state. */
+
+.lent-button {
+  --lent-button-fill: var(--color-brand);
+  --lent-button-fill-hover: var(--color-brand-hover);
+  --lent-button-ink: var(--color-bg);
+  --lent-button-face: var(--lent-button-fill);
+  --lent-button-edge: color-mix(in oklab, var(--lent-button-fill), black 40%);
+  --lent-button-rim-top: 0.32;
+  --lent-button-rim-mid: 0.1;
+  --lent-button-rim-bottom: 0.02;
+  --lent-button-rim-opacity: 1;
+  --lent-button-press: rgb(0 0 0 / 0);
+  --lent-button-press-surface: rgb(0 0 0 / 0);
+  --lent-button-near: 0 1px 1px rgb(52 18 0 / 0.22);
+  --lent-button-far: 0 2px 3px -1px rgb(52 18 0 / 0.22);
+  --lent-button-drop: drop-shadow(0 1px 0.5px rgb(52 18 0 / 0.22)) drop-shadow(0 2px 1.5px rgb(52 18 0 / 0.16));
+  /* What SmoothSurface draws. */
+  --surface-face: var(--lent-button-face);
+  --surface-edge: var(--lent-button-edge);
+  --surface-shade-top: rgb(0 0 0 / 0);
+  --surface-press: var(--lent-button-press-surface);
+  --surface-shade-bottom: rgb(0 0 0 / 0);
+  --surface-rim-top: var(--lent-button-rim-top);
+  --surface-rim-mid: var(--lent-button-rim-mid);
+  --surface-rim-bottom: var(--lent-button-rim-bottom);
+  --surface-rim-opacity: var(--lent-button-rim-opacity);
+  --surface-drop: var(--lent-button-drop);
+  background-color: var(--lent-button-face);
+  color: var(--lent-button-ink);
+  /* Medium, a touch tight. Here rather than in utilities: index.css
+     gives every <button> `font: inherit`, outside the layers, which beats
+     a font-… or tracking-… class on it. */
+  font-weight: 500;
+  letter-spacing: -0.01em;
+  box-shadow: 0 0 0 1px var(--lent-button-edge), inset 0 2px 3px var(--lent-button-press), var(--lent-button-near), var(--lent-button-far);
+  transition:
+    background-color 150ms ease,
+    box-shadow 220ms ease,
+    transform 320ms cubic-bezier(0.34, 1.56, 0.64, 1),
+    opacity 150ms ease;
+}
+
+.lent-button::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  padding: 1px;
+  border-radius: inherit;
+  background: linear-gradient(180deg, rgb(255 255 255 / var(--lent-button-rim-top)) 0%, rgb(255 255 255 / var(--lent-button-rim-mid)) 42%, rgb(255 255 255 / var(--lent-button-rim-bottom)) 100%);
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask: linear-gradient(#000 0 0) content-box exclude, linear-gradient(#000 0 0);
+  opacity: var(--lent-button-rim-opacity);
+  pointer-events: none;
+  transition: opacity 220ms ease;
+}
+
+.lent-button:hover:not(:disabled) {
+  --lent-button-face: var(--lent-button-fill-hover);
+  --lent-button-near: 0 1px 1px rgb(52 18 0 / 0.24);
+  --lent-button-far: 0 3px 4px -1px rgb(52 18 0 / 0.26);
+  --lent-button-drop: drop-shadow(0 1px 0.5px rgb(52 18 0 / 0.24)) drop-shadow(0 3px 2px rgb(52 18 0 / 0.2));
+}
+
+/* The red is lighter than the brand: its rim a stronger white, or it
+   vanishes at rest. Doubled class: over the dark theme's .lent-button,
+   further down. */
+.lent-button.lent-button--danger {
+  --lent-button-fill: var(--red-600);
+  --lent-button-fill-hover: color-mix(in oklab, var(--red-600), black 10%);
+  --lent-button-ink: #ffffff;
+  --lent-button-rim-top: 0.6;
+  --lent-button-rim-mid: 0.22;
+  --lent-button-rim-bottom: 0.06;
+}
+
+:where([data-theme="dark"]) .lent-button.lent-button--danger {
+  --lent-button-fill: #e5443d;
+  --lent-button-fill-hover: color-mix(in oklab, #e5443d, white 10%);
+  --lent-button-rim-top: 0.5;
+  --lent-button-rim-mid: 0.18;
+  --lent-button-rim-bottom: 0.05;
+}
+
+.lent-button:disabled:not([aria-busy="true"]) {
+  --lent-button-near: 0 0 0 0 transparent;
+  --lent-button-far: 0 0 0 0 transparent;
+  --lent-button-drop: drop-shadow(0 0 0 transparent) drop-shadow(0 0 0 transparent);
+}
+
+@layer components {
+  /* Positioned for the rim (::before) and the surface: without it they
+     are drawn around the nearest positioned ancestor instead. A caller's
+     absolute or fixed (a utility) still wins. */
+  .lent-button {
+    position: relative;
+  }
+
+  .lent-button:disabled:not([aria-busy="true"]),
+  .lent-button[aria-disabled="true"] {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+}
+
+.lent-button:active:not(:disabled) {
+  --lent-button-press: rgb(0 0 0 / 0.32);
+  --lent-button-press-surface: rgb(0 0 0 / 0.18);
+  --lent-button-rim-opacity: 0;
+  --lent-button-near: 0 0 1px rgb(52 18 0 / 0.12);
+  --lent-button-far: 0 2px 4px -4px rgb(52 18 0 / 0);
+  --lent-button-drop: drop-shadow(0 0 0.5px rgb(52 18 0 / 0.12)) drop-shadow(0 0 0 rgb(52 18 0 / 0));
+  transform: translateY(1px) scale(0.975);
+  transition-duration: 150ms, 80ms, 80ms, 150ms;
+  transition-timing-function: ease, ease-out, ease-out, ease;
+}
+
+.lent-button:active:not(:disabled)::before {
+  transition-duration: 80ms;
+}
+
+/* The dark theme's button is light: its edge is a dark line against the
+   page, its rim a brighter white, its shadows black. */
+:where([data-theme="dark"]) .lent-button {
+  --lent-button-edge: rgb(0 0 0 / 0.7);
+  --lent-button-rim-top: 0.95;
+  --lent-button-rim-mid: 0.35;
+  --lent-button-rim-bottom: 0.1;
+  --lent-button-near: 0 1px 1px rgb(0 0 0 / 0.5);
+  --lent-button-far: 0 2px 3px -1px rgb(0 0 0 / 0.5);
+  --lent-button-drop: drop-shadow(0 1px 0.5px rgb(0 0 0 / 0.5)) drop-shadow(0 2px 1.5px rgb(0 0 0 / 0.4));
+}
+
+:where([data-theme="dark"]) .lent-button:hover:not(:disabled) {
+  --lent-button-near: 0 1px 1px rgb(0 0 0 / 0.55);
+  --lent-button-far: 0 3px 4px -1px rgb(0 0 0 / 0.55);
+  --lent-button-drop: drop-shadow(0 1px 0.5px rgb(0 0 0 / 0.55)) drop-shadow(0 3px 2px rgb(0 0 0 / 0.45));
+}
+
+:where([data-theme="dark"]) .lent-button:active:not(:disabled) {
+  --lent-button-press: rgb(0 0 0 / 0.22);
+  --lent-button-press-surface: rgb(0 0 0 / 0.14);
+  --lent-button-near: 0 0 1px rgb(0 0 0 / 0.3);
+  --lent-button-far: 0 2px 4px -4px rgb(0 0 0 / 0);
+  --lent-button-drop: drop-shadow(0 0 0.5px rgb(0 0 0 / 0.3)) drop-shadow(0 0 0 rgb(0 0 0 / 0));
+}
+
+/* A tag in the primary's texture (BetaTag, a grade's marker, the subject
+   lists' tags, the widgets' counts): not a button, so no hover, no press,
+   and its own letters: revert-layer hands the weight and spacing back to
+   its utilities (the class's medium and tight tracking are a button's). */
+.lent-button.lent-button--tag {
+  --lent-button-face: var(--lent-button-fill);
+  font-weight: revert-layer;
+  letter-spacing: revert-layer;
+  cursor: default;
+}
+
+.lent-button.lent-button--tag:hover {
+  --lent-button-face: var(--lent-button-fill);
+}
+
+.lent-button.lent-button--tag:active {
+  transform: none;
+}
+
+/* No sink or spring without motion: the shadows still say it's pressed. */
+@media (prefers-reduced-motion: reduce) {
+  .lent-button:active:not(:disabled) {
+    transform: none;
+  }
+}

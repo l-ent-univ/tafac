@@ -1,0 +1,17 @@
+/* ── Dashboard hero image fade ── */
+
+.dashboard-hero {
+  -webkit-mask-image: linear-gradient(to bottom, rgb(0 0 0 / 0.85) 0%, rgb(0 0 0 / 0.6) 70%, transparent 100%);
+  mask-image: linear-gradient(to bottom, rgb(0 0 0 / 0.85) 0%, rgb(0 0 0 / 0.6) 70%, transparent 100%);
+}
+
+/* Phones: a soft black fade from the top of the photo, so the white logo and
+   the header buttons read on bright photos. Gone by the first cards. */
+@media (width < 1024px) {
+  .dashboard-hero::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(to bottom, rgb(0 0 0 / 0.42) 0px, rgb(0 0 0 / 0.16) 130px, transparent 260px);
+  }
+}

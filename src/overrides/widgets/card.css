@@ -1,0 +1,58 @@
+/* ── Widget card base: frosted glass over the hero photo ──
+   Every card paints its background with --color-widget-bg (and hovers with
+   --color-bg-subtle), so redefining both here makes all of them translucent
+   and tinted, with the photo blurred behind.
+   In the glass material (its tokens, above), its fill through
+   --color-widget-bg so the cards' own hover still works. Quiet strokes:
+   the widgets are large surfaces (their items: the full ones, below). Solid cards (no
+   wallpaper, side panels) keep their own look: further down. */
+
+.widget-card {
+  --color-widget-bg: var(--glass-fill);
+  --color-bg-subtle: var(--material-glass-hover);
+  border-color: var(--glass-quiet-edge);
+  outline: 1px solid var(--glass-quiet-outer);
+  outline-offset: 0;
+  box-shadow: var(--glass-quiet-shadow);
+  -webkit-backdrop-filter: var(--glass-blur);
+  backdrop-filter: var(--glass-blur);
+  /* Intro: cards rise and settle from a slightly smaller scale, staggered in
+     reading order via --widget-delay (set per widget below). Hover colour
+     changes stay instant-ish and undelayed. */
+  --widget-ease: cubic-bezier(0.16, 1, 0.3, 1);
+  --widget-delay: 0ms;
+  opacity: 0;
+  transform: translateY(10px) scale(0.965);
+  transform-origin: 50% 80%;
+  transition-property: opacity, transform, background-color;
+  transition-duration: 560ms, 900ms, 150ms;
+  transition-timing-function: var(--widget-ease), var(--widget-ease), ease;
+  transition-delay: var(--widget-delay), var(--widget-delay), 0ms;
+  will-change: opacity, transform;
+}
+
+:where([data-theme="dark"]) .widget-card {
+  --color-widget-bg: var(--glass-fill);
+  --color-bg-subtle: var(--material-glass-hover);
+}
+
+/* The quiet strokes are for the large widgets. An item in them or in a
+   sheet (an event, a grade, a notice, the launch card, a simulator's UE
+   card: the small corners) keeps the full ones. */
+.widget-card:is(.card-corners-sm, .planning-block, .latest-grade-card, .modal-inner-corners) {
+  border-color: var(--glass-edge);
+  outline-color: var(--glass-outer);
+  box-shadow: var(--glass-shadow);
+}
+
+/* The events (Planning's blocks and list cards), many side by side: the
+   strokes eased, between the full and the quiet ones (the outer stroke at
+   half, the quiet edge and shadow). */
+.widget-card:is(.planning-block, .planning-list-card) {
+  /* Tinted all over with the course's colour (no white left), its wash
+     deeper across the top. */
+  background-color: color-mix(in srgb, var(--accent) 8%, var(--color-widget-bg));
+  border-color: var(--glass-quiet-edge);
+  outline-color: color-mix(in srgb, var(--glass-outer) 55%, transparent);
+  box-shadow: var(--glass-quiet-shadow);
+}

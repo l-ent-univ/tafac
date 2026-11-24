@@ -1,0 +1,49 @@
+/* ── A page's first load (PageLoading) ──
+   The line under the spinner: each new one springs in (from smaller, a
+   touch past its size), the last one shrinks away in the same place. */
+.page-loading-label {
+  display: grid;
+  font-family: var(--font-body);
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 1.3;
+  color: var(--color-text-muted);
+}
+
+.page-loading-label > span {
+  grid-area: 1 / 1;
+  justify-self: center;
+}
+
+.page-loading-in {
+  animation: page-loading-in 560ms cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+
+.page-loading-out {
+  animation: page-loading-out 260ms ease-in both;
+}
+
+@keyframes page-loading-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px) scale(0.7);
+  }
+}
+
+@keyframes page-loading-out {
+  to {
+    opacity: 0;
+    transform: translateY(-4px) scale(0.9);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .page-loading-in,
+  .page-loading-out {
+    animation: none;
+  }
+
+  .page-loading-out {
+    display: none;
+  }
+}

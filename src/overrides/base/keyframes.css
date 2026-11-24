@@ -1,0 +1,90 @@
+/* ── Keyframes ── */
+
+/* The loading spinner (LoadingDots): the whole turns fast and steadily
+   (0.7 s a turn) while the arc, from a dot to three quarters of the ring,
+   grows and shrinks on its own beat (1.3 s). Its pathLength is 100, so the
+   dash is in hundredths of the ring: at the loop's end the arc has shrunk
+   back to a dot just before where it started, so it loops without a jump. */
+@keyframes loading-spinner-turn {
+  to { transform: rotate(360deg); }
+}
+
+@keyframes loading-spinner-arc {
+  0% { stroke-dasharray: 2 200; stroke-dashoffset: 0; }
+  50% { stroke-dasharray: 72 200; stroke-dashoffset: -26; }
+  100% { stroke-dasharray: 72 200; stroke-dashoffset: -98; }
+}
+
+.loading-spinner {
+  animation: loading-spinner-turn 0.7s linear infinite;
+}
+
+.loading-spinner-arc {
+  transform: rotate(-90deg);
+  transform-origin: 50% 50%;
+  stroke-dasharray: 2 200;
+  animation: loading-spinner-arc 1.3s cubic-bezier(0.45, 0, 0.25, 1) infinite;
+}
+
+/* Reduced motion: a quarter arc turning slowly, still saying "loading". */
+@media (prefers-reduced-motion: reduce) {
+  .loading-spinner {
+    animation-duration: 1.6s;
+  }
+
+  .loading-spinner-arc {
+    animation: none;
+    stroke-dasharray: 28 200;
+  }
+}
+
+@keyframes wave {
+  0% { transform: rotate(0deg); }
+  15% { transform: rotate(14deg); }
+  30% { transform: rotate(-8deg); }
+  45% { transform: rotate(14deg); }
+  60% { transform: rotate(-4deg); }
+  75% { transform: rotate(10deg); }
+  100% { transform: rotate(0deg); }
+}
+
+@keyframes favorites-strip-shimmer {
+  from { background-position: 200% 0; }
+  to { background-position: -200% 0; }
+}
+
+@keyframes favorites-context-menu-in {
+  from { opacity: 0; transform: scale(0.92); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+@keyframes favorites-context-menu-action-in {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes favorites-strip-item-remove {
+  from { opacity: 1; transform: translateY(0); }
+  to { opacity: 0; transform: translateY(10px); }
+}
+
+@keyframes weather-modal-backdrop-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes weather-modal-card-in {
+  from { opacity: 0; transform: translateY(10px) scale(0.985); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@keyframes app-card-enter {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* ── App card staggered entrance ── */
+
+.app-card-enter {
+  animation: app-card-enter 350ms ease both;
+}

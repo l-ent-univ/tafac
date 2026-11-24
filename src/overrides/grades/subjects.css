@@ -1,0 +1,270 @@
+/* ── "Dernières notes" UE wash ──
+   The colours of the UEs a grade counts for, across the top of its card and
+   fading out before the text. Behind the content (the card is `isolate`). */
+
+.latest-grade-wash {
+  position: absolute;
+  inset: 0 0 auto;
+  z-index: -1;
+  height: 70%;
+  opacity: 0.16;
+  pointer-events: none;
+  -webkit-mask-image: linear-gradient(to bottom, #000 0%, transparent 100%);
+  mask-image: linear-gradient(to bottom, #000 0%, transparent 100%);
+}
+
+:where([data-theme="dark"]) .latest-grade-wash {
+  opacity: 0.24;
+}
+
+/* ── "Matières" rows (Mes notes) ──
+   A row hovers with a light tint and keeps a deeper one while open, the tint
+   covering the row and its evaluations as one block. The panel opens by
+   animating its grid row from 0fr to 1fr (no height to measure); closed, it
+   is `visibility: hidden`, so its content leaves the tab order and the
+   accessibility tree once the collapse has played. */
+
+.subject-row {
+  transition: background-color 150ms ease;
+}
+
+.subject-row-toggle {
+  transition: background-color 150ms ease;
+}
+
+.subject-row:not(.subject-row--open) .subject-row-toggle:hover {
+  background-color: color-mix(in srgb, var(--color-brand-subtle) 50%, transparent);
+}
+
+/* UE card ("Par UE"): the header opens and closes it; its chevron is the
+   keyboard's way in. */
+.ue-card-chevron {
+  transition: background-color 150ms ease, color 150ms ease;
+}
+
+.ue-card-header:hover .ue-card-chevron {
+  background-color: color-mix(in srgb, var(--color-brand-subtle) 70%, transparent);
+  color: var(--color-text);
+}
+
+.ue-card-chevron:focus-visible,
+.ue-card-news:focus-visible,
+.latest-grade-card:focus-visible,
+.ue-full-close:focus-visible,
+.ue-also-link:focus-visible {
+  outline: 2px solid var(--color-text-30);
+  outline-offset: 0;
+}
+
+.ue-card-news {
+  transition: background-color 150ms ease, color 150ms ease;
+}
+
+.ue-card-news:hover {
+  background-color: color-mix(in srgb, var(--color-brand-subtle) 70%, transparent);
+  color: var(--color-text);
+}
+
+/* UE tile → full-page view: a view transition. The card's box grows
+   while its content cross-fades unscaled (clipped, not stretched); ribbon,
+   title and average glide on their own. The rest of the page cross-fades. */
+.ue-vt-card {
+  view-transition-class: ue-morph ue-card;
+}
+
+.ue-vt {
+  view-transition-class: ue-morph;
+}
+
+/* The ribbon's box reaches out over its drop shadow (down and to the left)
+   and is pulled back by as much, so the layout doesn't move but its morph
+   snapshot holds the whole shadow instead of cutting it square. */
+.ue-ribbon-box {
+  margin: -8px -8px -48px -40px;
+  padding: 8px 8px 48px 40px;
+  pointer-events: none;
+}
+
+::view-transition-group(*.ue-morph) {
+  animation-duration: 460ms;
+  animation-timing-function: cubic-bezier(0.32, 0.72, 0, 1);
+}
+
+/* The moving card is drawn by the group itself: a solid surface and the
+   card's shadow (the snapshots of two different sizes would otherwise leave
+   it half see-through mid-way, and their clip cut the shadow off). The
+   snapshots are clipped to the card's corners, not the shadow. */
+::view-transition-group(*.ue-card) {
+  border-radius: 31px;
+  background: var(--color-widget-bg);
+  box-shadow: 0 0 0 1px rgb(52 18 0 / 0.04), 0 1px 3px rgb(52 18 0 / 0.06), 0 10px 28px -14px rgb(52 18 0 / 0.16);
+}
+
+[data-theme="dark"]::view-transition-group(*.ue-card) {
+  box-shadow: 0 0 0 1px rgb(255 255 255 / 0.08), 0 1px 3px rgb(0 0 0 / 0.3), 0 10px 28px -14px rgb(0 0 0 / 0.6);
+}
+
+::view-transition-image-pair(*.ue-card) {
+  overflow: clip;
+  border-radius: 31px;
+}
+
+/* As the cards' (card-corners). */
+@supports (corner-shape: superellipse(1.3)) {
+  ::view-transition-group(*.ue-card),
+  ::view-transition-image-pair(*.ue-card) {
+    border-radius: 36px;
+    corner-shape: superellipse(1.3);
+  }
+}
+
+::view-transition-old(*.ue-card),
+::view-transition-new(*.ue-card) {
+  height: 100%;
+  object-fit: none;
+  object-position: top left;
+}
+
+@media (min-width: 1024px) {
+  /* While it grows or shrinks, the frame the group draws is the window's
+     own (its colour, corners and floating shadow), not a UE card's lighter
+     one: the shadow stays from start to end. After the .ue-card rules, which
+     it overrides. */
+  ::view-transition-group(mail-composer.ue-card),
+  ::view-transition-image-pair(mail-composer.ue-card) {
+    border-radius: 26px;
+  }
+
+  ::view-transition-group(mail-composer.ue-card) {
+    background: #ffffff;
+    box-shadow: 0 0 0 1px rgb(52 18 0 / 0.08), 0 1px 3px rgb(52 18 0 / 0.08), 0 32px 80px -20px rgb(52 18 0 / 0.36);
+  }
+
+  [data-theme="dark"]::view-transition-group(mail-composer.ue-card) {
+    background: #1c1c1c;
+    box-shadow: 0 0 0 1px rgb(255 255 255 / 0.1), 0 1px 3px rgb(0 0 0 / 0.4), 0 32px 80px -20px rgb(0 0 0 / 0.8);
+  }
+
+  @supports (corner-shape: superellipse(1.3)) {
+    ::view-transition-group(mail-composer.ue-card),
+    ::view-transition-image-pair(mail-composer.ue-card) {
+      border-radius: calc(26px / 0.853);
+      corner-shape: superellipse(1.3);
+    }
+  }
+}
+
+/* What the card showed goes quickly and what it shows arrives once it has
+   room, so the two layouts never sit on top of each other. */
+::view-transition-old(*.ue-card) {
+  animation-duration: 140ms;
+}
+
+::view-transition-new(*.ue-card) {
+  animation-duration: 280ms;
+  animation-delay: 160ms;
+  animation-fill-mode: both;
+}
+
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation-duration: 300ms;
+}
+
+.subject-row-toggle:focus-visible {
+  outline: 2px solid var(--color-text-30);
+  outline-offset: -2px;
+}
+
+.subject-row--open {
+  background-color: color-mix(in srgb, var(--color-brand-subtle) 65%, transparent);
+}
+
+.subject-row-chevron {
+  transition: transform 220ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.subject-row--open .subject-row-chevron {
+  transform: rotate(180deg);
+}
+
+.subject-panel {
+  display: grid;
+  grid-template-rows: 0fr;
+  visibility: hidden;
+  transition: grid-template-rows 280ms cubic-bezier(0.16, 1, 0.3, 1), visibility 0s linear 280ms;
+}
+
+.subject-row--open .subject-panel {
+  grid-template-rows: 1fr;
+  visibility: visible;
+  transition: grid-template-rows 280ms cubic-bezier(0.16, 1, 0.3, 1), visibility 0s;
+}
+
+.subject-panel-inner {
+  min-height: 0;
+  overflow: hidden;
+}
+
+/* The icon tile's UE wash: the grade cards' colours, a touch stronger on a
+   small tile so the hue still reads. */
+.subject-tile-wash {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  opacity: 0.2;
+  pointer-events: none;
+}
+
+:where([data-theme="dark"]) .subject-tile-wash {
+  opacity: 0.26;
+}
+
+/* The student's dot on the promo bar, ringed in the card's colour so it
+   stands off the spread behind it. */
+.subject-promo-dot {
+  box-shadow: 0 0 0 2px var(--color-widget-bg);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .subject-row,
+  .subject-row-toggle,
+  .subject-row-chevron,
+  .subject-panel,
+  .subject-row--open .subject-panel {
+    transition: none;
+  }
+}
+
+/* ── UE under 10 (Mes notes, "Par UE") ──
+   The warning next to the UE average: the app's amber (the session warning
+   banner's, the due-soon deadlines' in dark mode). */
+
+.ue-below-warning {
+  color: #b76e00;
+}
+
+.ue-below-warning:hover,
+.ue-below-warning:focus-visible {
+  color: #8f5600;
+}
+
+:where([data-theme="dark"]) .ue-below-warning {
+  color: #fbbf24;
+}
+
+/* The jury's code for a UE it didn't validate (AJ, RAT…): red, a pill. */
+.ue-jury-decision {
+  background-color: var(--color-error-bg);
+  color: var(--color-error);
+}
+
+.ue-jury-decision:hover,
+.ue-jury-decision:focus-visible {
+  background-color: color-mix(in srgb, var(--color-error) 18%, var(--color-error-bg));
+}
+
+:where([data-theme="dark"]) .ue-below-warning:hover,
+:where([data-theme="dark"]) .ue-below-warning:focus-visible {
+  color: #fcd34d;
+}

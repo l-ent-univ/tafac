@@ -1,0 +1,63 @@
+/* « Mise à jour nécessaire » (desktop app): the cloth the widgets press
+   through (src/components/ClothBackdrop.jsx). Each relief is a lit layer
+   and a shadow layer, transparent where the cloth is flat: their
+   strengths are the theme's. */
+.cloth-backdrop {
+  --cloth: var(--color-sunken);
+  --cloth-light: 1;
+  --cloth-shadow: 0.38;
+  position: fixed;
+  inset: 0;
+  overflow: hidden;
+  background: var(--cloth);
+}
+
+:where([data-theme="dark"]) .cloth-backdrop {
+  --cloth-light: 0.22;
+  --cloth-shadow: 0.9;
+}
+
+.cloth-stage {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  isolation: isolate;
+  background: var(--cloth);
+  transform-origin: center;
+}
+
+.cloth-light {
+  opacity: var(--cloth-light);
+}
+
+.cloth-shadow {
+  opacity: var(--cloth-shadow);
+}
+
+.cloth-relief {
+  position: absolute;
+  animation-name: cloth-press;
+  animation-timing-function: cubic-bezier(0.45, 0, 0.55, 1);
+  animation-iteration-count: infinite;
+  animation-direction: alternate;
+  will-change: opacity, transform;
+}
+
+/* A widget pushes into the cloth, then lets go. */
+@keyframes cloth-press {
+  from {
+    opacity: 0.1;
+    transform: translate3d(0, 14px, 0) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cloth-relief {
+    animation: none;
+    opacity: 0.85;
+  }
+}

@@ -1,0 +1,174 @@
+/* ── Segmented control (SegmentedControl) ──
+   In the soft style (no primary colour in it): the track a fill with a
+   faint hairline (--segmented-edge-top, -bottom), no rim, no gradient
+   (--segmented-well, kept at none). Over the picked option, a raised
+   white thumb: a faint hairline and a soft shadow, no rim, no gradient;
+   it slides and resizes to the new pick on
+   the panels' curve, and gives a little under the press as material does.
+   Both on the smooth pill (SmoothSurface, reading --surface-*) once
+   mounted; till then the same in CSS. The options' text over it: the
+   picked one full strength. */
+.segmented {
+  --segmented-fill: color-mix(in srgb, var(--ink) 6%, transparent);
+  --segmented-edge-top: color-mix(in srgb, var(--ink) 10%, transparent);
+  --segmented-edge-bottom: color-mix(in srgb, var(--ink) 10%, transparent);
+  --segmented-well: rgb(0 0 0 / 0);
+  --surface-face: var(--segmented-fill);
+  --surface-edge-top: var(--segmented-edge-top);
+  --surface-edge-bottom: var(--segmented-edge-bottom);
+  --surface-shade-top: rgb(0 0 0 / 0);
+  --surface-shade-bottom: rgb(0 0 0 / 0);
+  --surface-press: var(--segmented-well);
+  --surface-rim-top: 0;
+  --surface-rim-mid: 0.04;
+  --surface-rim-bottom: 0.3;
+  --surface-rim-opacity: 0;
+  --surface-drop: none;
+  position: relative;
+  isolation: isolate;
+  display: inline-flex;
+  min-width: 0;
+  gap: 2px;
+  padding: 3px;
+  border-radius: 9999px;
+  background-color: var(--segmented-fill);
+  box-shadow:
+    0 -1px 0 var(--segmented-edge-top),
+    0 1px 0 var(--segmented-edge-bottom),
+    inset 0 1px 2px var(--segmented-well);
+}
+
+:where([data-theme="dark"]) .segmented {
+  --segmented-edge-top: rgb(255 255 255 / 0.08);
+  --segmented-edge-bottom: rgb(255 255 255 / 0.08);
+  --segmented-well: rgb(0 0 0 / 0);
+  --surface-rim-bottom: 0.08;
+}
+
+.segmented--stretch {
+  display: grid;
+  grid-auto-columns: minmax(0, 1fr);
+  grid-auto-flow: column;
+}
+
+.segmented-thumb {
+  position: absolute;
+  top: 3px;
+  bottom: 3px;
+  left: 0;
+  z-index: -1;
+  width: var(--segmented-w);
+  transform: translateX(var(--segmented-x));
+  box-sizing: border-box;
+  --segmented-thumb-edge: color-mix(in srgb, var(--ink) 10%, transparent);
+  --surface-face: var(--surface-thumb);
+  --surface-edge: var(--segmented-thumb-edge);
+  /* Its own edge, one colour: not the track's carved one. */
+  --surface-edge-top: var(--segmented-thumb-edge);
+  --surface-edge-bottom: var(--segmented-thumb-edge);
+  --surface-shade-top: rgb(255 255 255 / 0);
+  --surface-shade-bottom: rgb(255 255 255 / 0);
+  --surface-press: rgb(0 0 0 / 0);
+  --surface-rim-opacity: 0;
+  --surface-drop: drop-shadow(0 1px 0.5px rgb(52 18 0 / 0.08)) drop-shadow(0 1px 2px rgb(52 18 0 / 0.1));
+  border: 1px solid var(--surface-thumb);
+  border-radius: 9999px;
+  background-color: var(--surface-thumb);
+  box-shadow:
+    0 0 0 1px var(--segmented-thumb-edge),
+    0 1px 1px rgb(52 18 0 / 0.08),
+    0 1px 3px rgb(52 18 0 / 0.1);
+}
+
+:where([data-theme="dark"]) .segmented-thumb {
+  --segmented-thumb-edge: rgb(255 255 255 / 0.08);
+  --surface-drop: drop-shadow(0 1px 0.5px rgb(0 0 0 / 0.3)) drop-shadow(0 1px 2px rgb(0 0 0 / 0.3));
+  box-shadow:
+    0 0 0 1px var(--segmented-thumb-edge),
+    0 1px 1px rgb(0 0 0 / 0.3),
+    0 1px 3px rgb(0 0 0 / 0.3);
+}
+
+.segmented[data-ready] .segmented-thumb {
+  transition:
+    transform 380ms cubic-bezier(0.32, 0.72, 0, 1),
+    width 380ms cubic-bezier(0.32, 0.72, 0, 1),
+    scale 140ms ease-out;
+}
+
+.segmented:has(.segmented-option[data-active]:active) .segmented-thumb {
+  scale: 0.96;
+}
+
+.segmented-option {
+  position: relative;
+  display: inline-flex;
+  min-width: 0;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 0 14px;
+  border: 0;
+  border-radius: 9999px;
+  background: transparent;
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  transition: color 200ms ease;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.segmented--md .segmented-option {
+  height: 34px;
+}
+
+.segmented--sm .segmented-option {
+  height: 30px;
+  padding: 0 12px;
+}
+
+.segmented-option[data-active] {
+  color: var(--color-text);
+  cursor: default;
+}
+
+@media (hover: hover) {
+  .segmented-option:not([data-active]):hover {
+    color: var(--color-text);
+  }
+}
+
+.segmented-option:focus-visible {
+  outline: 2px solid var(--color-text-30);
+  outline-offset: -2px;
+}
+
+.segmented-label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: var(--font-body);
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1;
+}
+
+.segmented-icon {
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+}
+
+@media (max-width: 599px) {
+  .segmented-label {
+    font-size: 13px;
+  }
+
+  .segmented-option {
+    padding: 0 10px;
+  }
+
+  .segmented-icon {
+    display: none;
+  }
+}

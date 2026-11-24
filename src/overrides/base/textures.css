@@ -1,0 +1,465 @@
+/* Planning's hovers in the dark theme: a light veil (the card's colour
+   is the page's there), a light hairline on the transparent rows. */
+@media (hover: hover) {
+  :where([data-theme="dark"]) :is(.planning-pill:not(.is-selected, .is-filled):hover, .planning-week-head:hover .planning-pill:not(.is-filled)) {
+    background-color: color-mix(in srgb, var(--glass-solid-fill), white 8%);
+  }
+
+  :where([data-theme="dark"]) :is(.planning-row.is-link:hover, .planning-note-link:hover) {
+    background-color: rgb(255 255 255 / 0.08);
+    box-shadow: 0 0 0 1px rgb(255 255 255 / 0.06);
+  }
+}
+
+/* A graph's dot (AverageSparkline: the latest grade, the one under the
+   pointer): a raised bead in the line's colour, lit from above and
+   shaded below, set on a ring of the card's colour with a hairline
+   round it and a close shadow, as the app's other raised pieces. */
+.chart-dot {
+  background:
+    radial-gradient(circle at 50% 28%, color-mix(in srgb, currentColor, white 38%), transparent 62%),
+    currentColor;
+  box-shadow:
+    inset 0 -1px 1.5px rgb(0 0 0 / 0.3),
+    inset 0 1px 0 rgb(255 255 255 / 0.35),
+    0 0 0 2.5px var(--color-widget-bg),
+    0 0 0 3px rgb(52 18 0 / 0.14),
+    0 1.5px 3px 2.5px rgb(52 18 0 / 0.16);
+}
+
+:where([data-theme="dark"]) .chart-dot {
+  background:
+    radial-gradient(circle at 50% 28%, rgb(255 255 255 / 0.9), transparent 62%),
+    currentColor;
+  box-shadow:
+    inset 0 -1px 1.5px rgb(0 0 0 / 0.35),
+    0 0 0 2.5px var(--color-widget-bg),
+    0 0 0 3px rgb(255 255 255 / 0.12),
+    0 1.5px 3px 2.5px rgb(0 0 0 / 0.5);
+}
+
+/* A list's separator (Assiduité's history: under a month, between two
+   absences): engraved, a dark hairline over a light one, inset from both
+   sides of the card instead of running edge to edge; dashed under a month
+   (--dashed). None under a list's last row. */
+.inset-separator {
+  position: relative;
+}
+
+.inset-separator::after {
+  content: "";
+  position: absolute;
+  right: 12px;
+  bottom: 0;
+  left: 12px;
+  height: 2px;
+  --separator-dark: color-mix(in srgb, var(--ink) 9%, transparent);
+  --separator-light: rgb(255 255 255 / 0.85);
+  background: linear-gradient(to bottom, var(--separator-dark) 50%, var(--separator-light) 50%);
+  pointer-events: none;
+}
+
+.inset-separator--dashed::after {
+  --separator-dark: color-mix(in srgb, var(--ink) 14%, transparent);
+  --separator-light: rgb(255 255 255 / 0.9);
+  background:
+    repeating-linear-gradient(to right, var(--separator-dark) 0 4px, transparent 4px 8px) top / 100% 1px no-repeat,
+    repeating-linear-gradient(to right, var(--separator-light) 0 4px, transparent 4px 8px) bottom / 100% 1px no-repeat;
+}
+
+:where([data-theme="dark"]) .inset-separator::after {
+  --separator-dark: rgb(0 0 0 / 0.55);
+  --separator-light: rgb(255 255 255 / 0.05);
+}
+
+:where([data-theme="dark"]) .inset-separator--dashed::after {
+  --separator-dark: rgb(0 0 0 / 0.6);
+  --separator-light: rgb(255 255 255 / 0.07);
+}
+
+li.inset-separator:last-child::after {
+  display: none;
+}
+
+/* Engraved: carved into the surface (a value's or a preview's well, an
+   empty slot: the signature's preview, À propos' header, a hidden card of
+   the home): a faint ink fill, an inner shadow under the top edge, an
+   inner hairline, a light lip below. The opposite of .glass-solid,
+   raised. */
+.engraved {
+  background-color: color-mix(in srgb, var(--ink) 4%, transparent);
+  box-shadow:
+    inset 0 1px 2px rgb(52 18 0 / 0.12),
+    inset 0 0 0 1px color-mix(in srgb, var(--ink) 6%, transparent),
+    0 1px 0 rgb(255 255 255 / 0.85);
+}
+
+:where([data-theme="dark"]) .engraved {
+  background-color: rgb(0 0 0 / 0.22);
+  box-shadow:
+    inset 0 1px 2px rgb(0 0 0 / 0.55),
+    inset 0 0 0 1px rgb(255 255 255 / 0.03),
+    0 1px 0 rgb(255 255 255 / 0.06);
+}
+
+/* Réglages: a group's rows split by engraved hairlines (a dark one over a
+   light one), inset 16px from both sides, as the rows' text. */
+.settings-rows > * + * {
+  position: relative;
+}
+
+.settings-rows > * + *::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  right: 16px;
+  left: 16px;
+  height: 2px;
+  background: linear-gradient(to bottom, color-mix(in srgb, var(--ink) 9%, transparent) 50%, rgb(255 255 255 / 0.85) 50%);
+  pointer-events: none;
+}
+
+:where([data-theme="dark"]) .settings-rows > * + *::before {
+  background: linear-gradient(to bottom, rgb(0 0 0 / 0.55) 50%, rgb(255 255 255 / 0.05) 50%);
+}
+
+/* Réglages' sections: under the pointer, white with a hairline (as a
+   menu's row); the one shown in solid glass. */
+.settings-tab {
+  transition: background-color 150ms ease, box-shadow 150ms ease, border-color 150ms ease;
+}
+
+@media (hover: hover) {
+  .settings-tab:not(.glass-solid):hover {
+    background-color: var(--surface-card);
+    box-shadow:
+      0 0 0 1px color-mix(in srgb, var(--color-text) 9%, transparent),
+      0 1px 2px rgb(0 0 0 / 0.06);
+  }
+
+  :where([data-theme="dark"]) .settings-tab:not(.glass-solid):hover {
+    background-color: rgb(255 255 255 / 0.08);
+    box-shadow: 0 0 0 1px rgb(255 255 255 / 0.06);
+  }
+}
+
+/* A modal's window (Réglages, the sheets, the dialogs: .modal-surface),
+   light mode: the sidebar's solid colour rather than a card's white, so
+   the cards, chips and buttons on it (white, solid glass) stand out. The
+   page colour inside follows (--color-bg: a sheet header's blur tint, a
+   footer's fill), so nothing shows as a band. */
+:where(:root:not([data-theme="dark"])) .modal-surface.glass-solid {
+  --color-bg: var(--material-sidebar-solid);
+  background-color: var(--material-sidebar-solid);
+}
+
+/* Dark mode: the page's colour, darker than the cards on it (solid glass
+   is nearly the cards' colour there, and they would melt into it). */
+:where([data-theme="dark"]) .modal-surface.glass-solid {
+  --color-bg: var(--surface-page);
+  background-color: var(--surface-page);
+}
+
+/* The macOS app's modals (Réglages, the sheets, the dialogs): tighter
+   corners, their cards' too so the curves still run close. Not where a
+   sheet sits on the window's bottom edge (narrow: its own corners). */
+@media (min-width: 640px) {
+  :root[data-desktop-macos] .modal-surface.modal-corners {
+    --modal-inner-radius: 14px;
+    --modal-radius: 26px;
+  }
+
+  /* The modals with corners of their own (corners-*), and the sheets whose
+     corners-* outdo .modal-corners. */
+  :root[data-desktop-macos] .modal-surface:is([class*="corners-["]) {
+    border-radius: 26px;
+  }
+
+  @supports (corner-shape: superellipse(1.3)) {
+    :root[data-desktop-macos] .modal-surface:is([class*="corners-["]) {
+      border-radius: calc(26px / 0.853);
+      corner-shape: superellipse(1.3);
+    }
+  }
+}
+
+/* Réglages in the macOS app: a sheet as the system draws them, the
+   window's content blurred through a translucent fill (the colour above,
+   at 72%). Opaque again when the student asks the system for less
+   transparency. */
+:root[data-desktop-macos] .account-modal-card.modal-surface.glass-solid {
+  background-color: color-mix(in srgb, var(--material-sidebar-solid) 72%, transparent);
+  -webkit-backdrop-filter: blur(40px) saturate(1.8);
+  backdrop-filter: blur(40px) saturate(1.8);
+}
+
+:root[data-desktop-macos][data-theme="dark"] .account-modal-card.modal-surface.glass-solid {
+  background-color: color-mix(in srgb, var(--surface-page) 72%, transparent);
+}
+
+@media (prefers-reduced-transparency: reduce) {
+  :root[data-desktop-macos] .account-modal-card.modal-surface.glass-solid {
+    background-color: var(--material-sidebar-solid);
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
+
+  :root[data-desktop-macos][data-theme="dark"] .account-modal-card.modal-surface.glass-solid {
+    background-color: var(--surface-page);
+  }
+}
+
+/* A raised bit of the brand colour (the « Justifier » sheet's steps done,
+   the reason picked's disc): a lit top edge, a darker hairline, a close
+   shadow. */
+.step-dot {
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.25),
+    0 0 0 0.5px color-mix(in oklab, var(--color-brand), black 30%),
+    0 1px 2px rgb(52 18 0 / 0.18);
+}
+
+:where([data-theme="dark"]) .step-dot {
+  box-shadow:
+    inset 0 -1px 0 rgb(0 0 0 / 0.18),
+    0 1px 2px rgb(0 0 0 / 0.45);
+}
+
+/* The drop zone, carved in: darker under the pointer or a file dragged
+   over. */
+@media (hover: hover) {
+  .justify-drop.engraved:hover {
+    background-color: color-mix(in srgb, var(--ink) 7%, transparent);
+  }
+}
+
+/* The university's outage notice (ServiceNotice): solid glass tinted
+   amber: its lit edges, an amber outer stroke, the material's shadow. */
+.service-notice {
+  border: 1px solid;
+  border-color: rgb(255 255 255 / 0.8) rgb(255 255 255 / 0.4) rgb(255 255 255 / 0.2);
+  background-color: #fff5e1;
+  outline: 1px solid rgb(183 110 0 / 0.28);
+  outline-offset: 0;
+  box-shadow: var(--glass-solid-shadow);
+}
+
+:where([data-theme="dark"]) .service-notice {
+  /* One colour all round: --glass-solid-shadow lights its top. */
+  border-color: rgb(255 255 255 / 0.04);
+  background-color: #2f2410;
+  outline-color: rgb(255 190 80 / 0.25);
+}
+
+/* Onboarding's step under way: its solid glass ringed in the brand
+   colour (the outer stroke, thicker). */
+.glass-solid.is-current {
+  outline: 2px solid var(--color-brand);
+}
+
+/* A positive status, engraved as the others (« Détecté sur ADE »). */
+.status-tag--success {
+  background-color: var(--color-success-bg);
+  box-shadow:
+    inset 0 1px 2px color-mix(in srgb, var(--color-success-text) 25%, transparent),
+    inset 0 0 0 1px color-mix(in srgb, var(--color-success-text) 14%, transparent),
+    0 1px 0 rgb(255 255 255 / 0.85);
+}
+
+:where([data-theme="dark"]) .status-tag--success {
+  box-shadow:
+    inset 0 1px 2px rgb(0 0 0 / 0.55),
+    inset 0 0 0 1px color-mix(in srgb, var(--color-success-text) 18%, transparent),
+    0 1px 0 rgb(255 255 255 / 0.06);
+}
+
+/* « Justifier »'s last step: the ticket, printed out of the slot above
+   it (its clip). White paper, its foot torn in a zigzag (the mask; the
+   drop shadow follows the teeth), fed out in jerks, a pause between each,
+   then a small settle. Its tear: a dashed line across. */
+.justify-ticket {
+  --tooth: 7px;
+  background-color: var(--surface-card);
+  mask: conic-gradient(from -45deg at bottom, #0000, #000 1deg 89deg, #0000 90deg) 50% / calc(2 * var(--tooth)) 100%;
+  animation: justify-ticket-print 1700ms linear both;
+  animation-delay: 150ms;
+}
+
+:where([data-theme="dark"]) .justify-ticket {
+  background-color: #262626;
+}
+
+/* The mask cuts the paper's own shadow: its clip casts it. */
+div:has(> .justify-ticket) {
+  filter: drop-shadow(0 1px 1px rgb(52 18 0 / 0.1)) drop-shadow(0 4px 8px rgb(52 18 0 / 0.1));
+}
+
+:where([data-theme="dark"]) div:has(> .justify-ticket) {
+  filter: drop-shadow(0 1px 1px rgb(0 0 0 / 0.5)) drop-shadow(0 4px 8px rgb(0 0 0 / 0.4));
+}
+
+.justify-ticket-tear {
+  background: repeating-linear-gradient(to right, color-mix(in srgb, var(--ink) 22%, transparent) 0 5px, transparent 5px 10px) top / 100% 1px no-repeat;
+}
+
+:where([data-theme="dark"]) .justify-ticket-tear {
+  background-image: repeating-linear-gradient(to right, rgb(255 255 255 / 0.2) 0 5px, transparent 5px 10px);
+}
+
+@keyframes justify-ticket-print {
+  0% { transform: translateY(-100%); animation-timing-function: cubic-bezier(0.3, 0, 0.4, 1); }
+  14% { transform: translateY(-76%); }
+  22% { transform: translateY(-76%); animation-timing-function: cubic-bezier(0.3, 0, 0.4, 1); }
+  36% { transform: translateY(-52%); }
+  44% { transform: translateY(-52%); animation-timing-function: cubic-bezier(0.3, 0, 0.4, 1); }
+  58% { transform: translateY(-28%); }
+  66% { transform: translateY(-28%); animation-timing-function: cubic-bezier(0.2, 0, 0.2, 1); }
+  88% { transform: translateY(1.5%); animation-timing-function: ease-out; }
+  100% { transform: translateY(0); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .justify-ticket {
+    animation: none;
+  }
+}
+
+:where([data-theme="dark"]) .widget-card:is(.planning-block, .planning-list-card) {
+  background-color: color-mix(in srgb, var(--accent-dark) 10%, var(--color-widget-bg));
+}
+
+@media (hover: hover) {
+  :where([data-theme="dark"]) .widget-card:is(.planning-list-card, button.planning-block):hover {
+    background-color: color-mix(in srgb, var(--accent-dark) 16%, var(--color-widget-bg));
+  }
+}
+
+/* A class's sheet: the occurrences' section eases to its content's height
+   as they come in (PlanningEventSheet), the list rising in, row after
+   row. Still for reduced motion. */
+.planning-occurrences-frame {
+  transition: height 380ms cubic-bezier(0.32, 0.72, 0, 1);
+}
+
+.planning-occurrences-in {
+  animation: planning-occurrences-in 320ms cubic-bezier(0.16, 1, 0.3, 1) backwards;
+}
+
+.planning-occurrences-in > * {
+  animation: planning-occurrences-in 360ms cubic-bezier(0.16, 1, 0.3, 1) backwards;
+}
+
+.planning-occurrences-in > :nth-child(2) { animation-delay: 40ms; }
+.planning-occurrences-in > :nth-child(3) { animation-delay: 80ms; }
+.planning-occurrences-in > :nth-child(4) { animation-delay: 120ms; }
+.planning-occurrences-in > :nth-child(5) { animation-delay: 160ms; }
+.planning-occurrences-in > :nth-child(n + 6) { animation-delay: 200ms; }
+
+@keyframes planning-occurrences-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .planning-occurrences-frame {
+    transition: none;
+  }
+
+  .planning-occurrences-in,
+  .planning-occurrences-in > * {
+    animation: none;
+  }
+}
+
+/* The hover bubbles (Tooltip, the sidebar's pockets, the next class): a
+   dark tag (white in dark mode) in the tags' material: a lit top edge, a
+   hairline, a tight shadow. */
+.tooltip-bubble {
+  border: 0;
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.16),
+    0 0 0 0.5px rgb(0 0 0 / 0.6),
+    0 1px 2px rgb(0 0 0 / 0.18),
+    0 6px 14px -4px rgb(0 0 0 / 0.22);
+}
+
+:where([data-theme="dark"]) .tooltip-bubble {
+  box-shadow:
+    inset 0 -1px 0 rgb(0 0 0 / 0.12),
+    0 0 0 0.5px rgb(255 255 255 / 0.4),
+    0 2px 8px -2px rgb(0 0 0 / 0.6);
+}
+
+/* « Ajouter une note » (the simulator): an engraved slot, darker under
+   the pointer. */
+@media (hover: hover) {
+  .subject-add-grade.engraved:hover {
+    background-color: color-mix(in srgb, var(--ink) 7%, transparent);
+  }
+}
+
+/* Floating over a phone's tab bar: it rises in, and holds a deeper shadow
+   (it sits over the page). An open mail's actions float there too (the
+   reader's toolbar, .mail-toolbar-veil): it goes up above them. */
+@media (width < 48rem) {
+  .update-notice-dock {
+    transition: bottom 320ms cubic-bezier(0.32, 0.72, 0, 1);
+  }
+
+  :root:has(.mail-toolbar-veil) .update-notice-dock {
+    bottom: calc(env(safe-area-inset-bottom) + 152px);
+  }
+
+  .update-notice-float {
+    box-shadow: var(--glass-solid-shadow), 0 10px 24px -8px rgb(52 18 0 / 0.28);
+    animation: weather-modal-card-in 320ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  }
+}
+
+/* An engraved slot to press (Réglages' « add a wallpaper »): its dashed
+   edge a little further in than a tag's, darker under the pointer. */
+.engraved-slot.status-tag--dashed {
+  outline-offset: -5px;
+}
+
+@media (hover: hover) {
+  .engraved-slot.engraved:hover:not(:disabled) {
+    background-color: color-mix(in srgb, var(--ink) 7%, transparent);
+  }
+}
+
+/* The composer's « drop your files here »: an engraved well over the
+   window (frosted, nearly opaque), its edge dashed inside. */
+.mail-drop-overlay {
+  background-color: color-mix(in srgb, var(--color-widget-bg) 85%, transparent);
+  box-shadow:
+    inset 0 1px 3px rgb(52 18 0 / 0.14),
+    inset 0 0 0 1px color-mix(in srgb, var(--ink) 8%, transparent);
+  outline: 1.5px dashed color-mix(in srgb, var(--ink) 25%, transparent);
+  outline-offset: -8px;
+}
+
+:where([data-theme="dark"]) .mail-drop-overlay {
+  box-shadow:
+    inset 0 1px 3px rgb(0 0 0 / 0.6),
+    inset 0 0 0 1px rgb(255 255 255 / 0.04);
+  outline-color: rgb(255 255 255 / 0.22);
+}
+
+/* The landing's questions: solid glass, lighter under the pointer and
+   while open. */
+.landing-faq-item {
+  transition: background-color 200ms ease;
+}
+
+.landing-faq-item[open] {
+  background-color: var(--glass-solid-fill-hover);
+}
+
+@media (hover: hover) {
+  .landing-faq-item:hover {
+    background-color: var(--glass-solid-fill-hover);
+  }
+}

@@ -1,0 +1,76 @@
+/* ── Next class widget gradient + transition ── */
+
+.next-class-widget {
+  background-color: var(--color-widget-bg);
+  --widget-delay: 70ms;
+}
+
+.next-class-widget:hover {
+  background-color: var(--color-bg-subtle);
+}
+
+/* ── Grade widget intro order ── */
+
+.latest-grade-widget,
+.average-grade-widget {
+  --widget-delay: 140ms;
+}
+
+/* ── Grade widget hover state ──
+   Only the cards that open something; the average card isn't a link. */
+
+.latest-grade-widget:hover {
+  background: var(--color-bg-subtle);
+}
+
+:where([data-theme="dark"]) .latest-grade-widget:hover {
+  background: var(--color-bg-subtle);
+}
+
+.latest-grade-widget:hover .grade-corner-arrow,
+.next-class-widget:hover .grade-corner-arrow {
+  opacity: 0.45;
+}
+
+/* ── Recent mail widget ── */
+
+.recent-mail-widget {
+  --widget-delay: 210ms;
+}
+
+.recent-mail-widget.cursor-pointer:hover {
+  background-color: var(--color-bg-subtle);
+}
+
+.recent-mail-widget .mail-corner-link {
+  opacity: 0;
+  transition: opacity 150ms ease;
+}
+
+.recent-mail-widget:hover .mail-corner-link {
+  opacity: 0.45;
+}
+
+.recent-mail-widget .mail-corner-link:hover,
+.recent-mail-widget .mail-corner-link:focus-visible {
+  opacity: 1;
+}
+
+.mail-unread-dot {
+  background-color: #1a73e8;
+}
+
+:where([data-theme="dark"]) .mail-unread-dot {
+  background-color: #5b9dff;
+}
+
+/* The unread count: a tag (.lent-button--tag) in the mail's blue. */
+.lent-button.mail-unread-pill {
+  --lent-button-fill: #1a73e8;
+  --lent-button-ink: #ffffff;
+}
+
+:where([data-theme="dark"]) .lent-button.mail-unread-pill {
+  --lent-button-fill: #5b9dff;
+  --lent-button-ink: #0f0f0f;
+}

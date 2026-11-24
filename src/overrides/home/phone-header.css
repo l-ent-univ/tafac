@@ -1,0 +1,136 @@
+/* The header's Tafac wordmark (not its chocolate mark) in white over the
+   photo, as the university's logo, for it to read; its own colours on the
+   plain page (white in dark mode, as LogoBut1 has it). */
+.header-wordmark {
+  filter: brightness(0) invert(1) drop-shadow(0 1px 2px rgb(0 0 0 / 0.45)) drop-shadow(0 0 10px rgb(0 0 0 / 0.3));
+}
+
+.dashboard-no-wallpaper .header-wordmark {
+  filter: none;
+}
+
+:where([data-theme="dark"]) .dashboard-no-wallpaper .header-wordmark {
+  filter: brightness(0) invert(1);
+}
+
+/* « Accueil »'s header on a phone (HomePhoneHeader).
+
+   The photo, to the screen's edges at full strength, fading down into the
+   page. It is behind the page: it goes up at half the page's speed, fade
+   and all, so the greeting and what follows slide up over it and it lingers
+   at the top of the screen. The browser moves it itself (a scroll-driven
+   animation: nothing runs in the page); where it can't, and for whoever
+   asked for less motion, the photo scrolls with the page.
+
+   It always ends in a fade: its own, and its frame's, which is the header's
+   box and fades out along its bottom edge. Whatever part of the photo gets
+   there fades too, at any point of the scroll; and it never shows over the
+   cards below. */
+/* The header starts at the page's top edge (the section's own padding
+   taken back). With a photo it also goes up behind the status bar, where
+   the page runs under it (the iOS app, --status-bar; 0 elsewhere): the
+   photo starts at the screen's edge, what is to be read or pressed stays
+   below the bar. */
+.home-phone-header {
+  margin-top: -12px;
+  padding-top: 16px;
+}
+
+.home-phone-header[data-photo] {
+  margin-top: calc(-12px - var(--status-bar));
+  padding-top: calc(16px + var(--status-bar));
+}
+
+.home-phone-photo-frame {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+  -webkit-mask-image: linear-gradient(to bottom, black calc(100% - 96px), transparent 100%);
+  mask-image: linear-gradient(to bottom, black calc(100% - 96px), transparent 100%);
+}
+
+.home-phone-photo {
+  position: absolute;
+  inset: 0 0 auto;
+  height: calc(200px + var(--status-bar));
+  background-size: cover;
+  background-position: center;
+  -webkit-mask-image: linear-gradient(to bottom, black 22%, transparent 86%);
+  mask-image: linear-gradient(to bottom, black 22%, transparent 86%);
+}
+
+@supports (animation-timeline: scroll()) {
+  @media (prefers-reduced-motion: no-preference) {
+    .home-phone-photo {
+      animation: home-phone-photo-behind linear both;
+      animation-timeline: scroll(root block);
+      animation-range: 0 400px;
+      will-change: transform;
+    }
+  }
+}
+
+@keyframes home-phone-photo-behind {
+  to {
+    transform: translate3d(0, 200px, 0);
+  }
+}
+
+/* Beside the sidebar (HomePhoneHeader's `wide`): from the column's top
+   (the section's 20px taken back), and the page scrolls in
+   its column (.app-column, App.jsx), not the window: the parallax follows
+   that scroll by its name (not `nearest`: the photo's frame, which clips
+   it, would be the one found), still at half its speed. */
+.home-phone-header-wide,
+.home-phone-header-wide[data-photo] {
+  margin-top: -20px;
+  padding-top: 20px;
+}
+
+.home-phone-header-wide .home-phone-photo {
+  height: 220px;
+  background-position: center 40%;
+  -webkit-mask-image: linear-gradient(to bottom, black 30%, transparent 92%);
+  mask-image: linear-gradient(to bottom, black 30%, transparent 92%);
+}
+
+@supports (animation-timeline: scroll()) {
+  @media (prefers-reduced-motion: no-preference) {
+    .home-phone-header-wide .home-phone-photo {
+      animation-name: home-phone-photo-behind-wide;
+      animation-timeline: --app-column;
+      animation-range: 0 440px;
+    }
+  }
+}
+
+.app-column {
+  scroll-timeline: --app-column block;
+}
+
+@keyframes home-phone-photo-behind-wide {
+  to {
+    transform: translate3d(0, 220px, 0);
+  }
+}
+
+/* On the website, the photo on to the window's left edge, under the
+   floating sidebar (12px from the edges, above the column): the header
+   reaches over the column's padding that keeps the page clear of it, and
+   gives it back to its text. */
+.home-phone-header-under-sidebar {
+  margin-left: calc(-24px - var(--sidebar-width, 280px) - 12px);
+  padding-left: calc(24px + var(--sidebar-width, 280px) + 12px);
+}
+
+/* Behind the status bar (the iOS app): a haze of the page's colour over the
+   photo's top, for the clock to read on any photo, light or dark as the
+   theme and so as the clock is. As tall as the bar and half again: nothing
+   where there is no bar over the photo. */
+.home-phone-photo-haze {
+  position: absolute;
+  inset: 0 0 auto;
+  height: calc(var(--status-bar) * 1.5);
+  background: linear-gradient(to bottom, color-mix(in srgb, var(--color-bg) 62%, transparent), transparent);
+}

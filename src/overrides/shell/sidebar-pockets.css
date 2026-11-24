@@ -1,0 +1,172 @@
+/* ── Next class widget inside sidebar: normalize sizing ── */
+
+.sidebar-next-class > article {
+  flex: none;
+  width: 100%;
+  max-width: 100%;
+  height: 148px;
+  min-height: 148px;
+}
+
+/* ── Sidebar grade pocket: tinted grade tag ── */
+
+.sidebar-grade-tag {
+  background: hsl(var(--tag-hue), 80%, 94%);
+  color: var(--color-text);
+}
+
+:where([data-theme="dark"]) .sidebar-grade-tag {
+  background: hsla(var(--tag-hue), 50%, 32%, 0.45);
+  color: hsl(var(--tag-hue), 78%, 80%);
+}
+
+/* ── Sidebar grade pocket: gradient background (matches next class widget) ── */
+
+.sidebar-grade-pocket {
+  background-color: var(--color-widget-bg);
+  background-image: var(--grade-gradient, none);
+  background-repeat: no-repeat;
+}
+
+/* Its strokes and shadow: solid glass's (the disabled one keeps its own). */
+.sidebar-grade-pocket:not(.grade-feature-disabled) {
+  border-color: var(--glass-solid-edge);
+  outline: 1px solid var(--glass-solid-outer);
+  outline-offset: 0;
+  box-shadow: var(--glass-solid-shadow);
+}
+
+.sidebar-grade-pocket:hover {
+  background-color: var(--color-bg-subtle);
+}
+
+:where([data-theme="dark"]) .sidebar-grade-pocket {
+  background-image: var(--grade-gradient-dark, none);
+}
+
+/* Disabled grade feature */
+
+.grade-feature-disabled,
+.latest-grade-widget.grade-feature-disabled:hover,
+.average-grade-widget.grade-feature-disabled:hover,
+.sidebar-grade-pocket.grade-feature-disabled:hover {
+  background: #f4f4f4;
+  color: var(--color-text);
+  border-color: rgba(17, 17, 17, 0.16);
+  cursor: not-allowed;
+  overflow: visible;
+}
+
+.grade-feature-disabled .grade-disabled-content {
+  filter: grayscale(1) blur(4px);
+  opacity: 0.32;
+  pointer-events: none;
+  user-select: none;
+}
+
+.grade-disabled-pill {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  z-index: 20;
+  transform: translate(-50%, -50%);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 30px;
+  max-width: calc(100% - 32px);
+  padding: 6px 13px;
+  border: 1px solid rgba(17, 17, 17, 0.14);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.94);
+  color: var(--color-text);
+  box-shadow: 0 10px 24px rgba(17, 17, 17, 0.12);
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1;
+  white-space: nowrap;
+  letter-spacing: 0;
+}
+
+.grade-disabled-hover-note {
+  position: absolute;
+  left: var(--grade-tooltip-x, 50%);
+  top: var(--grade-tooltip-y, 0px);
+  z-index: 9999;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  width: min(320px, calc(100vw - 32px));
+  padding: 9px 11px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 14px;
+
+  @supports (corner-shape: superellipse(1.3)) {
+    border-radius: calc(14px / 0.853);
+    corner-shape: superellipse(1.3);
+  }
+  background: rgba(17, 17, 17, 0.94);
+  color: #ffffff;
+  box-shadow: 0 14px 30px rgba(17, 17, 17, 0.2);
+  opacity: 0;
+  transform: translate(-50%, 10px) scale(0.98);
+  visibility: hidden;
+  pointer-events: none;
+  transition:
+    opacity 160ms ease,
+    transform 160ms ease,
+    visibility 160ms ease;
+}
+
+.grade-feature-disabled:hover .grade-disabled-hover-note,
+.grade-feature-disabled:focus-visible .grade-disabled-hover-note {
+  opacity: 1;
+  transform: translate(-50%, 14px) scale(1);
+  visibility: visible;
+}
+
+.grade-feature-disabled:hover,
+.grade-feature-disabled:focus-visible {
+  z-index: 999;
+}
+
+.grade-disabled-hover-title {
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1.1;
+  letter-spacing: 0;
+}
+
+.grade-disabled-hover-detail {
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.25;
+  color: rgba(255, 255, 255, 0.76);
+  letter-spacing: 0;
+}
+
+:where([data-theme="dark"]) .grade-feature-disabled,
+:where([data-theme="dark"]) .latest-grade-widget.grade-feature-disabled:hover,
+:where([data-theme="dark"]) .average-grade-widget.grade-feature-disabled:hover,
+:where([data-theme="dark"]) .sidebar-grade-pocket.grade-feature-disabled:hover {
+  background: #151515;
+  color: #ffffff;
+  border-color: rgba(255, 255, 255, 0.2);
+}
+
+:where([data-theme="dark"]) .grade-disabled-pill {
+  border-color: rgba(255, 255, 255, 0.18);
+  background: rgba(255, 255, 255, 0.92);
+  color: #111111;
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.28);
+}
+
+:where([data-theme="dark"]) .grade-disabled-hover-note {
+  border-color: rgba(255, 255, 255, 0.14);
+  background: rgba(245, 245, 245, 0.94);
+  color: #111111;
+}
+
+:where([data-theme="dark"]) .grade-disabled-hover-detail {
+  color: rgba(17, 17, 17, 0.68);
+}

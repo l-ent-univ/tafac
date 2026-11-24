@@ -1,0 +1,139 @@
+/* "Compatible avec" strip: the logos slide left forever, one half of the
+   track (UniversityMarquee) at a time, fading out at both ends under two
+   gradients of the page colour (a mask repainted the strip on every
+   frame). */
+.landing-marquee {
+  position: relative;
+}
+
+.landing-marquee::before,
+.landing-marquee::after {
+  content: "";
+  position: absolute;
+  inset-block: 0;
+  z-index: 1;
+  width: 15%;
+  pointer-events: none;
+}
+
+.landing-marquee::before {
+  left: 0;
+  background: linear-gradient(to right, var(--landing-marquee-fade, var(--color-bg)), transparent);
+}
+
+.landing-marquee::after {
+  right: 0;
+  background: linear-gradient(to left, var(--landing-marquee-fade, var(--color-bg)), transparent);
+}
+
+.landing-marquee-track {
+  animation: landing-marquee 30s linear infinite;
+  will-change: transform;
+}
+
+@keyframes landing-marquee {
+  to {
+    transform: translateX(-50%);
+  }
+}
+
+/* Landing phone and laptop mockups: their layers follow the pointer
+   (usePointerParallax sets --parallax-x / --parallax-y from -1 to 1), the
+   flower behind against it, the island in front the most. Eased, so a
+   quick move glides. */
+.landing-parallax {
+  --parallax-x: 0;
+  --parallax-y: 0;
+}
+
+.landing-parallax-back,
+.landing-parallax-mid,
+.landing-parallax-front {
+  transition: transform 600ms cubic-bezier(0.16, 1, 0.3, 1);
+  will-change: transform;
+}
+
+.landing-parallax-back {
+  transform: translate(calc(var(--parallax-x) * -10px), calc(var(--parallax-y) * -10px));
+}
+
+.landing-parallax-mid {
+  transform: translate(calc(var(--parallax-x) * 8px), calc(var(--parallax-y) * 6px));
+}
+
+.landing-parallax-front {
+  transform: translate(calc(var(--parallax-x) * 22px), calc(var(--parallax-y) * 16px));
+}
+
+/* Scroll parallax, subtle, driven by the scroll itself (no script, runs
+   off the main thread; without support, nothing moves). Around the phone,
+   as each comes onto the screen, the flower behind lags and the island in
+   front leads, both settling where they're placed (`translate`, as the
+   pointer parallax holds `transform`). The laptop takes the same flower
+   and island. The phone in front of it rises a little as it comes in
+   (.landing-device); it settles once fully on screen, which the page's end
+   always allows. */
+@supports (animation-timeline: scroll()) {
+  @media (prefers-reduced-motion: no-preference) {
+    .landing-parallax-back,
+    .landing-parallax-front {
+      animation: linear both;
+      animation-timeline: view();
+      animation-range: entry 0% entry 100%;
+    }
+
+    /* Until it's mid-screen: on tall screens it's already in view at the top. */
+    .landing-parallax-back {
+      animation-name: landing-scroll-back;
+      animation-range: cover 0% cover 50%;
+    }
+
+    .landing-parallax-front {
+      animation-name: landing-scroll-front;
+    }
+
+    .landing-device {
+      animation: landing-scroll-device linear both;
+      animation-timeline: view();
+      animation-range: entry 0% entry 100%;
+    }
+  }
+}
+
+@keyframes landing-scroll-back {
+  from {
+    translate: 0 -40px;
+  }
+}
+
+@keyframes landing-scroll-front {
+  from {
+    translate: 0 56px;
+  }
+}
+
+@keyframes landing-scroll-device {
+  from {
+    translate: 0 48px;
+  }
+}
+
+/* The landing's feature pills come in one by one once the list is on
+   screen (FeatureShowcase: data-revealed, --reveal-index). With reduced motion they're simply there. */
+@media (prefers-reduced-motion: no-preference) {
+  .landing-feature {
+    opacity: 0;
+    translate: 0 16px;
+  }
+
+  .landing-features[data-revealed] .landing-feature {
+    animation: landing-feature-in 600ms cubic-bezier(0.16, 1, 0.3, 1) calc(var(--reveal-index) * 90ms) both;
+  }
+}
+
+@keyframes landing-feature-in {
+  to {
+    opacity: 1;
+    translate: 0 0;
+  }
+}

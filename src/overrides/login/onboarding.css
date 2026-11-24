@@ -1,0 +1,402 @@
+/* ── Onboarding card depth ── */
+
+.onboarding-card {
+  --ring-color: rgba(0, 0, 0, 0.08);
+  box-shadow:
+    0 4px 12px -4px rgba(0, 0, 0, 0.08),
+    0 0 0 1px var(--ring-color);
+}
+
+.onboarding-card:hover {
+  --ring-color: rgba(0, 0, 0, 0.12);
+  box-shadow:
+    0 8px 20px -4px rgba(0, 0, 0, 0.12),
+    0 0 0 1px var(--ring-color);
+}
+
+.onboarding-td-card {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 200px;
+  height: 200px;
+  padding: 24px;
+  border: 1px solid rgba(255, 255, 255, 0.92);
+  border-radius: 999px;
+  background: var(--td-card-bg);
+  color: var(--td-card-text);
+  text-align: center;
+  isolation: isolate;
+  box-shadow:
+    0 18px 40px -28px rgba(17, 24, 39, 0.3),
+    0 4px 10px -8px rgba(17, 24, 39, 0.2),
+    0 0 0 1px rgba(255, 255, 255, 0.5) inset;
+  will-change: transform, box-shadow;
+  transition:
+    transform 260ms cubic-bezier(0.22, 1, 0.36, 1),
+    box-shadow 260ms cubic-bezier(0.22, 1, 0.36, 1),
+    filter 260ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.onboarding-step-panel {
+  animation: onboarding-step-panel-in 320ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.onboarding-step-panel--td-intro {
+  animation-duration: 460ms;
+}
+
+.onboarding-completion-page {
+  animation: onboarding-completion-page-in 420ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.onboarding-completion-panel {
+  animation: onboarding-completion-panel-in 520ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.dashboard-reveal-shell {
+  animation: dashboard-reveal-in 520ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+/* Page switch from the sidebar / tab bar. The page itself only rises: an
+   opacity below 1 on it would cut the widgets' backdrop blur off from the
+   wallpaper until the end. The fade comes from a veil in the page colour
+   laid over the column, which clears instead. Coming back from display:none
+   restarts the rise. */
+.page-enter {
+  animation: page-enter-in 320ms cubic-bezier(0.16, 1, 0.3, 1) backwards;
+}
+
+.page-switch-veil {
+  background-color: var(--color-bg);
+  opacity: 0;
+  animation: page-switch-veil-out 320ms ease-out backwards;
+}
+
+/* iOS app: a page switch as the system's tab bar makes one. The page comes
+   up to its size from a little smaller, around the middle of the screen,
+   while the veil clears a little faster: a short fade and a touch of scale,
+   no rise. A page is kept behind the others once visited (KeptPage) and
+   comes back where it was scrolled to (--page-scroll, useKeptPages.js):
+   the middle of the screen is that far down it. Back from display:none
+   the effect plays again; the animations inside the page are ended as it
+   shows (settleAnimations), so nothing in it arrives twice. */
+:root[data-ios-app] .app-column > .page-enter {
+  transform-origin: 50% calc(var(--page-scroll, 0px) + 45vh);
+  animation: page-enter-ios 300ms cubic-bezier(0.2, 0.8, 0.2, 1) backwards;
+}
+
+:root[data-ios-app] .page-switch-veil {
+  animation-duration: 240ms;
+}
+
+.account-modal-layout-panel {
+  animation: account-modal-layout-in 360ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.account-modal-layout-panel--compact {
+  animation-duration: 300ms;
+}
+
+.onboarding-td-card-enter {
+  animation: onboarding-td-card-enter 420ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.onboarding-td-card:hover:not(:disabled) {
+  transform: translateY(-6px) scale(1.1);
+  box-shadow:
+    0 28px 54px -28px rgba(17, 24, 39, 0.4),
+    0 14px 22px -12px rgba(17, 24, 39, 0.24),
+    0 0 0 1px rgba(255, 255, 255, 0.6) inset;
+}
+
+.onboarding-td-card:active:not(:disabled) {
+  transform: translateY(-1px) scale(1.03);
+}
+
+.onboarding-td-card__label {
+  position: relative;
+  z-index: 1;
+  max-width: none;
+  font-size: 36px;
+  font-weight: 800;
+  line-height: 1.02;
+  letter-spacing: -0.02em;
+  white-space: nowrap;
+}
+
+/* Full ADE names ("1A2 J", longer ones) when the short "TD B" form would
+   repeat; the longest wrap inside the ring. */
+.onboarding-td-card__label--long {
+  font-size: 28px;
+}
+
+.onboarding-td-card__label--xlong {
+  max-width: 130px;
+  font-size: 20px;
+  line-height: 1.1;
+  text-align: center;
+  white-space: normal;
+}
+
+.onboarding-td-card__orbit-text {
+  fill: var(--td-card-ring);
+  font-family: var(--font-body);
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+}
+
+.onboarding-td-card__orbit {
+  transform-origin: center;
+}
+
+.onboarding-td-card:hover:not(:disabled) .onboarding-td-card__orbit {
+  animation: onboarding-td-orbit-spin 8s linear infinite;
+}
+
+.onboarding-td-card__badge {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  z-index: 1;
+  border: 1px solid;
+  border-color: var(--glass-edge);
+  outline: 1px solid var(--glass-outer);
+  outline-offset: 0;
+  border-radius: 999px;
+  padding: 5px 9px;
+  background: var(--glass-fill-strong);
+  -webkit-backdrop-filter: var(--glass-blur);
+  backdrop-filter: var(--glass-blur);
+  font-family: var(--font-body);
+  font-size: 0.66rem;
+  font-weight: 700;
+  line-height: 1;
+  color: var(--td-card-text);
+  box-shadow: 0 8px 18px -12px rgba(17, 24, 39, 0.4);
+}
+
+@media (max-width: 600px) {
+  .onboarding-td-card {
+    width: min(44vw, 172px);
+    height: min(44vw, 172px);
+    padding: 18px;
+  }
+
+  .onboarding-td-card__label {
+    font-size: 36px;
+  }
+
+  .onboarding-td-card__label--long {
+    font-size: 24px;
+  }
+
+  .onboarding-td-card__label--xlong {
+    max-width: 100px;
+    font-size: 17px;
+  }
+
+  .onboarding-td-card__orbit-text {
+    font-size: 9px;
+  }
+
+  .onboarding-td-card__badge {
+    top: 12px;
+    right: 12px;
+    padding: 4px 8px;
+  }
+}
+
+@keyframes onboarding-td-orbit-spin {
+  from {
+    transform: rotate(0deg);
+  }
+
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes onboarding-step-panel-in {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes onboarding-completion-page-in {
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes onboarding-completion-panel-in {
+  from {
+    opacity: 0;
+    transform: translateY(18px) scale(0.98);
+    filter: blur(10px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+    filter: blur(0);
+  }
+}
+
+@keyframes dashboard-reveal-in {
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes page-enter-in {
+  from {
+    transform: translateY(6px);
+  }
+}
+
+@keyframes page-enter-ios {
+  from {
+    transform: scale(0.965);
+  }
+}
+
+@keyframes page-switch-veil-out {
+  from {
+    opacity: 1;
+  }
+}
+
+@keyframes account-modal-layout-in {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes onboarding-td-card-enter {
+  from {
+    opacity: 0;
+    filter: blur(8px);
+  }
+
+  to {
+    opacity: 1;
+    filter: blur(0);
+  }
+}
+
+@keyframes onboarding-step-panel-in-back {
+  from {
+    opacity: 0;
+    transform: translateY(-12px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.onboarding-step-panel--back {
+  animation-name: onboarding-step-panel-in-back;
+}
+
+@keyframes onboarding-completion-page-out {
+  from {
+    opacity: 1;
+  }
+
+  to {
+    opacity: 0;
+  }
+}
+
+@keyframes onboarding-completion-panel-out {
+  from {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+    filter: blur(0);
+  }
+
+  to {
+    opacity: 0;
+    transform: translateY(-12px) scale(0.98);
+    filter: blur(10px);
+  }
+}
+
+.onboarding-completion-page--leaving {
+  animation: onboarding-completion-page-out 280ms cubic-bezier(0.4, 0, 1, 1) both;
+}
+
+.onboarding-completion-panel--leaving {
+  animation: onboarding-completion-panel-out 280ms cubic-bezier(0.4, 0, 1, 1) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sidebar-handle-button,
+  .sidebar-handle-button svg,
+  .onboarding-completion-page,
+  .onboarding-completion-page--leaving,
+  .onboarding-completion-panel,
+  .onboarding-completion-panel--leaving,
+  .dashboard-reveal-shell,
+  .page-enter,
+  .page-switch-veil,
+  .sidebar-panel,
+  .account-modal-layout-panel,
+  .onboarding-step-panel,
+  .onboarding-step-panel--back,
+  .onboarding-td-card,
+  .onboarding-td-card__orbit {
+    transition: none;
+    animation: none !important;
+  }
+}
+
+:where([data-theme="dark"]) .onboarding-card {
+  --ring-color: rgba(0, 0, 0, 0.88);
+  border-color: rgba(255, 255, 255, 0.08);
+}
+
+:where([data-theme="dark"]) .onboarding-card:hover {
+  --ring-color: rgba(0, 0, 0, 0.88);
+  border-color: rgba(255, 255, 255, 0.12);
+}
+
+:where([data-theme="dark"]) .onboarding-td-card {
+  border-color: rgba(255, 255, 255, 0.14);
+  box-shadow:
+    0 18px 40px -28px rgba(0, 0, 0, 0.8),
+    0 8px 16px -10px rgba(0, 0, 0, 0.5),
+    0 0 0 1px rgba(255, 255, 255, 0.06) inset;
+}
+
+:where([data-theme="dark"]) .onboarding-td-card:hover:not(:disabled) {
+  box-shadow:
+    0 24px 48px -28px rgba(0, 0, 0, 0.88),
+    0 12px 20px -12px rgba(0, 0, 0, 0.6),
+    0 0 0 1px rgba(255, 255, 255, 0.1) inset;
+}

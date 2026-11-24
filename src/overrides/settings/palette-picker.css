@@ -1,0 +1,139 @@
+/* ── Palette picker (Réglages › Apparence › Couleurs, PalettePicker) ──
+   A settings row: the pick's name, then the swatches, one per palette,
+   each in its brand as the theme at hand draws it
+   (--swatch-light, --swatch-dark). The pick wears a ring a hair off the
+   disc and, when it has an intensity to set, a pencil: a tap on it opens
+   the dial below. On a phone the swatches go under the name. */
+.palette-picker,
+.palette-dial {
+  /* A spring with a little give at the end, and one that overshoots. */
+  --palette-spring: cubic-bezier(0.32, 0.72, 0, 1);
+  --palette-settle: cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+@supports (animation-timing-function: linear(0, 1)) {
+  .palette-picker,
+  .palette-dial {
+    --palette-spring: linear(0, 0.006, 0.025 2.8%, 0.101 6.1%, 0.539 18.9%, 0.721 25.3%, 0.849 31.5%, 0.937 38.1%, 0.968 41.8%, 0.991 45.7%, 1.006 50.1%, 1.015 55%, 1.017 63.9%, 1.001);
+    --palette-settle: linear(0, 0.011 1.6%, 0.044 3.4%, 0.17 7%, 0.6 15.1%, 0.858 21%, 1.017 26.1%, 1.095 30.3%, 1.122 33.1%, 1.129 35.8%, 1.11 40.9%, 1.016 56.5%, 0.994 64.7%, 0.991 74.5%, 1);
+  }
+}
+
+.palette-picker {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px 16px;
+  min-height: 54px;
+  padding: 11px 16px;
+}
+
+/* The row label's type (SettingsGroup's RowText). */
+.palette-name {
+  margin: 0;
+  font-family: var(--font-body);
+  font-size: 16px;
+  font-weight: 500;
+  line-height: 1.2;
+  letter-spacing: -0.3125px;
+  color: var(--ink);
+}
+
+/* Padded by the ring's reach and pulled back by as much: the discs line up
+   with the row's edges, the pick's ring reaching past them. */
+.palette-swatches {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin: 0 -4px;
+  padding: 4px;
+}
+
+.palette-swatch {
+  --swatch: var(--swatch-light);
+  --swatch-ink: #ffffff;
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  flex-shrink: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  /* A bead, as the graphs' dots: lit from above, shaded at its foot, a
+     hairline and a close shadow. */
+  background:
+    radial-gradient(circle at 50% 26%, rgb(255 255 255 / 0.4), rgb(255 255 255 / 0) 58%),
+    var(--swatch);
+  box-shadow:
+    inset 0 -1.5px 2px rgb(0 0 0 / 0.22),
+    inset 0 0 0 0.5px rgb(0 0 0 / 0.14),
+    0 1px 2px rgb(52 18 0 / 0.18),
+    0 2px 4px -1px rgb(52 18 0 / 0.14);
+  color: var(--swatch-ink);
+  cursor: pointer;
+  transition: scale 260ms var(--palette-settle);
+  -webkit-tap-highlight-color: transparent;
+}
+
+:root[data-theme="dark"] .palette-swatch {
+  --swatch: var(--swatch-dark);
+  --swatch-ink: rgb(0 0 0 / 0.78);
+}
+
+/* A finger's worth around the disc. */
+.palette-swatch::before {
+  content: '';
+  position: absolute;
+  inset: -6px;
+  border-radius: 50%;
+}
+
+/* The pick's ring: the swatch's colour, the card showing between the two. */
+.palette-swatch::after {
+  content: '';
+  position: absolute;
+  inset: -4px;
+  border: 2px solid var(--swatch);
+  border-radius: 50%;
+  opacity: 0;
+  scale: 0.78;
+  transition: opacity 140ms ease, scale 320ms var(--palette-settle);
+  pointer-events: none;
+}
+
+.palette-swatch[data-current]::after {
+  opacity: 1;
+  scale: 1;
+}
+
+.palette-swatch-edit {
+  width: 14px;
+  height: 14px;
+  animation: palette-swatch-edit-in 320ms var(--palette-settle) backwards;
+}
+
+@keyframes palette-swatch-edit-in {
+  from {
+    opacity: 0;
+    scale: 0.4;
+  }
+}
+
+.palette-swatch:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 6px;
+}
+
+@media (hover: hover) {
+  .palette-swatch:not([data-current]):hover {
+    scale: 1.12;
+  }
+}
+
+.palette-swatch:active {
+  scale: 0.92;
+  transition-duration: 80ms;
+}
