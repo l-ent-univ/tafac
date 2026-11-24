@@ -118,8 +118,8 @@ import {
   parseIsorbonneName,
   resolvePortalKind,
 } from './portalSession.js'
-import { SchoolCertificateUnavailableError, buildDemoCertificatePdf, openCertificateDownload } from './schoolCertificate.js'
-import { buildPlanningPersonalSelection, createPlanningRpcClient } from '../planningRpc.js'
+import { SchoolCertificateUnavailableError, buildDemoCertificatePdf, openCertificateDownload, openStudentIdentity } from './schoolCertificate.js'
+import { createPlanningRpcClient } from '../planningRpc.js'
 import { createTempoApiClient } from '../tempoApi.js'
 import {
   DEMO_ACCOUNT,
@@ -2051,6 +2051,7 @@ function clearSensitiveSessionCaches(session) {
   clearMailCaches(sessionId)
   clearMoodleCaches(sessionId)
   schoolCertificateStatusCache.delete(sessionId)
+  studentIdentityCache.delete(sessionId)
   clearAdeCaches(cacheScope)
   clearPlanningCaches(cacheScope)
   clearPortalCaches(cacheScope)
@@ -6203,6 +6204,65 @@ app.get('/__ent_auth/documents/school-certificate', async (req, res) => {
       ok: false,
       error: unavailable ? 'Aucun certificat de scolarité disponible.' : 'Certificat indisponible pour le moment.',
     })
+  }
+})
+
+// ============================================================================
+// ÉTAT CIVIL (MonDossierWeb), for the student card
+// ============================================================================
+
+// Read off MonDossierWeb's home view (server/schoolCertificate.js), kept a
+// while in memory only, dropped on sign-out (clearSensitiveSessionCaches).
+const STUDENT_IDENTITY_TTL_MS = 15 * 60 * 1000
+const studentIdentityCache = new Map()
+
+const DEMO_STUDENT_IDENTITY = {
+  studentNumber: '22301234',
+  nationalNumber: '0A1B2C3D4E5',
+  birthDate: '14/03/2005',
+  birthPlace: 'RENNES',
+}
+
+// GET /__ent_auth/student/identity
+//   200 { available: true, studentNumber, nationalNumber, birthDate, birthPlace }
+//       | { available: false }
+//   401 no session · 404 no MonDossierWeb for this university
+app.get('/__ent_auth/student/identity', async (req, res) => {
+  res.setHeader('Cache-Control', 'no-store')
+  const session = getSessionFromRequest(req)
+  if (!session) {
+    return res.status(401).json({ available: false, error: 'Authentication required.' })
+  }
+  if (!SCHOOL_CERTIFICATE_ORIGIN) {
+    return res.status(404).json({ available: false })
+  }
+
+  setSessionCookie(res, session)
+  if (isDemoSession(session)) {
+    return res.status(200).json({ available: true, ...DEMO_STUDENT_IDENTITY })
+  }
+
+  const cached = studentIdentityCache.get(session.id)
+  if (cached && Date.now() - cached.at < STUDENT_IDENTITY_TTL_MS) {
+    return res.status(200).json(cached.payload)
+  }
+
+  try {
+    const identity = await withSchoolCertificateLock(session, () => openStudentIdentity({
+      origin: SCHOOL_CERTIFICATE_ORIGIN,
+      jar: session.jar,
+      followRedirectChain,
+      fetchWithJar,
+    }))
+    const payload = { available: true, ...identity }
+    studentIdentityCache.set(session.id, { at: Date.now(), payload })
+    return res.status(200).json(payload)
+  } catch (error) {
+    // "Not there" is remembered; a network hiccup is retried next time.
+    if (error instanceof SchoolCertificateUnavailableError) {
+      studentIdentityCache.set(session.id, { at: Date.now(), payload: { available: false } })
+    }
+    return res.status(200).json({ available: false })
   }
 })
 

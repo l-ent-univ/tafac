@@ -333,6 +333,7 @@ export async function logoutFromEnt({ expired = false } = {}) {
   clearGradesCache()
   // Another account may sign in on this page.
   forgetSchoolCertificateStatus()
+  forgetStudentIdentity()
   localStorage.removeItem(ADE_TIMETABLE_CACHE_KEY)
   clearRecentLoginMarker()
 
@@ -442,6 +443,53 @@ export function preloadSchoolCertificateStatus() {
 
 function forgetSchoolCertificateStatus() {
   schoolCertificateStatus = null
+}
+
+// The student card's numbers and birth (n° étudiant, INE, date and place),
+// from MonDossierWeb's « Etat-civil » (server/schoolCertificate.js). Kept in
+// memory only, for the page's lifetime, and forgotten on sign-out.
+let studentIdentity = null
+let studentIdentityRequest = null
+
+const NO_STUDENT_IDENTITY = { available: false }
+
+export function getCachedStudentIdentity() {
+  return studentIdentity
+}
+
+// { available: true, studentNumber, nationalNumber, birthDate, birthPlace }
+// or { available: false }. Never throws.
+export function getStudentIdentity() {
+  if (!universityConfig.features?.schoolCertificate) {
+    return Promise.resolve(NO_STUDENT_IDENTITY)
+  }
+
+  studentIdentityRequest ??= (async () => {
+    try {
+      const response = await fetch(`${ENT_AUTH_PREFIX}/student/identity`, { credentials: 'same-origin' })
+      const payload = await response.json().catch(() => null)
+      const text = (value) => (typeof value === 'string' ? value : '')
+      studentIdentity = response.ok && payload?.available
+        ? {
+            available: true,
+            studentNumber: text(payload.studentNumber),
+            nationalNumber: text(payload.nationalNumber),
+            birthDate: text(payload.birthDate),
+            birthPlace: text(payload.birthPlace),
+          }
+        : NO_STUDENT_IDENTITY
+    } catch {
+      studentIdentity = NO_STUDENT_IDENTITY
+    }
+    return studentIdentity
+  })().finally(() => {
+    studentIdentityRequest = null
+  })
+  return studentIdentityRequest
+}
+
+function forgetStudentIdentity() {
+  studentIdentity = null
 }
 
 function getAttachmentFilename(contentDisposition, fallback) {

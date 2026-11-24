@@ -3,8 +3,9 @@ import { Icon } from '@iconify/react'
 import universityConfig from '@university'
 import { openChangelog, useChangelog } from '../changelogStore'
 import { getPillIds } from '../changelogState'
-import { downloadSchoolCertificate, getCachedSchoolCertificateStatus, getSchoolCertificateStatus } from '../entApi'
+import { downloadSchoolCertificate, getCachedSchoolCertificateStatus, getCachedStudentIdentity, getSchoolCertificateStatus, getStudentIdentity } from '../entApi'
 import { usePlanningExport } from '../usePlanningExport'
+import { saveStudentCard } from '../studentCardImage'
 import { AboutPage } from './AboutModal'
 import DesktopUpdateSettings from './DesktopUpdateSettings'
 import SettingsGroup, { RowText } from './SettingsGroup'
@@ -22,6 +23,9 @@ import { PALETTES } from '../theme'
 import PalettePicker from './PalettePicker'
 import WallpaperSwitchGlow from './WallpaperSwitchGlow'
 import { SIDEBAR_NEXT_CLASS_ENABLED, setSidebarNextClassShown, useSidebarNextClassShown } from '../sidebarNextClassPref'
+import Rennes1StudentCard from './StudentCards/Rennes1StudentCard'
+import Rennes2StudentCard from './StudentCards/Rennes2StudentCard'
+import StudentCardZoom from './StudentCards/StudentCardZoom'
 
 // Also the debug menu's toggles (src/components/debug/).
 export { Switch }
@@ -196,6 +200,116 @@ function SchoolCertificateGroup() {
       </SettingsGroup>
       {error ? (
         <p className="m-0 px-1 font-body text-[13px] font-semibold leading-[1.2] text-[#b91c1c] dark:text-[var(--color-error)]" role="alert">{error}</p>
+      ) : null}
+    </div>
+  )
+}
+
+// The student card for each university
+const STUDENT_CARDS = {
+  'univ-rennes': Rennes1StudentCard,
+  'univ-rennes-2': Rennes2StudentCard,
+}
+
+// A card, and below it the student card.
+function CardWithImage({ displayInfo, photoSrc, formation = '' }) {
+  const [certificateStatus, setCertificateStatus] = useState(getCachedSchoolCertificateStatus)
+  useEffect(() => {
+    let isCancelled = false
+    void getSchoolCertificateStatus().then((nextStatus) => {
+      if (!isCancelled) setCertificateStatus(nextStatus)
+    })
+    return () => {
+      isCancelled = true
+    }
+  }, [])
+  const year = certificateStatus?.schoolYear?.replace('-', '/') ?? ''
+  // N° étudiant, INE, birth date and place: MonDossierWeb's « Etat-civil ».
+  const [identity, setIdentity] = useState(getCachedStudentIdentity)
+  useEffect(() => {
+    let isCancelled = false
+    void getStudentIdentity().then((nextIdentity) => {
+      if (!isCancelled) setIdentity(nextIdentity)
+    })
+    return () => {
+      isCancelled = true
+    }
+  }, [])
+  const StudentCard = STUDENT_CARDS[universityConfig.id] ?? null
+  const cardRef = useRef(null)
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState('')
+  // The card's aspect ratio while it's enlarged, else null.
+  const [zoomed, setZoomed] = useState(null)
+
+  if (!StudentCard) return null
+
+  const cardProps = {
+    firstName: displayInfo.firstName,
+    lastName: displayInfo.lastName,
+    photoSrc,
+    year,
+    formation,
+    studentNumber: identity?.studentNumber ?? '',
+    nationalNumber: identity?.nationalNumber ?? '',
+    birthDate: identity?.birthDate ?? '',
+    birthPlace: identity?.birthPlace ?? '',
+  }
+
+  // The card as shown as a PNG.
+  const handleDownload = async () => {
+    const svg = cardRef.current?.querySelector('svg')
+    if (!svg) return
+    setBusy(true)
+    setError('')
+    try {
+      await saveStudentCard(svg)
+    } catch {
+      setError('Téléchargement impossible pour le moment')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <div className="flex flex-col gap-[18px]">
+      <div className="flex flex-col gap-[7px]">
+        <SettingsGroup title="Carte étudiante">
+          <button
+            type="button"
+            className={`${ROW_CLASSES} w-full border-0 bg-transparent text-left cursor-pointer transition-colors duration-[120ms] hover:bg-[#f8f7f3] disabled:cursor-wait dark:hover:bg-[var(--color-bg-subtle)]`}
+            onClick={() => void handleDownload()}
+            disabled={busy}
+            aria-busy={busy || undefined}
+          >
+            <RowText icon="ph:identification-card" label="Télécharger la carte" description={busy ? 'Préparation…' : 'Image PNG'} />
+            {busy
+              ? <LoadingDots label={null} className="w-4 shrink-0 text-text-60" />
+              : <Icon icon="ph:download-simple" className="h-4 w-4 shrink-0 text-text-60" aria-hidden="true" />}
+          </button>
+        </SettingsGroup>
+        {error ? (
+          <p className="m-0 px-1 font-body text-[13px] font-semibold leading-[1.2] text-[#b91c1c] dark:text-[var(--color-error)]" role="alert">{error}</p>
+        ) : null}
+      </div>
+
+      {/* A click enlarges it (StudentCardZoom). */}
+      <button
+        ref={cardRef}
+        type="button"
+        className="block w-full cursor-zoom-in border-0 bg-transparent p-0 transition-transform duration-[160ms] hover:scale-[1.01] active:scale-[0.99] focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-text"
+        onClick={(event) => {
+          const { width, height } = event.currentTarget.getBoundingClientRect()
+          setZoomed(height ? width / height : 1.6)
+        }}
+        aria-label="Agrandir la carte étudiante"
+      >
+        <StudentCard className="block w-full" {...cardProps} />
+      </button>
+      {zoomed ? (
+        <StudentCardZoom originRef={cardRef} aspect={zoomed} onClose={() => setZoomed(null)}>
+          <StudentCard className="block w-full" {...cardProps} />
+        </StudentCardZoom>
       ) : null}
     </div>
   )
@@ -1092,7 +1206,7 @@ function AccountModal({
                 <SwitchRow
                   icon="ph:chart-line"
                   label="Statistiques anonymes"
-                  description={anonymousAnalytics ? 'Activées, merci !' : 'Désactivées, plus rien n’est envoyé'}
+                  description={anonymousAnalytics ? 'Activées, merci !' : 'Désactivées, plus rien n’est envoyé'}
                   checked={anonymousAnalytics}
                   onChange={onAnonymousAnalyticsChange}
                 />

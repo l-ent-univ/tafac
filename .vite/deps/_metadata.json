@@ -1,0 +1,64 @@
+{
+  "hash": "c715fb7a",
+  "configHash": "3e8bea52",
+  "lockfileHash": "854a7a63",
+  "browserHash": "61cd7f4a",
+  "optimized": {
+    "react": {
+      "src": "../../node_modules/react/index.js",
+      "file": "react.js",
+      "fileHash": "091bfdd2",
+      "needsInterop": true
+    },
+    "react-dom/client": {
+      "src": "../../node_modules/react-dom/client.js",
+      "file": "react-dom_client.js",
+      "fileHash": "865e7ee4",
+      "needsInterop": true
+    },
+    "@iconify/react": {
+      "src": "../../node_modules/@iconify/react/dist/iconify.js",
+      "file": "@iconify_react.js",
+      "fileHash": "55a2532b",
+      "needsInterop": false
+    },
+    "@lisse/core": {
+      "src": "../../node_modules/@lisse/core/dist/index.js",
+      "file": "@lisse_core.js",
+      "fileHash": "f3649a99",
+      "needsInterop": false
+    },
+    "react-dom": {
+      "src": "../../node_modules/react-dom/index.js",
+      "file": "react-dom.js",
+      "fileHash": "652b9ed3",
+      "needsInterop": true
+    },
+    "skullet": {
+      "src": "../../node_modules/skullet/dist/index.mjs",
+      "file": "skullet.js",
+      "fileHash": "58da15ab",
+      "needsInterop": false
+    },
+    "skullet/react": {
+      "src": "../../node_modules/skullet/dist/react/index.mjs",
+      "file": "skullet_react.js",
+      "fileHash": "ff1d48fd",
+      "needsInterop": false
+    }
+  },
+  "chunks": {
+    "chunk-MLX6MPUC": {
+      "file": "chunk-MLX6MPUC.js"
+    },
+    "chunk-ZHHBABJV": {
+      "file": "chunk-ZHHBABJV.js"
+    },
+    "chunk-VK2PZV5F": {
+      "file": "chunk-VK2PZV5F.js"
+    },
+    "chunk-YLJ4XMA6": {
+      "file": "chunk-YLJ4XMA6.js"
+    }
+  }
+}

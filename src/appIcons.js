@@ -1,4 +1,4 @@
-// Automatic icons for application tiles, picked and remembered by the server
+ // Automatic icons for application tiles, picked and remembered by the server
 // for the whole university (server/appIcons.js). Hand-made icons
 // (services.getAppIcon) still win; these fill in the rest.
 //
