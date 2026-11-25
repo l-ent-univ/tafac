@@ -16,6 +16,7 @@ web view (tafac://localhost/)        src-tauri/src/ios.rs
    ▼
 bridge (Rust), as on the desktop     src-tauri/src/bridge.rs
    │  session cookie (jar.rs), kept login (signin.rs)
+   │  a few routes: tonAPI, in the app    src-tauri/crates/tafac-gateway
    ▼  Unix socket in the app's own folder, no TCP port
 server.js, unchanged                 desktop/ios.mjs
    │  inside the app's process, on Node 18  src-tauri/src/node.rs
@@ -74,6 +75,51 @@ except here, and only shows when the app runs. No test covers it yet.
 path may be (~104 bytes). The app works from its data folder
 (`set_current_dir`) and the socket is `s.sock` there; Node, in the same
 process, means the same folder.
+
+## tonAPI
+
+The server is moving from Node to
+[tonAPI](https://github.com/l-ent-univ/tonAPI) (Rust), a route at a time.
+A route moves once, for tafac.fr and both apps, in one crate:
+`src-tauri/crates/tafac-gateway` (its `lib.rs` says how; `docs/DESKTOP.md`,
+« tonAPI »). On the phone the bridge asks it before Node, in the app's own
+process: no JavaScript runs for a route that moved.
+
+- **Moved**: `GET /__ent_auth/session` and `GET /__ent_auth/account`, for
+  the Université de Rennes (`routes.rs`, the one table). Everything else is
+  Node's, as before: the login and the sign-out, the portal's applications,
+  grades, the planning, the mail, Moodle, Rennes 2, Sorbonne Nouvelle, the
+  demo account.
+- **One session**: Node's. tonAPI asks the portal with the cookies of
+  Node's session cookie, read at each request; it keeps none of its own, and
+  is never given the CAS ticket.
+- **Node still answers** a moved route whenever tonAPI can't give Node's own
+  answer: the portal no longer knows the session (Node signs in to it again,
+  or ends the session), an error, a slow answer. So an expired session
+  reaches the page as before.
+- **Asked as the app starts**: the session check is the page's first
+  question, and it can only ask once Node and the page have started. The app
+  asks the portal as it starts instead (`bridge::start_ahead`), so the
+  answer is there when the page asks.
+- **Nothing to ship**: tonAPI's settings for each university are in the
+  crate (taken from tonAPI's own repository as it builds). tonAPI is a git
+  dependency at one commit; its repository is private, so Cargo fetches it
+  with git (`src-tauri/.cargo/config.toml`) and a build needs read access
+  to it.
+
+Measured on a real Rennes account, iPhone 17 simulator, debug build
+(`TAFAC_NO_TONAPI=1` is the same build with every route left to Node):
+
+| Cold launch | `/__ent_auth/session` | `/__ent_auth/account` |
+|---|---|---|
+| Node, the portal's session alive | 89 to 306 ms | 11 to 37 ms |
+| tonAPI, the portal's session alive | 0 to 3 ms | 0 to 1 ms |
+| Node, the portal's session lapsed | 497 to 1069 ms | 16 to 34 ms |
+| tonAPI's turn, the portal's session lapsed | 402 to 807 ms, Node's | 11 to 18 ms |
+
+The rest of a launch is Node's and unchanged: the applications (about
+40 requests), grades, the planning, the mail (0.5 to 1.8 s), Moodle's
+deadlines (2.2 to 3.7 s).
 
 ## The window
 
@@ -390,12 +436,28 @@ xcrun simctl terminate booted fr.tafac.ios; xcrun simctl launch booted fr.tafac.
 
 The app's log (Node's output too):
 `xcrun simctl spawn booted log show --last 1m --predicate 'subsystem == "fr.tafac.ios"'`.
-`SIMCTL_CHILD_TAFAC_LOG_REQUESTS=1` logs each request of the page's to the
-server, with its answer's status, time and size (debug builds).
+`SIMCTL_CHILD_TAFAC_LOG_REQUESTS=1` logs each request of the page's, with
+its answer's status, time and size, and `tonapi` after the ones tonAPI
+answered (debug builds). `SIMCTL_CHILD_TAFAC_NO_TONAPI=1` leaves every route
+to Node, to compare the two on the same build.
 `SIMCTL_CHILD_TAFAC_START_PATH=/rennes` before `simctl launch` opens on that
 page, and `SIMCTL_CHILD_TAFAC_PRESS_TAB=moodle,planning` presses those tabs
 one after the other, a few seconds apart, by the way a finger does (debug
 builds: nothing taps a simulator from a script).
+
+**Signed in without tapping** (a debug build keeps the session secret in
+the app's data folder): start the app, sign in over its socket, stop the
+app, and write the cookie the answer set where the app keeps it.
+
+```sh
+DATA="$(xcrun simctl get_app_container booted fr.tafac.ios data)/Library/Application Support/fr.tafac.ios"
+cd "$DATA" && curl --unix-socket s.sock -si http://localhost/__ent_auth/login \
+  -H 'content-type: application/json' -H 'x-tafac-university: univ-rennes' \
+  -d "{\"username\":\"$LOGIN\",\"password\":\"$PASSWORD\"}"
+# cookies.json: {"__Host-lent_session": {"value": "<the cookie's value>", "expires_at": <Unix seconds>}}
+```
+
+The container's folder changes at each install: ask for it again.
 
 ## Releases
 
@@ -544,8 +606,13 @@ shows, signing in, the Keychain keeping the login.
 
 - **A phone**: beyond starting (above), the Keychain (release builds only)
   and what iOS does to a suspended app's socket are untested.
-- **A real account**: no real login was made in the app. Grades, planning,
-  mail and the launch relay ran on the demo account or not at all.
+- **A real account**: one was signed in over the app's socket, in the
+  simulator (« tonAPI », above): the dashboard's requests all answer. Not
+  seen: the screens themselves, the login typed in the app, a phone.
+- **tonAPI**: two routes moved. On a phone nothing was measured (Node
+  without a JIT is slower there than in the simulator). A release build's
+  size with tonAPI in it wasn't measured either (the gateway's own server,
+  built for release, is 3.4 MB on this Mac).
 - **Taps**: a UI test taps the simulator as a finger does (it was written
   for the glass, « Checked », and isn't in the repository: a test target
   with `XCUIApplication(bundleIdentifier: "fr.tafac.ios")`, run with

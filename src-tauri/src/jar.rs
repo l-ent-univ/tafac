@@ -62,6 +62,14 @@ impl CookieJar {
         )
     }
 
+    // One cookie's value, unless it has expired: the server's session
+    // cookie, for what the app answers itself (bridge.rs).
+    pub fn get(&self, name: &str) -> Option<String> {
+        let cookies = self.cookies.lock().unwrap();
+        let cookie = cookies.get(name)?;
+        cookie.expires_at.map_or(true, |expiry| expiry > now()).then(|| cookie.value.clone())
+    }
+
     // A response's Set-Cookie headers: stored, replaced, or cleared (empty
     // value, Max-Age=0 or a past Expires, as the server's logout sends).
     pub fn store<'a>(&self, set_cookies: impl Iterator<Item = &'a str>) {

@@ -105,17 +105,8 @@ pub fn run() {
                 } else if request.uri().path().starts_with(DESKTOP_PREFIX) {
                     http::Response::builder().status(404).body(Vec::new()).unwrap()
                 } else {
-                    // Development: TAFAC_LOG_REQUESTS=1 says what the page
-                    // asks the server, and how long each answer took.
-                    #[cfg(debug_assertions)]
-                    let asked = std::env::var_os("TAFAC_LOG_REQUESTS").map(|_| (format!("{} {}", request.method(), request.uri().path()), std::time::Instant::now()));
                     let bridge = app.state::<Arc<bridge::Bridge>>().inner().clone();
-                    let response = bridge::forward(&bridge, request).await;
-                    #[cfg(debug_assertions)]
-                    if let Some((what, since)) = asked {
-                        eprintln!("[tafac] {what} {} {}ms {}b", response.status().as_u16(), since.elapsed().as_millis(), response.body().len());
-                    }
-                    response
+                    bridge::forward(&bridge, request).await
                 };
                 responder.respond(response);
             });
@@ -129,12 +120,14 @@ pub fn run() {
             let script = app.path().resource_dir()?.join("server").join("desktop").join("ios.mjs");
             node::remote_settings(app.handle(), &data_dir);
             node::start(&script, &endpoint, &secret, &data_dir)?;
-            app.manage(Arc::new(bridge::Bridge {
-                endpoint,
-                jar: jar::CookieJar::load(data_dir.join("cookies.json")),
-                signin: signin::SignIn::for_this_build(),
-                assets: Default::default(),
-            }));
+            let bridge = Arc::new(
+                bridge::Bridge::new(endpoint, jar::CookieJar::load(data_dir.join("cookies.json")), signin::SignIn::for_this_build())
+                    .with_gateway(&secret),
+            );
+            app.manage(bridge.clone());
+            // The page's first question, asked of the university now, while
+            // the server and the page start.
+            tauri::async_runtime::spawn(async move { bridge::start_ahead(&bridge).await });
             app.manage(Arc::new(moodle::Moodle::default()));
             let _ = APP.set(app.handle().clone());
             ios_downloads::clear();

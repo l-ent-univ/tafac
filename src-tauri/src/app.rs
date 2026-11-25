@@ -79,12 +79,14 @@ pub fn run() {
             let endpoint = sidecar::endpoint(&data_dir)?;
             let secret = secret::session_secret(&data_dir)?;
             app.manage(sidecar::spawn(app.handle(), &endpoint, &secret, &data_dir)?);
-            app.manage(Arc::new(bridge::Bridge {
-                endpoint,
-                jar: jar::CookieJar::load(data_dir.join("cookies.json")),
-                signin: signin::SignIn::for_this_build(),
-                assets: Default::default(),
-            }));
+            let bridge = Arc::new(
+                bridge::Bridge::new(endpoint, jar::CookieJar::load(data_dir.join("cookies.json")), signin::SignIn::for_this_build())
+                    .with_gateway(&secret),
+            );
+            app.manage(bridge.clone());
+            // The page's first question, asked of the university now, while
+            // the server and the page start.
+            tauri::async_runtime::spawn(async move { bridge::start_ahead(&bridge).await });
             app.manage(Arc::new(moodle::Moodle::default()));
 
             // Before the window: its page asks for the update's state as it

@@ -2595,6 +2595,11 @@ app.use('/__ent_auth/mail', (req, res, next) => {
 })
 
 // 1. Auth Status Endpoint
+// This route and the account's below have moved to tonAPI: where the
+// gateway runs before this server (the apps; tafac.fr once it is deployed
+// there), it answers them while the portal's session lives
+// (src-tauri/crates/tafac-gateway, translate/). A field added, renamed or
+// removed here changes there too.
 app.get('/__ent_auth/session', async (req, res) => {
   try {
     res.setHeader('Cache-Control', 'no-store')

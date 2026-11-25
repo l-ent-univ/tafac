@@ -53,6 +53,50 @@ the university (CAS, ADE, webmail…)
 - The server stops with the app: its stdin is a pipe from the app, and when
   the pipe closes the server exits, even if the app crashed.
 
+## tonAPI
+
+The server is moving from Node to
+[tonAPI](https://github.com/l-ent-univ/tonAPI) (Rust: one provider per
+software, one settings file per university), a route at a time. A route
+moves once, in one crate, for every place Tafac runs:
+`src-tauri/crates/tafac-gateway`.
+
+```
+the page: /__ent_auth/*, /__ent_proxy/*      unchanged, the only contract
+   ▼
+the gateway (Rust)                           src-tauri/crates/tafac-gateway
+   │  routes.rs      the one table: each route, tonAPI's or Node's
+   │  translate/     tonAPI's answer as the page gets it from Node
+   │  session_link  tonAPI asks with the cookies of Node's session
+   ├─ a moved route, when tonAPI has Node's own answer ──▶ the university
+   ▼  everything else, as it came
+Node (server.js)
+```
+
+- **In the apps** the bridge calls the gateway in the app's own process
+  before it asks Node (`bridge.rs`), on the desktop and on iOS alike.
+- **On tafac.fr** the same crate is a small server in front of Node
+  (`cargo build -p tafac-gateway --release`, `src/main.rs`): it answers the
+  moved routes and passes every other request on as it came (headers,
+  cookies, bodies as they stream, redirects, WebSocket). Not deployed.
+- **One session**: Node's. The gateway reads Node's session cookie
+  (`session_link.rs`; the cookie's format is checked on both sides by
+  `tests/fixtures/session-cookie-v1.json`) and hands tonAPI the portal's
+  cookies for one request. No second sign-in, nothing kept on tonAPI's side.
+- **Node still answers** a moved route whenever tonAPI can't give Node's
+  own answer (each translator lists the cases): so a refusal, an expired
+  session and a sign-out are Node's, as before.
+- **To move a route**: its line in `routes.rs`, a translator in
+  `translate/`, and the answer compared with Node's on a real account.
+- `TAFAC_LOG_REQUESTS=1` logs the page's requests in a debug build of the
+  app, with `tonapi` after the ones tonAPI answered; `TAFAC_NO_TONAPI=1`
+  leaves every route to Node.
+
+Moved so far, for the Université de Rennes: `GET /__ent_auth/session` and
+`GET /__ent_auth/account`. On a real account, a debug build on a Mac: the
+session check 80 ms from Node, answered before the page asks with tonAPI
+(the app asks the portal as it starts); the account 10 ms, then 0.
+
 ## Staying signed in
 
 The student signs in once. The university's session dies on its own (the

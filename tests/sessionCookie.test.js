@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import { Buffer } from 'node:buffer'
 import { createHmac } from 'node:crypto'
+import { readFileSync } from 'node:fs'
 import test from 'node:test'
 import {
   HOST_PREFIXED_SESSION_COOKIE_NAME,
@@ -99,6 +100,21 @@ test('encodedLength predicts the real cookie size exactly', () => {
     const data = { ...sessionData(), jar: packJarCookies(jar) }
     assert.equal(codec.encode(data).length, codec.encodedLength(data))
   }
+})
+
+// The gateway reads this cookie too, in Rust, for the routes tonAPI answers
+// (src-tauri/crates/tafac-gateway/src/session_link.rs, whose tests read the
+// same file). A change of format that makes this test fail makes theirs
+// fail: the reader there changes with the codec here, and the file is made
+// again (createSessionCookieCodec({ secret }).encode(payload)).
+test('the cookie the gateway\'s reader is tested on is still one of the codec\'s', () => {
+  const fixture = JSON.parse(readFileSync(new URL('./fixtures/session-cookie-v1.json', import.meta.url), 'utf8'))
+  const decoded = createSessionCookieCodec({ secret: fixture.secret }).decode(fixture.cookie)
+
+  assert.deepEqual(decoded, { data: fixture.payload, format: 'v1', needsReissue: false })
+  assert.equal(getSessionCookieName(true), '__Host-lent_session')
+  assert.equal(isSessionDataExpired(fixture.payload, fixture.payload.createdAt + SESSION_ABSOLUTE_TTL_MS), false)
+  assert.equal(isSessionDataExpired(fixture.payload, fixture.payload.createdAt + SESSION_ABSOLUTE_TTL_MS + 1), true)
 })
 
 test('any single-character change is rejected', () => {

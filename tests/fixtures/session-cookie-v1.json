@@ -1,0 +1,42 @@
+{
+  "about": "A session cookie as server/sessionCookie.js writes it, with made-up values. Read back by the server (tests/sessionCookie.test.js) and by the gateway (src-tauri/crates/tafac-gateway/src/session_link.rs): a change of format fails both.",
+  "secret": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+  "cookie": "v1.J6b9d1hxKsUE0fd4.VbDwubtGCHYzSouYh25sLqtgGNwMUgbuVN9-MwVjYe0-rO64MHTgamzhf1tWce_GX0kBbgQ-aGAZnTtb6d4hzzw0iylQXm0G7PiG2DCJSSwVzp7PgAeEBAsBqtADLTlcE-9eo4VJ1ksZdgcqfKfYHY4m5PCJhX6CY_tE7Ao4Os_H2apm8C40Z-kaeJ19NJywchojKs8fAg4D5SeJzoKFmvTTQePjEsY4RRV3Ni7KLkNGUxfAdlJNWbHmvqRoJtYKdqql8QdLx8xHF8AHILFNedgSpJlrmdtWJf6u8eaPEgLS7BGohTAbf-TEb1w1i0zctTIxRbhnlNrjF9IWgi2qDNk9z2bm7q0uRnFeIIbTXgGniQTo3h_to84IQ9zxh9xpwnEA9g3p-ozo8kzpQ2yqqmXdw_cXb83URtEq_YKleFYUvB9oSkjJzxnX.XPzUPINyRZ_UVPE9exsQ0Q",
+  "payload": {
+    "id": "3f2a9c1e-7b64-4d0f-9a51-2c8e6d7f0b13",
+    "uni": "univ-exemple",
+    "user": "jdoe",
+    "mode": null,
+    "demoState": null,
+    "createdAt": 1790000000000,
+    "jar": [
+      [
+        "TGC",
+        "TGT-made-up-ticket",
+        "cas.exemple.test",
+        "/cas",
+        1,
+        1,
+        null
+      ],
+      [
+        "JSESSIONID",
+        "made-up-portal-session",
+        "ent.exemple.test",
+        "/",
+        1,
+        1,
+        null
+      ],
+      [
+        "lang",
+        "fr",
+        "exemple.test",
+        "/",
+        0,
+        0,
+        1795000000000
+      ]
+    ]
+  }
+}
