@@ -24,7 +24,7 @@
 use tonapi_core::Profile;
 
 use super::{another_student, json_answer, same_student, Translated, Unanswered};
-use crate::session_link::NodeSession;
+use crate::session::cookie::NodeSession;
 use crate::universities::University;
 
 fn cookie_names<'a>(session: &'a NodeSession, host: &str) -> Vec<&'a str> {

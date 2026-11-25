@@ -1,4 +1,4 @@
-// The session link: Node's session cookie, read for tonAPI.
+// Node's session cookie, read for tonAPI.
 //
 // The Node server keeps a student's session in one encrypted cookie
 // (server/sessionCookie.js): who it is, at which university, and the
@@ -231,7 +231,7 @@ mod tests {
     use super::*;
 
     // Made by Node's own codec (tests/sessionCookie.test.js reads it too).
-    const FIXTURE: &str = include_str!("../../../../tests/fixtures/session-cookie-v1.json");
+    const FIXTURE: &str = include_str!("../../../../../tests/fixtures/session-cookie-v1.json");
     const DAY_MS: i64 = 24 * 60 * 60 * 1000;
 
     struct Fixture {

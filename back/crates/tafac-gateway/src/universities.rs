@@ -4,7 +4,8 @@
 
 use std::collections::BTreeMap;
 
-use tonapi_config::{EstablishmentFile, PortalConfig, ResolvedUniversity, Sso, UniversityFile};
+use tonapi_config::{EstablishmentFile, HomeworkService, PortalConfig, ResolvedUniversity, Sso, UniversityFile};
+use url::Url;
 
 use crate::routes;
 
@@ -25,6 +26,8 @@ pub struct University {
     pub cas_host: String,
     // The path of the CAS's login page, where tonAPI goes for a lost session.
     pub cas_login_path: String,
+    // Where Moodle is, when the university's deadlines are read there.
+    pub moodle: Option<Url>,
 }
 
 impl University {
@@ -40,7 +43,11 @@ impl University {
         let portal_host = portal.host_str()?.to_ascii_lowercase();
         let cas_host = cas.base_url.host_str()?.to_ascii_lowercase();
         let cas_login_path = cas.base_url.join("login").ok()?.path().to_string();
-        Some(Self { settings, portal_host, cas_host, cas_login_path })
+        let moodle = match &settings.university.services.homework {
+            Some(HomeworkService::MoodleAjax { base_url, .. } | HomeworkService::MoodleWebservice { base_url, .. }) => Some(base_url.clone()),
+            _ => None,
+        };
+        Some(Self { settings, portal_host, cas_host, cas_login_path, moodle })
     }
 }
 
@@ -77,6 +84,10 @@ mod tests {
         assert_eq!(rennes.portal_host, "services-numeriques.univ-rennes.fr");
         assert_eq!(rennes.cas_host, "sso-cas.univ-rennes.fr");
         assert_eq!(rennes.cas_login_path, "/login");
+        assert_eq!(rennes.moodle.as_ref().and_then(|moodle| moodle.host_str()), Some("foad.univ-rennes.fr"));
+        // The grades are the IUT's own: the student's component decides.
+        assert!(rennes.differs_by_component(tonapi_config::ServiceKind::Grades));
+        assert!(!rennes.differs_by_component(tonapi_config::ServiceKind::Homework));
         assert_eq!(served.len(), routes::UNIVERSITIES.len());
         assert!(TONAPI_COMMIT.len() >= 7);
     }

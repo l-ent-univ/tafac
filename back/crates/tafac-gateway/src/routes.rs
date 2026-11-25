@@ -9,7 +9,7 @@
 //
 // A moved route is still Node's whenever tonAPI can't give Node's own
 // answer for it (its translator says when): a route moves, the session
-// stays (session_link.rs).
+// stays (session/).
 
 use http::Method;
 
@@ -23,6 +23,7 @@ pub const UNIVERSITIES: &[&str] = &["univ-rennes"];
 pub enum Moved {
     Session,
     Account,
+    MoodleDeadlines,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -53,6 +54,7 @@ pub const ROUTES: &[Route] = &[
     // Moved.
     moved("GET", "/__ent_auth/session", Moved::Session),
     moved("GET", "/__ent_auth/account", Moved::Account),
+    moved("GET", "/__ent_auth/moodle/deadlines", Moved::MoodleDeadlines),
     // The session itself.
     node("POST", "/__ent_auth/login", "the session is Node's cookie: Node signs in, tonAPI is handed its cookies"),
     node("POST", "/__ent_auth/logout", "ends Node's session and its cookie"),
@@ -74,7 +76,6 @@ pub const ROUTES: &[Route] = &[
     node("GET", "/__ent_auth/student-pic", "no photo in tonAPI's profile"),
     // Mail, Moodle, documents.
     node("*", "/__ent_auth/mail/*", "tonAPI reads an inbox only, and Rennes' stops at the SAML step: no message, folder, draft or send"),
-    node("GET", "/__ent_auth/moodle/deadlines", "tonAPI's Moodle through SAML was never tried at Rennes"),
     node("GET", "/__ent_auth/moodle/view", "Tafac's own, for the apps' Moodle page"),
     node("GET", "/__ent_auth/documents/*", "the school certificate is a stub in tonAPI"),
 ];
@@ -110,8 +111,12 @@ mod tests {
     fn the_moved_routes_and_only_them() {
         assert_eq!(backend(&Method::GET, "/__ent_auth/session"), Backend::TonApi(Moved::Session));
         assert_eq!(backend(&Method::GET, "/__ent_auth/account"), Backend::TonApi(Moved::Account));
+        assert_eq!(backend(&Method::GET, "/__ent_auth/moodle/deadlines"), Backend::TonApi(Moved::MoodleDeadlines));
         for (method, path) in [
             (Method::POST, "/__ent_auth/session"),
+            (Method::POST, "/__ent_auth/moodle/deadlines"),
+            (Method::GET, "/__ent_auth/moodle/view"),
+            (Method::GET, "/__ent_auth/moodle/deadlines/"),
             (Method::GET, "/__ent_auth/session/"),
             (Method::GET, "/__ent_auth/sessions"),
             (Method::POST, "/__ent_auth/login"),

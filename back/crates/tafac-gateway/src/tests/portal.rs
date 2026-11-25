@@ -1,30 +1,20 @@
-// The gateway on a made-up campus (testing.rs): what it answers, as Node
-// would, and what it leaves to Node.
+// The session check and the account, on the made-up campus: what the
+// gateway answers as Node would, and what it leaves to Node.
 
 use std::sync::atomic::{AtomicU32, Ordering};
+use std::time::{Duration, Instant};
 
 use http::header::{HeaderValue, SET_COOKIE};
+use http::{HeaderMap, Method};
+use tonapi_core::Profile;
 
+use super::{ask, node_says, ACCOUNT, SESSION};
+use crate::gateway::portal::EARLY_KEPT;
+use crate::node::{read_facts, NodeFacts, FACTS_KEPT};
+use crate::session::cookie::NodeSession;
 use crate::testing::*;
-use crate::translate::{account, session};
-use crate::*;
-
-const SESSION: &str = "/__ent_auth/session";
-const ACCOUNT: &str = "/__ent_auth/account";
-
-async fn node_says(university: String) -> Option<Vec<u8>> {
-    assert_eq!(university, UNIVERSITY);
-    Some(NODE_SAYS.to_vec())
-}
-
-fn ask(gateway: &Gateway, path: &str, cookie: &str) -> Option<serde_json::Value> {
-    let response = block_on(gateway.answer(&Method::GET, path, || Some(cookie.to_string()), node_says))?;
-    assert_eq!(response.status(), 200);
-    assert_eq!(response.headers()[ANSWERED_BY], "tonapi");
-    assert_eq!(response.headers()["cache-control"], "no-store");
-    assert_eq!(response.headers()["content-type"], "application/json; charset=utf-8");
-    Some(serde_json::from_slice(response.body()).unwrap())
-}
+use crate::translate::{account, session, Translated, Unanswered};
+use crate::Gateway;
 
 fn profile() -> Profile {
     Profile {
@@ -176,7 +166,7 @@ fn the_check_made_at_the_start_is_for_that_session_as_it_was() {
     // Too long ago.
     block_on(gateway.check_early(Some(&campus.alive()), node_says));
     if let Some(long_ago) = Instant::now().checked_sub(EARLY_KEPT + Duration::from_secs(1)) {
-        block_on(gateway.early.lock()).as_mut().unwrap().at = long_ago;
+        block_on(gateway.portal.early.lock()).as_mut().unwrap().at = long_ago;
         let asked = campus.paths().len();
         ask(&gateway, SESSION, &campus.alive()).unwrap();
         assert_eq!(campus.paths().len(), asked + 1);
@@ -218,7 +208,7 @@ fn what_is_not_a_plain_signed_in_session_is_nodes_without_a_request() {
         ("another university", campus.cookie(serde_json::json!({ "uni": "univ-rennes-2" }), &alive)),
         ("no portal cookie", campus.cookie(serde_json::json!({}), &[])),
         ("no CAS ticket", campus.cookie(serde_json::json!({ "jar": [["JSESSIONID", "alive", "127.0.0.1", "/", 1, 1, null]] }), &[])),
-        ("past its lifetime", campus.cookie(serde_json::json!({ "createdAt": crate::now_ms() - 31 * 24 * 60 * 60 * 1000 }), &alive)),
+        ("past its lifetime", campus.cookie(serde_json::json!({ "createdAt": crate::gateway::now_ms() - 31 * 24 * 60 * 60 * 1000 }), &alive)),
         ("not Node's cookie", "v1.AAAA.AAAA.AAAA".to_string()),
     ] {
         assert_eq!(ask(&gateway, SESSION, &cookie), None, "{why}");
@@ -320,8 +310,8 @@ fn node_is_asked_now_and_then_what_it_is_set_up_for() {
     assert_eq!(asked.load(Ordering::SeqCst), 1);
 
     // Long after: asked again (Node may have started again since).
-    if let Some(long_ago) = Instant::now().checked_sub(NODE_FACTS_KEPT + Duration::from_secs(1)) {
-        gateway.node_facts.lock().unwrap().get_mut(UNIVERSITY).unwrap().1 = long_ago;
+    if let Some(long_ago) = Instant::now().checked_sub(FACTS_KEPT + Duration::from_secs(1)) {
+        gateway.node.facts.lock().unwrap().get_mut(UNIVERSITY).unwrap().1 = long_ago;
         assert!(block_on(gateway.answer(&Method::GET, SESSION, || Some(cookie.clone()), counted)).is_some());
         assert_eq!(asked.load(Ordering::SeqCst), 2);
     }
@@ -336,25 +326,8 @@ fn a_node_that_doesnt_say_leaves_the_answer_to_itself() {
         let silent = move |_university: String| async move { said };
         assert!(block_on(gateway.answer(&Method::GET, SESSION, || Some(cookie.clone()), silent)).is_none());
     }
-    assert_eq!(read_node_facts(UNIVERSITY, NODE_SAYS), Some(NodeFacts { analytics_enabled: true }));
-    assert_eq!(read_node_facts(UNIVERSITY, br#"{"university":"univ-rennes"}"#), None);
-}
-
-#[test]
-fn a_cookie_the_portal_replaced_is_noticed() {
-    let cookie = |name: &str, value: &str| StoredCookie {
-        domain: "ent.exemple.test".into(),
-        path: "/".into(),
-        name: name.into(),
-        value: value.into(),
-        host_only: true,
-        expires: None,
-    };
-    let sent = [cookie("JSESSIONID", "one")];
-    assert!(still_held(&sent, &[cookie("JSESSIONID", "one")]));
-    assert!(still_held(&sent, &[cookie("JSESSIONID", "one"), cookie("lb", "node2")]));
-    assert!(!still_held(&sent, &[cookie("JSESSIONID", "two")]));
-    assert!(!still_held(&sent, &[]));
+    assert_eq!(read_facts(UNIVERSITY, NODE_SAYS), Some(NodeFacts { analytics_enabled: true }));
+    assert_eq!(read_facts(UNIVERSITY, br#"{"university":"univ-rennes"}"#), None);
 }
 
 fn node_session(user: &str) -> NodeSession {

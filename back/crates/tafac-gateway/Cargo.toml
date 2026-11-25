@@ -33,15 +33,17 @@ required-features = ["server"]
 # tonAPI's own code, at one commit of its repository, never a copy of it: its
 # providers ask the university, its settings say where (build.rs puts them
 # in the crate), its session holds the cookies.
-tonapi-providers = { git = "https://github.com/l-ent-univ/tonAPI", rev = "8fe5100c8955bcb1de534f287cbe51268c8eb355" }
-tonapi-config = { git = "https://github.com/l-ent-univ/tonAPI", rev = "8fe5100c8955bcb1de534f287cbe51268c8eb355" }
-tonapi-session = { git = "https://github.com/l-ent-univ/tonAPI", rev = "8fe5100c8955bcb1de534f287cbe51268c8eb355" }
-tonapi-core = { git = "https://github.com/l-ent-univ/tonAPI", rev = "8fe5100c8955bcb1de534f287cbe51268c8eb355" }
+tonapi-providers = { git = "https://github.com/l-ent-univ/tonAPI", rev = "a28cb46ff73d5dc329967a99aae0530f48c20288" }
+tonapi-config = { git = "https://github.com/l-ent-univ/tonAPI", rev = "a28cb46ff73d5dc329967a99aae0530f48c20288" }
+tonapi-session = { git = "https://github.com/l-ent-univ/tonAPI", rev = "a28cb46ff73d5dc329967a99aae0530f48c20288" }
+tonapi-core = { git = "https://github.com/l-ent-univ/tonAPI", rev = "a28cb46ff73d5dc329967a99aae0530f48c20288" }
 # The time a provider is asked at (tonAPI's Context).
 chrono = { version = "0.4", default-features = false, features = ["clock"] }
 # tonAPI's settings files, read as tonAPI reads them.
 toml = "1"
-# Node's session cookie (src/session_link.rs): HKDF-SHA256 for its key,
+# Where a service of the university is (its address in tonAPI's settings).
+url = "2"
+# Node's session cookie (src/session/cookie.rs): HKDF-SHA256 for its key,
 # AES-256-GCM, base64url.
 aes-gcm = "0.11.1"
 hkdf = "0.12"

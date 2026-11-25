@@ -23,7 +23,7 @@
 use tonapi_core::Profile;
 
 use super::{another_student, json_answer, same_student, Translated, Unanswered};
-use crate::session_link::NodeSession;
+use crate::session::cookie::NodeSession;
 
 pub fn translate(asked: Result<&Profile, Unanswered>, session: &NodeSession) -> Translated {
     let profile = match asked {

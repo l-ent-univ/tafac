@@ -17,7 +17,7 @@
 use std::sync::Arc;
 
 use tafac_gateway::proxy::{serve, Proxy};
-use tafac_gateway::{session_link, Gateway, TONAPI_COMMIT};
+use tafac_gateway::{Gateway, DEVELOPMENT_COOKIE, PRODUCTION_COOKIE, TONAPI_COMMIT};
 
 fn setting(name: &str, default: &str) -> String {
     std::env::var(name).ok().map(|value| value.trim().to_string()).filter(|value| !value.is_empty()).unwrap_or_else(|| default.to_string())
@@ -43,7 +43,7 @@ async fn main() -> std::io::Result<()> {
     // The cookie Node itself reads: with the other name the gateway would
     // answer for a session Node doesn't see.
     let development = !setting("TAFAC_GATEWAY_DEV", "").is_empty();
-    let cookie = if development { session_link::DEVELOPMENT_COOKIE } else { session_link::PRODUCTION_COOKIE };
+    let cookie = if development { DEVELOPMENT_COOKIE } else { PRODUCTION_COOKIE };
 
     let secret = setting("SESSION_SECRET", "");
     let gateway = (!secret.is_empty()).then(|| Gateway::new(&secret, cookie));

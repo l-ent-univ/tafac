@@ -5880,6 +5880,11 @@ app.get('/__ent_auth/moodle/view', (req, res) => {
 })
 
 // 6d. Moodle deadlines endpoint
+// Moved to tonAPI where the gateway runs before this server: it answers
+// while the session lives, and leaves the rest to this route (nobody signed
+// in, the demo account, an expired session, an error). What it does as this
+// route does is in back/crates/tafac-gateway, translate/moodle_deadlines.rs:
+// a change to an item's fields or to selectMoodleDeadlines goes there too.
 app.get('/__ent_auth/moodle/deadlines', async (req, res) => {
   try {
     res.setHeader('Cache-Control', 'no-store')

@@ -52,7 +52,7 @@ impl Bridge {
     // With the gateway, for the app's own server: its secret, and its
     // session cookie's name (the app's server always runs in production).
     pub fn with_gateway(mut self, session_secret: &str) -> Self {
-        self.gateway = Some(Gateway::new(session_secret, tafac_gateway::session_link::PRODUCTION_COOKIE));
+        self.gateway = Some(Gateway::new(session_secret, tafac_gateway::PRODUCTION_COOKIE));
         // Development: TAFAC_NO_TONAPI=1 leaves every route to the server,
         // to compare the two on the same build.
         #[cfg(debug_assertions)]

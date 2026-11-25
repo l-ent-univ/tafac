@@ -27,7 +27,8 @@ use hyper_util::client::legacy::Client;
 use hyper_util::rt::{TokioExecutor, TokioIo};
 use tokio::net::{TcpListener, TcpStream};
 
-use crate::{session_link, Gateway, SESSION_PATH, UNIVERSITY_HEADER};
+use crate::session::cookie;
+use crate::{Gateway, SESSION_PATH, UNIVERSITY_HEADER};
 
 type BoxError = Box<dyn std::error::Error + Send + Sync>;
 type Body = UnsyncBoxBody<Bytes, BoxError>;
@@ -85,7 +86,7 @@ impl Proxy {
         let path = request.uri().path().to_string();
         let cookie = self.gateway.as_ref().and_then(|gateway| {
             let header: Vec<&str> = request.headers().get_all(COOKIE).iter().filter_map(|value| value.to_str().ok()).collect();
-            session_link::cookie_in_header(&header.join("; "), gateway.cookie_name()).map(str::to_string)
+            cookie::cookie_in_header(&header.join("; "), gateway.cookie_name()).map(str::to_string)
         });
 
         if let Some(gateway) = &self.gateway {

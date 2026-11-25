@@ -67,8 +67,11 @@ the page: /__ent_auth/*, /__ent_proxy/*      unchanged, the only contract
    ▼
 the gateway (Rust)                           back/crates/tafac-gateway
    │  routes.rs      the one table: each route, tonAPI's or Node's
+   │  gateway/       who is signed in, the route's question, the answer
+   │  session/       Node's cookie read, what tonAPI is handed, what is
+   │                 remembered of a session between two questions
+   │  tonapi/        the questions to tonAPI, one file per thing asked
    │  translate/     tonAPI's answer as the page gets it from Node
-   │  session_link  tonAPI asks with the cookies of Node's session
    ├─ a moved route, when tonAPI has Node's own answer ──▶ the university
    ▼  everything else, as it came
 Node (server.js)
@@ -81,22 +84,38 @@ Node (server.js)
   moved routes and passes every other request on as it came (headers,
   cookies, bodies as they stream, redirects, WebSocket). Not deployed.
 - **One session**: Node's. The gateway reads Node's session cookie
-  (`session_link.rs`; the cookie's format is checked on both sides by
-  `tests/fixtures/session-cookie-v1.json`) and hands tonAPI the portal's
-  cookies for one request. No second sign-in, nothing kept on tonAPI's side.
+  (`session/cookie.rs`; the cookie's format is checked on both sides by
+  `tests/fixtures/session-cookie-v1.json`) and never writes it. No second
+  sign-in at the university.
+- **What tonAPI is handed** (`session/handed.rs`): for the portal, the
+  portal's cookies and never the CAS ticket (the portal's session is shared
+  with Node, which alone opens a new one). For another service (Moodle), the
+  CAS ticket and nothing of the portal's: tonAPI opens that service's
+  session itself, as Node does on a copy of its jar. The CAS binds its
+  ticket to the User-Agent that signed in, so tonAPI presents itself as
+  Node does (`node.rs`; `tests/gatewayUserAgent.test.js` holds Node to it).
+- **What is remembered** (`session/memory.rs`), in the gateway's own memory
+  and nowhere else: each service's session (an hour unused), the student's
+  component, and each answer for as long as tonAPI says it may be given
+  again (the deadlines: five minutes, as Node caches them). It goes with the
+  session (signed out, expired) and starts over when Node signs in again.
 - **Node still answers** a moved route whenever tonAPI can't give Node's
   own answer (each translator lists the cases): so a refusal, an expired
   session and a sign-out are Node's, as before.
-- **To move a route**: its line in `routes.rs`, a translator in
-  `translate/`, and the answer compared with Node's on a real account.
+- **To move a route**: its line in `routes.rs`, its question in `tonapi/`,
+  a translator in `translate/`, three lines in `gateway/`, and the answer
+  compared with Node's on a real account.
 - `TAFAC_LOG_REQUESTS=1` logs the page's requests in a debug build of the
   app, with `tonapi` after the ones tonAPI answered; `TAFAC_NO_TONAPI=1`
   leaves every route to Node.
 
-Moved so far, for the Université de Rennes: `GET /__ent_auth/session` and
-`GET /__ent_auth/account`. On a real account, a debug build on a Mac: the
-session check 80 ms from Node, answered before the page asks with tonAPI
-(the app asks the portal as it starts); the account 10 ms, then 0.
+Moved so far, for the Université de Rennes: `GET /__ent_auth/session`,
+`GET /__ent_auth/account` and `GET /__ent_auth/moodle/deadlines`. On a
+real account, a debug build on a Mac: the session check 80 ms from Node,
+answered before the page asks with tonAPI (the app asks the portal as it
+starts); the account 10 ms, then 0; the deadlines 4.7 s the first time
+(Moodle's sign-in through the federation: 4.3 s from Node), then 3 ms for
+five minutes, as from Node, and the same six items field for field.
 
 ## Staying signed in
 
