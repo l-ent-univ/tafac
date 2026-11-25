@@ -1,12 +1,14 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import {
+  buildForwardedMail,
   buildMailMessage,
   dropOwnMailCopies,
   getMailPartDisposition,
   isValidDemoMailMessageId,
   isValidMailMessageId,
   isValidMailPartId,
+  mailHtmlToText,
   mailTextToHtml,
   readContentDispositionFilename,
   sanitizeMailHtml,
@@ -307,4 +309,47 @@ test('names received in a mail lose what would turn them around', () => {
   assert.deepEqual(message.attachments.map((attachment) => attachment.name), ['rapportfdp.exe', 'Famille 👨‍👩‍👧.pdf'])
   assert.equal(getMailPartDisposition({ contentType: 'application/pdf', filename: 'a‮fdp.exe\r\nX: y', download: true }).disposition.includes('‮'), false)
   assert.match(getMailPartDisposition({ contentType: 'application/pdf', filename: 'a\r\nX: y', download: true }).disposition, /^attachment; filename="a__X: y"/)
+})
+
+test('a forwarded mail keeps its HTML and CSS, its images by cid, scripts still go', () => {
+  const forwarded = buildForwardedMail({
+    id: '257',
+    mp: [{
+      part: 'TEXT',
+      ct: 'multipart/related',
+      mp: [
+        {
+          part: '1',
+          ct: 'text/html',
+          body: true,
+          content: '<html><head><style>.card{background:url(https://cdn.example/bg.png);color:#123}</style></head>'
+            + '<body bgcolor="#eeeeee"><table class="card" background="https://cdn.example/t.png"><tr><td style="padding:12px;background:url(cid:logo@x)">'
+            + '<img src="cid:Logo@X"><img src="https://cdn.example/a.png" alt="A"><script>alert(1)</script>'
+            + '<p onclick="x()">Bonjour<br>à tous</p></td><td>Deux</td></tr></table></body></html>',
+        },
+        { part: '2', ct: 'image/png', ci: '<logo@x>', s: 1200 },
+        { part: '3', ct: 'image/png', ci: '<unused@x>', s: 900 },
+      ],
+    }],
+  })
+  assert.match(forwarded.html, /<style>\.card\{background:url\("https:\/\/cdn\.example\/bg\.png"\);color:#123\}<\/style>/)
+  assert.match(forwarded.html, /background="https:\/\/cdn\.example\/t\.png"/)
+  assert.match(forwarded.html, /style="padding:12px;background:url\(&quot;cid:logo@x&quot;\)"/)
+  assert.match(forwarded.html, /<img src="cid:logo@x" \/>/)
+  assert.match(forwarded.html, /<img alt="A" src="https:\/\/cdn\.example\/a\.png" \/>/)
+  assert.match(forwarded.html, /<div style="background-color:#eeeeee" class="tafac-mail-body">/)
+  assert.doesNotMatch(forwarded.html, /script|alert|onclick|data-remote/)
+  assert.deepEqual(forwarded.inlineImages, [{ cid: 'logo@x', part: '2' }])
+  assert.equal(forwarded.text, 'Bonjour\nà tous\nDeux')
+})
+
+test('a forwarded plain text mail keeps its lines', () => {
+  const forwarded = buildForwardedMail({ mp: [{ part: '1', ct: 'text/plain', body: true, content: 'Ligne 1\r\n  Ligne <2>\r\n' }] })
+  assert.equal(forwarded.html, '<div style="white-space:pre-wrap">Ligne 1\r\n  Ligne &lt;2&gt;\r\n</div>')
+  assert.equal(forwarded.text, 'Ligne 1\n  Ligne <2>')
+  assert.deepEqual(forwarded.inlineImages, [])
+})
+
+test('a mail\'s HTML as text: blocks and rows a line, items marked, entities read', () => {
+  assert.equal(mailHtmlToText('<style>p{}</style><h1>Titre</h1><div>Un &amp; deux</div><ul><li>a</li><li>b</li></ul><p></p><p></p><p></p><p>fin</p>'), 'Titre\nUn & deux\n\n• a\n• b\n\nfin')
 })

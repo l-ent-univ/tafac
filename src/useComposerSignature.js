@@ -55,7 +55,7 @@ export function syncSignatureNode(editor, on) {
   let offset = 0
   doc.forEach((node, nodeOffset, index) => {
     if (node.type.name === 'mailSignature') signatures.push({ from: nodeOffset, to: nodeOffset + node.nodeSize })
-    if (node.type.name === 'blockquote') quoteIndex = index
+    if (node.type.name === 'blockquote' || node.type.name === 'mailForwarded') quoteIndex = index
     offset = nodeOffset + node.nodeSize
   })
   if (!on) {

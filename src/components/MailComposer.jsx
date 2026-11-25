@@ -1,4 +1,4 @@
-import { Fragment, useCallback, useEffect, useId, useImperativeHandle, useRef, useState, useSyncExternalStore } from 'react'
+import { Fragment, useCallback, useEffect, useId, useImperativeHandle, useMemo, useRef, useState, useSyncExternalStore } from 'react'
 import { createPortal } from 'react-dom'
 import { Icon } from '@iconify/react'
 import { EditorContent, useEditor, useEditorState } from '@tiptap/react'
@@ -10,6 +10,8 @@ import { Indent } from '../tiptapIndent'
 import { withViewTransition } from '../viewTransition'
 import { MailSignature } from '../mailSignatureNode'
 import { MailSignatureContext } from '../mailSignatureContext'
+import { MailForwarded } from '../mailForwardedNode'
+import { MailForwardedContext } from '../mailForwardedContext'
 import { useComposerSignature, useSignatureNodeSync } from '../useComposerSignature'
 import { MailSummary } from '../mailSummaryNode'
 import { MailInlineImage } from '../mailInlineImageNode'
@@ -171,6 +173,7 @@ const EDITOR_EXTENSIONS = [
   MailSignature,
   MailSummary,
   MailInlineImage,
+  MailForwarded,
 ]
 
 // The switch's label, by the signature's kind (Réglages › Messagerie).
@@ -248,15 +251,23 @@ function withSignaturePlaceholder(html, include) {
   return body.innerHTML
 }
 
+// What follows the header line: a reply's quote, the mail's text; a
+// forward's, the mail itself (the mailForwarded node: its HTML, styles and
+// all, put in by the server), never flattened to its text.
+function buildQuoteBlock(message, kind) {
+  if (kind === 'forward') return { type: 'mailForwarded' }
+  const quoted = textToParagraphs(htmlToQuotedText(message.html))
+  return { type: 'blockquote', content: quoted.length ? quoted : [{ type: 'paragraph' }] }
+}
+
 // The text a draft opens with: an empty line to write on, the signature
 // (`withSignature`), then for a reply or a forward the line naming the mail
-// and its text, quoted.
+// and the mail, quoted or forwarded (buildQuoteBlock).
 function buildInitialContent(message, kind, withSignature = false) {
   const content = [{ type: 'paragraph' }]
   if (withSignature) content.push({ type: 'mailSignature' })
   if (message && kind !== 'new') {
-    const quoted = textToParagraphs(htmlToQuotedText(message.html))
-    content.push({ type: 'paragraph' }, linesToParagraph(quoteHeader(message, kind)), { type: 'blockquote', content: quoted.length ? quoted : [{ type: 'paragraph' }] })
+    content.push({ type: 'paragraph' }, linesToParagraph(quoteHeader(message, kind)), buildQuoteBlock(message, kind))
   }
   return { type: 'doc', content }
 }
@@ -1261,6 +1272,10 @@ function MailComposer({ initialKind = 'new', message = null, sender = null, iden
   // « De : »: an identity's id (null: the account's default, the server's).
   const [identityId, setIdentityId] = useState(() => restore?.identityId ?? pickDefaultIdentity(identities, message))
   const origin = composeOrigin(kind, message, restore?.origin)
+  // The mail a forward sends on, for its block in the text to show it
+  // (MailForwardedView): the one opened, or a resumed draft's.
+  const forwardedMessageId = message?.id ?? (restore?.origin?.kind === 'forward' ? restore.origin.messageId : null)
+  const forwardedValue = useMemo(() => (forwardedMessageId ? { messageId: forwardedMessageId, message } : null), [forwardedMessageId, message])
   // The draft's saves: « Brouillon non enregistré » when one fails.
   const [draftStatus, setDraftStatus] = useState(() => saver?.status ?? 'idle')
   const [toInput, setToInput] = useState('')
@@ -1755,20 +1770,26 @@ function MailComposer({ initialKind = 'new', message = null, sender = null, iden
     // A forward takes the mail's attachments along, a reply leaves them;
     // the files added are kept either way.
     setMessageItems(fields.attachments)
-    // The header is the paragraph right before the text's last quote.
+    // The header is the paragraph right before the text's last quote (or
+    // the mail forwarded). Between a reply and a forward, the quote follows
+    // too: the mail's text, or the mail itself.
     const current = editorRef.current
     if (!current) return
     const { doc } = current.state
     let quoteIndex = -1
     doc.forEach((node, offset, index) => {
-      if (node.type.name === 'blockquote') quoteIndex = index
+      if (node.type.name === 'blockquote' || node.type.name === 'mailForwarded') quoteIndex = index
     })
     if (quoteIndex < 1) return
     const header = doc.child(quoteIndex - 1)
     if (header.type.name !== 'paragraph') return
     let from = 0
     for (let index = 0; index < quoteIndex - 1; index += 1) from += doc.child(index).nodeSize
-    current.chain().insertContentAt({ from, to: from + header.nodeSize }, linesToParagraph(quoteHeader(message, next))).run()
+    const quote = doc.child(quoteIndex)
+    const swapQuote = (quote.type.name === 'mailForwarded') !== (next === 'forward')
+    const to = from + header.nodeSize + (swapQuote ? quote.nodeSize : 0)
+    const replacement = swapQuote ? [linesToParagraph(quoteHeader(message, next)), buildQuoteBlock(message, next)] : linesToParagraph(quoteHeader(message, next))
+    current.chain().insertContentAt({ from, to }, replacement).run()
   }
 
   // `opener`: the button it came from, given the focus back on close (the
@@ -2335,7 +2356,9 @@ function MailComposer({ initialKind = 'new', message = null, sender = null, iden
 
         <MailSignatureContext.Provider value={signature.value}>
           <MailInlineImageContext.Provider value={inlineImages.context}>
-            <EditorContent editor={editor} className="flex min-h-0 flex-1 flex-col [&>.mail-composer-body]:flex-1" />
+            <MailForwardedContext.Provider value={forwardedValue}>
+              <EditorContent editor={editor} className="flex min-h-0 flex-1 flex-col [&>.mail-composer-body]:flex-1" />
+            </MailForwardedContext.Provider>
           </MailInlineImageContext.Provider>
         </MailSignatureContext.Provider>
       </div>

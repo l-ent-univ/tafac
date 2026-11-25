@@ -9,6 +9,8 @@ import {
   buildZimbraMessage,
   composerHtmlToText,
   createSendLimiter,
+  forwardedDraftHtml,
+  hasForwardedPlaceholder,
   createSendOnce,
   mapDraftAttachments,
   mapZimbraSendFault,
@@ -22,6 +24,7 @@ import {
   sanitizeComposerHtml,
   sanitizeSubject,
   settleDraftAttachments,
+  settleForwardedQuote,
   settleDraftInlineImages,
   submitZimbraSend,
 } from '../server/mailSend.js'
@@ -833,4 +836,59 @@ test('the demo\'s images of the text: its own uploads only, an image, inline in 
   // Sent from the draft's part.
   const fromDraft = await post(base, 'send', cookie, { to: [{ email: 'leo@univ.fr' }], subject: 'Brouillon', html, draftId: id, inlineImages: [{ cid: IMAGE_CID, source: 'message', messageId: id, part: '2', width: 520, height: 300 }], sendUid: 'uid-image-draft' })
   assert.deepEqual([fromDraft.status, fromDraft.body], [200, { ok: true }])
+}))
+
+test('a forward\'s placeholder: kept by the composer\'s cleaning, the mail put in its place', () => {
+  const clean = sanitizeComposerHtml('<p>Voir ci-dessous</p><p></p><p>Début du message réexpédié :<br>Objet : A</p><blockquote data-forwarded-mail="" style="x" class="y"></blockquote>')
+  assert.equal(clean, '<p>Voir ci-dessous</p><p></p><p>Début du message réexpédié :<br />Objet : A</p><blockquote data-forwarded-mail></blockquote>')
+  assert.equal(hasForwardedPlaceholder(clean), true)
+  assert.equal(hasForwardedPlaceholder('<blockquote><p>cité</p></blockquote>'), false)
+  const html = buildMailHtml(clean, { forwardedHtml: '<div><style>.a{color:red}</style><table class="a"><tr><td>Original</td></tr></table></div>' })
+  assert.match(html, /<br \/>Objet : A<\/p><div><style>\.a\{color:red\}<\/style><table class="a"><tr><td>Original<\/td><\/tr><\/table><\/div><\/div><\/body>/)
+  assert.doesNotMatch(html, /data-forwarded-mail/)
+  // Without the mail (deleted meanwhile), nothing in its place; a second
+  // placeholder never takes it twice.
+  assert.doesNotMatch(buildMailHtml(clean), /data-forwarded-mail|<blockquote/)
+  const twice = buildMailHtml(`${clean}<blockquote data-forwarded-mail=""></blockquote>`, { forwardedHtml: '<i>X</i>' })
+  assert.equal(twice.match(/<i>X<\/i>/g).length, 1)
+  assert.doesNotMatch(twice, /data-forwarded-mail/)
+  // The text alternative: the mail's text where it goes, unquoted.
+  assert.equal(composerHtmlToText(`<blockquote><p>cité</p></blockquote>${clean}<p>après</p>`, { forwardedText: 'Original\n\nSuite' }), '> cité\nVoir ci-dessous\n\nDébut du message réexpédié :\nObjet : A\nOriginal\n\nSuite\nafter'.replace('after', 'après'))
+})
+
+test('a forward\'s draft: the mail\'s text in the placeholder, the placeholder again once resumed', () => {
+  const saved = forwardedDraftHtml('Bonjour <tous>\n\nFin')
+  assert.match(saved, /^<blockquote data-forwarded-mail="" style="[^"]+"><p style="margin:0">Bonjour &lt;tous&gt;<\/p><p style="margin:0"><br \/><\/p><p style="margin:0">Fin<\/p><\/blockquote>$/)
+  assert.equal(settleForwardedQuote(sanitizeComposerHtml(`<p>Mot</p><p>Début du message réexpédié :</p>${saved}`)), '<p>Mot</p><p>Début du message réexpédié :</p><blockquote data-forwarded-mail></blockquote>')
+  // Its mark lost by Partage, a composer from before's text quote, quotes
+  // nested inside: the last block still.
+  assert.equal(settleForwardedQuote('<p>a</p><blockquote><p>x</p><blockquote><p>y</p></blockquote></blockquote><p></p>'), '<p>a</p><blockquote data-forwarded-mail></blockquote>')
+  // A quote with text written after it isn't the mail forwarded.
+  assert.equal(settleForwardedQuote('<blockquote><p>x</p></blockquote><p>suite</p>'), '<blockquote><p>x</p></blockquote><p>suite</p>')
+  assert.equal(settleForwardedQuote('<p>rien</p>'), '<p>rien</p>')
+  const resumed = readDraftForComposer({
+    id: '300',
+    rt: 'w',
+    origid: '257',
+    mp: [{ part: '1', ct: 'text/html', body: true, content: `<html><body><div style="font-family:x"><p>Mot</p>${saved}</div></body></html>` }],
+  })
+  assert.deepEqual(resumed.origin, { kind: 'forward', messageId: '257' })
+  assert.equal(resumed.html, '<p>Mot</p><blockquote data-forwarded-mail></blockquote>')
+  // A reply's draft keeps its quote.
+  const reply = readDraftForComposer({ id: '301', rt: 'r', origid: '257', mp: [{ part: '1', ct: 'text/html', body: true, content: '<p>Mot</p><blockquote><p>cité</p></blockquote>' }] })
+  assert.equal(reply.html, '<p>Mot</p><blockquote><p>cité</p></blockquote>')
+})
+
+test('the demo\'s forward: the mail sent holds the original as it was', () => withApp(async ({ base, signIn }) => {
+  const cookie = await signIn()
+  const html = '<p>Pour info</p><p></p><p>Début du message réexpédié :</p><blockquote data-forwarded-mail=""></blockquote>'
+  const sent = await post(base, 'send', cookie, { to: [{ email: 'leo@univ.fr' }], subject: 'Fwd: A', html, signature: { include: false }, sendUid: 'uid-forward-1', origin: { kind: 'forward', messageId: 'demo-mail-1' } })
+  assert.deepEqual([sent.status, sent.body], [200, { ok: true }])
+  const original = await fetch(`${base}/__ent_auth/mail/message?id=demo-mail-1`, { headers: { cookie } }).then((response) => response.json())
+  const sentFolder = await fetch(`${base}/__ent_auth/mail/recent?folder=5`, { headers: { cookie } }).then((response) => response.json())
+  const copy = await fetch(`${base}/__ent_auth/mail/message?id=${sentFolder.mail.messages[0].id}`, { headers: { cookie } }).then((response) => response.json())
+  const firstWords = original.message.html.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim().split(' ').slice(0, 4).join(' ')
+  assert.ok(firstWords.length > 5)
+  assert.ok(copy.message.html.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').includes(firstWords))
+  assert.doesNotMatch(copy.message.html, /data-forwarded-mail/)
 }))

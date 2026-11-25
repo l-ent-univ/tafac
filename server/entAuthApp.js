@@ -60,6 +60,8 @@ import {
   isValidDemoMailMessageId,
   isValidMailMessageId,
   isValidMailPartId,
+  buildForwardedMail,
+  mailHtmlToText,
   mailTextToHtml,
   readContentDispositionFilename,
   sanitizeMailHtml,
@@ -83,6 +85,8 @@ import {
   buildZimbraMessage,
   composerHtmlToText,
   createSendLimiter,
+  forwardedDraftHtml,
+  hasForwardedPlaceholder,
   createSendOnce,
   INLINE_IMAGE_TYPES,
   mapDraftAttachments,
@@ -4780,17 +4784,36 @@ async function uploadSignatureLogos(context, logos) {
 }
 
 // The mail answered or forwarded: whether it's still there, and its
-// Message-ID (for In-Reply-To), read here, never taken from the page.
-async function readOriginalMessage(context, id) {
+// Message-ID (for In-Reply-To), read here, never taken from the page. With
+// `forwarded`, its body too (buildForwardedMail: what a forward's
+// placeholder becomes), whole, as sent (neuter: 0).
+async function readOriginalMessage(context, id, { forwarded = false } = {}) {
   try {
-    const result = await zimbraSoapRequest(context, 'GetMsgRequest', { m: { id, max: 1 } })
+    const request = forwarded ? { id, html: 1, neuter: 0, max: MAIL_MESSAGE_MAX_BYTES } : { id, max: 1 }
+    const result = await zimbraSoapRequest(context, 'GetMsgRequest', { m: request })
     const message = Array.isArray(result.m) ? result.m[0] : result.m
     const header = typeof message?.mid === 'string' ? message.mid.trim() : ''
-    return { exists: Boolean(message), messageIdHeader: /^<[^<>\s]{1,500}>$/.test(header) ? header : null }
+    return {
+      exists: Boolean(message),
+      messageIdHeader: /^<[^<>\s]{1,500}>$/.test(header) ? header : null,
+      forwarded: forwarded && message ? buildForwardedMail(message) : null,
+    }
   } catch (error) {
-    if (!(error instanceof MailAuthError) && /NO_SUCH_(MSG|ITEM)/.test(error.message)) return { exists: false, messageIdHeader: null }
+    if (!(error instanceof MailAuthError) && /NO_SUCH_(MSG|ITEM)/.test(error.message)) return { exists: false, messageIdHeader: null, forwarded: null }
     throw error
   }
+}
+
+// Whether a payload forwards a mail whose body the server puts in (the
+// text holds the placeholder).
+function forwardsOriginal(payload) {
+  return payload.origin?.kind === 'forward' && hasForwardedPlaceholder(payload.html)
+}
+
+// The original's inline images, as parts of the mail sent (by reference:
+// nothing is uploaded again).
+function forwardedInlineParts(forwarded, messageId) {
+  return (forwarded?.inlineImages ?? []).map((image) => ({ cid: image.cid, messageId, part: image.part }))
 }
 
 // The uploads named, each one this session made, and all of a mail's
@@ -4835,12 +4858,13 @@ async function sendZimbraMail(context, session, payload) {
   const ownSignature = payload.signature.include && payload.signature.mode !== 'auto'
   const signature = ownSignature ? null : resolveMailSignature(payload.signature, identity, session)
   const [original, logoParts, signatures] = await Promise.all([
-    payload.origin ? readOriginalMessage(context, payload.origin.messageId) : null,
+    payload.origin ? readOriginalMessage(context, payload.origin.messageId, { forwarded: forwardsOriginal(payload) }) : null,
     signature?.logos.length ? uploadSignatureLogos(context, signature.logos) : [],
     ownSignature ? readZimbraSignatureList(context) : null,
   ])
   // An original deleted meanwhile: the mail still goes, as a new one.
   const origin = payload.origin && original?.exists ? { ...payload.origin, messageIdHeader: original.messageIdHeader } : null
+  const forwarded = origin ? original.forwarded : null
   const built = ownSignature
     ? resolveOwnSignature(payload.signature, identity, signatures, context.mailIdentitySignatureIds, { reply: Boolean(payload.origin) })
     : signature ? buildMailSignature({ ...signature, logos: logoParts }) : { html: '', text: '' }
@@ -4850,9 +4874,9 @@ async function sendZimbraMail(context, session, payload) {
     cc: payload.cc,
     bcc: payload.bcc,
     subject: payload.subject,
-    html: buildMailHtml(payload.html, { signatureHtml: built.html, images: inlineImageSources(payload.inlineImages) }),
-    text: composerHtmlToText(payload.html, { signatureText: built.text }),
-    inlineParts: [...logoParts, ...inlineImageParts(payload.inlineImages)],
+    html: buildMailHtml(payload.html, { signatureHtml: built.html, images: inlineImageSources(payload.inlineImages), forwardedHtml: forwarded ? `<div>${forwarded.html}</div>` : '' }),
+    text: composerHtmlToText(payload.html, { signatureText: built.text, forwardedText: forwarded?.text ?? '' }),
+    inlineParts: [...logoParts, ...inlineImageParts(payload.inlineImages), ...forwardedInlineParts(forwarded, origin?.messageId)],
     attachments: payload.attachments,
     origin,
     draftId: payload.draftId,
@@ -4878,14 +4902,17 @@ async function saveZimbraDraft(context, session, payload) {
   // draft's count of them isn't what was sent (mapDraftAttachments).
   const uploads = runtimeMailUploads.get(session.id)
   const names = payload.attachments.map((entry) => (entry.source === 'upload' ? uploads?.get(entry.aid)?.name ?? null : null))
+  // A forward's draft holds the mail's text where the mail goes (the webmail
+  // shows it); deleted meanwhile, an empty placeholder.
+  const forwarded = forwardsOriginal(payload) ? (await readOriginalMessage(context, payload.origin.messageId, { forwarded: true })).forwarded : null
   const message = buildZimbraMessage({
     identity,
     to: payload.to,
     cc: payload.cc,
     bcc: payload.bcc,
     subject: payload.subject,
-    html: buildMailHtml(payload.html, { keepPlaceholder: true, images: inlineImageSources(payload.inlineImages) }),
-    text: composerHtmlToText(payload.html),
+    html: buildMailHtml(payload.html, { keepPlaceholder: true, images: inlineImageSources(payload.inlineImages), forwardedHtml: forwardsOriginal(payload) ? forwardedDraftHtml(forwarded?.text ?? '') : '' }),
+    text: composerHtmlToText(payload.html, { forwardedText: forwarded?.text ?? '' }),
     inlineParts: inlineImageParts(payload.inlineImages),
     attachments: payload.attachments,
     origin: payload.origin,
@@ -5040,7 +5067,10 @@ function sendDemoMail(session, payload) {
     : signature
       ? buildMailSignature({ ...signature, logos: signature.logos.map((logo) => ({ ...logo, cid: 'demo', src: `data:image/png;base64,${logo.bytes.toString('base64')}` })) })
       : { html: '', text: '' }
-  const text = composerHtmlToText(payload.html, { signatureText: built.text })
+  // A forward: the demo's mail as the reader has it.
+  const forwardedMessage = forwardsOriginal(payload) ? buildDemoMailMessage(payload.origin.messageId) : null
+  const forwardedHtml = forwardedMessage ? `<div>${forwardedMessage.html}</div>` : ''
+  const text = composerHtmlToText(payload.html, { signatureText: built.text, forwardedText: forwardedMessage ? mailHtmlToText(forwardedMessage.html) : '' })
   const id = `demo-sent-${state.next}`
   state.next += 1
   const now = Date.now()
@@ -5056,7 +5086,7 @@ function sendDemoMail(session, payload) {
       receivedAt: new Date(now).toISOString(),
       unread: false,
       format: 'html',
-      html: sanitizeMailHtml(buildMailHtml(payload.html, { signatureHtml: built.html, images: inlineImageSources(images, (image) => `data:${image.contentType};base64,${image.bytes.toString('base64')}`) })).html,
+      html: sanitizeMailHtml(buildMailHtml(payload.html, { signatureHtml: built.html, images: inlineImageSources(images, (image) => `data:${image.contentType};base64,${image.bytes.toString('base64')}`), forwardedHtml })).html,
       remoteImages: 0,
       truncated: false,
       attachments: files.map((file, index) => ({ part: String(index + 2), name: file.name, type: file.contentType, size: file.size, href: null })),

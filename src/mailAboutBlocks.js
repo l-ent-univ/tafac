@@ -59,7 +59,7 @@ export function makeInlineImageItem({ blob, width, height, name, alt }) {
 export function pickAboutInsertIndex(blocks, caretIndex = null) {
   const list = Array.isArray(blocks) ? blocks : []
   const signature = list.findIndex((block) => block.type === 'mailSignature')
-  const quote = list.findIndex((block) => block.type === 'blockquote')
+  const quote = list.findIndex((block) => block.type === 'blockquote' || block.type === 'mailForwarded')
   let end = list.length
   if (signature >= 0) end = signature
   else if (quote >= 1) {

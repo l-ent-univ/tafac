@@ -504,7 +504,7 @@ function markQuotedPart(doc) {
 // widths give way to the frame (buildFrameStyle), so most mails wrap to it.
 // `onResumeDraft`: a draft's body, with « Reprendre le brouillon » under
 // it, before the quote's button.
-function MailBodyFrame({ message, showRemoteImages, title, onResumeDraft = null }) {
+export function MailBodyFrame({ message, showRemoteImages, title, onResumeDraft = null }) {
   const colors = useThemeColors()
   const frameRef = useRef(null)
   const observerRef = useRef(null)

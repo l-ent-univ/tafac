@@ -74,7 +74,9 @@ const BLOCK_STYLES = { 'margin-left': [INDENT] }
 // code, rules and other headings), its text style marks, the highlight,
 // the indent, links to http(s) and mailto only, and the signature's
 // placeholder (src/mailSignatureNode.js: an empty div[data-mail-signature],
-// one at most). Any other div (a resumed draft's wrapper) gives way to its
+// one at most) and a forward's (src/mailForwardedNode.js: a
+// blockquote[data-forwarded-mail], the mail forwarded as it was, put in by
+// the server: buildMailHtml). Any other div (a resumed draft's wrapper) gives way to its
 // content (sanitizeComposerHtml); anything else goes, its text kept.
 // A summary box (src/mailSummaryNode.js): a table of text, label and value
 // a row, no attribute but its mark (a draft read back may have lost it).
@@ -108,6 +110,7 @@ const COMPOSER_SANITIZE_OPTIONS = {
     h3: ['style'],
     ol: ['start'],
     div: ['data-mail-signature'],
+    blockquote: ['data-forwarded-mail'],
     table: ['data-mail-summary'],
     img: ['data-inline-cid', 'alt', 'width', 'height'],
   },
@@ -128,6 +131,7 @@ const COMPOSER_SANITIZE_OPTIONS = {
   transformTags: {
     div: (tagName, attribs) => ({ tagName, attribs: Object.hasOwn(attribs, 'data-mail-signature') ? { 'data-mail-signature': '' } : {} }),
     table: (tagName, attribs) => ({ tagName, attribs: Object.hasOwn(attribs, 'data-mail-summary') ? { 'data-mail-summary': '' } : {} }),
+    blockquote: (tagName, attribs) => ({ tagName, attribs: Object.hasOwn(attribs, 'data-forwarded-mail') ? { 'data-forwarded-mail': '' } : {} }),
     img: (tagName, attribs) => ({ tagName, attribs: cleanImageAttributes(attribs) }),
     ol: (tagName, attribs) => ({ tagName, attribs: /^\d{1,4}$/.test(attribs.start ?? '') && attribs.start !== '1' ? { start: attribs.start } : {} }),
     a: (tagName, attribs) => {
@@ -155,6 +159,19 @@ export function sanitizeComposerHtml(html) {
 }
 
 export const SIGNATURE_PLACEHOLDER = '<div data-mail-signature></div>'
+
+// A forward's placeholder, as sanitizeComposerHtml leaves it.
+export const FORWARDED_PLACEHOLDER = '<blockquote data-forwarded-mail></blockquote>'
+const FORWARDED_BLOCKQUOTE = /<blockquote data-forwarded-mail(?:="")?>/
+// As inlineComposerStyles turns an empty one: its own tag, for
+// buildMailHtml to find.
+const FORWARDED_DIV = /<div data-forwarded-mail(?:="")?><\/div>/
+
+// Whether the text holds a forward's placeholder: the mail it forwards is
+// then read, for the server to put it in.
+export function hasForwardedPlaceholder(cleanHtml) {
+  return FORWARDED_BLOCKQUOTE.test(String(cleanHtml ?? ''))
+}
 
 // The images the mail takes, from sanitizeComposerHtml's HTML and the
 // payload's references (normalizeComposePayload's `inlineImages`, by cid):
@@ -241,6 +258,7 @@ export function inlineComposerStyles(cleanHtml, { images = new Map() } = {}) {
           return { tagName, attribs: image ? inlineImageTag(image) : {} }
         }
         if (tagName === 'table') return { tagName, attribs: { cellpadding: '0', cellspacing: '0', style: ELEMENT_STYLES.table } }
+        if (tagName === 'blockquote' && Object.hasOwn(attribs, 'data-forwarded-mail')) return { tagName: 'div', attribs: { 'data-forwarded-mail': '' } }
         const base = ELEMENT_STYLES[tagName]
         if (tagName === 'span' && attribs.style) {
           return { tagName, attribs: { style: attribs.style.replace(/font-family:\s*"?(?:Collab Sans|Inter Variable)"?, system-ui, sans-serif/, `font-family:${DEFAULT_FONT}`) } }
@@ -263,10 +281,23 @@ export function inlineComposerStyles(cleanHtml, { images = new Map() } = {}) {
 // where the editor had its placeholder. A draft keeps the placeholder
 // (`keepPlaceholder`): empty, it shows nothing in the webmail, and the
 // composer puts the signature back there when the draft is resumed.
-export function buildMailHtml(cleanHtml, { signatureHtml = '', keepPlaceholder = false, images = new Map() } = {}) {
+// `forwardedHtml`: what takes a forward's placeholder (the first; any
+// other goes): the mail forwarded (buildForwardedMail's), or for a draft
+// its placeholder holding the mail's text (forwardedDraftHtml).
+export function buildMailHtml(cleanHtml, { signatureHtml = '', keepPlaceholder = false, images = new Map(), forwardedHtml = '' } = {}) {
   const styled = inlineComposerStyles(cleanHtml, { images })
-  const body = keepPlaceholder ? styled : styled.replace(SIGNATURE_DIV, () => signatureHtml)
+  const signed = keepPlaceholder ? styled : styled.replace(SIGNATURE_DIV, () => signatureHtml)
+  const body = signed.replace(FORWARDED_DIV, () => forwardedHtml).replace(new RegExp(FORWARDED_DIV.source, 'g'), '')
   return `<html><head><meta charset="utf-8"></head><body><div style="${WRAPPER_STYLE}">${body}</div></body></html>`
+}
+
+// A forward's placeholder in a saved draft: the mail's text inside, for the
+// webmail to show it (and send it, if the draft is sent from there). The
+// composer, resuming the draft, shows the mail itself in its place
+// (readDraftForComposer).
+export function forwardedDraftHtml(text) {
+  const lines = String(text ?? '').split('\n').map((line) => `<p style="${ELEMENT_STYLES.p}">${line ? escapeHtml(line) : '<br />'}</p>`)
+  return `<blockquote data-forwarded-mail="" style="${ELEMENT_STYLES.blockquote}">${lines.join('')}</blockquote>`
 }
 
 // ── The text/plain alternative ─────────────────────────────────────────────
@@ -279,10 +310,13 @@ export function buildMailHtml(cleanHtml, { signatureHtml = '', keepPlaceholder =
 // The HTML is
 // sanitize-html's output (tags of the allowlist, quoted attributes), which
 // a plain tokenizer reads safely.
-export function composerHtmlToText(cleanHtml, { signatureText = '' } = {}) {
+export function composerHtmlToText(cleanHtml, { signatureText = '', forwardedText = '' } = {}) {
   const lines = []
   let line = null
   let quoteDepth = 0
+  // Each blockquote open: a quote (true) or a forward's placeholder, whose
+  // text (`forwardedText`) isn't quoted.
+  const quotes = []
   const lists = []
   let marker = null
   let link = null
@@ -392,7 +426,13 @@ export function composerHtmlToText(cleanHtml, { signatureText = '' } = {}) {
     }
     if (tag === 'blockquote') {
       close()
-      quoteDepth = Math.max(0, quoteDepth + (closing ? -1 : 1))
+      if (!closing && /data-forwarded-mail/.test(attributes)) {
+        quotes.push(false)
+        if (forwardedText) for (const forwardedLine of forwardedText.split('\n')) lines.push((prefix() + forwardedLine).trimEnd())
+        continue
+      }
+      const quote = closing ? quotes.pop() ?? true : (quotes.push(true), true)
+      if (quote) quoteDepth = Math.max(0, quoteDepth + (closing ? -1 : 1))
     }
   }
   close()
@@ -1058,6 +1098,28 @@ function readDraftImages(html, cids) {
   return { html: out, used, dropped }
 }
 
+// A forward's draft, resumed: its quote, the text's last block (the mail
+// forwarded, as forwardedDraftHtml saved it, or its text quoted by a
+// composer from before, a placeholder whose mark Partage may have lost),
+// becomes the placeholder again, for the composer to show the mail itself
+// there and the send to put it in. Anything else is left as it is.
+export function settleForwardedQuote(cleanHtml) {
+  const html = String(cleanHtml ?? '')
+  let depth = 0
+  let last = null
+  for (const match of html.matchAll(/<(\/?)blockquote\b[^>]*>/g)) {
+    if (!match[1]) {
+      if (depth === 0) last = { start: match.index, end: null }
+      depth += 1
+    } else if (depth > 0) {
+      depth -= 1
+      if (depth === 0 && last) last.end = match.index + match[0].length
+    }
+  }
+  if (!last?.end || !/^(?:\s|<p><\/p>|<p><br \/><\/p>)*$/.test(html.slice(last.end))) return html
+  return html.slice(0, last.start) + FORWARDED_PLACEHOLDER
+}
+
 // A draft as GetMsgRequest gives it (html: 1, neuter: 0: its HTML as
 // saved) → what the composer opens with: { id, to, cc, bcc, subject, html
 // (sanitizeComposerHtml's: what the editor itself may hold), attachments:
@@ -1097,7 +1159,7 @@ export function readDraftForComposer(message, identities = []) {
     cc: pick('c'),
     bcc: pick('b'),
     subject: sanitizeSubject(message?.su ?? ''),
-    html,
+    html: origin?.kind === 'forward' ? settleForwardedQuote(html) : html,
     attachments: readDraftAttachmentParts(message),
     inlineImages: images.used.map((cid) => ({ ...inlineParts.find((part) => part.cid === cid), ...sizes.get(cid) })),
     droppedImages: images.dropped,

@@ -13,7 +13,7 @@
 //   any other URL in them goes (rewriteCssUrls);
 // - a plain text body becomes escaped HTML with its links clickable.
 import sanitizeHtml from 'sanitize-html'
-import { cleanReceivedName, escapeHtml } from '../src/mailText.js'
+import { cleanReceivedName, decodeEntities, escapeHtml } from '../src/mailText.js'
 
 const MAIL_PART_PATH = '/__ent_auth/mail/part'
 const PART_ID_PATTERN = /^\d+(?:\.\d+)*$/
@@ -190,7 +190,10 @@ function rewriteCssUrls(css, resolveCid) {
 
 // `resolveCid(cid)`: the URL of the inline image with that Content-ID, or null.
 // Returns { html, remoteImages } where remoteImages counts what was held back.
-export function sanitizeMailHtml(html, { resolveCid = () => null } = {}) {
+// `forward`: the HTML for a mail sent on (buildForwardedMail), not for the
+// reader: remote images keep their URLs (the recipient's client decides
+// whether to load them) and resolveCid may give cid: URLs.
+export function sanitizeMailHtml(html, { resolveCid = () => null, forward = false } = {}) {
   let remoteImages = 0
 
   // `background` (tables, cells): held back like a remote <img>, cid:
@@ -198,6 +201,7 @@ export function sanitizeMailHtml(html, { resolveCid = () => null } = {}) {
   const holdRemoteBackground = (attribs) => {
     const { background: rawBackground, 'data-remote-background': _ignored, ...rest } = attribs
     const background = String(rawBackground ?? '').trim()
+    if (isRemoteUrl(background) && forward) return { ...rest, background }
     if (isRemoteUrl(background)) {
       remoteImages += 1
       return { ...rest, 'data-remote-background': background }
@@ -212,6 +216,10 @@ export function sanitizeMailHtml(html, { resolveCid = () => null } = {}) {
     const { 'data-remote-style': _ignored, ...rest } = attribs
     if (rest.style === undefined) return rest
     const { held, revealed, remote } = rewriteCssUrls(rest.style, resolveCid)
+    if (forward) {
+      rest.style = revealed ?? held
+      return rest
+    }
     remoteImages += remote
     rest.style = held
     if (revealed) rest['data-remote-style'] = revealed
@@ -226,8 +234,8 @@ export function sanitizeMailHtml(html, { resolveCid = () => null } = {}) {
       a: ['href', 'name', 'target', 'rel'],
       img: ['src', 'alt', 'data-remote-src'],
     },
-    allowedSchemes: ['http', 'https', 'mailto', 'tel'],
-    allowedSchemesByTag: { img: ['data'] },
+    allowedSchemes: forward ? ['http', 'https', 'mailto', 'tel', 'cid'] : ['http', 'https', 'mailto', 'tel'],
+    allowedSchemesByTag: { img: forward ? ['data', 'cid', 'http', 'https'] : ['data'] },
     allowedSchemesAppliedToAttributes: ['href', 'src', 'cite', 'background'],
     allowProtocolRelative: false,
     // Their text goes with them (not just the tag).
@@ -259,6 +267,7 @@ export function sanitizeMailHtml(html, { resolveCid = () => null } = {}) {
           const resolved = resolveCid(normalizeCid(src))
           return { tagName, attribs: resolved ? { ...rest, src: resolved } : rest }
         }
+        if (isRemoteUrl(src) && forward) return { tagName, attribs: { ...rest, src } }
         if (isRemoteUrl(src)) {
           remoteImages += 1
           return { tagName, attribs: { ...rest, 'data-remote-src': src } }
@@ -275,6 +284,7 @@ export function sanitizeMailHtml(html, { resolveCid = () => null } = {}) {
   // version with the remote images kept in data-remote-css for « Afficher ».
   const styled = clean.replace(STYLE_ELEMENT, (_match, attributes, css) => {
     const { held, revealed, remote } = rewriteCssUrls(css, resolveCid)
+    if (forward) return `<style${attributes}>${(revealed ?? held).replace(/<\/(style)/gi, '<\\/$1')}</style>`
     remoteImages += remote
     const reveal = revealed ? ` data-remote-css="${escapeHtml(revealed)}"` : ''
     return `<style${attributes}${reveal}>${held.replace(/<\/(style)/gi, '<\\/$1')}</style>`
@@ -392,6 +402,63 @@ export function buildMailMessage(message, messageId) {
     attachments: leaves
       .filter((leaf) => !(leaf.cid && usedCids.has(leaf.cid)))
       .map(({ part, name, type, size }) => ({ part, name, type, size, href: buildMailPartHref(id, part, { download: true }) })),
+  }
+}
+
+// A mail's HTML (sanitizeMailHtml's, well formed) as plain text: a block, a
+// row or a line break a new line, a list item « • », cells apart by a space,
+// no run of more than one empty line.
+const TEXT_BLOCK_END = /<\/(?:p|div|tr|table|h[1-6]|ul|ol|blockquote|pre|section|article|header|footer|main|aside|nav|figure|figcaption|address|center|dl|dt|dd|details|summary|caption)>|<hr\b[^>]*>/gi
+
+export function mailHtmlToText(html) {
+  return decodeEntities(String(html ?? '')
+    .replace(/<style\b[^>]*>[\s\S]*?<\/style>/gi, '')
+    .replace(/\s+/g, ' ')
+    .replace(/<br\b[^>]*>/gi, '\n')
+    .replace(/<li\b[^>]*>/gi, '\n• ')
+    .replace(/<\/t[dh]>/gi, ' ')
+    .replace(TEXT_BLOCK_END, '\n')
+    .replace(/<[^>]*>/g, ''))
+    .replace(/\u00a0/g, ' ')
+    .split('\n').map((line) => line.trim()).join('\n')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim()
+}
+
+// A mail sent on as it was (a forward): its HTML as written, styles and
+// <style> blocks kept (sanitizeMailHtml in its `forward` mode: no script,
+// form or the like goes with it), its inline images by their cid, a plain
+// text body kept to its lines. From Zimbra's GetMsgResponse (html: 1,
+// neuter: 0). → { html, text, inlineImages: [{ cid, part }] } (the
+// original's parts the mail sent takes inline).
+export function buildForwardedMail(message) {
+  const { bodies, leaves } = collectParts(message?.mp, { bodies: [], leaves: [] })
+  const imagesByCid = new Map(
+    leaves.filter((leaf) => leaf.cid && INLINE_IMAGE_TYPES.has(leaf.type)).map((leaf) => [leaf.cid, leaf]),
+  )
+  const used = new Map()
+  const resolveCid = (cid) => {
+    const leaf = imagesByCid.get(cid)
+    if (!leaf) return null
+    used.set(cid, leaf.part)
+    return `cid:${cid}`
+  }
+  const htmlParts = []
+  const textParts = []
+  for (const body of bodies) {
+    if (body.type === 'text/html') {
+      const { html } = sanitizeMailHtml(body.content, { resolveCid, forward: true })
+      htmlParts.push(html)
+      textParts.push(mailHtmlToText(html))
+    } else {
+      htmlParts.push(`<div style="white-space:pre-wrap">${mailTextToHtml(body.content).replace(/^<div class="tafac-mail-text">|<\/div>$/g, '')}</div>`)
+      textParts.push(String(body.content ?? '').replace(/\r\n?/g, '\n').trim())
+    }
+  }
+  return {
+    html: htmlParts.join('<hr>'),
+    text: textParts.filter(Boolean).join('\n\n'),
+    inlineImages: [...used].map(([cid, part]) => ({ cid, part })),
   }
 }
 
