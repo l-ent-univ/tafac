@@ -16,7 +16,7 @@ web view (tafac://localhost/)        src-tauri/src/ios.rs
    ▼
 bridge (Rust), as on the desktop     src-tauri/src/bridge.rs
    │  session cookie (jar.rs), kept login (signin.rs)
-   │  a few routes: tonAPI, in the app    src-tauri/crates/tafac-gateway
+   │  a few routes: tonAPI, in the app    back/crates/tafac-gateway
    ▼  Unix socket in the app's own folder, no TCP port
 server.js, unchanged                 desktop/ios.mjs
    │  inside the app's process, on Node 18  src-tauri/src/node.rs
@@ -81,7 +81,7 @@ process, means the same folder.
 The server is moving from Node to
 [tonAPI](https://github.com/l-ent-univ/tonAPI) (Rust), a route at a time.
 A route moves once, for tafac.fr and both apps, in one crate:
-`src-tauri/crates/tafac-gateway` (its `lib.rs` says how; `docs/DESKTOP.md`,
+`back/crates/tafac-gateway` (its `lib.rs` says how; `docs/DESKTOP.md`,
 « tonAPI »). On the phone the bridge asks it before Node, in the app's own
 process: no JavaScript runs for a route that moved.
 
@@ -104,7 +104,7 @@ process: no JavaScript runs for a route that moved.
 - **Nothing to ship**: tonAPI's settings for each university are in the
   crate (taken from tonAPI's own repository as it builds). tonAPI is a git
   dependency at one commit; its repository is private, so Cargo fetches it
-  with git (`src-tauri/.cargo/config.toml`) and a build needs read access
+  with git (`.cargo/config.toml`) and a build needs read access
   to it.
 
 Measured on a real Rennes account, iPhone 17 simulator, debug build

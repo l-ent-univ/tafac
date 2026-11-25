@@ -12,7 +12,7 @@
 // reads a video a few bytes at a time.
 //
 // A few routes are answered in the app itself, by tonAPI, when it can give
-// the server's own answer: the gateway (crates/tafac-gateway), the same code
+// the server's own answer: the gateway (back/crates/tafac-gateway), the same code
 // that answers them on tafac.fr. The server answers the rest, and those too
 // whenever tonAPI can't.
 

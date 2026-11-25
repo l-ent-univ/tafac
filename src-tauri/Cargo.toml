@@ -12,11 +12,6 @@ publish = false
 name = "tafac_lib"
 crate-type = ["staticlib", "rlib"]
 
-# The gateway: the routes tonAPI answers in the Node server's place, here and
-# on tafac.fr, which builds it alone (cargo build -p tafac-gateway --release).
-[workspace]
-members = ["crates/tafac-gateway"]
-
 [build-dependencies]
 tauri-build = { version = "2", features = [] }
 
@@ -36,7 +31,7 @@ rand = "0.8"
 tauri-plugin-opener = "2"
 # The routes tonAPI answers, asked before the local server (src/bridge.rs).
 # Without its own HTTP server, which is tafac.fr's.
-tafac-gateway = { path = "crates/tafac-gateway", default-features = false }
+tafac-gateway = { path = "../back/crates/tafac-gateway", default-features = false }
 
 # Desktop only: iOS has one window, and its updates are the App Store's.
 [target.'cfg(not(any(target_os = "ios", target_os = "android")))'.dependencies]
@@ -125,7 +120,7 @@ features = ["sync-secret-service"]
 
 # The gateway's made-up campus, for the bridge's tests.
 [dev-dependencies]
-tafac-gateway = { path = "crates/tafac-gateway", default-features = false, features = ["testing"] }
+tafac-gateway = { path = "../back/crates/tafac-gateway", default-features = false, features = ["testing"] }
 
 [profile.release]
 codegen-units = 1

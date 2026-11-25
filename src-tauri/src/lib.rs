@@ -9,7 +9,7 @@
 // login (signin.rs), where links go (links.rs).
 //
 // A few routes are answered without the server, by tonAPI: the gateway
-// (crates/tafac-gateway), which the bridge asks first, and which tafac.fr
+// (back/crates/tafac-gateway), which the bridge asks first, and which tafac.fr
 // runs in front of its own server.
 
 mod assets;

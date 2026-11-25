@@ -1,0 +1,6 @@
+# Tafac's backend in Rust: each crate under crates/, built and tested from
+# here (cargo test, cargo build --release -p tafac-gateway for tafac.fr).
+# The apps (src-tauri) use the same crates by path.
+[workspace]
+resolver = "2"
+members = ["crates/*"]

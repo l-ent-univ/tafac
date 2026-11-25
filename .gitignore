@@ -57,6 +57,7 @@ data/
 # project (src-tauri/gen/apple) is kept: project.yml links Node into it. Its
 # assets/ is the copy of the app's resources each build makes.
 src-tauri/target/
+back/target/
 src-tauri/gen/schemas/
 src-tauri/gen/apple/assets/
 src-tauri/gen/apple/Pods/

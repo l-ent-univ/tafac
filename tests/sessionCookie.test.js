@@ -103,7 +103,7 @@ test('encodedLength predicts the real cookie size exactly', () => {
 })
 
 // The gateway reads this cookie too, in Rust, for the routes tonAPI answers
-// (src-tauri/crates/tafac-gateway/src/session_link.rs, whose tests read the
+// (back/crates/tafac-gateway/src/session_link.rs, whose tests read the
 // same file). A change of format that makes this test fail makes theirs
 // fail: the reader there changes with the codec here, and the file is made
 // again (createSessionCookieCodec({ secret }).encode(payload)).

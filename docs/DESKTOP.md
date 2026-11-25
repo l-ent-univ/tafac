@@ -59,12 +59,13 @@ The server is moving from Node to
 [tonAPI](https://github.com/l-ent-univ/tonAPI) (Rust: one provider per
 software, one settings file per university), a route at a time. A route
 moves once, in one crate, for every place Tafac runs:
-`src-tauri/crates/tafac-gateway`.
+`back/crates/tafac-gateway`. `back/` is the Rust backend's root (a Cargo
+workspace, `back/README.md`); the apps use its crates by path.
 
 ```
 the page: /__ent_auth/*, /__ent_proxy/*      unchanged, the only contract
    ▼
-the gateway (Rust)                           src-tauri/crates/tafac-gateway
+the gateway (Rust)                           back/crates/tafac-gateway
    │  routes.rs      the one table: each route, tonAPI's or Node's
    │  translate/     tonAPI's answer as the page gets it from Node
    │  session_link  tonAPI asks with the cookies of Node's session
@@ -76,7 +77,7 @@ Node (server.js)
 - **In the apps** the bridge calls the gateway in the app's own process
   before it asks Node (`bridge.rs`), on the desktop and on iOS alike.
 - **On tafac.fr** the same crate is a small server in front of Node
-  (`cargo build -p tafac-gateway --release`, `src/main.rs`): it answers the
+  (`cargo build --release -p tafac-gateway` in `back/`, `src/main.rs`): it answers the
   moved routes and passes every other request on as it came (headers,
   cookies, bodies as they stream, redirects, WebSocket). Not deployed.
 - **One session**: Node's. The gateway reads Node's session cookie
