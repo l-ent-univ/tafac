@@ -110,13 +110,10 @@ mod tests {
         assert!(TONAPI_COMMIT.len() >= 7);
     }
 
-    // Rennes 2 and the Sorbonne Nouvelle: tonAPI has their settings and the
-    // gateway can answer for them (tests/other_portals.rs), but no real
-    // account has confirmed it: neither is one of routes::UNIVERSITIES.
-    // Adding its id there is all it takes: this test then fails, and the
-    // university's place is in the one above.
+    // Rennes 2 and the Sorbonne Nouvelle, whose portals are not uPortal:
+    // served, with the places Node's own settings name for them.
     #[test]
-    fn rennes_2_and_the_sorbonne_nouvelle_are_ready_and_not_served() {
+    fn rennes_2_and_the_sorbonne_nouvelle_are_served_at_nodes_own_places() {
         // Node's own settings for a university: shared.js, server.js.
         let node = |university: &str| match university {
             "univ-rennes-2" => (include_str!("../../../../universities/univ-rennes-2/shared.js"), include_str!("../../../../universities/univ-rennes-2/server.js")),
@@ -148,8 +145,7 @@ mod tests {
             assert!(server.contains("casLoginPath: '/login/index.php?authCAS=CAS'"));
             assert!(embedded.university.contains("entry = \"cas\""));
 
-            assert!(!routes::UNIVERSITIES.contains(&id), "{id} is switched on: check it with rennes_is_served_with_its_portal_and_its_cas");
-            assert!(!served().contains_key(id));
+            assert!(served().contains_key(id), "{id} is one of routes::UNIVERSITIES");
         }
     }
 

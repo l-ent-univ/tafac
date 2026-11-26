@@ -51,8 +51,8 @@ the page ──▶ the gateway (Rust) ──▶ tonAPI ──▶ the university
   `routes.rs` lists them with what keeps each there. The moved routes are
   still Node's for the sessions the gateway doesn't hold: nobody signed in,
   another university.
-  Two of those universities are ready here and not switched on: see
-  « Universities ready, not switched on ».
+  Rennes 2 and the Sorbonne Nouvelle are answered here like Rennes: see
+  « Rennes 2 and the Sorbonne Nouvelle ».
 - **The demo account is nobody's here.** The page serves it by itself,
   with no session (`src/demoServer.js`, `src/demoSession.js`): its login
   is never posted, and posted all the same it is a login like any other,
@@ -196,25 +196,33 @@ crates/tafac-gateway/
 5. Its tests in `tests/`, on the made-up campus (`testing/`).
 6. The answer compared with Node's on a real account.
 
-## Universities ready, not switched on
+## Rennes 2 and the Sorbonne Nouvelle
 
 Rennes 2 (`univ-rennes-2`) and the Sorbonne Nouvelle
 (`univ-sorbonne-nouvelle`) have their settings and their providers in
 tonAPI (a Drupal portal and TEMPO for the first, the iSorbonne portal for
-the second), written from this repository's Node code and never tried on a
-real account. The gateway loads them and answers the sign-in, the sign-out,
-the session check, the account, the applications and Moodle's deadlines for
-them, on two made-up campuses whose settings are tonAPI's own files with
-the addresses changed (`tests/other_portals.rs`). Node still serves both:
-neither id is in `routes::UNIVERSITIES`.
+the second), written from this repository's Node code. Both ids are in
+`routes::UNIVERSITIES` since 2026-11-26: the gateway answers every moved
+route for them, and the launch relay has their own lists
+(`launch/targets.rs`). Its tests run on two made-up campuses whose
+settings are tonAPI's own files with the addresses changed
+(`tests/other_portals.rs`).
 
-To switch one on: add its id to `UNIVERSITIES` in `routes.rs`. Two tests
-then fail and say what to move (`neither_university_is_switched_on_yet`,
-`rennes_2_and_the_sorbonne_nouvelle_are_ready_and_not_served`). Before
-that, in development (« To see it work », with the id added locally and
-`TAFAC_LOG_REQUESTS=1`), a real account confirms the list below, in this
-order: each step needs the one before. « Node's answer » is the same
-request asked of Node directly, on its own port.
+What that rests on: a real account signed in at each, in development,
+through the page, on a gateway with the id added; the student found the
+page working, and the gateway's log (`TAFAC_LOG_REQUESTS=1`) said no route
+failed or was refused. The lists below were not gone through one by one:
+they stay as what to look at when one of them goes wrong. « Node's
+answer » is the same request asked of Node directly, on its own port. Not
+tried at all: an account the CAS asks a one-time code of, a session that
+lapses, and whether the school certificate (tonAPI's `mon-dossier-web`)
+was downloaded. Neither university has grades (`features.grades` is off,
+the page doesn't ask): the routes answer 500 here, as for a component
+without ScoDoc.
+
+Another university is added the same way: its id in `UNIVERSITIES`, its
+lists in `launch/targets.rs` (a test holds them to Node's settings), and
+a real account.
 
 What is known to differ from Node, at both:
 
@@ -235,9 +243,10 @@ What is known to differ from Node, at both:
    password is refused in the CAS's own words. An account the CAS asks a
    one-time code of: Node refuses those today (no `auth.mfa` in its
    settings); see what the gateway does with one.
-2. **Node with that session.** The planning (TEMPO), the mail and the
-   launch relay, which stay Node's, work with the cookie the gateway
-   wrote: Rennes 2's CAS binds its ticket to the User-Agent that signed in.
+2. **Node with that session.** The planning (TEMPO) and the mail, which
+   stay Node's, work with the cookie the gateway wrote: Rennes 2's CAS
+   binds its ticket to the User-Agent that signed in. The launch relay is
+   the gateway's, for the services under `univ-rennes2.fr`.
 3. **Session check.** `GET /session` is answered here from one request to
    the portal's `/user` page, with the cookie's own portal cookies (the log
    says nothing was left to Node). Then again once the portal's session has
@@ -269,8 +278,10 @@ too.
 1. **Sign-in.** As at Rennes 2, from the portal's page
    `/ENT/secure/index.xhtml` and with the CAS under `/cas/`; the cookie
    holds the `TGC` and iSorbonne's session cookie.
-2. **Node with that session.** The planning (ADE's GWT client) and the
-   launch relay work with the cookie the gateway wrote.
+2. **Node with that session.** The planning (ADE's GWT client), which
+   stays Node's, works with the cookie the gateway wrote. The launch relay
+   is the gateway's, for the services under `sorbonne-nouvelle.fr` and
+   `univ-paris3.fr`.
 3. **Session check.** One request to the portal's page with the cookie's
    own portal cookies; then, the portal's session lapsed, one the gateway
    opens with the ticket.

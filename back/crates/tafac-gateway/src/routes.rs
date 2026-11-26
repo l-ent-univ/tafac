@@ -15,13 +15,10 @@ use http::Method;
 
 // The universities the gateway signs in at and answers for: named alike in
 // tonAPI's settings and in Tafac's (universities/<id>), and checked there on
-// a real account. Any other university is Node's, sign-in included.
-//
-// Ready and not switched on: "univ-rennes-2" and "univ-sorbonne-nouvelle".
-// The gateway answers for them on a made-up campus (tests/other_portals.rs);
-// adding an id here is all it takes, once a real account has confirmed what
-// back/README.md lists for it (« Universities ready, not switched on »).
-pub const UNIVERSITIES: &[&str] = &["univ-rennes"];
+// a real account (back/README.md, « The universities answered here »). Any
+// other university is Node's, sign-in included. One added here brings the
+// relay's own lists (launch/targets.rs).
+pub const UNIVERSITIES: &[&str] = &["univ-rennes", "univ-rennes-2", "univ-sorbonne-nouvelle"];
 
 // A route tonAPI answers, by its translator (translate/<name>.rs).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]

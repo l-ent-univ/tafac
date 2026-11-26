@@ -41,14 +41,21 @@ pub(crate) struct Own {
     pub moodle_sign_in: &'static [&'static str],
 }
 
-const OWN: &[(&str, Own)] = &[(
-    "univ-rennes",
-    Own {
-        launch: &["univ-rennes.fr", "univ-rennes1.fr", "iut-lannion.loxya.app"],
-        mail_sign_in: &["partage.renater.fr", "univ-rennes1.fr", "univ-rennes.fr"],
-        moodle_sign_in: &["wayf.univ-rennes.fr", "ident-shib.univ-rennes1.fr"],
-    },
-)];
+const OWN: &[(&str, Own)] = &[
+    (
+        "univ-rennes",
+        Own {
+            launch: &["univ-rennes.fr", "univ-rennes1.fr", "iut-lannion.loxya.app"],
+            mail_sign_in: &["partage.renater.fr", "univ-rennes1.fr", "univ-rennes.fr"],
+            moodle_sign_in: &["wayf.univ-rennes.fr", "ident-shib.univ-rennes1.fr"],
+        },
+    ),
+    // Cursus signs in at the CAS itself: no federation to go through.
+    ("univ-rennes-2", Own { launch: &["univ-rennes2.fr"], mail_sign_in: &["partage.renater.fr", "uhb.fr", "univ-rennes2.fr"], moodle_sign_in: &[] }),
+    // univ-paris3.fr: the university's former name, still on some hosts.
+    // No webmail of Tafac's there, and iCampus signs in at the CAS itself.
+    ("univ-sorbonne-nouvelle", Own { launch: &["sorbonne-nouvelle.fr", "univ-paris3.fr"], mail_sign_in: &[], moodle_sign_in: &[] }),
+];
 
 const NONE_OF_ITS_OWN: Own = Own { launch: &[], mail_sign_in: &[], moodle_sign_in: &[] };
 

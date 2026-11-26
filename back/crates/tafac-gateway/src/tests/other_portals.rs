@@ -3,10 +3,9 @@
 // 2's, and iSorbonne, the Sorbonne Nouvelle's. Their settings are tonAPI's
 // own files for the two universities, the addresses aside.
 //
-// Neither university is one of routes.rs' yet: these tests go through a
-// gateway made for them. What they find working is what adding a
-// university's id to routes::UNIVERSITIES turns on; what only a real
-// account can say is listed in back/README.md.
+// Both universities are among routes.rs': these tests go through a gateway
+// made for their campus, and the last one through the gateway that runs.
+// What a real account confirmed is in back/README.md.
 
 use http::header::CONTENT_TYPE;
 use http::{HeaderMap, Method};
@@ -246,20 +245,18 @@ fn a_portal_that_is_down_is_said_here() {
     }
 }
 
-// The two universities are not switched on: the gateway that runs (every
-// university of routes.rs') leaves them to Node, sign-in included, without
-// a request to anything.
+// The gateway that runs (every university of routes.rs') answers for both:
+// a sign-in for one of them is no longer Node's. One for a university that
+// isn't there still is, without a request to anything.
 #[test]
-fn neither_university_is_switched_on_yet() {
+fn both_universities_are_switched_on() {
     let gateway = Gateway::new(SECRET, COOKIE_NAME);
     for campus in campuses() {
-        assert!(!routes::UNIVERSITIES.contains(&campus.id()), "{} is switched on: its line of back/README.md says what a real account confirmed", campus.id());
-        assert!(!gateway.universities().contains(&campus.id()));
-        let (headers, body) = login(&campus, "jdoe");
-        assert!(block_on(gateway.answer(&asked(&POST, LOGIN, &headers, body.as_bytes()), || None, never)).is_none());
-        for target in [SESSION, ACCOUNT, APPS, DEADLINES] {
-            assert!(block_on(gateway.answer(&asked(&GET, target, &NO_HEADERS, &[]), || Some(campus.alive()), never)).is_none());
-        }
-        assert!(campus.paths().is_empty());
+        assert!(routes::UNIVERSITIES.contains(&campus.id()));
+        assert!(gateway.universities().contains(&campus.id()));
     }
+    let mut headers = HeaderMap::new();
+    headers.insert(CONTENT_TYPE, "application/json".parse().unwrap());
+    let body = serde_json::json!({ "username": "jdoe", "password": "a-password", "university": "univ-exemple" }).to_string();
+    assert!(block_on(gateway.answer(&asked(&POST, LOGIN, &headers, body.as_bytes()), || None, never)).is_none());
 }

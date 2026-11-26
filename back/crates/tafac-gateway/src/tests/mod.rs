@@ -17,7 +17,7 @@
 //   student.rs            the student's photo and school certificate: the
 //                         same
 //   other_portals.rs      the same routes at a university whose portal is
-//                         not uPortal (Drupal, iSorbonne): not switched on
+//                         not uPortal (Drupal, iSorbonne)
 
 mod apps;
 mod expiry;
