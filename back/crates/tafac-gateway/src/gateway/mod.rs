@@ -20,6 +20,9 @@
 //                 launch.rs (the launch relay, its preview) and student.rs
 //                 (the photo, the school certificate)
 //
+// And one route of Tafac's own, which asks the university nothing: the
+// applications' icons (own/icons.rs).
+//
 // The session is the gateway's: it signs the student in, holds what tonAPI
 // got from the university, and says when the session is over. For a session
 // it holds, every moved route is answered here, its errors too
@@ -50,6 +53,7 @@ pub use attempts::TrustedProxies;
 use behind::Lasting;
 
 use crate::node::{self, NodeAnswer, NodeRequest};
+use crate::own::universities::Served;
 use crate::routes::{self, Moved};
 use crate::session::cookie;
 use crate::session::handed::CAS_TICKET;
@@ -84,11 +88,13 @@ pub struct Gateway {
     // Shared with what is asked behind an answer (behind.rs).
     universities: BTreeMap<String, Arc<University>>,
     cookie_name: String,
-    codec: cookie::Codec,
+    pub(crate) codec: cookie::Codec,
     net: NetSettings,
     trusted: TrustedProxies,
     // Whether the statistics are on, as Node is set up (node.rs).
     statistics: bool,
+    // Where the statistics go, when the gateway sends them (own/analytics.rs).
+    pub(crate) statistics_sent: Option<crate::own::analytics::Statistics>,
     // Says every request a moved route refused, not only the ones that
     // failed.
     verbose: bool,
@@ -98,6 +104,14 @@ pub struct Gateway {
     // A sign-in has the home page's answers asked at once (behind.rs).
     // Always, but in the tests, which count what a sign-in asks.
     asks_ahead: bool,
+    // The universities this server serves, where it says (`serving`):
+    // Tafac's own routes about them are then answered here
+    // (own/universities.rs), and so is a session check nobody is signed in
+    // for.
+    served: Option<Served>,
+    // The applications' icons, when the gateway has Node's data directory
+    // (own/icons.rs); None: Node answers them.
+    icons: Option<crate::own::icons::Icons>,
 }
 
 pub(crate) fn now_ms() -> i64 {
@@ -120,12 +134,31 @@ impl Gateway {
             net,
             trusted: TrustedProxies::Private,
             statistics: false,
+            statistics_sent: None,
             verbose: std::env::var_os("TAFAC_LOG_REQUESTS").is_some(),
             memory: Memory::default(),
             attempts: attempts::Attempts::default(),
             early: portal::Early::default(),
             asks_ahead: true,
+            served: None,
+            icons: None,
         }
+    }
+
+    // The applications' icons answered here, from the file Node keeps in
+    // `data_dir` (its DATA_DIR): tafac.fr's server. The apps leave them to
+    // their own Node.
+    pub fn with_icons_in(mut self, data_dir: impl Into<std::path::PathBuf>) -> Self {
+        self.icons = Some(crate::own::icons::Icons::new(data_dir));
+        self
+    }
+
+    // What this server serves, as Node behind it is set up
+    // (`Served::from_environment`). Without it (the apps), the list of
+    // universities and a request nobody is signed in for stay Node's.
+    pub fn serving(mut self, served: Served) -> Self {
+        self.served = Some(served);
+        self
     }
 
     // Whose word is taken for the address a request came from (the
@@ -180,9 +213,10 @@ impl Gateway {
     }
 
     // Whether a request's body is read here: a sign-in's, which says who
-    // signs in. Every other body goes to Node as it streams.
+    // signs in, the statistics', and the applications' list their icons
+    // are for. Every other body goes to Node as it streams.
     pub fn reads_body(method: &Method, path: &str) -> bool {
-        matches!(routes::moved_route(method, path), Some(Moved::Login))
+        matches!(routes::moved_route(method, path), Some(Moved::Login | Moved::Analytics | Moved::AppIcons))
     }
 
     // The answer to a request, when its route has moved (routes.rs) and the
@@ -206,7 +240,20 @@ impl Gateway {
         if route == Moved::Login {
             return self.sign_in(asked).await;
         }
-        let value = cookie()?;
+        // Tafac's own, whoever asks, with a session or without (own/).
+        if let Moved::Universities | Moved::UniversityLogo = route {
+            return self.own_universities(route, asked, cookie().as_deref());
+        }
+        if route == Moved::Analytics {
+            return self.statistics_posted(asked, cookie());
+        }
+        let Some(value) = cookie() else {
+            return self.nobody(route, asked);
+        };
+        // Tafac's own icons: nothing asked of the university.
+        if route == Moved::AppIcons {
+            return self.icons.as_ref()?.answer(&self.signed_in(Some(&value))?.session.university, asked);
+        }
         // The routes answered to their end here, failures included.
         if Self::settles(route) {
             return self.settled(route, asked, &value, &cookie, &node).await;
@@ -221,8 +268,9 @@ impl Gateway {
 
         let translated = match route {
             // A sign-in was answered above, and so were the routes of
-            // settled.rs.
+            // settled.rs and Tafac's own.
             Moved::Login | Moved::Launch | Moved::LaunchPreview | Moved::MoodleView | Moved::StudentPicture | Moved::CertificateStatus | Moved::Certificate => return None,
+            Moved::Universities | Moved::UniversityLogo | Moved::Analytics | Moved::AppIcons => return None,
             // The session ends: nothing to check of it after.
             Moved::Logout => return Some(self.sign_out(&held, &value, &node).await),
             Moved::Session => self.session_check(&held).await,
@@ -252,6 +300,32 @@ impl Gateway {
         // session this answer is about is no longer the one there is.
         let still = self.signed_in(cookie().as_deref()).is_some_and(|current| current.session.id == held.session.id);
         still.then_some(response)
+    }
+
+    // GET /__ent_auth/universities and a university's logo
+    // (own/universities.rs), where the server said what it serves. None
+    // elsewhere, and for a session cookie that isn't read here: Node knows
+    // what it holds (a cookie sealed with the secret before, or from before
+    // sessions named their university).
+    fn own_universities(&self, route: Moved, asked: &Asked<'_>, cookie: Option<&str>) -> Option<http::Response<Vec<u8>>> {
+        let served = self.served.as_ref()?;
+        if route == Moved::UniversityLogo {
+            return served.logo(routes::under(route, asked.path)?, asked.headers);
+        }
+        let session = match cookie {
+            Some(cookie) => Some(self.codec.read(cookie, now_ms())?.university),
+            None => None,
+        };
+        Some(served.list(asked.headers, session.as_deref()))
+    }
+
+    // A moved route asked without a session cookie: nobody signed in. The
+    // session check says so here, at the university the request is for,
+    // where the server said what it serves. None: Node's (the other
+    // routes, each with its own answer for nobody; the apps).
+    fn nobody(&self, route: Moved, asked: &Asked<'_>) -> Option<http::Response<Vec<u8>>> {
+        let served = self.served.as_ref()?;
+        (route == Moved::Session).then(|| translate::expired::nobody_signed_in(served.for_nobody(asked.headers), self.statistics))
     }
 
     // A moved route without an answer of its own: its error, worded here as

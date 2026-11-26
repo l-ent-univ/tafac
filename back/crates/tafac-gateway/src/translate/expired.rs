@@ -26,27 +26,40 @@ use crate::session::cookie::clear_cookie;
 
 const SESSION_EXPIRED_CODE: &str = "session_expired";
 
+// What GET /__ent_auth/session says of nobody: Node's answer where no
+// session is read. `university`: the one the request is for;
+// `analytics_enabled`: whether the statistics are on.
+fn nobody(university: &str, analytics_enabled: bool) -> serde_json::Value {
+    serde_json::json!({
+        "authenticated": false,
+        "user": null,
+        "sessionMode": null,
+        "sessionSource": null,
+        "degraded": false,
+        "degradedReason": null,
+        "canUseServerLaunch": false,
+        "analyticsEnabled": analytics_enabled,
+        "university": university,
+    })
+}
+
+// GET /__ent_auth/session for a request without a session cookie: nobody
+// signed in, at the university the request is for (own/universities.rs).
+pub fn nobody_signed_in(university: &str, analytics_enabled: bool) -> http::Response<Vec<u8>> {
+    json_response(200, serde_json::to_vec(&nobody(university, analytics_enabled)).unwrap_or_default())
+}
+
 // `session_check`: for GET /__ent_auth/session, the session's university
 // and whether the statistics are on (`analyticsEnabled`); None for any
 // other route. `ends_it`: the session cookie's name, on the answer that
 // ends the session.
 pub fn answer(session_check: Option<(&str, bool)>, ends_it: Option<&str>) -> http::Response<Vec<u8>> {
     let (status, body) = match session_check {
-        Some((university, analytics_enabled)) => (
-            200,
-            serde_json::json!({
-                "authenticated": false,
-                "expired": true,
-                "user": null,
-                "sessionMode": null,
-                "sessionSource": null,
-                "degraded": false,
-                "degradedReason": null,
-                "canUseServerLaunch": false,
-                "analyticsEnabled": analytics_enabled,
-                "university": university,
-            }),
-        ),
+        Some((university, analytics_enabled)) => {
+            let mut said = nobody(university, analytics_enabled);
+            said["expired"] = true.into();
+            (200, said)
+        }
         None => (401, serde_json::json!({ "error": SESSION_EXPIRED_CODE })),
     };
     let mut response = json_response(status, serde_json::to_vec(&body).unwrap_or_default());

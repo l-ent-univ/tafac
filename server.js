@@ -104,6 +104,9 @@ app.use(universitiesApp)
 // Both name this server's address, which comes from the request
 // (X-Forwarded-Host): only one that reads as an address is written into
 // them (getSafePublicOrigin). Without one, no sitemap.
+// Moved to the gateway where it runs before this server with the build
+// (TAFAC_GATEWAY_DIST; own/statics.rs there), as are Apple's file below and
+// the built files further down. Without it, they are this server's.
 app.get('/robots.txt', (req, res) => {
   const origin = getSafePublicOrigin(req)
 
@@ -133,11 +136,18 @@ app.get('/.well-known/apple-app-site-association', (req, res) => {
 // The desktop app's updates: the manifest the installed apps read
 // (/desktop/latest.json, from DESKTOP_LATEST_FILE or DESKTOP_LATEST_JSON) and
 // its installers' address (server/desktopUpdate, docs/DESKTOP.md).
+// Moved to the gateway where it runs before this server
+// (back/crates/tafac-gateway/src/own/ there), with these three: these
+// routes are left a server without the gateway in front, and what the
+// gateway leaves (a method but GET and HEAD, a platform's name that doesn't
+// decode).
 app.use(createDesktopUpdateRouter())
 // The apps' remote settings, served as they are (APP_SETTINGS_FILE).
 app.use(createAppSettingsRouter())
 // Published by itself: the newest GitHub release's manifest, once its
-// desktop build is done (server/desktopUpdate/follow.ts).
+// desktop build is done (server/desktopUpdate/follow.ts). With the gateway
+// in front, it follows the releases too: DESKTOP_LATEST_FILE is for one of
+// the two.
 followReleases()
 
 app.get('/sitemap.xml', (req, res) => {
@@ -208,7 +218,8 @@ function isClientPath(pathname) {
 // URLs on every address. Signed out, the home page and each university's
 // page come with their landing in them.
 // The page, with what it may load and run (its inline scripts go by their
-// hash, read from the page as it is sent).
+// hash, read from the page as it is sent). The gateway's page_headers
+// (own/page_headers.rs) gives the same headers, for when it serves the page.
 function sendPage(res, html) {
   res.setHeader('Content-Security-Policy', buildPagePolicy(html))
   res.type('html').send(html)
@@ -268,6 +279,10 @@ function sendAppShell(req, res, next) {
   sendPage(res, fillPublicOrigin(shell, origin))
 }
 
+// Moved to the gateway where it runs before this server and is given the
+// build (back/crates/tafac-gateway, own/page.rs and own/shell.rs): the page
+// at every address below, and the sitemap above. A change to what is sent,
+// or to a header, goes there too.
 app.get('/', sendAppShell)
 // The page under its file name: what the service worker caches (Workbox's
 // precache of index.html) and serves on every visit, signed in or not. So
@@ -289,7 +304,9 @@ app.get('/index.html', (req, res, next) => {
 })
 
 // Serve the built static files, each with how long it may be kept
-// (server/staticFiles/).
+// (server/staticFiles/). The gateway answers them where it has the build
+// (above), and holds itself to this handler's answers
+// (tests/fixtures/static-files.json).
 app.use(serveBuiltFiles(DIST_DIR))
 
 // Client-side entry points (/<slug> of a university, the picker) and any

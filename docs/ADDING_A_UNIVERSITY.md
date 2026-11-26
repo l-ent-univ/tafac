@@ -195,7 +195,7 @@ appIcons: {
 
 Chaque mode de couleur a sa variante sombre. Le fichier ne garde que le concept et la teinte : changer de style ou de mode redessine toutes les tuiles sans rien remélanger. Une valeur inconnue empêche le serveur de démarrer (comme un id d'université inconnu). Exemples : Rennes en `carbon` + `pastel`, l'université de démo en `phosphor-duotone` + `soft`.
 
-Pour améliorer les choix, ajoutez des mots-clés dans `APP_ICON_RULES` (`src/appIconPicks.js`, que le serveur et la page partagent ; test dans `tests/appIcons.test.js`) ; un nouveau concept doit avoir une icône dans chaque style (`ICONS_BY_CONCEPT`). Pour corriger une tuile déjà attribuée, éditez le fichier JSON (voir SELF_HOSTING) ou ajoutez une icône faite main.
+Pour améliorer les choix, ajoutez des mots-clés dans `APP_ICON_RULES` (`src/appIconPicks.js`, que le serveur et la page partagent ; test dans `tests/appIcons.test.js`) ; un nouveau concept doit avoir une icône dans chaque style (`ICONS_BY_CONCEPT`). La passerelle Rust choisit avec une copie de ces listes et du style de chaque université : après une modification, lancez `node scripts/gateway-data.mjs` (les tests échouent tant que ce n'est pas fait). Pour corriger une tuile déjà attribuée, éditez le fichier JSON (voir SELF_HOSTING) ou ajoutez une icône faite main.
 
 ## Checklist de validation
 

@@ -8,7 +8,9 @@
 // boolean. There is no free-text property on purpose: no titles, names,
 // subjects, URLs, grades or search text can ever get through.
 //
-// Adding an event or property means editing this file AND docs/ANALYTICS.md.
+// Adding an event or property means editing this file AND docs/ANALYTICS.md,
+// AND the gateway's copy (back/crates/tafac-gateway/src/own/analytics/
+// schema.rs), which its tests hold to this file.
 // ============================================================================
 
 export const ANALYTICS_MAX_BODY_BYTES = 8 * 1024

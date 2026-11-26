@@ -579,8 +579,10 @@ state and asks for the install through `/__desktop/update/*`
 `minimum` and `installer` are ours; the plugin ignores them. `notes` stays
 empty.
 
-**tafac.fr** serves it (`server/desktopUpdate/`, mounted by `server.js`),
-from `DESKTOP_LATEST_FILE` (a path, read again whenever the file changes: no
+**tafac.fr** serves it: its gateway, in front of Node
+(`back/crates/tafac-gateway/src/own/desktop_update.rs`; Node's
+`server/desktopUpdate/` answers where no gateway is in front), from
+`DESKTOP_LATEST_FILE` (a path, read again whenever the file changes: no
 restart) or `DESKTOP_LATEST_JSON` (the JSON itself). A manifest that the apps
 couldn't read, or whose `minimum` is above its `version`, is not served
 (404, a line in the server's log): to the apps that is no answer.
@@ -622,7 +624,9 @@ no app to replace there, and the install is refused.
 3. **Publish**: by itself. tafac.fr reads the newest release's
    `latest.json` every 10 minutes and, when it changed and checks, writes it
    to `DESKTOP_LATEST_FILE`, where it serves it from
-   (`server/desktopUpdate/follow.ts`). CI uploads it only once the build is
+   (the gateway's `own/desktop_update/follow.rs`, as Node's
+   `server/desktopUpdate/follow.ts`, which follows too when Node is given
+   the same setting: give it to one of them). CI uploads it only once the build is
    signed and notarized, so a release whose desktop build failed, or is
    still running, has none, and what is served stays as it is.
    - **Withdrawing an update**: delete its GitHub release. The previous one is
@@ -650,7 +654,7 @@ nécessaire » until updated.
 | `POSTHOG_PROJECT_KEY` | PostHog's public project key, as tafac.fr's: the app's anonymous statistics (below). Unset, the app sends none |
 
 Then the repository variable `DESKTOP_RELEASE` = `true`, and
-`DESKTOP_LATEST_FILE` on tafac.fr.
+`DESKTOP_LATEST_FILE` on tafac.fr, for its gateway.
 
 ## Remote settings
 

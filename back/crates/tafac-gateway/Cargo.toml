@@ -17,10 +17,13 @@ server = [
     "dep:hyper-util",
     "dep:http-body-util",
     "dep:bytes",
+    "dep:minisign-verify",
     "tokio/rt-multi-thread",
     "tokio/net",
     "tokio/io-util",
     "tokio/signal",
+    # The page's files, read as they go out (own/statics.rs).
+    "tokio/fs",
 ]
 # A made-up campus for the tests of what uses this crate (the apps' bridge).
 testing = ["tokio/rt-multi-thread", "tokio/net", "tokio/io-util"]
@@ -57,7 +60,9 @@ sha2 = "0.10"
 base64 = "0.23"
 http = "1"
 serde = { version = "1", features = ["derive"] }
-serde_json = "1"
+# raw_value: a landing's structured data goes into the page as the build
+# wrote it, its keys in their order (own/shell.rs).
+serde_json = { version = "1", features = ["raw_value"] }
 # rt: what is asked of the university behind an answer (gateway/behind.rs).
 tokio = { version = "1", features = ["sync", "time", "macros", "rt"] }
 # A panic inside a provider is one route's error, not a request lost.
@@ -66,6 +71,10 @@ hyper = { version = "1", features = ["client", "server", "http1"], optional = tr
 hyper-util = { version = "0.1", features = ["tokio", "client-legacy", "http1"], optional = true }
 http-body-util = { version = "0.1", optional = true }
 bytes = { version = "1", optional = true }
+# The apps' remote settings' signature (own/settings/minisign.rs): Ed25519
+# over BLAKE2b, as `tauri signer` signs, verification only, no dependency of
+# its own. The apps have the same one, through Tauri's updater.
+minisign-verify = { version = "0.3", optional = true }
 
 # Where tonAPI's settings files are on this computer (build.rs).
 [build-dependencies]

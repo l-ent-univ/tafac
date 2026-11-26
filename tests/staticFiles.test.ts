@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { get } from 'node:http'
 import type { AddressInfo } from 'node:net'
 import { tmpdir } from 'node:os'
@@ -7,6 +7,7 @@ import path from 'node:path'
 import test from 'node:test'
 import express from 'express'
 import { cacheControlFor, serveBuiltFiles } from '../server/staticFiles/index.ts'
+import { buildStaticFixture, outputPath } from '../scripts/gateway-data.mjs'
 
 const FOR_GOOD = 'public, max-age=31536000, immutable'
 const A_DAY = 'public, max-age=86400'
@@ -80,4 +81,18 @@ test('the built files go out with their own header', async (t) => {
 
   // Not a file: left to the routes after (the page).
   assert.equal((await header('/assets/missing.webp')).status, 404)
+})
+
+// The gateway serves these files itself on tafac.fr when it is given the
+// build (back/crates/tafac-gateway, own/statics.rs), and holds itself to
+// what this handler answered, written in tests/fixtures/static-files.json
+// by scripts/gateway-data.mjs. It fails here when this handler answers
+// otherwise and the script wasn't run again.
+test('the gateway holds to what this handler answers', async () => {
+  const written = JSON.parse(readFileSync(outputPath('tests/fixtures/static-files.json'), 'utf8'))
+  const made = await buildStaticFixture()
+  // A file's time as the file system keeps it may differ by a few
+  // nanoseconds from one to another; the answers don't.
+  const withoutNanoseconds = (fixture: { files: { mtimeNs: string }[] }) => ({ ...fixture, files: fixture.files.map((file) => ({ ...file, mtimeNs: null })) })
+  assert.deepEqual(withoutNanoseconds(written), withoutNanoseconds(made))
 })

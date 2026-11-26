@@ -1,6 +1,8 @@
 // tafac.fr's side of the gateway: an HTTP server in front of Node.
 //
-// It answers what the gateway answers, as the apps' bridge does
+// It answers tafac.fr's own routes first (own/: the apps' remote settings,
+// the desktop update), which the apps' bridge never sees; then what the
+// gateway answers, as the apps' bridge does
 // (Gateway::answer: the sign-in, the session, the moved routes), and passes
 // every other request on to Node as it came, and Node's answer back as it
 // came: the method, the path and its query, every header (Host, Cookie,
@@ -10,9 +12,13 @@
 // it (Connection, Keep-Alive, Transfer-Encoding…). An upgraded connection
 // (the development server's WebSocket) is joined end to end.
 //
-// One body is read here before anything is decided: a sign-in's, which says
-// who signs in. It is small, and goes to Node whole when the sign-in is
-// Node's.
+// Three bodies are read here before anything is decided: a sign-in's, which
+// says who signs in, the statistics', and the applications' list their
+// icons are for (Gateway::reads_body). They are small, and go to Node whole
+// when the request is Node's.
+//
+// Given the page's build, it answers the page's files itself
+// (own/statics.rs), before the gateway and Node.
 //
 // Node sees the requests it gets as before, but for where they come from:
 // this server, on the same machine, in place of what was in front of it.
@@ -33,14 +39,15 @@ use hyper_util::client::legacy::Client;
 use hyper_util::rt::{TokioExecutor, TokioIo};
 use tokio::net::{TcpListener, TcpStream};
 
+use crate::own::{self, Service};
 use crate::session::cookie;
 use crate::{Asked, Gateway, NodeAnswer, NodeRequest};
 
 type BoxError = Box<dyn std::error::Error + Send + Sync>;
 type Body = UnsyncBoxBody<Bytes, BoxError>;
 
-// The largest sign-in read here (express.json's own limit: Node refuses a
-// larger one, and gets it as it streams).
+// The largest body read here, a sign-in's or the icons' (express.json's own
+// limit: Node refuses a larger one, and gets it as it streams).
 const MAX_SIGN_IN_BYTES: u64 = 100 * 1024;
 
 // What a hop keeps to itself (RFC 9110 § 7.6.1), besides what Connection names.
@@ -53,6 +60,12 @@ pub struct Proxy {
     // Node's address, host:port.
     node: String,
     client: Client<HttpConnector, Body>,
+    // tafac.fr's own services (own/), with or without a gateway.
+    own: Vec<Box<dyn Service>>,
+    // The page's files, when this server is given the build.
+    statics: Option<crate::own::statics::Statics>,
+    // The page itself, where the build has no file (own/page.rs).
+    page: Option<crate::own::page::Page>,
 }
 
 fn full(body: impl Into<Bytes>) -> Body {
@@ -92,13 +105,47 @@ impl Proxy {
         // One connection per request, as the apps' bridge: Node is on the
         // same machine, and closes an idle connection when it likes.
         let client = Client::builder(TokioExecutor::new()).pool_max_idle_per_host(0).build_http();
-        Self { gateway, node: node.to_string(), client }
+        Self { gateway, node: node.to_string(), client, own: Vec::new(), statics: None, page: None }
+    }
+
+    // One of tafac.fr's own services, answered before the gateway and Node.
+    pub fn serving(mut self, service: impl Service + 'static) -> Self {
+        self.own.push(Box::new(service));
+        self
+    }
+
+    // The page's files answered here, from its build (`dist`), with
+    // robots.txt and Apple's file (`apple_app_ids`: APPLE_APP_IDS, as Node
+    // is given it).
+    // `served`: the universities this server serves, whose text and pages
+    // the page is filled with. Without the build's index.html, the page
+    // itself stays Node's.
+    pub fn with_page_files(mut self, dist: std::path::PathBuf, apple_app_ids: &str, served: crate::own::universities::Served) -> Self {
+        self.page = crate::own::page::Page::read(&dist, served);
+        if self.page.is_none() {
+            eprintln!("Tafac gateway: no index.html in {}: the page itself is Node's", dist.display());
+        }
+        self.statics = Some(crate::own::statics::Statics::new(dist, apple_app_ids));
+        self
     }
 
     // `peer`: the address the connection came from.
     async fn handle(self: Arc<Self>, mut request: Request<Incoming>, peer: IpAddr) -> Response<Body> {
+        if let Some(statics) = &self.statics {
+            if let Some(response) = statics.answer(request.method(), request.uri(), request.headers()).await {
+                return response;
+            }
+        }
         let method = request.method().clone();
         let path = request.uri().path().to_string();
+        if let Some(response) = own::answer(&self.own, &method, &path, request.headers()) {
+            return response.map(full);
+        }
+        if let Some(page) = &self.page {
+            if let Some(response) = page.answer(&method, request.uri(), request.headers()).await {
+                return response.map(full);
+            }
+        }
         let cookie = self.gateway.as_ref().and_then(|gateway| {
             let header: Vec<&str> = request.headers().get_all(COOKIE).iter().filter_map(|value| value.to_str().ok()).collect();
             cookie::cookie_in_header(&header.join("; "), gateway.cookie_name()).map(str::to_string)

@@ -1,0 +1,1839 @@
+{
+  "about": "Written by scripts/gateway-data.mjs from server.js's modules: the gateway (own/statics.rs, own/page_headers.rs) and the Node tests hold to it.",
+  "contentTypes": {
+    "js": "text/javascript; charset=utf-8",
+    "mjs": "text/javascript; charset=utf-8",
+    "css": "text/css; charset=utf-8",
+    "html": "text/html; charset=utf-8",
+    "json": "application/json; charset=utf-8",
+    "map": "application/json; charset=utf-8",
+    "webmanifest": "application/manifest+json; charset=utf-8",
+    "txt": "text/plain; charset=utf-8",
+    "xml": "application/xml",
+    "svg": "image/svg+xml",
+    "png": "image/png",
+    "jpg": "image/jpeg",
+    "jpeg": "image/jpeg",
+    "gif": "image/gif",
+    "webp": "image/webp",
+    "avif": "image/avif",
+    "ico": "image/vnd.microsoft.icon",
+    "woff": "font/woff",
+    "woff2": "font/woff2",
+    "ttf": "font/ttf",
+    "otf": "font/otf",
+    "mp4": "video/mp4",
+    "webm": "video/webm",
+    "mov": "video/quicktime",
+    "mp3": "audio/mpeg",
+    "wasm": "application/wasm",
+    "pdf": "application/pdf"
+  },
+  "cacheControl": [
+    [
+      "assets/index-DaeHe8mh.js",
+      "public, max-age=31536000, immutable"
+    ],
+    [
+      "assets/lake-D07LPwNH.webp",
+      "public, max-age=31536000, immutable"
+    ],
+    [
+      "assets/sub/x.css",
+      "public, max-age=31536000, immutable"
+    ],
+    [
+      "assets",
+      "public, max-age=86400"
+    ],
+    [
+      "sw.js",
+      "public, max-age=0, must-revalidate"
+    ],
+    [
+      "index.html",
+      "public, max-age=0, must-revalidate"
+    ],
+    [
+      "manifest.webmanifest",
+      "public, max-age=0, must-revalidate"
+    ],
+    [
+      "icon.png",
+      "public, max-age=86400"
+    ],
+    [
+      "robots.txt",
+      "public, max-age=86400"
+    ],
+    [
+      "workbox-2fbc6a65.js",
+      "public, max-age=86400"
+    ],
+    [
+      "other/assets/x.js",
+      "public, max-age=86400"
+    ],
+    [
+      "other/sw.js",
+      "public, max-age=86400"
+    ],
+    [
+      "Assets/x.js",
+      "public, max-age=86400"
+    ],
+    [
+      "SW.JS",
+      "public, max-age=86400"
+    ]
+  ],
+  "files": [
+    {
+      "path": "assets/index-DaeHe8mh.js",
+      "content": "console.log(\"hashed\")\n",
+      "mtimeNs": "1767323045999599933"
+    },
+    {
+      "path": "icon.png",
+      "content": "not really a png",
+      "mtimeNs": "1767323045499399900"
+    },
+    {
+      "path": "sw.js",
+      "content": "// worker",
+      "mtimeNs": "1700000000000000000"
+    },
+    {
+      "path": "empty.txt",
+      "content": "",
+      "mtimeNs": "1700000000250000000"
+    },
+    {
+      "path": "Upper.PNG",
+      "content": "upper",
+      "mtimeNs": "1700000000000000000"
+    },
+    {
+      "path": "no-extension",
+      "content": "what is it",
+      "mtimeNs": "1700000000000000000"
+    },
+    {
+      "path": "dotted.",
+      "content": "a dot",
+      "mtimeNs": "1700000000000000000"
+    },
+    {
+      "path": "archive.tar.gz",
+      "content": "gz",
+      "mtimeNs": "1700000000000000000"
+    },
+    {
+      "path": "with space.txt",
+      "content": "space",
+      "mtimeNs": "1700000000000000000"
+    },
+    {
+      "path": ".hidden",
+      "content": "hidden",
+      "mtimeNs": "1700000000000000000"
+    },
+    {
+      "path": "assets/index.html",
+      "content": "<p>nested</p>",
+      "mtimeNs": "1700000000000000000"
+    },
+    {
+      "path": "types/file.js",
+      "content": "js",
+      "mtimeNs": "1700000000000000000"
+    },
+    {
+      "path": "types/file.mjs",
+      "content": "mjs",
+      "mtimeNs": "1700000000000000000"
+    },
+    {
+      "path": "types/file.css",
+      "content": "css",
+      "mtimeNs": "1700000000000000000"
+    },
+    {
+      "path": "types/file.html",
+      "content": "html",
+      "mtimeNs": "1700000000000000000"
+    },
+    {
+      "path": "types/file.json",
+      "content": "json",
+      "mtimeNs": "1700000000000000000"
+    },
+    {
+      "path": "types/file.map",
+      "content": "map",
+      "mtimeNs": "1700000000000000000"
+    },
+    {
+      "path": "types/file.webmanifest",
+      "content": "webmanifest",
+      "mtimeNs": "1700000000000000000"
+    },
+    {
+      "path": "types/file.txt",
+      "content": "txt",
+      "mtimeNs": "1700000000000000000"
+    },
+    {
+      "path": "types/file.xml",
+      "content": "xml",
+      "mtimeNs": "1700000000000000000"
+    },
+    {
+      "path": "types/file.svg",
+      "content": "svg",
+      "mtimeNs": "1700000000000000000"
+    },
+    {
+      "path": "types/file.png",
+      "content": "png",
+      "mtimeNs": "1700000000000000000"
+    },
+    {
+      "path": "types/file.jpg",
+      "content": "jpg",
+      "mtimeNs": "1700000000000000000"
+    },
+    {
+      "path": "types/file.jpeg",
+      "content": "jpeg",
+      "mtimeNs": "1700000000000000000"
+    },
+    {
+      "path": "types/file.gif",
+      "content": "gif",
+      "mtimeNs": "1700000000000000000"
+    },
+    {
+      "path": "types/file.webp",
+      "content": "webp",
+      "mtimeNs": "1700000000000000000"
+    },
+    {
+      "path": "types/file.avif",
+      "content": "avif",
+      "mtimeNs": "1700000000000000000"
+    },
+    {
+      "path": "types/file.ico",
+      "content": "ico",
+      "mtimeNs": "1700000000000000000"
+    },
+    {
+      "path": "types/file.woff",
+      "content": "woff",
+      "mtimeNs": "1700000000000000000"
+    },
+    {
+      "path": "types/file.woff2",
+      "content": "woff2",
+      "mtimeNs": "1700000000000000000"
+    },
+    {
+      "path": "types/file.ttf",
+      "content": "ttf",
+      "mtimeNs": "1700000000000000000"
+    },
+    {
+      "path": "types/file.otf",
+      "content": "otf",
+      "mtimeNs": "1700000000000000000"
+    },
+    {
+      "path": "types/file.mp4",
+      "content": "mp4",
+      "mtimeNs": "1700000000000000000"
+    },
+    {
+      "path": "types/file.webm",
+      "content": "webm",
+      "mtimeNs": "1700000000000000000"
+    },
+    {
+      "path": "types/file.mov",
+      "content": "mov",
+      "mtimeNs": "1700000000000000000"
+    },
+    {
+      "path": "types/file.mp3",
+      "content": "mp3",
+      "mtimeNs": "1700000000000000000"
+    },
+    {
+      "path": "types/file.wasm",
+      "content": "wasm",
+      "mtimeNs": "1700000000000000000"
+    },
+    {
+      "path": "types/file.pdf",
+      "content": "pdf",
+      "mtimeNs": "1700000000000000000"
+    }
+  ],
+  "answers": [
+    {
+      "method": "GET",
+      "path": "/assets/index-DaeHe8mh.js",
+      "headers": {},
+      "left": false,
+      "status": 200,
+      "answered": {
+        "cache-control": "public, max-age=31536000, immutable",
+        "accept-ranges": "bytes",
+        "last-modified": "Fri, 02 Jan 2026 03:04:06 GMT",
+        "etag": "W/\"16-19b7ca99070\"",
+        "content-type": "text/javascript; charset=utf-8",
+        "content-length": "22"
+      },
+      "body": "console.log(\"hashed\")\n"
+    },
+    {
+      "method": "HEAD",
+      "path": "/assets/index-DaeHe8mh.js",
+      "headers": {},
+      "left": false,
+      "status": 200,
+      "answered": {
+        "cache-control": "public, max-age=31536000, immutable",
+        "accept-ranges": "bytes",
+        "last-modified": "Fri, 02 Jan 2026 03:04:06 GMT",
+        "etag": "W/\"16-19b7ca99070\"",
+        "content-type": "text/javascript; charset=utf-8",
+        "content-length": "22"
+      },
+      "body": ""
+    },
+    {
+      "method": "GET",
+      "path": "/icon.png",
+      "headers": {},
+      "left": false,
+      "status": 200,
+      "answered": {
+        "cache-control": "public, max-age=86400",
+        "accept-ranges": "bytes",
+        "last-modified": "Fri, 02 Jan 2026 03:04:05 GMT",
+        "etag": "W/\"10-19b7ca98e7b\"",
+        "content-type": "image/png",
+        "content-length": "16"
+      },
+      "body": "not really a png"
+    },
+    {
+      "method": "GET",
+      "path": "/sw.js",
+      "headers": {},
+      "left": false,
+      "status": 200,
+      "answered": {
+        "cache-control": "public, max-age=0, must-revalidate",
+        "accept-ranges": "bytes",
+        "last-modified": "Tue, 14 Nov 2023 22:13:20 GMT",
+        "etag": "W/\"9-18bcfe56800\"",
+        "content-type": "text/javascript; charset=utf-8",
+        "content-length": "9"
+      },
+      "body": "// worker"
+    },
+    {
+      "method": "GET",
+      "path": "/empty.txt",
+      "headers": {},
+      "left": false,
+      "status": 200,
+      "answered": {
+        "cache-control": "public, max-age=86400",
+        "accept-ranges": "bytes",
+        "last-modified": "Tue, 14 Nov 2023 22:13:20 GMT",
+        "etag": "W/\"0-18bcfe568fa\"",
+        "content-type": "text/plain; charset=utf-8",
+        "content-length": "0"
+      },
+      "body": ""
+    },
+    {
+      "method": "GET",
+      "path": "/Upper.PNG",
+      "headers": {},
+      "left": false,
+      "status": 200,
+      "answered": {
+        "cache-control": "public, max-age=86400",
+        "accept-ranges": "bytes",
+        "last-modified": "Tue, 14 Nov 2023 22:13:20 GMT",
+        "etag": "W/\"5-18bcfe56800\"",
+        "content-type": "image/png",
+        "content-length": "5"
+      },
+      "body": "upper"
+    },
+    {
+      "method": "GET",
+      "path": "/no-extension",
+      "headers": {},
+      "left": true,
+      "status": 200,
+      "answered": {
+        "cache-control": "public, max-age=86400",
+        "accept-ranges": "bytes",
+        "last-modified": "Tue, 14 Nov 2023 22:13:20 GMT",
+        "etag": "W/\"a-18bcfe56800\"",
+        "content-type": "application/octet-stream",
+        "content-length": "10"
+      },
+      "body": "what is it"
+    },
+    {
+      "method": "GET",
+      "path": "/dotted.",
+      "headers": {},
+      "left": true,
+      "status": 200,
+      "answered": {
+        "cache-control": "public, max-age=86400",
+        "accept-ranges": "bytes",
+        "last-modified": "Tue, 14 Nov 2023 22:13:20 GMT",
+        "etag": "W/\"5-18bcfe56800\"",
+        "content-type": "application/octet-stream",
+        "content-length": "5"
+      },
+      "body": "a dot"
+    },
+    {
+      "method": "GET",
+      "path": "/archive.tar.gz",
+      "headers": {},
+      "left": true,
+      "status": 200,
+      "answered": {
+        "cache-control": "public, max-age=86400",
+        "accept-ranges": "bytes",
+        "last-modified": "Tue, 14 Nov 2023 22:13:20 GMT",
+        "etag": "W/\"2-18bcfe56800\"",
+        "content-type": "application/gzip",
+        "content-length": "2"
+      },
+      "body": "gz"
+    },
+    {
+      "method": "GET",
+      "path": "/with%20space.txt",
+      "headers": {},
+      "left": false,
+      "status": 200,
+      "answered": {
+        "cache-control": "public, max-age=86400",
+        "accept-ranges": "bytes",
+        "last-modified": "Tue, 14 Nov 2023 22:13:20 GMT",
+        "etag": "W/\"5-18bcfe56800\"",
+        "content-type": "text/plain; charset=utf-8",
+        "content-length": "5"
+      },
+      "body": "space"
+    },
+    {
+      "method": "GET",
+      "path": "/%61ssets/index-DaeHe8mh.js",
+      "headers": {},
+      "left": false,
+      "status": 200,
+      "answered": {
+        "cache-control": "public, max-age=31536000, immutable",
+        "accept-ranges": "bytes",
+        "last-modified": "Fri, 02 Jan 2026 03:04:06 GMT",
+        "etag": "W/\"16-19b7ca99070\"",
+        "content-type": "text/javascript; charset=utf-8",
+        "content-length": "22"
+      },
+      "body": "console.log(\"hashed\")\n"
+    },
+    {
+      "method": "GET",
+      "path": "/types/file.js",
+      "headers": {},
+      "left": false,
+      "status": 200,
+      "answered": {
+        "cache-control": "public, max-age=86400",
+        "accept-ranges": "bytes",
+        "last-modified": "Tue, 14 Nov 2023 22:13:20 GMT",
+        "etag": "W/\"2-18bcfe56800\"",
+        "content-type": "text/javascript; charset=utf-8",
+        "content-length": "2"
+      },
+      "body": "js"
+    },
+    {
+      "method": "GET",
+      "path": "/types/file.mjs",
+      "headers": {},
+      "left": false,
+      "status": 200,
+      "answered": {
+        "cache-control": "public, max-age=86400",
+        "accept-ranges": "bytes",
+        "last-modified": "Tue, 14 Nov 2023 22:13:20 GMT",
+        "etag": "W/\"3-18bcfe56800\"",
+        "content-type": "text/javascript; charset=utf-8",
+        "content-length": "3"
+      },
+      "body": "mjs"
+    },
+    {
+      "method": "GET",
+      "path": "/types/file.css",
+      "headers": {},
+      "left": false,
+      "status": 200,
+      "answered": {
+        "cache-control": "public, max-age=86400",
+        "accept-ranges": "bytes",
+        "last-modified": "Tue, 14 Nov 2023 22:13:20 GMT",
+        "etag": "W/\"3-18bcfe56800\"",
+        "content-type": "text/css; charset=utf-8",
+        "content-length": "3"
+      },
+      "body": "css"
+    },
+    {
+      "method": "GET",
+      "path": "/types/file.html",
+      "headers": {},
+      "left": false,
+      "status": 200,
+      "answered": {
+        "cache-control": "public, max-age=86400",
+        "accept-ranges": "bytes",
+        "last-modified": "Tue, 14 Nov 2023 22:13:20 GMT",
+        "etag": "W/\"4-18bcfe56800\"",
+        "content-type": "text/html; charset=utf-8",
+        "content-length": "4"
+      },
+      "body": "html"
+    },
+    {
+      "method": "GET",
+      "path": "/types/file.json",
+      "headers": {},
+      "left": false,
+      "status": 200,
+      "answered": {
+        "cache-control": "public, max-age=86400",
+        "accept-ranges": "bytes",
+        "last-modified": "Tue, 14 Nov 2023 22:13:20 GMT",
+        "etag": "W/\"4-18bcfe56800\"",
+        "content-type": "application/json; charset=utf-8",
+        "content-length": "4"
+      },
+      "body": "json"
+    },
+    {
+      "method": "GET",
+      "path": "/types/file.map",
+      "headers": {},
+      "left": false,
+      "status": 200,
+      "answered": {
+        "cache-control": "public, max-age=86400",
+        "accept-ranges": "bytes",
+        "last-modified": "Tue, 14 Nov 2023 22:13:20 GMT",
+        "etag": "W/\"3-18bcfe56800\"",
+        "content-type": "application/json; charset=utf-8",
+        "content-length": "3"
+      },
+      "body": "map"
+    },
+    {
+      "method": "GET",
+      "path": "/types/file.webmanifest",
+      "headers": {},
+      "left": false,
+      "status": 200,
+      "answered": {
+        "cache-control": "public, max-age=86400",
+        "accept-ranges": "bytes",
+        "last-modified": "Tue, 14 Nov 2023 22:13:20 GMT",
+        "etag": "W/\"b-18bcfe56800\"",
+        "content-type": "application/manifest+json; charset=utf-8",
+        "content-length": "11"
+      },
+      "body": "webmanifest"
+    },
+    {
+      "method": "GET",
+      "path": "/types/file.txt",
+      "headers": {},
+      "left": false,
+      "status": 200,
+      "answered": {
+        "cache-control": "public, max-age=86400",
+        "accept-ranges": "bytes",
+        "last-modified": "Tue, 14 Nov 2023 22:13:20 GMT",
+        "etag": "W/\"3-18bcfe56800\"",
+        "content-type": "text/plain; charset=utf-8",
+        "content-length": "3"
+      },
+      "body": "txt"
+    },
+    {
+      "method": "GET",
+      "path": "/types/file.xml",
+      "headers": {},
+      "left": false,
+      "status": 200,
+      "answered": {
+        "cache-control": "public, max-age=86400",
+        "accept-ranges": "bytes",
+        "last-modified": "Tue, 14 Nov 2023 22:13:20 GMT",
+        "etag": "W/\"3-18bcfe56800\"",
+        "content-type": "application/xml",
+        "content-length": "3"
+      },
+      "body": "xml"
+    },
+    {
+      "method": "GET",
+      "path": "/types/file.svg",
+      "headers": {},
+      "left": false,
+      "status": 200,
+      "answered": {
+        "cache-control": "public, max-age=86400",
+        "accept-ranges": "bytes",
+        "last-modified": "Tue, 14 Nov 2023 22:13:20 GMT",
+        "etag": "W/\"3-18bcfe56800\"",
+        "content-type": "image/svg+xml",
+        "content-length": "3"
+      },
+      "body": "svg"
+    },
+    {
+      "method": "GET",
+      "path": "/types/file.png",
+      "headers": {},
+      "left": false,
+      "status": 200,
+      "answered": {
+        "cache-control": "public, max-age=86400",
+        "accept-ranges": "bytes",
+        "last-modified": "Tue, 14 Nov 2023 22:13:20 GMT",
+        "etag": "W/\"3-18bcfe56800\"",
+        "content-type": "image/png",
+        "content-length": "3"
+      },
+      "body": "png"
+    },
+    {
+      "method": "GET",
+      "path": "/types/file.jpg",
+      "headers": {},
+      "left": false,
+      "status": 200,
+      "answered": {
+        "cache-control": "public, max-age=86400",
+        "accept-ranges": "bytes",
+        "last-modified": "Tue, 14 Nov 2023 22:13:20 GMT",
+        "etag": "W/\"3-18bcfe56800\"",
+        "content-type": "image/jpeg",
+        "content-length": "3"
+      },
+      "body": "jpg"
+    },
+    {
+      "method": "GET",
+      "path": "/types/file.jpeg",
+      "headers": {},
+      "left": false,
+      "status": 200,
+      "answered": {
+        "cache-control": "public, max-age=86400",
+        "accept-ranges": "bytes",
+        "last-modified": "Tue, 14 Nov 2023 22:13:20 GMT",
+        "etag": "W/\"4-18bcfe56800\"",
+        "content-type": "image/jpeg",
+        "content-length": "4"
+      },
+      "body": "jpeg"
+    },
+    {
+      "method": "GET",
+      "path": "/types/file.gif",
+      "headers": {},
+      "left": false,
+      "status": 200,
+      "answered": {
+        "cache-control": "public, max-age=86400",
+        "accept-ranges": "bytes",
+        "last-modified": "Tue, 14 Nov 2023 22:13:20 GMT",
+        "etag": "W/\"3-18bcfe56800\"",
+        "content-type": "image/gif",
+        "content-length": "3"
+      },
+      "body": "gif"
+    },
+    {
+      "method": "GET",
+      "path": "/types/file.webp",
+      "headers": {},
+      "left": false,
+      "status": 200,
+      "answered": {
+        "cache-control": "public, max-age=86400",
+        "accept-ranges": "bytes",
+        "last-modified": "Tue, 14 Nov 2023 22:13:20 GMT",
+        "etag": "W/\"4-18bcfe56800\"",
+        "content-type": "image/webp",
+        "content-length": "4"
+      },
+      "body": "webp"
+    },
+    {
+      "method": "GET",
+      "path": "/types/file.avif",
+      "headers": {},
+      "left": false,
+      "status": 200,
+      "answered": {
+        "cache-control": "public, max-age=86400",
+        "accept-ranges": "bytes",
+        "last-modified": "Tue, 14 Nov 2023 22:13:20 GMT",
+        "etag": "W/\"4-18bcfe56800\"",
+        "content-type": "image/avif",
+        "content-length": "4"
+      },
+      "body": "avif"
+    },
+    {
+      "method": "GET",
+      "path": "/types/file.ico",
+      "headers": {},
+      "left": false,
+      "status": 200,
+      "answered": {
+        "cache-control": "public, max-age=86400",
+        "accept-ranges": "bytes",
+        "last-modified": "Tue, 14 Nov 2023 22:13:20 GMT",
+        "etag": "W/\"3-18bcfe56800\"",
+        "content-type": "image/vnd.microsoft.icon",
+        "content-length": "3"
+      },
+      "body": "ico"
+    },
+    {
+      "method": "GET",
+      "path": "/types/file.woff",
+      "headers": {},
+      "left": false,
+      "status": 200,
+      "answered": {
+        "cache-control": "public, max-age=86400",
+        "accept-ranges": "bytes",
+        "last-modified": "Tue, 14 Nov 2023 22:13:20 GMT",
+        "etag": "W/\"4-18bcfe56800\"",
+        "content-type": "font/woff",
+        "content-length": "4"
+      },
+      "body": "woff"
+    },
+    {
+      "method": "GET",
+      "path": "/types/file.woff2",
+      "headers": {},
+      "left": false,
+      "status": 200,
+      "answered": {
+        "cache-control": "public, max-age=86400",
+        "accept-ranges": "bytes",
+        "last-modified": "Tue, 14 Nov 2023 22:13:20 GMT",
+        "etag": "W/\"5-18bcfe56800\"",
+        "content-type": "font/woff2",
+        "content-length": "5"
+      },
+      "body": "woff2"
+    },
+    {
+      "method": "GET",
+      "path": "/types/file.ttf",
+      "headers": {},
+      "left": false,
+      "status": 200,
+      "answered": {
+        "cache-control": "public, max-age=86400",
+        "accept-ranges": "bytes",
+        "last-modified": "Tue, 14 Nov 2023 22:13:20 GMT",
+        "etag": "W/\"3-18bcfe56800\"",
+        "content-type": "font/ttf",
+        "content-length": "3"
+      },
+      "body": "ttf"
+    },
+    {
+      "method": "GET",
+      "path": "/types/file.otf",
+      "headers": {},
+      "left": false,
+      "status": 200,
+      "answered": {
+        "cache-control": "public, max-age=86400",
+        "accept-ranges": "bytes",
+        "last-modified": "Tue, 14 Nov 2023 22:13:20 GMT",
+        "etag": "W/\"3-18bcfe56800\"",
+        "content-type": "font/otf",
+        "content-length": "3"
+      },
+      "body": "otf"
+    },
+    {
+      "method": "GET",
+      "path": "/types/file.mp4",
+      "headers": {},
+      "left": false,
+      "status": 200,
+      "answered": {
+        "cache-control": "public, max-age=86400",
+        "accept-ranges": "bytes",
+        "last-modified": "Tue, 14 Nov 2023 22:13:20 GMT",
+        "etag": "W/\"3-18bcfe56800\"",
+        "content-type": "video/mp4",
+        "content-length": "3"
+      },
+      "body": "mp4"
+    },
+    {
+      "method": "GET",
+      "path": "/types/file.webm",
+      "headers": {},
+      "left": false,
+      "status": 200,
+      "answered": {
+        "cache-control": "public, max-age=86400",
+        "accept-ranges": "bytes",
+        "last-modified": "Tue, 14 Nov 2023 22:13:20 GMT",
+        "etag": "W/\"4-18bcfe56800\"",
+        "content-type": "video/webm",
+        "content-length": "4"
+      },
+      "body": "webm"
+    },
+    {
+      "method": "GET",
+      "path": "/types/file.mov",
+      "headers": {},
+      "left": false,
+      "status": 200,
+      "answered": {
+        "cache-control": "public, max-age=86400",
+        "accept-ranges": "bytes",
+        "last-modified": "Tue, 14 Nov 2023 22:13:20 GMT",
+        "etag": "W/\"3-18bcfe56800\"",
+        "content-type": "video/quicktime",
+        "content-length": "3"
+      },
+      "body": "mov"
+    },
+    {
+      "method": "GET",
+      "path": "/types/file.mp3",
+      "headers": {},
+      "left": false,
+      "status": 200,
+      "answered": {
+        "cache-control": "public, max-age=86400",
+        "accept-ranges": "bytes",
+        "last-modified": "Tue, 14 Nov 2023 22:13:20 GMT",
+        "etag": "W/\"3-18bcfe56800\"",
+        "content-type": "audio/mpeg",
+        "content-length": "3"
+      },
+      "body": "mp3"
+    },
+    {
+      "method": "GET",
+      "path": "/types/file.wasm",
+      "headers": {},
+      "left": false,
+      "status": 200,
+      "answered": {
+        "cache-control": "public, max-age=86400",
+        "accept-ranges": "bytes",
+        "last-modified": "Tue, 14 Nov 2023 22:13:20 GMT",
+        "etag": "W/\"4-18bcfe56800\"",
+        "content-type": "application/wasm",
+        "content-length": "4"
+      },
+      "body": "wasm"
+    },
+    {
+      "method": "GET",
+      "path": "/types/file.pdf",
+      "headers": {},
+      "left": false,
+      "status": 200,
+      "answered": {
+        "cache-control": "public, max-age=86400",
+        "accept-ranges": "bytes",
+        "last-modified": "Tue, 14 Nov 2023 22:13:20 GMT",
+        "etag": "W/\"3-18bcfe56800\"",
+        "content-type": "application/pdf",
+        "content-length": "3"
+      },
+      "body": "pdf"
+    },
+    {
+      "method": "GET",
+      "path": "/assets/index-DaeHe8mh.js",
+      "headers": {
+        "if-none-match": "W/\"16-19b7ca99070\""
+      },
+      "left": false,
+      "status": 304,
+      "answered": {
+        "cache-control": "public, max-age=31536000, immutable",
+        "accept-ranges": "bytes",
+        "last-modified": "Fri, 02 Jan 2026 03:04:06 GMT",
+        "etag": "W/\"16-19b7ca99070\""
+      },
+      "body": ""
+    },
+    {
+      "method": "HEAD",
+      "path": "/assets/index-DaeHe8mh.js",
+      "headers": {
+        "if-none-match": "W/\"16-19b7ca99070\""
+      },
+      "left": false,
+      "status": 304,
+      "answered": {
+        "cache-control": "public, max-age=31536000, immutable",
+        "accept-ranges": "bytes",
+        "last-modified": "Fri, 02 Jan 2026 03:04:06 GMT",
+        "etag": "W/\"16-19b7ca99070\""
+      },
+      "body": ""
+    },
+    {
+      "method": "GET",
+      "path": "/assets/index-DaeHe8mh.js",
+      "headers": {
+        "if-none-match": "\"16-19b7ca99070\""
+      },
+      "left": false,
+      "status": 304,
+      "answered": {
+        "cache-control": "public, max-age=31536000, immutable",
+        "accept-ranges": "bytes",
+        "last-modified": "Fri, 02 Jan 2026 03:04:06 GMT",
+        "etag": "W/\"16-19b7ca99070\""
+      },
+      "body": ""
+    },
+    {
+      "method": "GET",
+      "path": "/assets/index-DaeHe8mh.js",
+      "headers": {
+        "if-none-match": "\"other\", W/\"16-19b7ca99070\""
+      },
+      "left": false,
+      "status": 304,
+      "answered": {
+        "cache-control": "public, max-age=31536000, immutable",
+        "accept-ranges": "bytes",
+        "last-modified": "Fri, 02 Jan 2026 03:04:06 GMT",
+        "etag": "W/\"16-19b7ca99070\""
+      },
+      "body": ""
+    },
+    {
+      "method": "GET",
+      "path": "/assets/index-DaeHe8mh.js",
+      "headers": {
+        "if-none-match": "\"other\""
+      },
+      "left": false,
+      "status": 200,
+      "answered": {
+        "cache-control": "public, max-age=31536000, immutable",
+        "accept-ranges": "bytes",
+        "last-modified": "Fri, 02 Jan 2026 03:04:06 GMT",
+        "etag": "W/\"16-19b7ca99070\"",
+        "content-type": "text/javascript; charset=utf-8",
+        "content-length": "22"
+      },
+      "body": "console.log(\"hashed\")\n"
+    },
+    {
+      "method": "GET",
+      "path": "/assets/index-DaeHe8mh.js",
+      "headers": {
+        "if-none-match": "*"
+      },
+      "left": false,
+      "status": 304,
+      "answered": {
+        "cache-control": "public, max-age=31536000, immutable",
+        "accept-ranges": "bytes",
+        "last-modified": "Fri, 02 Jan 2026 03:04:06 GMT",
+        "etag": "W/\"16-19b7ca99070\""
+      },
+      "body": ""
+    },
+    {
+      "method": "GET",
+      "path": "/assets/index-DaeHe8mh.js",
+      "headers": {
+        "if-none-match": "W/\"16-19b7ca99070\"",
+        "cache-control": "max-age=0, no-cache"
+      },
+      "left": false,
+      "status": 200,
+      "answered": {
+        "cache-control": "public, max-age=31536000, immutable",
+        "accept-ranges": "bytes",
+        "last-modified": "Fri, 02 Jan 2026 03:04:06 GMT",
+        "etag": "W/\"16-19b7ca99070\"",
+        "content-type": "text/javascript; charset=utf-8",
+        "content-length": "22"
+      },
+      "body": "console.log(\"hashed\")\n"
+    },
+    {
+      "method": "GET",
+      "path": "/assets/index-DaeHe8mh.js",
+      "headers": {
+        "if-none-match": "W/\"16-19b7ca99070\"",
+        "cache-control": "no-cache-please"
+      },
+      "left": false,
+      "status": 304,
+      "answered": {
+        "cache-control": "public, max-age=31536000, immutable",
+        "accept-ranges": "bytes",
+        "last-modified": "Fri, 02 Jan 2026 03:04:06 GMT",
+        "etag": "W/\"16-19b7ca99070\""
+      },
+      "body": ""
+    },
+    {
+      "method": "GET",
+      "path": "/assets/index-DaeHe8mh.js",
+      "headers": {
+        "if-modified-since": "Fri, 02 Jan 2026 03:04:06 GMT"
+      },
+      "left": false,
+      "status": 304,
+      "answered": {
+        "cache-control": "public, max-age=31536000, immutable",
+        "accept-ranges": "bytes",
+        "last-modified": "Fri, 02 Jan 2026 03:04:06 GMT",
+        "etag": "W/\"16-19b7ca99070\""
+      },
+      "body": ""
+    },
+    {
+      "method": "GET",
+      "path": "/assets/index-DaeHe8mh.js",
+      "headers": {
+        "if-modified-since": "Sat, 03 Jan 2026 00:00:00 GMT"
+      },
+      "left": false,
+      "status": 304,
+      "answered": {
+        "cache-control": "public, max-age=31536000, immutable",
+        "accept-ranges": "bytes",
+        "last-modified": "Fri, 02 Jan 2026 03:04:06 GMT",
+        "etag": "W/\"16-19b7ca99070\""
+      },
+      "body": ""
+    },
+    {
+      "method": "GET",
+      "path": "/assets/index-DaeHe8mh.js",
+      "headers": {
+        "if-modified-since": "Fri, 02 Jan 2026 03:04:05 GMT"
+      },
+      "left": false,
+      "status": 200,
+      "answered": {
+        "cache-control": "public, max-age=31536000, immutable",
+        "accept-ranges": "bytes",
+        "last-modified": "Fri, 02 Jan 2026 03:04:06 GMT",
+        "etag": "W/\"16-19b7ca99070\"",
+        "content-type": "text/javascript; charset=utf-8",
+        "content-length": "22"
+      },
+      "body": "console.log(\"hashed\")\n"
+    },
+    {
+      "method": "GET",
+      "path": "/assets/index-DaeHe8mh.js",
+      "headers": {
+        "if-modified-since": "Thu, 01 Jan 1970 00:00:00 GMT"
+      },
+      "left": false,
+      "status": 200,
+      "answered": {
+        "cache-control": "public, max-age=31536000, immutable",
+        "accept-ranges": "bytes",
+        "last-modified": "Fri, 02 Jan 2026 03:04:06 GMT",
+        "etag": "W/\"16-19b7ca99070\"",
+        "content-type": "text/javascript; charset=utf-8",
+        "content-length": "22"
+      },
+      "body": "console.log(\"hashed\")\n"
+    },
+    {
+      "method": "GET",
+      "path": "/assets/index-DaeHe8mh.js",
+      "headers": {
+        "if-modified-since": "yesterday"
+      },
+      "left": true,
+      "status": 200,
+      "answered": {
+        "cache-control": "public, max-age=31536000, immutable",
+        "accept-ranges": "bytes",
+        "last-modified": "Fri, 02 Jan 2026 03:04:06 GMT",
+        "etag": "W/\"16-19b7ca99070\"",
+        "content-type": "text/javascript; charset=utf-8",
+        "content-length": "22"
+      },
+      "body": "console.log(\"hashed\")\n"
+    },
+    {
+      "method": "GET",
+      "path": "/assets/index-DaeHe8mh.js",
+      "headers": {
+        "if-modified-since": "2026-01-03T00:00:00Z"
+      },
+      "left": true,
+      "status": 304,
+      "answered": {
+        "cache-control": "public, max-age=31536000, immutable",
+        "accept-ranges": "bytes",
+        "last-modified": "Fri, 02 Jan 2026 03:04:06 GMT",
+        "etag": "W/\"16-19b7ca99070\""
+      },
+      "body": ""
+    },
+    {
+      "method": "GET",
+      "path": "/assets/index-DaeHe8mh.js",
+      "headers": {
+        "if-none-match": "\"other\"",
+        "if-modified-since": "Sat, 03 Jan 2026 00:00:00 GMT"
+      },
+      "left": false,
+      "status": 200,
+      "answered": {
+        "cache-control": "public, max-age=31536000, immutable",
+        "accept-ranges": "bytes",
+        "last-modified": "Fri, 02 Jan 2026 03:04:06 GMT",
+        "etag": "W/\"16-19b7ca99070\"",
+        "content-type": "text/javascript; charset=utf-8",
+        "content-length": "22"
+      },
+      "body": "console.log(\"hashed\")\n"
+    },
+    {
+      "method": "GET",
+      "path": "/assets/index-DaeHe8mh.js",
+      "headers": {
+        "if-match": "W/\"16-19b7ca99070\""
+      },
+      "left": false,
+      "status": 200,
+      "answered": {
+        "cache-control": "public, max-age=31536000, immutable",
+        "accept-ranges": "bytes",
+        "last-modified": "Fri, 02 Jan 2026 03:04:06 GMT",
+        "etag": "W/\"16-19b7ca99070\"",
+        "content-type": "text/javascript; charset=utf-8",
+        "content-length": "22"
+      },
+      "body": "console.log(\"hashed\")\n"
+    },
+    {
+      "method": "GET",
+      "path": "/assets/index-DaeHe8mh.js",
+      "headers": {
+        "if-match": "*"
+      },
+      "left": false,
+      "status": 200,
+      "answered": {
+        "cache-control": "public, max-age=31536000, immutable",
+        "accept-ranges": "bytes",
+        "last-modified": "Fri, 02 Jan 2026 03:04:06 GMT",
+        "etag": "W/\"16-19b7ca99070\"",
+        "content-type": "text/javascript; charset=utf-8",
+        "content-length": "22"
+      },
+      "body": "console.log(\"hashed\")\n"
+    },
+    {
+      "method": "GET",
+      "path": "/assets/index-DaeHe8mh.js",
+      "headers": {
+        "if-match": "\"other\""
+      },
+      "left": true,
+      "status": 298,
+      "answered": {
+        "cache-control": "public, max-age=31536000, immutable",
+        "accept-ranges": "bytes",
+        "last-modified": "Fri, 02 Jan 2026 03:04:06 GMT",
+        "etag": "W/\"16-19b7ca99070\"",
+        "content-type": "text/javascript; charset=utf-8",
+        "content-length": "0"
+      },
+      "body": ""
+    },
+    {
+      "method": "GET",
+      "path": "/assets/index-DaeHe8mh.js",
+      "headers": {
+        "if-unmodified-since": "Sat, 03 Jan 2026 00:00:00 GMT"
+      },
+      "left": false,
+      "status": 200,
+      "answered": {
+        "cache-control": "public, max-age=31536000, immutable",
+        "accept-ranges": "bytes",
+        "last-modified": "Fri, 02 Jan 2026 03:04:06 GMT",
+        "etag": "W/\"16-19b7ca99070\"",
+        "content-type": "text/javascript; charset=utf-8",
+        "content-length": "22"
+      },
+      "body": "console.log(\"hashed\")\n"
+    },
+    {
+      "method": "GET",
+      "path": "/assets/index-DaeHe8mh.js",
+      "headers": {
+        "if-unmodified-since": "Thu, 01 Jan 1970 00:00:00 GMT"
+      },
+      "left": true,
+      "status": 298,
+      "answered": {
+        "cache-control": "public, max-age=31536000, immutable",
+        "accept-ranges": "bytes",
+        "last-modified": "Fri, 02 Jan 2026 03:04:06 GMT",
+        "etag": "W/\"16-19b7ca99070\"",
+        "content-type": "text/javascript; charset=utf-8",
+        "content-length": "0"
+      },
+      "body": ""
+    },
+    {
+      "method": "GET",
+      "path": "/assets/index-DaeHe8mh.js",
+      "headers": {
+        "range": "bytes=0-3"
+      },
+      "left": false,
+      "status": 206,
+      "answered": {
+        "cache-control": "public, max-age=31536000, immutable",
+        "accept-ranges": "bytes",
+        "last-modified": "Fri, 02 Jan 2026 03:04:06 GMT",
+        "etag": "W/\"16-19b7ca99070\"",
+        "content-type": "text/javascript; charset=utf-8",
+        "content-range": "bytes 0-3/22",
+        "content-length": "4"
+      },
+      "body": "cons"
+    },
+    {
+      "method": "HEAD",
+      "path": "/assets/index-DaeHe8mh.js",
+      "headers": {
+        "range": "bytes=0-3"
+      },
+      "left": false,
+      "status": 206,
+      "answered": {
+        "cache-control": "public, max-age=31536000, immutable",
+        "accept-ranges": "bytes",
+        "last-modified": "Fri, 02 Jan 2026 03:04:06 GMT",
+        "etag": "W/\"16-19b7ca99070\"",
+        "content-type": "text/javascript; charset=utf-8",
+        "content-range": "bytes 0-3/22",
+        "content-length": "4"
+      },
+      "body": ""
+    },
+    {
+      "method": "GET",
+      "path": "/assets/index-DaeHe8mh.js",
+      "headers": {
+        "range": "bytes=5-"
+      },
+      "left": false,
+      "status": 206,
+      "answered": {
+        "cache-control": "public, max-age=31536000, immutable",
+        "accept-ranges": "bytes",
+        "last-modified": "Fri, 02 Jan 2026 03:04:06 GMT",
+        "etag": "W/\"16-19b7ca99070\"",
+        "content-type": "text/javascript; charset=utf-8",
+        "content-range": "bytes 5-21/22",
+        "content-length": "17"
+      },
+      "body": "le.log(\"hashed\")\n"
+    },
+    {
+      "method": "GET",
+      "path": "/assets/index-DaeHe8mh.js",
+      "headers": {
+        "range": "bytes=-4"
+      },
+      "left": false,
+      "status": 206,
+      "answered": {
+        "cache-control": "public, max-age=31536000, immutable",
+        "accept-ranges": "bytes",
+        "last-modified": "Fri, 02 Jan 2026 03:04:06 GMT",
+        "etag": "W/\"16-19b7ca99070\"",
+        "content-type": "text/javascript; charset=utf-8",
+        "content-range": "bytes 18-21/22",
+        "content-length": "4"
+      },
+      "body": "d\")\n"
+    },
+    {
+      "method": "GET",
+      "path": "/assets/index-DaeHe8mh.js",
+      "headers": {
+        "range": "bytes=0-99999"
+      },
+      "left": false,
+      "status": 206,
+      "answered": {
+        "cache-control": "public, max-age=31536000, immutable",
+        "accept-ranges": "bytes",
+        "last-modified": "Fri, 02 Jan 2026 03:04:06 GMT",
+        "etag": "W/\"16-19b7ca99070\"",
+        "content-type": "text/javascript; charset=utf-8",
+        "content-range": "bytes 0-21/22",
+        "content-length": "22"
+      },
+      "body": "console.log(\"hashed\")\n"
+    },
+    {
+      "method": "GET",
+      "path": "/assets/index-DaeHe8mh.js",
+      "headers": {
+        "range": "bytes=002-004"
+      },
+      "left": false,
+      "status": 206,
+      "answered": {
+        "cache-control": "public, max-age=31536000, immutable",
+        "accept-ranges": "bytes",
+        "last-modified": "Fri, 02 Jan 2026 03:04:06 GMT",
+        "etag": "W/\"16-19b7ca99070\"",
+        "content-type": "text/javascript; charset=utf-8",
+        "content-range": "bytes 2-4/22",
+        "content-length": "3"
+      },
+      "body": "nso"
+    },
+    {
+      "method": "GET",
+      "path": "/assets/index-DaeHe8mh.js",
+      "headers": {
+        "range": "bytes=0-1,4-5"
+      },
+      "left": true,
+      "status": 200,
+      "answered": {
+        "cache-control": "public, max-age=31536000, immutable",
+        "accept-ranges": "bytes",
+        "last-modified": "Fri, 02 Jan 2026 03:04:06 GMT",
+        "etag": "W/\"16-19b7ca99070\"",
+        "content-type": "text/javascript; charset=utf-8",
+        "content-length": "22"
+      },
+      "body": "console.log(\"hashed\")\n"
+    },
+    {
+      "method": "GET",
+      "path": "/assets/index-DaeHe8mh.js",
+      "headers": {
+        "range": "bytes=99-"
+      },
+      "left": true,
+      "status": 298,
+      "answered": {
+        "cache-control": "public, max-age=31536000, immutable",
+        "accept-ranges": "bytes",
+        "last-modified": "Fri, 02 Jan 2026 03:04:06 GMT",
+        "etag": "W/\"16-19b7ca99070\"",
+        "content-type": "text/javascript; charset=utf-8",
+        "content-range": "bytes */22",
+        "content-length": "0"
+      },
+      "body": ""
+    },
+    {
+      "method": "GET",
+      "path": "/assets/index-DaeHe8mh.js",
+      "headers": {
+        "range": "bytes=-0"
+      },
+      "left": true,
+      "status": 298,
+      "answered": {
+        "cache-control": "public, max-age=31536000, immutable",
+        "accept-ranges": "bytes",
+        "last-modified": "Fri, 02 Jan 2026 03:04:06 GMT",
+        "etag": "W/\"16-19b7ca99070\"",
+        "content-type": "text/javascript; charset=utf-8",
+        "content-range": "bytes */22",
+        "content-length": "0"
+      },
+      "body": ""
+    },
+    {
+      "method": "GET",
+      "path": "/assets/index-DaeHe8mh.js",
+      "headers": {
+        "range": "bytes=3-1"
+      },
+      "left": true,
+      "status": 298,
+      "answered": {
+        "cache-control": "public, max-age=31536000, immutable",
+        "accept-ranges": "bytes",
+        "last-modified": "Fri, 02 Jan 2026 03:04:06 GMT",
+        "etag": "W/\"16-19b7ca99070\"",
+        "content-type": "text/javascript; charset=utf-8",
+        "content-range": "bytes */22",
+        "content-length": "0"
+      },
+      "body": ""
+    },
+    {
+      "method": "GET",
+      "path": "/assets/index-DaeHe8mh.js",
+      "headers": {
+        "range": "bytes= 0-3"
+      },
+      "left": true,
+      "status": 206,
+      "answered": {
+        "cache-control": "public, max-age=31536000, immutable",
+        "accept-ranges": "bytes",
+        "last-modified": "Fri, 02 Jan 2026 03:04:06 GMT",
+        "etag": "W/\"16-19b7ca99070\"",
+        "content-type": "text/javascript; charset=utf-8",
+        "content-range": "bytes 0-3/22",
+        "content-length": "4"
+      },
+      "body": "cons"
+    },
+    {
+      "method": "GET",
+      "path": "/assets/index-DaeHe8mh.js",
+      "headers": {
+        "range": "items=0-3"
+      },
+      "left": false,
+      "status": 200,
+      "answered": {
+        "cache-control": "public, max-age=31536000, immutable",
+        "accept-ranges": "bytes",
+        "last-modified": "Fri, 02 Jan 2026 03:04:06 GMT",
+        "etag": "W/\"16-19b7ca99070\"",
+        "content-type": "text/javascript; charset=utf-8",
+        "content-length": "22"
+      },
+      "body": "console.log(\"hashed\")\n"
+    },
+    {
+      "method": "GET",
+      "path": "/assets/index-DaeHe8mh.js",
+      "headers": {
+        "range": "bytes=0-3",
+        "if-range": "W/\"16-19b7ca99070\""
+      },
+      "left": false,
+      "status": 206,
+      "answered": {
+        "cache-control": "public, max-age=31536000, immutable",
+        "accept-ranges": "bytes",
+        "last-modified": "Fri, 02 Jan 2026 03:04:06 GMT",
+        "etag": "W/\"16-19b7ca99070\"",
+        "content-type": "text/javascript; charset=utf-8",
+        "content-range": "bytes 0-3/22",
+        "content-length": "4"
+      },
+      "body": "cons"
+    },
+    {
+      "method": "GET",
+      "path": "/assets/index-DaeHe8mh.js",
+      "headers": {
+        "range": "bytes=0-3",
+        "if-range": "\"other\""
+      },
+      "left": false,
+      "status": 200,
+      "answered": {
+        "cache-control": "public, max-age=31536000, immutable",
+        "accept-ranges": "bytes",
+        "last-modified": "Fri, 02 Jan 2026 03:04:06 GMT",
+        "etag": "W/\"16-19b7ca99070\"",
+        "content-type": "text/javascript; charset=utf-8",
+        "content-length": "22"
+      },
+      "body": "console.log(\"hashed\")\n"
+    },
+    {
+      "method": "GET",
+      "path": "/assets/index-DaeHe8mh.js",
+      "headers": {
+        "range": "bytes=0-3",
+        "if-range": "Fri, 02 Jan 2026 03:04:06 GMT"
+      },
+      "left": false,
+      "status": 206,
+      "answered": {
+        "cache-control": "public, max-age=31536000, immutable",
+        "accept-ranges": "bytes",
+        "last-modified": "Fri, 02 Jan 2026 03:04:06 GMT",
+        "etag": "W/\"16-19b7ca99070\"",
+        "content-type": "text/javascript; charset=utf-8",
+        "content-range": "bytes 0-3/22",
+        "content-length": "4"
+      },
+      "body": "cons"
+    },
+    {
+      "method": "GET",
+      "path": "/assets/index-DaeHe8mh.js",
+      "headers": {
+        "range": "bytes=0-3",
+        "if-range": "Thu, 01 Jan 1970 00:00:00 GMT"
+      },
+      "left": false,
+      "status": 200,
+      "answered": {
+        "cache-control": "public, max-age=31536000, immutable",
+        "accept-ranges": "bytes",
+        "last-modified": "Fri, 02 Jan 2026 03:04:06 GMT",
+        "etag": "W/\"16-19b7ca99070\"",
+        "content-type": "text/javascript; charset=utf-8",
+        "content-length": "22"
+      },
+      "body": "console.log(\"hashed\")\n"
+    },
+    {
+      "method": "GET",
+      "path": "/assets/index-DaeHe8mh.js",
+      "headers": {
+        "range": "bytes=99-",
+        "if-range": "\"other\""
+      },
+      "left": false,
+      "status": 200,
+      "answered": {
+        "cache-control": "public, max-age=31536000, immutable",
+        "accept-ranges": "bytes",
+        "last-modified": "Fri, 02 Jan 2026 03:04:06 GMT",
+        "etag": "W/\"16-19b7ca99070\"",
+        "content-type": "text/javascript; charset=utf-8",
+        "content-length": "22"
+      },
+      "body": "console.log(\"hashed\")\n"
+    },
+    {
+      "method": "GET",
+      "path": "/empty.txt",
+      "headers": {
+        "range": "bytes=0-"
+      },
+      "left": true,
+      "status": 298,
+      "answered": {
+        "cache-control": "public, max-age=86400",
+        "accept-ranges": "bytes",
+        "last-modified": "Tue, 14 Nov 2023 22:13:20 GMT",
+        "etag": "W/\"0-18bcfe568fa\"",
+        "content-type": "text/plain; charset=utf-8",
+        "content-range": "bytes */0",
+        "content-length": "0"
+      },
+      "body": ""
+    },
+    {
+      "method": "GET",
+      "path": "/assets/index-DaeHe8mh.js",
+      "headers": {
+        "range": "bytes=0-3",
+        "if-none-match": "W/\"16-19b7ca99070\""
+      },
+      "left": false,
+      "status": 304,
+      "answered": {
+        "cache-control": "public, max-age=31536000, immutable",
+        "accept-ranges": "bytes",
+        "last-modified": "Fri, 02 Jan 2026 03:04:06 GMT",
+        "etag": "W/\"16-19b7ca99070\""
+      },
+      "body": ""
+    },
+    {
+      "method": "GET",
+      "path": "/missing.js",
+      "headers": {},
+      "left": true,
+      "status": 299,
+      "answered": {
+        "content-length": "0"
+      },
+      "body": ""
+    },
+    {
+      "method": "GET",
+      "path": "/assets",
+      "headers": {},
+      "left": true,
+      "status": 301,
+      "answered": {
+        "content-type": "text/html; charset=UTF-8",
+        "content-length": "156",
+        "content-security-policy": "default-src 'none'",
+        "x-content-type-options": "nosniff",
+        "location": "/assets/"
+      },
+      "body": "<!DOCTYPE html>\n<html lang=\"en\">\n<head>\n<meta charset=\"utf-8\">\n<title>Redirecting</title>\n</head>\n<body>\n<pre>Redirecting to /assets/</pre>\n</body>\n</html>\n"
+    },
+    {
+      "method": "GET",
+      "path": "/assets/",
+      "headers": {},
+      "left": true,
+      "status": 200,
+      "answered": {
+        "cache-control": "public, max-age=31536000, immutable",
+        "accept-ranges": "bytes",
+        "last-modified": "Tue, 14 Nov 2023 22:13:20 GMT",
+        "etag": "W/\"d-18bcfe56800\"",
+        "content-type": "text/html; charset=utf-8",
+        "content-length": "13"
+      },
+      "body": "<p>nested</p>"
+    },
+    {
+      "method": "GET",
+      "path": "/.hidden",
+      "headers": {},
+      "left": true,
+      "status": 299,
+      "answered": {
+        "content-length": "0"
+      },
+      "body": ""
+    },
+    {
+      "method": "GET",
+      "path": "/assets/../icon.png",
+      "headers": {},
+      "left": true,
+      "status": 200,
+      "answered": {
+        "cache-control": "public, max-age=86400",
+        "accept-ranges": "bytes",
+        "last-modified": "Fri, 02 Jan 2026 03:04:05 GMT",
+        "etag": "W/\"10-19b7ca98e7b\"",
+        "content-type": "image/png",
+        "content-length": "16"
+      },
+      "body": "not really a png"
+    },
+    {
+      "method": "GET",
+      "path": "/assets/%2e%2e/icon.png",
+      "headers": {},
+      "left": true,
+      "status": 200,
+      "answered": {
+        "cache-control": "public, max-age=86400",
+        "accept-ranges": "bytes",
+        "last-modified": "Fri, 02 Jan 2026 03:04:05 GMT",
+        "etag": "W/\"10-19b7ca98e7b\"",
+        "content-type": "image/png",
+        "content-length": "16"
+      },
+      "body": "not really a png"
+    },
+    {
+      "method": "GET",
+      "path": "/../etc/passwd",
+      "headers": {},
+      "left": true,
+      "status": 299,
+      "answered": {
+        "content-length": "0"
+      },
+      "body": ""
+    },
+    {
+      "method": "GET",
+      "path": "/%2e%2e/etc/passwd",
+      "headers": {},
+      "left": true,
+      "status": 299,
+      "answered": {
+        "content-length": "0"
+      },
+      "body": ""
+    },
+    {
+      "method": "GET",
+      "path": "/%00",
+      "headers": {},
+      "left": true,
+      "status": 299,
+      "answered": {
+        "content-length": "0"
+      },
+      "body": ""
+    },
+    {
+      "method": "GET",
+      "path": "/%E0%A4%A",
+      "headers": {},
+      "left": true,
+      "status": 299,
+      "answered": {
+        "content-length": "0"
+      },
+      "body": ""
+    },
+    {
+      "method": "GET",
+      "path": "//icon.png",
+      "headers": {},
+      "left": true,
+      "status": 200,
+      "answered": {
+        "cache-control": "public, max-age=86400",
+        "accept-ranges": "bytes",
+        "last-modified": "Fri, 02 Jan 2026 03:04:05 GMT",
+        "etag": "W/\"10-19b7ca98e7b\"",
+        "content-type": "image/png",
+        "content-length": "16"
+      },
+      "body": "not really a png"
+    },
+    {
+      "method": "GET",
+      "path": "/assets\\..\\icon.png",
+      "headers": {},
+      "left": true,
+      "status": 299,
+      "answered": {
+        "content-length": "0"
+      },
+      "body": ""
+    },
+    {
+      "method": "POST",
+      "path": "/assets/index-DaeHe8mh.js",
+      "headers": {},
+      "left": true,
+      "status": 299,
+      "answered": {
+        "content-length": "0"
+      },
+      "body": ""
+    }
+  ],
+  "etags": [
+    [
+      "",
+      "W/\"0-2jmj7l5rSw0yVb/vlWAYkK/YBwk\""
+    ],
+    [
+      "User-agent: *\nAllow: /\nDisallow: /__ent_auth/\nDisallow: /__ent_proxy/",
+      "W/\"45-K9lwVPcMxTFGf9z6+0zm0GKRVxM\""
+    ],
+    [
+      "User-agent: *\nAllow: /\nDisallow: /__ent_auth/\nDisallow: /__ent_proxy/\nSitemap: https://tafac.fr/sitemap.xml",
+      "W/\"6b-XYfqZxXQtODByMEVbVO3J0aOqrw\""
+    ],
+    [
+      "{\"webcredentials\":{\"apps\":[\"ABCDE12345.fr.tafac.desktop\"]}}",
+      "W/\"3b-CgNPQ8ePTTCK540H3D9DKBrqJpw\""
+    ],
+    [
+      "é",
+      "W/\"2-vxW+cXrBsIC08cRWaSgliR/1Bz0\""
+    ],
+    [
+      "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+      "W/\"3e8-w++mkPo/3S4lJoU+7WcFOOoSdjg\""
+    ]
+  ],
+  "pagePolicies": [
+    [
+      "<p>no script</p>",
+      "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https: http:; font-src 'self' data:; media-src 'self' data: blob:; connect-src 'self' https://api.open-meteo.com https://geocoding-api.open-meteo.com https://nominatim.openstreetmap.org https://api.github.com https://api.iconify.design https://api.simplesvg.com https://api.unisvg.com; frame-src 'self'; worker-src 'self'; manifest-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'self'"
+    ],
+    [
+      "<script>theme()</script><script src=\"/app.js\"></script>",
+      "default-src 'self'; script-src 'self' 'sha256-Rfr3GgHZFiXm+TmNr+li+0sZ4J9FGllo8jsXcJF5XZ8='; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https: http:; font-src 'self' data:; media-src 'self' data: blob:; connect-src 'self' https://api.open-meteo.com https://geocoding-api.open-meteo.com https://nominatim.openstreetmap.org https://api.github.com https://api.iconify.design https://api.simplesvg.com https://api.unisvg.com; frame-src 'self'; worker-src 'self'; manifest-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'self'"
+    ],
+    [
+      "<head>\n    <script type=\"application/ld+json\">{\"@context\":\"https://schema.org\"}</script>\n    <script>document.documentElement.dataset.theme = 'dark'</script>\n    <script type=\"module\">import '/x.js'</script>\n    <script type=\"module\" crossorigin src=\"/assets/index.js\"></script>\n    <script src=\"/a.js\"> </script>\n    <script></script>\n  </head>",
+      "default-src 'self'; script-src 'self' 'sha256-OtwzC4kLCUqUC1CG1s30zaJDdDxZwQK0GoeqKYn4JMc=' 'sha256-qUZKMOllPk7k0gA2Vk3gvLuaNJuCb/uSdc1sQCykBPs='; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https: http:; font-src 'self' data:; media-src 'self' data: blob:; connect-src 'self' https://api.open-meteo.com https://geocoding-api.open-meteo.com https://nominatim.openstreetmap.org https://api.github.com https://api.iconify.design https://api.simplesvg.com https://api.unisvg.com; frame-src 'self'; worker-src 'self'; manifest-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'self'"
+    ],
+    [
+      "<SCRIPT TYPE=\"TEXT/JAVASCRIPT\">a()</SCRIPT><script type=\" module \">b()</script><script type=\"text/plain\">c()</script>",
+      "default-src 'self'; script-src 'self' 'sha256-qVpDBgj7bpq5hMAcGp3AOc79J3Y1Z4HvySTwKrWDoy4=' 'sha256-cf242PFc/kb7xD0Qzhsmd9vvRkc+cWFmbi+k+YvtdKc='; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https: http:; font-src 'self' data:; media-src 'self' data: blob:; connect-src 'self' https://api.open-meteo.com https://geocoding-api.open-meteo.com https://nominatim.openstreetmap.org https://api.github.com https://api.iconify.design https://api.simplesvg.com https://api.unisvg.com; frame-src 'self'; worker-src 'self'; manifest-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'self'"
+    ],
+    [
+      "<script type>d()</script><script type=\"\">e()</script><script data-src=\"x\">f()</script><script srcset=\"x\">g()</script>",
+      "default-src 'self'; script-src 'self' 'sha256-4zBr8UBpE9eDnLz2rHNIBoz7HsYVPjh/vsTpDpPSmAA=' 'sha256-RgVio8Ylgwb9TO4BOoYK273eqBAJT/A5Y6H7GQVloio=' 'sha256-GcEEE0IkDzIP5EQ6DXZaDPORqT5RTBELX8Fyzyg9yvo=' 'sha256-0MnLMx7X/7BMD5xktSLMF+06cYrjoQUKaUL576/RYPk='; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https: http:; font-src 'self' data:; media-src 'self' data: blob:; connect-src 'self' https://api.open-meteo.com https://geocoding-api.open-meteo.com https://nominatim.openstreetmap.org https://api.github.com https://api.iconify.design https://api.simplesvg.com https://api.unisvg.com; frame-src 'self'; worker-src 'self'; manifest-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'self'"
+    ],
+    [
+      "<script SRC>h()</script><script src = 'x'>i()</script><script src=x>j()</script><script x src=\"y\"z>k()</script>",
+      "default-src 'self'; script-src 'self' 'sha256-ODVW3qwa4byZofwQE5/6ef8hI6ama9aSstDQc9f9R4g='; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https: http:; font-src 'self' data:; media-src 'self' data: blob:; connect-src 'self' https://api.open-meteo.com https://geocoding-api.open-meteo.com https://nominatim.openstreetmap.org https://api.github.com https://api.iconify.design https://api.simplesvg.com https://api.unisvg.com; frame-src 'self'; worker-src 'self'; manifest-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'self'"
+    ],
+    [
+      "<scripts>l()</scripts><script>m()</script >n()</script><script>o()</SCRIPT><script>p()",
+      "default-src 'self'; script-src 'self' 'sha256-aq/kQKZCqE8XrMqAdFPm1im8wygDhoK3Wd5dUJQWD7Y=' 'sha256-HAKyi0jmIIl8+H9lsu2QUonvSka5pP8QzcDDHKAzOc8='; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https: http:; font-src 'self' data:; media-src 'self' data: blob:; connect-src 'self' https://api.open-meteo.com https://geocoding-api.open-meteo.com https://nominatim.openstreetmap.org https://api.github.com https://api.iconify.design https://api.simplesvg.com https://api.unisvg.com; frame-src 'self'; worker-src 'self'; manifest-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'self'"
+    ],
+    [
+      "<script>same()</script><script>same()</script><script>unicode(\"é ✓ 📚\")</script><script\ttype=\"module\"\n>q()</script>",
+      "default-src 'self'; script-src 'self' 'sha256-xHe2tAa13bRTbf95OYmU0KYOCVw5CtQw7yL/4NiVuzU=' 'sha256-IAzj7BYT/ETobNbjCjGWMDo+eVCCPr7+wSBFwDdRb5s=' 'sha256-+05UvaPBOazZiIpHRe6LhEDTGLqsjdsJpg+ZoRlo10M='; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https: http:; font-src 'self' data:; media-src 'self' data: blob:; connect-src 'self' https://api.open-meteo.com https://geocoding-api.open-meteo.com https://nominatim.openstreetmap.org https://api.github.com https://api.iconify.design https://api.simplesvg.com https://api.unisvg.com; frame-src 'self'; worker-src 'self'; manifest-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'self'"
+    ],
+    [
+      "<script type=\"application/javascript\">r()</script><script type=\"text/ecmascript\">s()</script><script type=\"text/javascripts\">t()</script>",
+      "default-src 'self'; script-src 'self' 'sha256-Zln7czyuVsj/kW1SRpvacSCYFjxYqdj9rg7YtRgujO4=' 'sha256-DUQvyBW3cp321tqiTMq5r0hc4ZZBR1LgXRjYIlCoW8A='; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https: http:; font-src 'self' data:; media-src 'self' data: blob:; connect-src 'self' https://api.open-meteo.com https://geocoding-api.open-meteo.com https://nominatim.openstreetmap.org https://api.github.com https://api.iconify.design https://api.simplesvg.com https://api.unisvg.com; frame-src 'self'; worker-src 'self'; manifest-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'self'"
+    ],
+    [
+      "<script type='module' src>u()</script><script type=\"module\"src=\"x\">v()</script><script src=\"x\">w()</script>",
+      "default-src 'self'; script-src 'self' 'sha256-XBSXGr2WkAV0l3hAsNmchCdtPE4AhdikBSDJhGVCba8='; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https: http:; font-src 'self' data:; media-src 'self' data: blob:; connect-src 'self' https://api.open-meteo.com https://geocoding-api.open-meteo.com https://nominatim.openstreetmap.org https://api.github.com https://api.iconify.design https://api.simplesvg.com https://api.unisvg.com; frame-src 'self'; worker-src 'self'; manifest-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'self'"
+    ],
+    [
+      "<script type=\"module\" src=\"x\" src>x()</script><script src=\"a\"src=\"b\">y()</script><script type=module>z()</script>",
+      "default-src 'self'; script-src 'self' 'sha256-nwG+cZ8J4yZ7RZ4RWxVDwCwkMn9GJelY2VgKXNi2Uvk=' 'sha256-+IAo/yLFsgWyM2kLoIdrJDRQdjAavwoWj6BtTLULmrM='; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https: http:; font-src 'self' data:; media-src 'self' data: blob:; connect-src 'self' https://api.open-meteo.com https://geocoding-api.open-meteo.com https://nominatim.openstreetmap.org https://api.github.com https://api.iconify.design https://api.simplesvg.com https://api.unisvg.com; frame-src 'self'; worker-src 'self'; manifest-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'self'"
+    ],
+    [
+      "<script>a</script><script>b</script><scriptx>c</script><script/>d</script><script\n>e</script>",
+      "default-src 'self'; script-src 'self' 'sha256-ypeBEsobvcr6wjGzmiPcTaeG7/gUfE5yuYB3ha/uSLs=' 'sha256-PiPoFgA5WUoziU9lZOGxNIu9egCI1CxKy3PurtWcAJ0=' 'sha256-GKw+c0PwFokMUQ6T+TUmEWnZ4/VlQ2Qpgw+vCTT0+OQ=' 'sha256-P3m7e0NbBTIWUdrv03TNxoHcBvqmXjdOODN7iMoEbeo='; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https: http:; font-src 'self' data:; media-src 'self' data: blob:; connect-src 'self' https://api.open-meteo.com https://geocoding-api.open-meteo.com https://nominatim.openstreetmap.org https://api.github.com https://api.iconify.design https://api.simplesvg.com https://api.unisvg.com; frame-src 'self'; worker-src 'self'; manifest-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'self'"
+    ]
+  ]
+}

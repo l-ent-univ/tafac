@@ -1,0 +1,4114 @@
+{
+  "about": "Written by scripts/gateway-data.mjs from src/appIconPicks.js, server/appIcons.js and universities/*: never by hand.",
+  "fileVersion": 1,
+  "maxStoredServices": 500,
+  "maxRequestServices": 200,
+  "maxTitleLength": 120,
+  "maxDescriptionLength": 300,
+  "maxCategoryLength": 40,
+  "servicePattern": "^[A-Za-z0-9][A-Za-z0-9_.-]{0,63}$",
+  "iconNamePattern": "^[a-z0-9]+(?:-[a-z0-9]+)*:[a-z0-9]+(?:-[a-z0-9]+)*$",
+  "generic": "generic",
+  "brands": [
+    "moodle"
+  ],
+  "hues": [
+    "red",
+    "orange",
+    "yellow",
+    "lime",
+    "green",
+    "teal",
+    "cyan",
+    "sky",
+    "blue",
+    "indigo",
+    "violet",
+    "fuchsia",
+    "pink"
+  ],
+  "concepts": [
+    "spell-check",
+    "chat-bot",
+    "chat",
+    "visio",
+    "announcement",
+    "mail",
+    "office",
+    "calendar",
+    "collaboration",
+    "moodle",
+    "course",
+    "exam",
+    "grades",
+    "diploma",
+    "jobs",
+    "student-record",
+    "orientation",
+    "directory",
+    "publications",
+    "library",
+    "research",
+    "search",
+    "vpn",
+    "wifi",
+    "printing",
+    "security",
+    "account",
+    "upload",
+    "cloud",
+    "files",
+    "signature",
+    "video",
+    "documentation",
+    "restaurant",
+    "payment",
+    "map",
+    "card",
+    "help",
+    "sport",
+    "accessibility",
+    "health",
+    "housing",
+    "transport",
+    "international",
+    "languages",
+    "survey",
+    "form",
+    "events",
+    "desktop",
+    "code",
+    "software",
+    "equipment",
+    "booking",
+    "analytics",
+    "phone",
+    "mobile",
+    "settings",
+    "tools",
+    "home",
+    "generic"
+  ],
+  "builtInIcons": {
+    "carbon:spell-check": "spell-check",
+    "carbon:chat-bot": "chat-bot",
+    "carbon:chat": "chat",
+    "carbon:video-chat": "visio",
+    "carbon:bullhorn": "announcement",
+    "carbon:email": "mail",
+    "carbon:apps": "office",
+    "carbon:calendar": "calendar",
+    "carbon:collaborate": "collaboration",
+    "devicon-plain:moodle": "moodle",
+    "carbon:education": "course",
+    "carbon:task": "exam",
+    "carbon:report": "grades",
+    "carbon:certificate": "diploma",
+    "carbon:portfolio": "jobs",
+    "carbon:user-profile": "student-record",
+    "carbon:compass": "orientation",
+    "carbon:user-multiple": "directory",
+    "carbon:catalog": "publications",
+    "carbon:book": "library",
+    "carbon:microscope": "research",
+    "carbon:search": "search",
+    "carbon:vpn": "vpn",
+    "carbon:wifi": "wifi",
+    "carbon:printer": "printing",
+    "carbon:locked": "security",
+    "carbon:password": "account",
+    "carbon:cloud-upload": "upload",
+    "carbon:cloud": "cloud",
+    "carbon:folder": "files",
+    "carbon:document-signed": "signature",
+    "carbon:play-outline": "video",
+    "carbon:notebook": "documentation",
+    "carbon:restaurant": "restaurant",
+    "carbon:wallet": "payment",
+    "carbon:map": "map",
+    "carbon:identification": "card",
+    "carbon:help": "help",
+    "carbon:basketball": "sport",
+    "carbon:accessibility": "accessibility",
+    "carbon:health-cross": "health",
+    "carbon:building": "housing",
+    "carbon:bus": "transport",
+    "carbon:earth": "international",
+    "carbon:translate": "languages",
+    "carbon:list-checked": "survey",
+    "carbon:document": "form",
+    "carbon:events": "events",
+    "carbon:screen": "desktop",
+    "carbon:code": "code",
+    "carbon:download": "software",
+    "carbon:box": "equipment",
+    "carbon:calendar-add-alt": "booking",
+    "carbon:analytics": "analytics",
+    "carbon:phone": "phone",
+    "carbon:mobile": "mobile",
+    "carbon:settings": "settings",
+    "carbon:tool-kit": "tools",
+    "carbon:home": "home",
+    "carbon:application-web": "generic",
+    "ph:text-aa": "spell-check",
+    "ph:robot": "chat-bot",
+    "ph:chats-circle": "chat",
+    "ph:video-camera": "visio",
+    "ph:megaphone": "announcement",
+    "ph:envelope-simple": "mail",
+    "ph:squares-four": "office",
+    "ph:calendar-blank": "calendar",
+    "ph:users-three": "collaboration",
+    "ph:graduation-cap": "course",
+    "ph:exam": "exam",
+    "ph:chart-bar": "grades",
+    "ph:certificate": "diploma",
+    "ph:briefcase": "jobs",
+    "ph:folder-user": "student-record",
+    "ph:compass": "orientation",
+    "ph:address-book": "directory",
+    "ph:books": "publications",
+    "ph:book-open": "library",
+    "ph:flask": "research",
+    "ph:magnifying-glass": "search",
+    "ph:shield-check": "vpn",
+    "ph:wifi-high": "wifi",
+    "ph:printer": "printing",
+    "ph:lock-key": "security",
+    "ph:key": "account",
+    "ph:cloud-arrow-up": "upload",
+    "ph:cloud": "cloud",
+    "ph:folder": "files",
+    "ph:signature": "signature",
+    "ph:play-circle": "video",
+    "ph:notebook": "documentation",
+    "ph:fork-knife": "restaurant",
+    "ph:wallet": "payment",
+    "ph:map-trifold": "map",
+    "ph:identification-card": "card",
+    "ph:question": "help",
+    "ph:basketball": "sport",
+    "ph:wheelchair": "accessibility",
+    "ph:first-aid": "health",
+    "ph:buildings": "housing",
+    "ph:bus": "transport",
+    "ph:globe-hemisphere-west": "international",
+    "ph:translate": "languages",
+    "ph:list-checks": "survey",
+    "ph:file-text": "form",
+    "ph:confetti": "events",
+    "ph:desktop": "desktop",
+    "ph:code": "code",
+    "ph:download-simple": "software",
+    "ph:package": "equipment",
+    "ph:calendar-plus": "booking",
+    "ph:chart-pie-slice": "analytics",
+    "ph:phone": "phone",
+    "ph:device-mobile": "mobile",
+    "ph:gear-six": "settings",
+    "ph:wrench": "tools",
+    "ph:house": "home",
+    "ph:app-window": "generic",
+    "ph:text-aa-fill": "spell-check",
+    "ph:robot-fill": "chat-bot",
+    "ph:chats-circle-fill": "chat",
+    "ph:video-camera-fill": "visio",
+    "ph:megaphone-fill": "announcement",
+    "ph:envelope-simple-fill": "mail",
+    "ph:squares-four-fill": "office",
+    "ph:calendar-blank-fill": "calendar",
+    "ph:users-three-fill": "collaboration",
+    "ph:graduation-cap-fill": "course",
+    "ph:exam-fill": "exam",
+    "ph:chart-bar-fill": "grades",
+    "ph:certificate-fill": "diploma",
+    "ph:briefcase-fill": "jobs",
+    "ph:folder-user-fill": "student-record",
+    "ph:compass-fill": "orientation",
+    "ph:address-book-fill": "directory",
+    "ph:books-fill": "publications",
+    "ph:book-open-fill": "library",
+    "ph:flask-fill": "research",
+    "ph:magnifying-glass-fill": "search",
+    "ph:shield-check-fill": "vpn",
+    "ph:wifi-high-fill": "wifi",
+    "ph:printer-fill": "printing",
+    "ph:lock-key-fill": "security",
+    "ph:key-fill": "account",
+    "ph:cloud-arrow-up-fill": "upload",
+    "ph:cloud-fill": "cloud",
+    "ph:folder-fill": "files",
+    "ph:signature-fill": "signature",
+    "ph:play-circle-fill": "video",
+    "ph:notebook-fill": "documentation",
+    "ph:fork-knife-fill": "restaurant",
+    "ph:wallet-fill": "payment",
+    "ph:map-trifold-fill": "map",
+    "ph:identification-card-fill": "card",
+    "ph:question-fill": "help",
+    "ph:basketball-fill": "sport",
+    "ph:wheelchair-fill": "accessibility",
+    "ph:first-aid-fill": "health",
+    "ph:buildings-fill": "housing",
+    "ph:bus-fill": "transport",
+    "ph:globe-hemisphere-west-fill": "international",
+    "ph:translate-fill": "languages",
+    "ph:list-checks-fill": "survey",
+    "ph:file-text-fill": "form",
+    "ph:confetti-fill": "events",
+    "ph:desktop-fill": "desktop",
+    "ph:code-fill": "code",
+    "ph:download-simple-fill": "software",
+    "ph:package-fill": "equipment",
+    "ph:calendar-plus-fill": "booking",
+    "ph:chart-pie-slice-fill": "analytics",
+    "ph:phone-fill": "phone",
+    "ph:device-mobile-fill": "mobile",
+    "ph:gear-six-fill": "settings",
+    "ph:wrench-fill": "tools",
+    "ph:house-fill": "home",
+    "ph:app-window-fill": "generic",
+    "ph:text-aa-duotone": "spell-check",
+    "ph:robot-duotone": "chat-bot",
+    "ph:chats-circle-duotone": "chat",
+    "ph:video-camera-duotone": "visio",
+    "ph:megaphone-duotone": "announcement",
+    "ph:envelope-simple-duotone": "mail",
+    "ph:squares-four-duotone": "office",
+    "ph:calendar-blank-duotone": "calendar",
+    "ph:users-three-duotone": "collaboration",
+    "ph:graduation-cap-duotone": "course",
+    "ph:exam-duotone": "exam",
+    "ph:chart-bar-duotone": "grades",
+    "ph:certificate-duotone": "diploma",
+    "ph:briefcase-duotone": "jobs",
+    "ph:folder-user-duotone": "student-record",
+    "ph:compass-duotone": "orientation",
+    "ph:address-book-duotone": "directory",
+    "ph:books-duotone": "publications",
+    "ph:book-open-duotone": "library",
+    "ph:flask-duotone": "research",
+    "ph:magnifying-glass-duotone": "search",
+    "ph:shield-check-duotone": "vpn",
+    "ph:wifi-high-duotone": "wifi",
+    "ph:printer-duotone": "printing",
+    "ph:lock-key-duotone": "security",
+    "ph:key-duotone": "account",
+    "ph:cloud-arrow-up-duotone": "upload",
+    "ph:cloud-duotone": "cloud",
+    "ph:folder-duotone": "files",
+    "ph:signature-duotone": "signature",
+    "ph:play-circle-duotone": "video",
+    "ph:notebook-duotone": "documentation",
+    "ph:fork-knife-duotone": "restaurant",
+    "ph:wallet-duotone": "payment",
+    "ph:map-trifold-duotone": "map",
+    "ph:identification-card-duotone": "card",
+    "ph:question-duotone": "help",
+    "ph:basketball-duotone": "sport",
+    "ph:wheelchair-duotone": "accessibility",
+    "ph:first-aid-duotone": "health",
+    "ph:buildings-duotone": "housing",
+    "ph:bus-duotone": "transport",
+    "ph:globe-hemisphere-west-duotone": "international",
+    "ph:translate-duotone": "languages",
+    "ph:list-checks-duotone": "survey",
+    "ph:file-text-duotone": "form",
+    "ph:confetti-duotone": "events",
+    "ph:desktop-duotone": "desktop",
+    "ph:code-duotone": "code",
+    "ph:download-simple-duotone": "software",
+    "ph:package-duotone": "equipment",
+    "ph:calendar-plus-duotone": "booking",
+    "ph:chart-pie-slice-duotone": "analytics",
+    "ph:phone-duotone": "phone",
+    "ph:device-mobile-duotone": "mobile",
+    "ph:gear-six-duotone": "settings",
+    "ph:wrench-duotone": "tools",
+    "ph:house-duotone": "home",
+    "ph:app-window-duotone": "generic",
+    "tabler:text-spellcheck": "spell-check",
+    "tabler:robot": "chat-bot",
+    "tabler:messages": "chat",
+    "tabler:video": "visio",
+    "tabler:speakerphone": "announcement",
+    "tabler:mail": "mail",
+    "tabler:layout-grid": "office",
+    "tabler:calendar": "calendar",
+    "tabler:users-group": "collaboration",
+    "tabler:school": "course",
+    "tabler:clipboard-check": "exam",
+    "tabler:chart-bar": "grades",
+    "tabler:certificate": "diploma",
+    "tabler:briefcase": "jobs",
+    "tabler:folder-user": "student-record",
+    "tabler:compass": "orientation",
+    "tabler:address-book": "directory",
+    "tabler:books": "publications",
+    "tabler:book": "library",
+    "tabler:microscope": "research",
+    "tabler:search": "search",
+    "tabler:shield-lock": "vpn",
+    "tabler:wifi": "wifi",
+    "tabler:printer": "printing",
+    "tabler:lock": "security",
+    "tabler:key": "account",
+    "tabler:cloud-upload": "upload",
+    "tabler:cloud": "cloud",
+    "tabler:folder": "files",
+    "tabler:signature": "signature",
+    "tabler:player-play": "video",
+    "tabler:notebook": "documentation",
+    "tabler:tools-kitchen-2": "restaurant",
+    "tabler:wallet": "payment",
+    "tabler:map": "map",
+    "tabler:id": "card",
+    "tabler:help": "help",
+    "tabler:ball-basketball": "sport",
+    "tabler:wheelchair": "accessibility",
+    "tabler:first-aid-kit": "health",
+    "tabler:building": "housing",
+    "tabler:bus": "transport",
+    "tabler:world": "international",
+    "tabler:language": "languages",
+    "tabler:list-check": "survey",
+    "tabler:file-text": "form",
+    "tabler:confetti": "events",
+    "tabler:device-desktop": "desktop",
+    "tabler:code": "code",
+    "tabler:download": "software",
+    "tabler:package": "equipment",
+    "tabler:calendar-plus": "booking",
+    "tabler:chart-pie": "analytics",
+    "tabler:phone": "phone",
+    "tabler:device-mobile": "mobile",
+    "tabler:settings": "settings",
+    "tabler:tool": "tools",
+    "tabler:home": "home",
+    "tabler:app-window": "generic"
+  },
+  "colorModes": {
+    "pastel": {
+      "red": {
+        "light": {
+          "bg": "#fca5a5",
+          "fg": "#7f1d1d"
+        },
+        "dark": {
+          "bg": "#f87171",
+          "fg": "#450a0a"
+        }
+      },
+      "orange": {
+        "light": {
+          "bg": "#fdba74",
+          "fg": "#7c2d12"
+        },
+        "dark": {
+          "bg": "#fb923c",
+          "fg": "#431407"
+        }
+      },
+      "yellow": {
+        "light": {
+          "bg": "#fde047",
+          "fg": "#713f12"
+        },
+        "dark": {
+          "bg": "#facc15",
+          "fg": "#422006"
+        }
+      },
+      "lime": {
+        "light": {
+          "bg": "#bef264",
+          "fg": "#365314"
+        },
+        "dark": {
+          "bg": "#a3e635",
+          "fg": "#1a2e05"
+        }
+      },
+      "green": {
+        "light": {
+          "bg": "#86efac",
+          "fg": "#14532d"
+        },
+        "dark": {
+          "bg": "#4ade80",
+          "fg": "#052e16"
+        }
+      },
+      "teal": {
+        "light": {
+          "bg": "#5eead4",
+          "fg": "#134e4a"
+        },
+        "dark": {
+          "bg": "#2dd4bf",
+          "fg": "#042f2e"
+        }
+      },
+      "cyan": {
+        "light": {
+          "bg": "#67e8f9",
+          "fg": "#164e63"
+        },
+        "dark": {
+          "bg": "#22d3ee",
+          "fg": "#083344"
+        }
+      },
+      "sky": {
+        "light": {
+          "bg": "#7dd3fc",
+          "fg": "#0c4a6e"
+        },
+        "dark": {
+          "bg": "#38bdf8",
+          "fg": "#082f49"
+        }
+      },
+      "blue": {
+        "light": {
+          "bg": "#93c5fd",
+          "fg": "#1e3a8a"
+        },
+        "dark": {
+          "bg": "#60a5fa",
+          "fg": "#172554"
+        }
+      },
+      "indigo": {
+        "light": {
+          "bg": "#a5b4fc",
+          "fg": "#312e81"
+        },
+        "dark": {
+          "bg": "#818cf8",
+          "fg": "#1e1b4b"
+        }
+      },
+      "violet": {
+        "light": {
+          "bg": "#c4b5fd",
+          "fg": "#4c1d95"
+        },
+        "dark": {
+          "bg": "#a78bfa",
+          "fg": "#2e1065"
+        }
+      },
+      "fuchsia": {
+        "light": {
+          "bg": "#f0abfc",
+          "fg": "#701a75"
+        },
+        "dark": {
+          "bg": "#e879f9",
+          "fg": "#4a044e"
+        }
+      },
+      "pink": {
+        "light": {
+          "bg": "#f9a8d4",
+          "fg": "#831843"
+        },
+        "dark": {
+          "bg": "#f472b6",
+          "fg": "#500724"
+        }
+      }
+    },
+    "soft": {
+      "red": {
+        "light": {
+          "bg": "#fee2e2",
+          "fg": "#b91c1c"
+        },
+        "dark": {
+          "bg": "#7f1d1d",
+          "fg": "#fca5a5"
+        }
+      },
+      "orange": {
+        "light": {
+          "bg": "#ffedd5",
+          "fg": "#c2410c"
+        },
+        "dark": {
+          "bg": "#7c2d12",
+          "fg": "#fdba74"
+        }
+      },
+      "yellow": {
+        "light": {
+          "bg": "#fef9c3",
+          "fg": "#a16207"
+        },
+        "dark": {
+          "bg": "#713f12",
+          "fg": "#fde047"
+        }
+      },
+      "lime": {
+        "light": {
+          "bg": "#ecfccb",
+          "fg": "#4d7c0f"
+        },
+        "dark": {
+          "bg": "#365314",
+          "fg": "#bef264"
+        }
+      },
+      "green": {
+        "light": {
+          "bg": "#dcfce7",
+          "fg": "#15803d"
+        },
+        "dark": {
+          "bg": "#14532d",
+          "fg": "#86efac"
+        }
+      },
+      "teal": {
+        "light": {
+          "bg": "#ccfbf1",
+          "fg": "#0f766e"
+        },
+        "dark": {
+          "bg": "#134e4a",
+          "fg": "#5eead4"
+        }
+      },
+      "cyan": {
+        "light": {
+          "bg": "#cffafe",
+          "fg": "#0e7490"
+        },
+        "dark": {
+          "bg": "#164e63",
+          "fg": "#67e8f9"
+        }
+      },
+      "sky": {
+        "light": {
+          "bg": "#e0f2fe",
+          "fg": "#0369a1"
+        },
+        "dark": {
+          "bg": "#0c4a6e",
+          "fg": "#7dd3fc"
+        }
+      },
+      "blue": {
+        "light": {
+          "bg": "#dbeafe",
+          "fg": "#1d4ed8"
+        },
+        "dark": {
+          "bg": "#1e3a8a",
+          "fg": "#93c5fd"
+        }
+      },
+      "indigo": {
+        "light": {
+          "bg": "#e0e7ff",
+          "fg": "#4338ca"
+        },
+        "dark": {
+          "bg": "#312e81",
+          "fg": "#a5b4fc"
+        }
+      },
+      "violet": {
+        "light": {
+          "bg": "#ede9fe",
+          "fg": "#6d28d9"
+        },
+        "dark": {
+          "bg": "#4c1d95",
+          "fg": "#c4b5fd"
+        }
+      },
+      "fuchsia": {
+        "light": {
+          "bg": "#fae8ff",
+          "fg": "#a21caf"
+        },
+        "dark": {
+          "bg": "#701a75",
+          "fg": "#f0abfc"
+        }
+      },
+      "pink": {
+        "light": {
+          "bg": "#fce7f3",
+          "fg": "#be185d"
+        },
+        "dark": {
+          "bg": "#831843",
+          "fg": "#f9a8d4"
+        }
+      }
+    },
+    "vivid": {
+      "red": {
+        "light": {
+          "bg": "#dc2626",
+          "fg": "#ffffff"
+        },
+        "dark": {
+          "bg": "#dc2626",
+          "fg": "#ffffff"
+        }
+      },
+      "orange": {
+        "light": {
+          "bg": "#ea580c",
+          "fg": "#ffffff"
+        },
+        "dark": {
+          "bg": "#ea580c",
+          "fg": "#ffffff"
+        }
+      },
+      "yellow": {
+        "light": {
+          "bg": "#ca8a04",
+          "fg": "#ffffff"
+        },
+        "dark": {
+          "bg": "#ca8a04",
+          "fg": "#ffffff"
+        }
+      },
+      "lime": {
+        "light": {
+          "bg": "#65a30d",
+          "fg": "#ffffff"
+        },
+        "dark": {
+          "bg": "#65a30d",
+          "fg": "#ffffff"
+        }
+      },
+      "green": {
+        "light": {
+          "bg": "#16a34a",
+          "fg": "#ffffff"
+        },
+        "dark": {
+          "bg": "#16a34a",
+          "fg": "#ffffff"
+        }
+      },
+      "teal": {
+        "light": {
+          "bg": "#0d9488",
+          "fg": "#ffffff"
+        },
+        "dark": {
+          "bg": "#0d9488",
+          "fg": "#ffffff"
+        }
+      },
+      "cyan": {
+        "light": {
+          "bg": "#0891b2",
+          "fg": "#ffffff"
+        },
+        "dark": {
+          "bg": "#0891b2",
+          "fg": "#ffffff"
+        }
+      },
+      "sky": {
+        "light": {
+          "bg": "#0284c7",
+          "fg": "#ffffff"
+        },
+        "dark": {
+          "bg": "#0284c7",
+          "fg": "#ffffff"
+        }
+      },
+      "blue": {
+        "light": {
+          "bg": "#2563eb",
+          "fg": "#ffffff"
+        },
+        "dark": {
+          "bg": "#2563eb",
+          "fg": "#ffffff"
+        }
+      },
+      "indigo": {
+        "light": {
+          "bg": "#4f46e5",
+          "fg": "#ffffff"
+        },
+        "dark": {
+          "bg": "#4f46e5",
+          "fg": "#ffffff"
+        }
+      },
+      "violet": {
+        "light": {
+          "bg": "#7c3aed",
+          "fg": "#ffffff"
+        },
+        "dark": {
+          "bg": "#7c3aed",
+          "fg": "#ffffff"
+        }
+      },
+      "fuchsia": {
+        "light": {
+          "bg": "#c026d3",
+          "fg": "#ffffff"
+        },
+        "dark": {
+          "bg": "#c026d3",
+          "fg": "#ffffff"
+        }
+      },
+      "pink": {
+        "light": {
+          "bg": "#db2777",
+          "fg": "#ffffff"
+        },
+        "dark": {
+          "bg": "#db2777",
+          "fg": "#ffffff"
+        }
+      }
+    },
+    "mono": {
+      "red": {
+        "light": {
+          "bg": "#ffffff",
+          "fg": "#341200"
+        },
+        "dark": {
+          "bg": "#2a2a2a",
+          "fg": "#e4e4e4"
+        }
+      },
+      "orange": {
+        "light": {
+          "bg": "#ffffff",
+          "fg": "#341200"
+        },
+        "dark": {
+          "bg": "#2a2a2a",
+          "fg": "#e4e4e4"
+        }
+      },
+      "yellow": {
+        "light": {
+          "bg": "#ffffff",
+          "fg": "#341200"
+        },
+        "dark": {
+          "bg": "#2a2a2a",
+          "fg": "#e4e4e4"
+        }
+      },
+      "lime": {
+        "light": {
+          "bg": "#ffffff",
+          "fg": "#341200"
+        },
+        "dark": {
+          "bg": "#2a2a2a",
+          "fg": "#e4e4e4"
+        }
+      },
+      "green": {
+        "light": {
+          "bg": "#ffffff",
+          "fg": "#341200"
+        },
+        "dark": {
+          "bg": "#2a2a2a",
+          "fg": "#e4e4e4"
+        }
+      },
+      "teal": {
+        "light": {
+          "bg": "#ffffff",
+          "fg": "#341200"
+        },
+        "dark": {
+          "bg": "#2a2a2a",
+          "fg": "#e4e4e4"
+        }
+      },
+      "cyan": {
+        "light": {
+          "bg": "#ffffff",
+          "fg": "#341200"
+        },
+        "dark": {
+          "bg": "#2a2a2a",
+          "fg": "#e4e4e4"
+        }
+      },
+      "sky": {
+        "light": {
+          "bg": "#ffffff",
+          "fg": "#341200"
+        },
+        "dark": {
+          "bg": "#2a2a2a",
+          "fg": "#e4e4e4"
+        }
+      },
+      "blue": {
+        "light": {
+          "bg": "#ffffff",
+          "fg": "#341200"
+        },
+        "dark": {
+          "bg": "#2a2a2a",
+          "fg": "#e4e4e4"
+        }
+      },
+      "indigo": {
+        "light": {
+          "bg": "#ffffff",
+          "fg": "#341200"
+        },
+        "dark": {
+          "bg": "#2a2a2a",
+          "fg": "#e4e4e4"
+        }
+      },
+      "violet": {
+        "light": {
+          "bg": "#ffffff",
+          "fg": "#341200"
+        },
+        "dark": {
+          "bg": "#2a2a2a",
+          "fg": "#e4e4e4"
+        }
+      },
+      "fuchsia": {
+        "light": {
+          "bg": "#ffffff",
+          "fg": "#341200"
+        },
+        "dark": {
+          "bg": "#2a2a2a",
+          "fg": "#e4e4e4"
+        }
+      },
+      "pink": {
+        "light": {
+          "bg": "#ffffff",
+          "fg": "#341200"
+        },
+        "dark": {
+          "bg": "#2a2a2a",
+          "fg": "#e4e4e4"
+        }
+      }
+    }
+  },
+  "themes": {
+    "example-minimal": {
+      "style": "carbon",
+      "colorMode": "pastel",
+      "icons": {
+        "spell-check": "carbon:spell-check",
+        "chat-bot": "carbon:chat-bot",
+        "chat": "carbon:chat",
+        "visio": "carbon:video-chat",
+        "announcement": "carbon:bullhorn",
+        "mail": "carbon:email",
+        "office": "carbon:apps",
+        "calendar": "carbon:calendar",
+        "collaboration": "carbon:collaborate",
+        "moodle": "devicon-plain:moodle",
+        "course": "carbon:education",
+        "exam": "carbon:task",
+        "grades": "carbon:report",
+        "diploma": "carbon:certificate",
+        "jobs": "carbon:portfolio",
+        "student-record": "carbon:user-profile",
+        "orientation": "carbon:compass",
+        "directory": "carbon:user-multiple",
+        "publications": "carbon:catalog",
+        "library": "carbon:book",
+        "research": "carbon:microscope",
+        "search": "carbon:search",
+        "vpn": "carbon:vpn",
+        "wifi": "carbon:wifi",
+        "printing": "carbon:printer",
+        "security": "carbon:locked",
+        "account": "carbon:password",
+        "upload": "carbon:cloud-upload",
+        "cloud": "carbon:cloud",
+        "files": "carbon:folder",
+        "signature": "carbon:document-signed",
+        "video": "carbon:play-outline",
+        "documentation": "carbon:notebook",
+        "restaurant": "carbon:restaurant",
+        "payment": "carbon:wallet",
+        "map": "carbon:map",
+        "card": "carbon:identification",
+        "help": "carbon:help",
+        "sport": "carbon:basketball",
+        "accessibility": "carbon:accessibility",
+        "health": "carbon:health-cross",
+        "housing": "carbon:building",
+        "transport": "carbon:bus",
+        "international": "carbon:earth",
+        "languages": "carbon:translate",
+        "survey": "carbon:list-checked",
+        "form": "carbon:document",
+        "events": "carbon:events",
+        "desktop": "carbon:screen",
+        "code": "carbon:code",
+        "software": "carbon:download",
+        "equipment": "carbon:box",
+        "booking": "carbon:calendar-add-alt",
+        "analytics": "carbon:analytics",
+        "phone": "carbon:phone",
+        "mobile": "carbon:mobile",
+        "settings": "carbon:settings",
+        "tools": "carbon:tool-kit",
+        "home": "carbon:home",
+        "generic": "carbon:application-web"
+      }
+    },
+    "univ-exemple": {
+      "style": "phosphor-duotone",
+      "colorMode": "soft",
+      "icons": {
+        "spell-check": "ph:text-aa-duotone",
+        "chat-bot": "ph:robot-duotone",
+        "chat": "ph:chats-circle-duotone",
+        "visio": "ph:video-camera-duotone",
+        "announcement": "ph:megaphone-duotone",
+        "mail": "ph:envelope-simple-duotone",
+        "office": "ph:squares-four-duotone",
+        "calendar": "ph:calendar-blank-duotone",
+        "collaboration": "ph:users-three-duotone",
+        "moodle": "devicon-plain:moodle",
+        "course": "ph:graduation-cap-duotone",
+        "exam": "ph:exam-duotone",
+        "grades": "ph:chart-bar-duotone",
+        "diploma": "ph:certificate-duotone",
+        "jobs": "ph:briefcase-duotone",
+        "student-record": "ph:folder-user-duotone",
+        "orientation": "ph:compass-duotone",
+        "directory": "ph:address-book-duotone",
+        "publications": "ph:books-duotone",
+        "library": "ph:book-open-duotone",
+        "research": "ph:flask-duotone",
+        "search": "ph:magnifying-glass-duotone",
+        "vpn": "ph:shield-check-duotone",
+        "wifi": "ph:wifi-high-duotone",
+        "printing": "ph:printer-duotone",
+        "security": "ph:lock-key-duotone",
+        "account": "ph:key-duotone",
+        "upload": "ph:cloud-arrow-up-duotone",
+        "cloud": "ph:cloud-duotone",
+        "files": "ph:folder-duotone",
+        "signature": "ph:signature-duotone",
+        "video": "ph:play-circle-duotone",
+        "documentation": "ph:notebook-duotone",
+        "restaurant": "ph:fork-knife-duotone",
+        "payment": "ph:wallet-duotone",
+        "map": "ph:map-trifold-duotone",
+        "card": "ph:identification-card-duotone",
+        "help": "ph:question-duotone",
+        "sport": "ph:basketball-duotone",
+        "accessibility": "ph:wheelchair-duotone",
+        "health": "ph:first-aid-duotone",
+        "housing": "ph:buildings-duotone",
+        "transport": "ph:bus-duotone",
+        "international": "ph:globe-hemisphere-west-duotone",
+        "languages": "ph:translate-duotone",
+        "survey": "ph:list-checks-duotone",
+        "form": "ph:file-text-duotone",
+        "events": "ph:confetti-duotone",
+        "desktop": "ph:desktop-duotone",
+        "code": "ph:code-duotone",
+        "software": "ph:download-simple-duotone",
+        "equipment": "ph:package-duotone",
+        "booking": "ph:calendar-plus-duotone",
+        "analytics": "ph:chart-pie-slice-duotone",
+        "phone": "ph:phone-duotone",
+        "mobile": "ph:device-mobile-duotone",
+        "settings": "ph:gear-six-duotone",
+        "tools": "ph:wrench-duotone",
+        "home": "ph:house-duotone",
+        "generic": "ph:app-window-duotone"
+      }
+    },
+    "univ-rennes": {
+      "style": "phosphor-duotone",
+      "colorMode": "soft",
+      "icons": {
+        "spell-check": "ph:text-aa-duotone",
+        "chat-bot": "ph:robot-duotone",
+        "chat": "ph:chats-circle-duotone",
+        "visio": "ph:video-camera-duotone",
+        "announcement": "ph:megaphone-duotone",
+        "mail": "ph:envelope-simple-duotone",
+        "office": "ph:squares-four-duotone",
+        "calendar": "ph:calendar-blank-duotone",
+        "collaboration": "ph:users-three-duotone",
+        "moodle": "devicon-plain:moodle",
+        "course": "ph:graduation-cap-duotone",
+        "exam": "ph:exam-duotone",
+        "grades": "ph:chart-bar-duotone",
+        "diploma": "ph:certificate-duotone",
+        "jobs": "ph:briefcase-duotone",
+        "student-record": "ph:folder-user-duotone",
+        "orientation": "ph:compass-duotone",
+        "directory": "ph:address-book-duotone",
+        "publications": "ph:books-duotone",
+        "library": "ph:book-open-duotone",
+        "research": "ph:flask-duotone",
+        "search": "ph:magnifying-glass-duotone",
+        "vpn": "ph:shield-check-duotone",
+        "wifi": "ph:wifi-high-duotone",
+        "printing": "ph:printer-duotone",
+        "security": "ph:lock-key-duotone",
+        "account": "ph:key-duotone",
+        "upload": "ph:cloud-arrow-up-duotone",
+        "cloud": "ph:cloud-duotone",
+        "files": "ph:folder-duotone",
+        "signature": "ph:signature-duotone",
+        "video": "ph:play-circle-duotone",
+        "documentation": "ph:notebook-duotone",
+        "restaurant": "ph:fork-knife-duotone",
+        "payment": "ph:wallet-duotone",
+        "map": "ph:map-trifold-duotone",
+        "card": "ph:identification-card-duotone",
+        "help": "ph:question-duotone",
+        "sport": "ph:basketball-duotone",
+        "accessibility": "ph:wheelchair-duotone",
+        "health": "ph:first-aid-duotone",
+        "housing": "ph:buildings-duotone",
+        "transport": "ph:bus-duotone",
+        "international": "ph:globe-hemisphere-west-duotone",
+        "languages": "ph:translate-duotone",
+        "survey": "ph:list-checks-duotone",
+        "form": "ph:file-text-duotone",
+        "events": "ph:confetti-duotone",
+        "desktop": "ph:desktop-duotone",
+        "code": "ph:code-duotone",
+        "software": "ph:download-simple-duotone",
+        "equipment": "ph:package-duotone",
+        "booking": "ph:calendar-plus-duotone",
+        "analytics": "ph:chart-pie-slice-duotone",
+        "phone": "ph:phone-duotone",
+        "mobile": "ph:device-mobile-duotone",
+        "settings": "ph:gear-six-duotone",
+        "tools": "ph:wrench-duotone",
+        "home": "ph:house-duotone",
+        "generic": "ph:app-window-duotone"
+      }
+    },
+    "univ-rennes-2": {
+      "style": "phosphor-duotone",
+      "colorMode": "soft",
+      "icons": {
+        "spell-check": "ph:text-aa-duotone",
+        "chat-bot": "ph:robot-duotone",
+        "chat": "ph:chats-circle-duotone",
+        "visio": "ph:video-camera-duotone",
+        "announcement": "ph:megaphone-duotone",
+        "mail": "ph:envelope-simple-duotone",
+        "office": "ph:squares-four-duotone",
+        "calendar": "ph:calendar-blank-duotone",
+        "collaboration": "ph:users-three-duotone",
+        "moodle": "devicon-plain:moodle",
+        "course": "ph:graduation-cap-duotone",
+        "exam": "ph:exam-duotone",
+        "grades": "ph:chart-bar-duotone",
+        "diploma": "ph:certificate-duotone",
+        "jobs": "ph:briefcase-duotone",
+        "student-record": "ph:folder-user-duotone",
+        "orientation": "ph:compass-duotone",
+        "directory": "ph:address-book-duotone",
+        "publications": "ph:books-duotone",
+        "library": "ph:book-open-duotone",
+        "research": "ph:flask-duotone",
+        "search": "ph:magnifying-glass-duotone",
+        "vpn": "ph:shield-check-duotone",
+        "wifi": "ph:wifi-high-duotone",
+        "printing": "ph:printer-duotone",
+        "security": "ph:lock-key-duotone",
+        "account": "ph:key-duotone",
+        "upload": "ph:cloud-arrow-up-duotone",
+        "cloud": "ph:cloud-duotone",
+        "files": "ph:folder-duotone",
+        "signature": "ph:signature-duotone",
+        "video": "ph:play-circle-duotone",
+        "documentation": "ph:notebook-duotone",
+        "restaurant": "ph:fork-knife-duotone",
+        "payment": "ph:wallet-duotone",
+        "map": "ph:map-trifold-duotone",
+        "card": "ph:identification-card-duotone",
+        "help": "ph:question-duotone",
+        "sport": "ph:basketball-duotone",
+        "accessibility": "ph:wheelchair-duotone",
+        "health": "ph:first-aid-duotone",
+        "housing": "ph:buildings-duotone",
+        "transport": "ph:bus-duotone",
+        "international": "ph:globe-hemisphere-west-duotone",
+        "languages": "ph:translate-duotone",
+        "survey": "ph:list-checks-duotone",
+        "form": "ph:file-text-duotone",
+        "events": "ph:confetti-duotone",
+        "desktop": "ph:desktop-duotone",
+        "code": "ph:code-duotone",
+        "software": "ph:download-simple-duotone",
+        "equipment": "ph:package-duotone",
+        "booking": "ph:calendar-plus-duotone",
+        "analytics": "ph:chart-pie-slice-duotone",
+        "phone": "ph:phone-duotone",
+        "mobile": "ph:device-mobile-duotone",
+        "settings": "ph:gear-six-duotone",
+        "tools": "ph:wrench-duotone",
+        "home": "ph:house-duotone",
+        "generic": "ph:app-window-duotone"
+      }
+    },
+    "univ-sorbonne-nouvelle": {
+      "style": "carbon",
+      "colorMode": "pastel",
+      "icons": {
+        "spell-check": "carbon:spell-check",
+        "chat-bot": "carbon:chat-bot",
+        "chat": "carbon:chat",
+        "visio": "carbon:video-chat",
+        "announcement": "carbon:bullhorn",
+        "mail": "carbon:email",
+        "office": "carbon:apps",
+        "calendar": "carbon:calendar",
+        "collaboration": "carbon:collaborate",
+        "moodle": "devicon-plain:moodle",
+        "course": "carbon:education",
+        "exam": "carbon:task",
+        "grades": "carbon:report",
+        "diploma": "carbon:certificate",
+        "jobs": "carbon:portfolio",
+        "student-record": "carbon:user-profile",
+        "orientation": "carbon:compass",
+        "directory": "carbon:user-multiple",
+        "publications": "carbon:catalog",
+        "library": "carbon:book",
+        "research": "carbon:microscope",
+        "search": "carbon:search",
+        "vpn": "carbon:vpn",
+        "wifi": "carbon:wifi",
+        "printing": "carbon:printer",
+        "security": "carbon:locked",
+        "account": "carbon:password",
+        "upload": "carbon:cloud-upload",
+        "cloud": "carbon:cloud",
+        "files": "carbon:folder",
+        "signature": "carbon:document-signed",
+        "video": "carbon:play-outline",
+        "documentation": "carbon:notebook",
+        "restaurant": "carbon:restaurant",
+        "payment": "carbon:wallet",
+        "map": "carbon:map",
+        "card": "carbon:identification",
+        "help": "carbon:help",
+        "sport": "carbon:basketball",
+        "accessibility": "carbon:accessibility",
+        "health": "carbon:health-cross",
+        "housing": "carbon:building",
+        "transport": "carbon:bus",
+        "international": "carbon:earth",
+        "languages": "carbon:translate",
+        "survey": "carbon:list-checked",
+        "form": "carbon:document",
+        "events": "carbon:events",
+        "desktop": "carbon:screen",
+        "code": "carbon:code",
+        "software": "carbon:download",
+        "equipment": "carbon:box",
+        "booking": "carbon:calendar-add-alt",
+        "analytics": "carbon:analytics",
+        "phone": "carbon:phone",
+        "mobile": "carbon:mobile",
+        "settings": "carbon:settings",
+        "tools": "carbon:tool-kit",
+        "home": "carbon:home",
+        "generic": "carbon:application-web"
+      }
+    }
+  },
+  "rules": [
+    {
+      "concept": "spell-check",
+      "keywords": [
+        "orthograph",
+        "voltaire",
+        "ecri+"
+      ]
+    },
+    {
+      "concept": "chat-bot",
+      "keywords": [
+        "intelligence artificielle",
+        "ia ",
+        "chatgpt",
+        "copilot",
+        "mistral",
+        "llm "
+      ]
+    },
+    {
+      "concept": "chat",
+      "keywords": [
+        "messagerie instantanee",
+        "chat ",
+        "tchat",
+        "mattermost",
+        "rocket chat",
+        "discord",
+        "communication"
+      ]
+    },
+    {
+      "concept": "visio",
+      "keywords": [
+        "visio",
+        "webconf",
+        "web conf",
+        "webinaire",
+        "webinar",
+        "zoom ",
+        "teams ",
+        "big blue",
+        "bbb ",
+        "jitsi",
+        "rendez vous",
+        "classe virtuelle",
+        "meet "
+      ]
+    },
+    {
+      "concept": "announcement",
+      "keywords": [
+        "liste de diffusion",
+        "listes de diffusion",
+        "mailing",
+        "sympa ",
+        "actualite",
+        "annonce",
+        "newsletter",
+        "news"
+      ]
+    },
+    {
+      "concept": "mail",
+      "keywords": [
+        "messagerie",
+        "mail",
+        "webmail",
+        "courriel",
+        "zimbra",
+        "outlook",
+        "boite aux lettres",
+        "boite mail"
+      ]
+    },
+    {
+      "concept": "office",
+      "keywords": [
+        "microsoft",
+        "office 365",
+        "o365 ",
+        "m365 ",
+        "office ",
+        "onedrive",
+        "sharepoint",
+        "google workspace",
+        "suite bureautique"
+      ]
+    },
+    {
+      "concept": "calendar",
+      "keywords": [
+        "emploi du temps",
+        "emplois du temps",
+        "edt ",
+        "planning",
+        "calendrier",
+        "agenda",
+        "ade ",
+        "hyperplanning",
+        "celcat",
+        "horaire",
+        "timetable",
+        "schedule",
+        "calendar"
+      ]
+    },
+    {
+      "concept": "collaboration",
+      "keywords": [
+        "klaxoon",
+        "wooclap",
+        "collabor",
+        "pad ",
+        "etherpad",
+        "tableau blanc",
+        "whiteboard",
+        "brainstorm",
+        "mural",
+        "miro ",
+        "quiz"
+      ]
+    },
+    {
+      "concept": "moodle",
+      "keywords": [
+        "moodle"
+      ]
+    },
+    {
+      "concept": "course",
+      "keywords": [
+        "foad",
+        "e learning",
+        "elearning",
+        "cours en ligne",
+        "plateforme pedagogique",
+        "espace pedagogique",
+        "mooc",
+        "formation a distance",
+        "enseignement a distance",
+        "teleformation",
+        "auto formati",
+        "autoformation",
+        "module",
+        "ecampus",
+        "e campus",
+        "chamilo",
+        "claroline",
+        "blackboard",
+        "tutorat",
+        "cours ",
+        "learning"
+      ]
+    },
+    {
+      "concept": "exam",
+      "keywords": [
+        "examen",
+        "convocation",
+        "partiel"
+      ]
+    },
+    {
+      "concept": "grades",
+      "keywords": [
+        "notes ",
+        "note ",
+        "resultat",
+        "releve",
+        "bulletin",
+        "scodoc",
+        "moyenne",
+        "grades"
+      ]
+    },
+    {
+      "concept": "diploma",
+      "keywords": [
+        "diplome",
+        "attestation",
+        "certificat",
+        "certification"
+      ]
+    },
+    {
+      "concept": "jobs",
+      "keywords": [
+        "stage",
+        "emploi",
+        "job",
+        "alternance",
+        "apprentissage",
+        "offres",
+        "recrutement",
+        "carriere",
+        "insertion professionnelle",
+        "internship",
+        "career",
+        "entreprise"
+      ]
+    },
+    {
+      "concept": "student-record",
+      "keywords": [
+        "scolarite",
+        "dossier etudiant",
+        "dossier administratif",
+        "apogee",
+        "pegase",
+        "inscription",
+        "reinscription",
+        "contrat pedagogique",
+        "ia web",
+        "ip web",
+        "student record"
+      ]
+    },
+    {
+      "concept": "orientation",
+      "keywords": [
+        "orientation",
+        "suio",
+        "scuio",
+        "parcoursup",
+        "projet professionnel",
+        "accompagnement",
+        "reussite"
+      ]
+    },
+    {
+      "concept": "directory",
+      "keywords": [
+        "annuaire",
+        "directory",
+        "contacts",
+        "trombinoscope",
+        "trombi",
+        "qui est qui",
+        "people"
+      ]
+    },
+    {
+      "concept": "publications",
+      "keywords": [
+        "these",
+        "hal ",
+        "archive ouverte",
+        "archives ouvertes",
+        "publication",
+        "ori oai",
+        "depot institutionnel"
+      ]
+    },
+    {
+      "concept": "library",
+      "keywords": [
+        "bibliotheque",
+        "bu ",
+        "scd ",
+        "documentaire",
+        "catalogue",
+        "livre",
+        "library",
+        "ressources electroniques",
+        "periodique",
+        "revues",
+        "primo",
+        "koha",
+        "cairn",
+        "europresse",
+        "lecture",
+        "mediatheque"
+      ]
+    },
+    {
+      "concept": "research",
+      "keywords": [
+        "recherche scientifique",
+        "laboratoire",
+        "labo ",
+        "research"
+      ]
+    },
+    {
+      "concept": "search",
+      "keywords": [
+        "recherche",
+        "search",
+        "moteur"
+      ]
+    },
+    {
+      "concept": "vpn",
+      "keywords": [
+        "vpn",
+        "acces distant",
+        "connexion a distance"
+      ]
+    },
+    {
+      "concept": "wifi",
+      "keywords": [
+        "wifi",
+        "wi fi",
+        "eduroam",
+        "reseau",
+        "network"
+      ]
+    },
+    {
+      "concept": "printing",
+      "keywords": [
+        "impression",
+        "imprim",
+        "print",
+        "photocopi",
+        "reprographie",
+        "copieur",
+        "papercut"
+      ]
+    },
+    {
+      "concept": "security",
+      "keywords": [
+        "authentification",
+        "mfa ",
+        "2fa ",
+        "multifacteur",
+        "double facteur",
+        "securite",
+        "otp ",
+        "security"
+      ]
+    },
+    {
+      "concept": "account",
+      "keywords": [
+        "compte",
+        "mot de passe",
+        "password",
+        "sesame",
+        "identifiant",
+        "account"
+      ]
+    },
+    {
+      "concept": "upload",
+      "keywords": [
+        "filesender",
+        "mise en ligne",
+        "envoi de fichier",
+        "transfert de fichier",
+        "depot de fichier",
+        "upload"
+      ]
+    },
+    {
+      "concept": "cloud",
+      "keywords": [
+        "drive",
+        "stockage",
+        "cloud",
+        "nextcloud",
+        "owncloud",
+        "seafile",
+        "storage"
+      ]
+    },
+    {
+      "concept": "files",
+      "keywords": [
+        "fichier",
+        "files",
+        "dossiers partages",
+        "documents"
+      ]
+    },
+    {
+      "concept": "signature",
+      "keywords": [
+        "signature",
+        "parapheur",
+        "signer",
+        "contrat",
+        "convention"
+      ]
+    },
+    {
+      "concept": "video",
+      "keywords": [
+        "video",
+        "mediaserver",
+        "media",
+        "pod ",
+        "nudgis",
+        "ubicast",
+        "podcast",
+        "webtv",
+        "web tv",
+        "youtube",
+        "streaming",
+        "replay",
+        "capsule"
+      ]
+    },
+    {
+      "concept": "documentation",
+      "keywords": [
+        "documentation",
+        "guide",
+        "tutoriel",
+        "tuto ",
+        "mode d emploi",
+        "manuel",
+        "wiki",
+        "notice",
+        "doc "
+      ]
+    },
+    {
+      "concept": "restaurant",
+      "keywords": [
+        "restau",
+        "resto",
+        "crous",
+        "cafeteria",
+        "cafet",
+        "repas",
+        "menu",
+        "cantine",
+        "ru "
+      ]
+    },
+    {
+      "concept": "payment",
+      "keywords": [
+        "paiement",
+        "payer",
+        "payment",
+        "cvec",
+        "frais",
+        "facture",
+        "bourse",
+        "aide financiere",
+        "aides financieres",
+        "izly",
+        "remboursement",
+        "boutique",
+        "achat"
+      ]
+    },
+    {
+      "concept": "map",
+      "keywords": [
+        "plan du campus",
+        "plan ",
+        "carte du campus",
+        "campus map",
+        "localisation",
+        "batiments"
+      ]
+    },
+    {
+      "concept": "card",
+      "keywords": [
+        "carte",
+        "badge",
+        "leocarte",
+        "student card"
+      ]
+    },
+    {
+      "concept": "help",
+      "keywords": [
+        "assistance",
+        "support",
+        "helpdesk",
+        "help desk",
+        "hotline",
+        "aide",
+        "ticket",
+        "glpi",
+        "depannage",
+        "incident",
+        "sos ",
+        "faq ",
+        "help"
+      ]
+    },
+    {
+      "concept": "sport",
+      "keywords": [
+        "sport",
+        "suaps",
+        "staps",
+        "activites physiques",
+        "gymnase",
+        "piscine",
+        "fitness",
+        "musculation"
+      ]
+    },
+    {
+      "concept": "accessibility",
+      "keywords": [
+        "handicap",
+        "accessibilite",
+        "accessibility"
+      ]
+    },
+    {
+      "concept": "health",
+      "keywords": [
+        "sante",
+        "medecin",
+        "medical",
+        "ssu ",
+        "sumpps",
+        "psycholog",
+        "infirmer",
+        "bien etre",
+        "health"
+      ]
+    },
+    {
+      "concept": "housing",
+      "keywords": [
+        "logement",
+        "residence",
+        "housing",
+        "hebergement"
+      ]
+    },
+    {
+      "concept": "transport",
+      "keywords": [
+        "transport",
+        "bus ",
+        "velo",
+        "parking",
+        "stationnement",
+        "covoiturage",
+        "navette"
+      ]
+    },
+    {
+      "concept": "international",
+      "keywords": [
+        "international",
+        "erasmus",
+        "mobilite",
+        "etranger",
+        "echange",
+        "abroad"
+      ]
+    },
+    {
+      "concept": "languages",
+      "keywords": [
+        "langue",
+        "anglais",
+        "toeic",
+        "language",
+        "english",
+        "traduction"
+      ]
+    },
+    {
+      "concept": "survey",
+      "keywords": [
+        "enquete",
+        "sondage",
+        "questionnaire",
+        "evaluation des enseignements",
+        "limesurvey",
+        "vote",
+        "election",
+        "survey"
+      ]
+    },
+    {
+      "concept": "form",
+      "keywords": [
+        "demarche",
+        "demande",
+        "requete",
+        "formulaire",
+        "form "
+      ]
+    },
+    {
+      "concept": "events",
+      "keywords": [
+        "vie etudiante",
+        "vie de campus",
+        "association",
+        "culture",
+        "evenement",
+        "club",
+        "bde ",
+        "loisir",
+        "spectacle",
+        "musique"
+      ]
+    },
+    {
+      "concept": "desktop",
+      "keywords": [
+        "bureau virtuel",
+        "bureau a distance",
+        "vdi ",
+        "machine virtuelle",
+        "salle informatique"
+      ]
+    },
+    {
+      "concept": "code",
+      "keywords": [
+        "gitlab",
+        "github",
+        "git ",
+        "forge",
+        "code",
+        "developpement",
+        "jupyter",
+        "programmation",
+        "calcul",
+        "hpc ",
+        "cluster",
+        "serveur",
+        "linux",
+        "terminal",
+        "ssh "
+      ]
+    },
+    {
+      "concept": "software",
+      "keywords": [
+        "logiciel",
+        "software",
+        "telechargement",
+        "antivirus"
+      ]
+    },
+    {
+      "concept": "equipment",
+      "keywords": [
+        "pret de materiel",
+        "materiel",
+        "emprunt",
+        "location",
+        "loxya",
+        "equipement"
+      ]
+    },
+    {
+      "concept": "booking",
+      "keywords": [
+        "reservation",
+        "reserver",
+        "booking",
+        "salle"
+      ]
+    },
+    {
+      "concept": "analytics",
+      "keywords": [
+        "statistique",
+        "tableau de bord",
+        "dashboard",
+        "pilotage",
+        "indicateur",
+        "decisionnel"
+      ]
+    },
+    {
+      "concept": "phone",
+      "keywords": [
+        "telephon",
+        "standard",
+        "voip"
+      ]
+    },
+    {
+      "concept": "mobile",
+      "keywords": [
+        "application mobile",
+        "app mobile",
+        "appli"
+      ]
+    },
+    {
+      "concept": "settings",
+      "keywords": [
+        "parametre",
+        "preference",
+        "reglage",
+        "configuration",
+        "settings",
+        "profil"
+      ]
+    },
+    {
+      "concept": "tools",
+      "keywords": [
+        "outil",
+        "tools",
+        "boite a outils"
+      ]
+    },
+    {
+      "concept": "course",
+      "keywords": [
+        "pedagog",
+        "enseignement",
+        "formation"
+      ]
+    },
+    {
+      "concept": "home",
+      "keywords": [
+        "portail",
+        "accueil",
+        "intranet",
+        "ent "
+      ]
+    }
+  ],
+  "fold": [
+    [
+      192,
+      197,
+      "a"
+    ],
+    [
+      199,
+      199,
+      "c"
+    ],
+    [
+      200,
+      203,
+      "e"
+    ],
+    [
+      204,
+      207,
+      "i"
+    ],
+    [
+      209,
+      209,
+      "n"
+    ],
+    [
+      210,
+      214,
+      "o"
+    ],
+    [
+      217,
+      220,
+      "u"
+    ],
+    [
+      221,
+      221,
+      "y"
+    ],
+    [
+      224,
+      229,
+      "a"
+    ],
+    [
+      231,
+      231,
+      "c"
+    ],
+    [
+      232,
+      235,
+      "e"
+    ],
+    [
+      236,
+      239,
+      "i"
+    ],
+    [
+      241,
+      241,
+      "n"
+    ],
+    [
+      242,
+      246,
+      "o"
+    ],
+    [
+      249,
+      252,
+      "u"
+    ],
+    [
+      253,
+      253,
+      "y"
+    ],
+    [
+      255,
+      255,
+      "y"
+    ],
+    [
+      256,
+      261,
+      "a"
+    ],
+    [
+      262,
+      269,
+      "c"
+    ],
+    [
+      270,
+      271,
+      "d"
+    ],
+    [
+      274,
+      283,
+      "e"
+    ],
+    [
+      284,
+      291,
+      "g"
+    ],
+    [
+      292,
+      293,
+      "h"
+    ],
+    [
+      296,
+      304,
+      "i"
+    ],
+    [
+      308,
+      309,
+      "j"
+    ],
+    [
+      310,
+      311,
+      "k"
+    ],
+    [
+      313,
+      318,
+      "l"
+    ],
+    [
+      323,
+      328,
+      "n"
+    ],
+    [
+      332,
+      337,
+      "o"
+    ],
+    [
+      340,
+      345,
+      "r"
+    ],
+    [
+      346,
+      353,
+      "s"
+    ],
+    [
+      354,
+      357,
+      "t"
+    ],
+    [
+      360,
+      371,
+      "u"
+    ],
+    [
+      372,
+      373,
+      "w"
+    ],
+    [
+      374,
+      376,
+      "y"
+    ],
+    [
+      377,
+      382,
+      "z"
+    ],
+    [
+      416,
+      417,
+      "o"
+    ],
+    [
+      431,
+      432,
+      "u"
+    ],
+    [
+      461,
+      462,
+      "a"
+    ],
+    [
+      463,
+      464,
+      "i"
+    ],
+    [
+      465,
+      466,
+      "o"
+    ],
+    [
+      467,
+      476,
+      "u"
+    ],
+    [
+      478,
+      481,
+      "a"
+    ],
+    [
+      486,
+      487,
+      "g"
+    ],
+    [
+      488,
+      489,
+      "k"
+    ],
+    [
+      490,
+      493,
+      "o"
+    ],
+    [
+      496,
+      496,
+      "j"
+    ],
+    [
+      500,
+      501,
+      "g"
+    ],
+    [
+      504,
+      505,
+      "n"
+    ],
+    [
+      506,
+      507,
+      "a"
+    ],
+    [
+      512,
+      515,
+      "a"
+    ],
+    [
+      516,
+      519,
+      "e"
+    ],
+    [
+      520,
+      523,
+      "i"
+    ],
+    [
+      524,
+      527,
+      "o"
+    ],
+    [
+      528,
+      531,
+      "r"
+    ],
+    [
+      532,
+      535,
+      "u"
+    ],
+    [
+      536,
+      537,
+      "s"
+    ],
+    [
+      538,
+      539,
+      "t"
+    ],
+    [
+      542,
+      543,
+      "h"
+    ],
+    [
+      550,
+      551,
+      "a"
+    ],
+    [
+      552,
+      553,
+      "e"
+    ],
+    [
+      554,
+      561,
+      "o"
+    ],
+    [
+      562,
+      563,
+      "y"
+    ],
+    [
+      768,
+      879,
+      ""
+    ],
+    [
+      1155,
+      1161,
+      ""
+    ],
+    [
+      1425,
+      1469,
+      ""
+    ],
+    [
+      1471,
+      1471,
+      ""
+    ],
+    [
+      1473,
+      1474,
+      ""
+    ],
+    [
+      1476,
+      1477,
+      ""
+    ],
+    [
+      1479,
+      1479,
+      ""
+    ],
+    [
+      1552,
+      1562,
+      ""
+    ],
+    [
+      1611,
+      1631,
+      ""
+    ],
+    [
+      1648,
+      1648,
+      ""
+    ],
+    [
+      1750,
+      1756,
+      ""
+    ],
+    [
+      1759,
+      1764,
+      ""
+    ],
+    [
+      1767,
+      1768,
+      ""
+    ],
+    [
+      1770,
+      1773,
+      ""
+    ],
+    [
+      1809,
+      1809,
+      ""
+    ],
+    [
+      1840,
+      1866,
+      ""
+    ],
+    [
+      1958,
+      1968,
+      ""
+    ],
+    [
+      2027,
+      2035,
+      ""
+    ],
+    [
+      2045,
+      2045,
+      ""
+    ],
+    [
+      2070,
+      2073,
+      ""
+    ],
+    [
+      2075,
+      2083,
+      ""
+    ],
+    [
+      2085,
+      2087,
+      ""
+    ],
+    [
+      2089,
+      2093,
+      ""
+    ],
+    [
+      2137,
+      2139,
+      ""
+    ],
+    [
+      2199,
+      2207,
+      ""
+    ],
+    [
+      2250,
+      2273,
+      ""
+    ],
+    [
+      2275,
+      2307,
+      ""
+    ],
+    [
+      2362,
+      2364,
+      ""
+    ],
+    [
+      2366,
+      2383,
+      ""
+    ],
+    [
+      2385,
+      2391,
+      ""
+    ],
+    [
+      2402,
+      2403,
+      ""
+    ],
+    [
+      2433,
+      2435,
+      ""
+    ],
+    [
+      2492,
+      2492,
+      ""
+    ],
+    [
+      2494,
+      2500,
+      ""
+    ],
+    [
+      2503,
+      2504,
+      ""
+    ],
+    [
+      2507,
+      2509,
+      ""
+    ],
+    [
+      2519,
+      2519,
+      ""
+    ],
+    [
+      2530,
+      2531,
+      ""
+    ],
+    [
+      2558,
+      2558,
+      ""
+    ],
+    [
+      2561,
+      2563,
+      ""
+    ],
+    [
+      2620,
+      2620,
+      ""
+    ],
+    [
+      2622,
+      2626,
+      ""
+    ],
+    [
+      2631,
+      2632,
+      ""
+    ],
+    [
+      2635,
+      2637,
+      ""
+    ],
+    [
+      2641,
+      2641,
+      ""
+    ],
+    [
+      2672,
+      2673,
+      ""
+    ],
+    [
+      2677,
+      2677,
+      ""
+    ],
+    [
+      2689,
+      2691,
+      ""
+    ],
+    [
+      2748,
+      2748,
+      ""
+    ],
+    [
+      2750,
+      2757,
+      ""
+    ],
+    [
+      2759,
+      2761,
+      ""
+    ],
+    [
+      2763,
+      2765,
+      ""
+    ],
+    [
+      2786,
+      2787,
+      ""
+    ],
+    [
+      2810,
+      2815,
+      ""
+    ],
+    [
+      2817,
+      2819,
+      ""
+    ],
+    [
+      2876,
+      2876,
+      ""
+    ],
+    [
+      2878,
+      2884,
+      ""
+    ],
+    [
+      2887,
+      2888,
+      ""
+    ],
+    [
+      2891,
+      2893,
+      ""
+    ],
+    [
+      2901,
+      2903,
+      ""
+    ],
+    [
+      2914,
+      2915,
+      ""
+    ],
+    [
+      2946,
+      2946,
+      ""
+    ],
+    [
+      3006,
+      3010,
+      ""
+    ],
+    [
+      3014,
+      3016,
+      ""
+    ],
+    [
+      3018,
+      3021,
+      ""
+    ],
+    [
+      3031,
+      3031,
+      ""
+    ],
+    [
+      3072,
+      3076,
+      ""
+    ],
+    [
+      3132,
+      3132,
+      ""
+    ],
+    [
+      3134,
+      3140,
+      ""
+    ],
+    [
+      3142,
+      3144,
+      ""
+    ],
+    [
+      3146,
+      3149,
+      ""
+    ],
+    [
+      3157,
+      3158,
+      ""
+    ],
+    [
+      3170,
+      3171,
+      ""
+    ],
+    [
+      3201,
+      3203,
+      ""
+    ],
+    [
+      3260,
+      3260,
+      ""
+    ],
+    [
+      3262,
+      3268,
+      ""
+    ],
+    [
+      3270,
+      3272,
+      ""
+    ],
+    [
+      3274,
+      3277,
+      ""
+    ],
+    [
+      3285,
+      3286,
+      ""
+    ],
+    [
+      3298,
+      3299,
+      ""
+    ],
+    [
+      3315,
+      3315,
+      ""
+    ],
+    [
+      3328,
+      3331,
+      ""
+    ],
+    [
+      3387,
+      3388,
+      ""
+    ],
+    [
+      3390,
+      3396,
+      ""
+    ],
+    [
+      3398,
+      3400,
+      ""
+    ],
+    [
+      3402,
+      3405,
+      ""
+    ],
+    [
+      3415,
+      3415,
+      ""
+    ],
+    [
+      3426,
+      3427,
+      ""
+    ],
+    [
+      3457,
+      3459,
+      ""
+    ],
+    [
+      3530,
+      3530,
+      ""
+    ],
+    [
+      3535,
+      3540,
+      ""
+    ],
+    [
+      3542,
+      3542,
+      ""
+    ],
+    [
+      3544,
+      3551,
+      ""
+    ],
+    [
+      3570,
+      3571,
+      ""
+    ],
+    [
+      3633,
+      3633,
+      ""
+    ],
+    [
+      3636,
+      3642,
+      ""
+    ],
+    [
+      3655,
+      3662,
+      ""
+    ],
+    [
+      3761,
+      3761,
+      ""
+    ],
+    [
+      3764,
+      3772,
+      ""
+    ],
+    [
+      3784,
+      3790,
+      ""
+    ],
+    [
+      3864,
+      3865,
+      ""
+    ],
+    [
+      3893,
+      3893,
+      ""
+    ],
+    [
+      3895,
+      3895,
+      ""
+    ],
+    [
+      3897,
+      3897,
+      ""
+    ],
+    [
+      3902,
+      3903,
+      ""
+    ],
+    [
+      3953,
+      3972,
+      ""
+    ],
+    [
+      3974,
+      3975,
+      ""
+    ],
+    [
+      3981,
+      3991,
+      ""
+    ],
+    [
+      3993,
+      4028,
+      ""
+    ],
+    [
+      4038,
+      4038,
+      ""
+    ],
+    [
+      4139,
+      4158,
+      ""
+    ],
+    [
+      4182,
+      4185,
+      ""
+    ],
+    [
+      4190,
+      4192,
+      ""
+    ],
+    [
+      4194,
+      4196,
+      ""
+    ],
+    [
+      4199,
+      4205,
+      ""
+    ],
+    [
+      4209,
+      4212,
+      ""
+    ],
+    [
+      4226,
+      4237,
+      ""
+    ],
+    [
+      4239,
+      4239,
+      ""
+    ],
+    [
+      4250,
+      4253,
+      ""
+    ],
+    [
+      4957,
+      4959,
+      ""
+    ],
+    [
+      5906,
+      5909,
+      ""
+    ],
+    [
+      5938,
+      5940,
+      ""
+    ],
+    [
+      5970,
+      5971,
+      ""
+    ],
+    [
+      6002,
+      6003,
+      ""
+    ],
+    [
+      6068,
+      6099,
+      ""
+    ],
+    [
+      6109,
+      6109,
+      ""
+    ],
+    [
+      6155,
+      6157,
+      ""
+    ],
+    [
+      6159,
+      6159,
+      ""
+    ],
+    [
+      6277,
+      6278,
+      ""
+    ],
+    [
+      6313,
+      6313,
+      ""
+    ],
+    [
+      6432,
+      6443,
+      ""
+    ],
+    [
+      6448,
+      6459,
+      ""
+    ],
+    [
+      6679,
+      6683,
+      ""
+    ],
+    [
+      6741,
+      6750,
+      ""
+    ],
+    [
+      6752,
+      6780,
+      ""
+    ],
+    [
+      6783,
+      6783,
+      ""
+    ],
+    [
+      6832,
+      6877,
+      ""
+    ],
+    [
+      6880,
+      6891,
+      ""
+    ],
+    [
+      6912,
+      6916,
+      ""
+    ],
+    [
+      6964,
+      6980,
+      ""
+    ],
+    [
+      7019,
+      7027,
+      ""
+    ],
+    [
+      7040,
+      7042,
+      ""
+    ],
+    [
+      7073,
+      7085,
+      ""
+    ],
+    [
+      7142,
+      7155,
+      ""
+    ],
+    [
+      7204,
+      7223,
+      ""
+    ],
+    [
+      7376,
+      7378,
+      ""
+    ],
+    [
+      7380,
+      7400,
+      ""
+    ],
+    [
+      7405,
+      7405,
+      ""
+    ],
+    [
+      7412,
+      7412,
+      ""
+    ],
+    [
+      7415,
+      7417,
+      ""
+    ],
+    [
+      7616,
+      7679,
+      ""
+    ],
+    [
+      7680,
+      7681,
+      "a"
+    ],
+    [
+      7682,
+      7687,
+      "b"
+    ],
+    [
+      7688,
+      7689,
+      "c"
+    ],
+    [
+      7690,
+      7699,
+      "d"
+    ],
+    [
+      7700,
+      7709,
+      "e"
+    ],
+    [
+      7710,
+      7711,
+      "f"
+    ],
+    [
+      7712,
+      7713,
+      "g"
+    ],
+    [
+      7714,
+      7723,
+      "h"
+    ],
+    [
+      7724,
+      7727,
+      "i"
+    ],
+    [
+      7728,
+      7733,
+      "k"
+    ],
+    [
+      7734,
+      7741,
+      "l"
+    ],
+    [
+      7742,
+      7747,
+      "m"
+    ],
+    [
+      7748,
+      7755,
+      "n"
+    ],
+    [
+      7756,
+      7763,
+      "o"
+    ],
+    [
+      7764,
+      7767,
+      "p"
+    ],
+    [
+      7768,
+      7775,
+      "r"
+    ],
+    [
+      7776,
+      7785,
+      "s"
+    ],
+    [
+      7786,
+      7793,
+      "t"
+    ],
+    [
+      7794,
+      7803,
+      "u"
+    ],
+    [
+      7804,
+      7807,
+      "v"
+    ],
+    [
+      7808,
+      7817,
+      "w"
+    ],
+    [
+      7818,
+      7821,
+      "x"
+    ],
+    [
+      7822,
+      7823,
+      "y"
+    ],
+    [
+      7824,
+      7829,
+      "z"
+    ],
+    [
+      7830,
+      7830,
+      "h"
+    ],
+    [
+      7831,
+      7831,
+      "t"
+    ],
+    [
+      7832,
+      7832,
+      "w"
+    ],
+    [
+      7833,
+      7833,
+      "y"
+    ],
+    [
+      7840,
+      7863,
+      "a"
+    ],
+    [
+      7864,
+      7879,
+      "e"
+    ],
+    [
+      7880,
+      7883,
+      "i"
+    ],
+    [
+      7884,
+      7907,
+      "o"
+    ],
+    [
+      7908,
+      7921,
+      "u"
+    ],
+    [
+      7922,
+      7929,
+      "y"
+    ],
+    [
+      8400,
+      8432,
+      ""
+    ],
+    [
+      8490,
+      8490,
+      "k"
+    ],
+    [
+      8491,
+      8491,
+      "a"
+    ],
+    [
+      11503,
+      11505,
+      ""
+    ],
+    [
+      11647,
+      11647,
+      ""
+    ],
+    [
+      11744,
+      11775,
+      ""
+    ],
+    [
+      12330,
+      12335,
+      ""
+    ],
+    [
+      12441,
+      12442,
+      ""
+    ],
+    [
+      42607,
+      42610,
+      ""
+    ],
+    [
+      42612,
+      42621,
+      ""
+    ],
+    [
+      42654,
+      42655,
+      ""
+    ],
+    [
+      42736,
+      42737,
+      ""
+    ],
+    [
+      43010,
+      43010,
+      ""
+    ],
+    [
+      43014,
+      43014,
+      ""
+    ],
+    [
+      43019,
+      43019,
+      ""
+    ],
+    [
+      43043,
+      43047,
+      ""
+    ],
+    [
+      43052,
+      43052,
+      ""
+    ],
+    [
+      43136,
+      43137,
+      ""
+    ],
+    [
+      43188,
+      43205,
+      ""
+    ],
+    [
+      43232,
+      43249,
+      ""
+    ],
+    [
+      43263,
+      43263,
+      ""
+    ],
+    [
+      43302,
+      43309,
+      ""
+    ],
+    [
+      43335,
+      43347,
+      ""
+    ],
+    [
+      43392,
+      43395,
+      ""
+    ],
+    [
+      43443,
+      43456,
+      ""
+    ],
+    [
+      43493,
+      43493,
+      ""
+    ],
+    [
+      43561,
+      43574,
+      ""
+    ],
+    [
+      43587,
+      43587,
+      ""
+    ],
+    [
+      43596,
+      43597,
+      ""
+    ],
+    [
+      43643,
+      43645,
+      ""
+    ],
+    [
+      43696,
+      43696,
+      ""
+    ],
+    [
+      43698,
+      43700,
+      ""
+    ],
+    [
+      43703,
+      43704,
+      ""
+    ],
+    [
+      43710,
+      43711,
+      ""
+    ],
+    [
+      43713,
+      43713,
+      ""
+    ],
+    [
+      43755,
+      43759,
+      ""
+    ],
+    [
+      43765,
+      43766,
+      ""
+    ],
+    [
+      44003,
+      44010,
+      ""
+    ],
+    [
+      44012,
+      44013,
+      ""
+    ],
+    [
+      64286,
+      64286,
+      ""
+    ],
+    [
+      65024,
+      65039,
+      ""
+    ],
+    [
+      65056,
+      65071,
+      ""
+    ],
+    [
+      66045,
+      66045,
+      ""
+    ],
+    [
+      66272,
+      66272,
+      ""
+    ],
+    [
+      66422,
+      66426,
+      ""
+    ],
+    [
+      68097,
+      68099,
+      ""
+    ],
+    [
+      68101,
+      68102,
+      ""
+    ],
+    [
+      68108,
+      68111,
+      ""
+    ],
+    [
+      68152,
+      68154,
+      ""
+    ],
+    [
+      68159,
+      68159,
+      ""
+    ],
+    [
+      68325,
+      68326,
+      ""
+    ],
+    [
+      68900,
+      68903,
+      ""
+    ],
+    [
+      68969,
+      68973,
+      ""
+    ],
+    [
+      69291,
+      69292,
+      ""
+    ],
+    [
+      69370,
+      69375,
+      ""
+    ],
+    [
+      69446,
+      69456,
+      ""
+    ],
+    [
+      69506,
+      69509,
+      ""
+    ],
+    [
+      69632,
+      69634,
+      ""
+    ],
+    [
+      69688,
+      69702,
+      ""
+    ],
+    [
+      69744,
+      69744,
+      ""
+    ],
+    [
+      69747,
+      69748,
+      ""
+    ],
+    [
+      69759,
+      69762,
+      ""
+    ],
+    [
+      69808,
+      69818,
+      ""
+    ],
+    [
+      69826,
+      69826,
+      ""
+    ],
+    [
+      69888,
+      69890,
+      ""
+    ],
+    [
+      69927,
+      69940,
+      ""
+    ],
+    [
+      69957,
+      69958,
+      ""
+    ],
+    [
+      70003,
+      70003,
+      ""
+    ],
+    [
+      70016,
+      70018,
+      ""
+    ],
+    [
+      70067,
+      70080,
+      ""
+    ],
+    [
+      70089,
+      70092,
+      ""
+    ],
+    [
+      70094,
+      70095,
+      ""
+    ],
+    [
+      70188,
+      70199,
+      ""
+    ],
+    [
+      70206,
+      70206,
+      ""
+    ],
+    [
+      70209,
+      70209,
+      ""
+    ],
+    [
+      70367,
+      70378,
+      ""
+    ],
+    [
+      70400,
+      70403,
+      ""
+    ],
+    [
+      70459,
+      70460,
+      ""
+    ],
+    [
+      70462,
+      70468,
+      ""
+    ],
+    [
+      70471,
+      70472,
+      ""
+    ],
+    [
+      70475,
+      70477,
+      ""
+    ],
+    [
+      70487,
+      70487,
+      ""
+    ],
+    [
+      70498,
+      70499,
+      ""
+    ],
+    [
+      70502,
+      70508,
+      ""
+    ],
+    [
+      70512,
+      70516,
+      ""
+    ],
+    [
+      70584,
+      70592,
+      ""
+    ],
+    [
+      70594,
+      70594,
+      ""
+    ],
+    [
+      70597,
+      70597,
+      ""
+    ],
+    [
+      70599,
+      70602,
+      ""
+    ],
+    [
+      70604,
+      70608,
+      ""
+    ],
+    [
+      70610,
+      70610,
+      ""
+    ],
+    [
+      70625,
+      70626,
+      ""
+    ],
+    [
+      70709,
+      70726,
+      ""
+    ],
+    [
+      70750,
+      70750,
+      ""
+    ],
+    [
+      70832,
+      70851,
+      ""
+    ],
+    [
+      71087,
+      71093,
+      ""
+    ],
+    [
+      71096,
+      71104,
+      ""
+    ],
+    [
+      71132,
+      71133,
+      ""
+    ],
+    [
+      71216,
+      71232,
+      ""
+    ],
+    [
+      71339,
+      71351,
+      ""
+    ],
+    [
+      71453,
+      71467,
+      ""
+    ],
+    [
+      71724,
+      71738,
+      ""
+    ],
+    [
+      71984,
+      71989,
+      ""
+    ],
+    [
+      71991,
+      71992,
+      ""
+    ],
+    [
+      71995,
+      71998,
+      ""
+    ],
+    [
+      72000,
+      72000,
+      ""
+    ],
+    [
+      72002,
+      72003,
+      ""
+    ],
+    [
+      72145,
+      72151,
+      ""
+    ],
+    [
+      72154,
+      72160,
+      ""
+    ],
+    [
+      72164,
+      72164,
+      ""
+    ],
+    [
+      72193,
+      72202,
+      ""
+    ],
+    [
+      72243,
+      72249,
+      ""
+    ],
+    [
+      72251,
+      72254,
+      ""
+    ],
+    [
+      72263,
+      72263,
+      ""
+    ],
+    [
+      72273,
+      72283,
+      ""
+    ],
+    [
+      72330,
+      72345,
+      ""
+    ],
+    [
+      72544,
+      72551,
+      ""
+    ],
+    [
+      72751,
+      72758,
+      ""
+    ],
+    [
+      72760,
+      72767,
+      ""
+    ],
+    [
+      72850,
+      72871,
+      ""
+    ],
+    [
+      72873,
+      72886,
+      ""
+    ],
+    [
+      73009,
+      73014,
+      ""
+    ],
+    [
+      73018,
+      73018,
+      ""
+    ],
+    [
+      73020,
+      73021,
+      ""
+    ],
+    [
+      73023,
+      73029,
+      ""
+    ],
+    [
+      73031,
+      73031,
+      ""
+    ],
+    [
+      73098,
+      73102,
+      ""
+    ],
+    [
+      73104,
+      73105,
+      ""
+    ],
+    [
+      73107,
+      73111,
+      ""
+    ],
+    [
+      73459,
+      73462,
+      ""
+    ],
+    [
+      73472,
+      73473,
+      ""
+    ],
+    [
+      73475,
+      73475,
+      ""
+    ],
+    [
+      73524,
+      73530,
+      ""
+    ],
+    [
+      73534,
+      73538,
+      ""
+    ],
+    [
+      73562,
+      73562,
+      ""
+    ],
+    [
+      78912,
+      78912,
+      ""
+    ],
+    [
+      78919,
+      78933,
+      ""
+    ],
+    [
+      90398,
+      90415,
+      ""
+    ],
+    [
+      92912,
+      92916,
+      ""
+    ],
+    [
+      92976,
+      92982,
+      ""
+    ],
+    [
+      94031,
+      94031,
+      ""
+    ],
+    [
+      94033,
+      94087,
+      ""
+    ],
+    [
+      94095,
+      94098,
+      ""
+    ],
+    [
+      94180,
+      94180,
+      ""
+    ],
+    [
+      94192,
+      94193,
+      ""
+    ],
+    [
+      113821,
+      113822,
+      ""
+    ],
+    [
+      118528,
+      118573,
+      ""
+    ],
+    [
+      118576,
+      118598,
+      ""
+    ],
+    [
+      119141,
+      119145,
+      ""
+    ],
+    [
+      119149,
+      119154,
+      ""
+    ],
+    [
+      119163,
+      119170,
+      ""
+    ],
+    [
+      119173,
+      119179,
+      ""
+    ],
+    [
+      119210,
+      119213,
+      ""
+    ],
+    [
+      119362,
+      119364,
+      ""
+    ],
+    [
+      121344,
+      121398,
+      ""
+    ],
+    [
+      121403,
+      121452,
+      ""
+    ],
+    [
+      121461,
+      121461,
+      ""
+    ],
+    [
+      121476,
+      121476,
+      ""
+    ],
+    [
+      121499,
+      121503,
+      ""
+    ],
+    [
+      121505,
+      121519,
+      ""
+    ],
+    [
+      122880,
+      122886,
+      ""
+    ],
+    [
+      122888,
+      122904,
+      ""
+    ],
+    [
+      122907,
+      122913,
+      ""
+    ],
+    [
+      122915,
+      122916,
+      ""
+    ],
+    [
+      122918,
+      122922,
+      ""
+    ],
+    [
+      123023,
+      123023,
+      ""
+    ],
+    [
+      123184,
+      123190,
+      ""
+    ],
+    [
+      123566,
+      123566,
+      ""
+    ],
+    [
+      123628,
+      123631,
+      ""
+    ],
+    [
+      124140,
+      124143,
+      ""
+    ],
+    [
+      124398,
+      124399,
+      ""
+    ],
+    [
+      124643,
+      124643,
+      ""
+    ],
+    [
+      124646,
+      124646,
+      ""
+    ],
+    [
+      124654,
+      124655,
+      ""
+    ],
+    [
+      124661,
+      124661,
+      ""
+    ],
+    [
+      125136,
+      125142,
+      ""
+    ],
+    [
+      125252,
+      125258,
+      ""
+    ],
+    [
+      917760,
+      917999,
+      ""
+    ]
+  ]
+}

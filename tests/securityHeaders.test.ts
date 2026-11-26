@@ -56,3 +56,13 @@ test('index.html\'s inline scripts are the ones the policy is written for', () =
   // No inline event handler: a hash doesn't cover those.
   assert.doesNotMatch(html, /\son[a-z]+\s*=/i)
 })
+
+// The gateway writes the page's policy itself (back/crates/tafac-gateway,
+// own/page_headers.rs) and holds itself to these, written by
+// scripts/gateway-data.mjs: a change to the policy fails here until the
+// script is run again, and there until the gateway writes the same.
+test('the gateway\'s pages are the policies this module writes', () => {
+  const written = JSON.parse(readFileSync(new URL('./fixtures/static-files.json', import.meta.url), 'utf8')) as { pagePolicies: [string, string][] }
+  assert.ok(written.pagePolicies.length > 5)
+  for (const [html, policy] of written.pagePolicies) assert.equal(buildPagePolicy(html), policy, html)
+})

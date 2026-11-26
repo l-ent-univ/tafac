@@ -2232,6 +2232,12 @@ app.use((req, res, next) => {
 // also accepts navigator.sendBeacon's text/plain bodies. Always answers 204
 // (even when analytics are off or the batch is invalid) and never touches
 // the session cookie.
+// Moved to the gateway where it runs before this server (own/analytics.rs
+// there, which sends to PostHog itself): this route is left the apps, a
+// session cookie the gateway doesn't read, a request without a session that
+// names its university, and a body it would read another way (compressed,
+// another charset, JSON it doesn't parse). A change to the allowlist, or to
+// what is sent, goes there too.
 const parseAnalyticsBody = express.text({ type: () => true, limit: ANALYTICS_MAX_BODY_BYTES })
 app.post('/__ent_auth/analytics', (req, res) => {
   res.setHeader('Cache-Control', 'no-store')
@@ -5976,6 +5982,11 @@ app.get('/__ent_auth/student-pic', async (req, res) => {
 // credentials are public, so a demo session only gets demo services written
 // down (with the server's own titles); anything else it sends is answered
 // without being stored.
+// Moved to the gateway where it runs before this server with DATA_DIR
+// (own/icons.rs there, reading and writing this same file): this route is
+// left nobody signed in, the sessions it doesn't hold, the bodies it leaves
+// to express.json(), and the apps, whose gateway leaves it to this server.
+// A change to the picking reaches it through scripts/gateway-data.mjs.
 app.post('/__ent_auth/app-icons', async (req, res) => {
   try {
     res.setHeader('Cache-Control', 'no-store')

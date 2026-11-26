@@ -101,7 +101,7 @@ pub(crate) fn old_answer(body: Vec<u8>) -> Translated {
 // (server/securityHeaders/baseline.ts: BASELINE_HEADERS), which an answer
 // made here carries too: no sniffing, no framing by another site, HTTPS
 // only. A test below holds them to Node's.
-const BASELINE_HEADERS: &[(&str, &str)] = &[
+pub(crate) const BASELINE_HEADERS: &[(&str, &str)] = &[
     ("x-content-type-options", "nosniff"),
     ("x-frame-options", "SAMEORIGIN"),
     ("content-security-policy", "frame-ancestors 'self'"),

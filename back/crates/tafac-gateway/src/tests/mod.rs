@@ -21,17 +21,29 @@
 //                         same
 //   other_portals.rs      the same routes at a university whose portal is
 //                         not uPortal (Drupal, iSorbonne)
+//   universities.rs       Tafac's own: the universities served, their logos,
+//                         and the session check nobody is signed in for
+//   analytics.rs          Tafac's own statistics: what reaches a made-up
+//                         PostHog, and when it is slow or down
+//   icons.rs              the applications' icons, Tafac's own: Node's file
+//   own.rs                tafac.fr's server on the wire: the page's files,
+//                         the icons' body read on its way
 
+mod analytics;
 mod apps;
 mod behind;
 mod expiry;
 mod grades;
+mod icons;
 mod launch;
 mod moodle_deadlines;
 mod other_portals;
+#[cfg(feature = "server")]
+mod own;
 mod portal;
 mod signin;
 mod student;
+mod universities;
 
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{LazyLock, Mutex};

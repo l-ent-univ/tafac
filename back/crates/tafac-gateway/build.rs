@@ -53,6 +53,33 @@ fn main() {
 
     let out = PathBuf::from(env::var("OUT_DIR").expect("set by Cargo")).join("universities.rs");
     fs::write(out, written).expect("the build's own folder is writable");
+
+    write_logos(&manifest_dir);
+}
+
+// Tafac's own universities (universities/<id>/ at the repository's root):
+// each one's logo, universities/<id>/assets/logo.<ext>, the first of these
+// kinds as for Node (universities/index.js: LOGO_EXTENSIONS). src/own/
+// universities.rs includes what this writes.
+const LOGO_EXTENSIONS: [&str; 4] = ["svg", "png", "webp", "jpg"];
+
+fn write_logos(manifest_dir: &Path) {
+    let universities = manifest_dir.join("../../../universities");
+    println!("cargo:rerun-if-changed={}", universities.display());
+    let mut written = String::from("// Written by build.rs: each university's logo (its id, its kind, the file).\n");
+    written.push_str("const LOGOS: &[(&str, &str, &[u8])] = &[\n");
+    for id in folders(&universities) {
+        let assets = universities.join(&id).join("assets");
+        println!("cargo:rerun-if-changed={}", assets.display());
+        if let Some((extension, file)) = LOGO_EXTENSIONS.iter().map(|extension| (extension, assets.join(format!("logo.{extension}")))).find(|(_, file)| file.is_file()) {
+            let file = file.canonicalize().expect("the logo is there");
+            println!("cargo:rerun-if-changed={}", file.display());
+            written.push_str(&format!("    ({id:?}, {extension:?}, include_bytes!({file:?})),\n"));
+        }
+    }
+    written.push_str("];\n");
+    let out = PathBuf::from(env::var("OUT_DIR").expect("set by Cargo")).join("logos.rs");
+    fs::write(out, written).expect("the build's own folder is writable");
 }
 
 fn folders(folder: &Path) -> Vec<String> {

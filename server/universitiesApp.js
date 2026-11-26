@@ -220,6 +220,13 @@ export async function createUniversitiesApp({
 
   router.use(cookieParser())
 
+  // Moved to the gateway where it runs before this server and is told what
+  // is served (back/crates/tafac-gateway, own/universities.rs), with the
+  // logos below and the university a signed-out request is for
+  // (resolveUniversity): a change here goes there too, and one to what a
+  // university's shared.js says of it goes through
+  // scripts/universities-directory.mjs. Still this server's in the apps,
+  // and for a session cookie the gateway doesn't read.
   router.get('/__ent_auth/universities', (req, res) => {
     res.setHeader('Cache-Control', 'no-store')
     res.json({

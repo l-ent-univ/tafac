@@ -89,7 +89,10 @@ the apps that have it.
 3. Put both on tafac.fr, where `APP_SETTINGS_FILE` points
    (`settings.json`; its signature is read at the same path plus `.sig`).
    The server sends them as they are (`GET /app/settings.json`,
-   `/app/settings.json.sig`), read again at each request: no restart.
+   `/app/settings.json.sig`), read again at each request: no restart. On
+   tafac.fr that is its gateway, in front of Node
+   (`back/crates/tafac-gateway/src/own/settings.rs`), which reads
+   `APP_SETTINGS_FILE` as Node does.
 
 tafac.fr holds no key: whoever got into it could not make a file the apps
 take. The signature is the private key's, which is on the maintainer's

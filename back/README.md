@@ -40,14 +40,42 @@ the page ──▶ the gateway (Rust) ──▶ tonAPI ──▶ the university
   answers what Moodle's view in the apps may show (`GET /moodle/view`), the
   student's photo (`GET /student-pic`, from ScoDoc) and the school
   certificate (`GET /documents/school-certificate`, and its `/status`).
+  With Node's `DATA_DIR`, it answers the applications' icons too (`POST
+  /app-icons`, `own/icons.rs`), from and into Node's own file; and with
+  the page's build (`TAFAC_GATEWAY_DIST`, tafac.fr's server only), the
+  page's files, `robots.txt` and Apple's file (`own/statics.rs`), and the
+  page itself with its sitemap (`own/page.rs`, `own/shell.rs`): the same
+  bytes and the same headers as Node's, its security policy included,
+  held to Node's own answers by fixtures and compared with `server.js`
+  running on a real build.
   For a session it holds, it answers all of these whatever happens: a
   service down or slow, a parameter to refuse, are said here in the status
   and the words Node's own route has for them (`translate/failed.rs`;
   `gateway/settled.rs` for the launch relay, Moodle's view, the photo and
   the certificate).
+- **Tafac's own routes** are no university's (`own/`): which universities
+  the server serves and their logos (`own/universities.rs`), from
+  `universities/directory.json`, written from the settings Node reads
+  (`scripts/universities-directory.mjs`; a test holds the file to them).
+  The server tells the gateway what it serves from the same environment
+  Node reads (`UNIVERSITY`, `UNIVERSITIES`, `MULTI_UNIVERSITY`); the
+  session check of a request without a cookie is then answered here too,
+  at the university the request is for. In the apps these stay Node's.
+  On tafac.fr it also answers Tafac's own statistics (`POST /analytics`,
+  `own/analytics.rs`), signed in or not, and sends them to PostHog itself;
+  in the apps that route is still Node's.
+- **tafac.fr's own routes** are its server's, whoever asks and whatever
+  the session (`own/`): the apps' remote settings (`GET /app/settings.json`
+  and its `.sig`, sent as they are) and the desktop app's update (`GET
+  /desktop/latest.json`, `/desktop/download/<platform>`, and the newest
+  release's manifest followed). The apps ask tafac.fr for them, never their
+  bridge: none of it is in the library they embed. Their settings are
+  Node's (`APP_SETTINGS_FILE`, `DESKTOP_LATEST_*`), read by `main.rs`.
 - **Node** answers everything else: the planning and ADE, the mail, the
-  icons, the statistics, the account's photo (the portal's proxy), and
-  every route of the other universities, sign-in and applications included.
+  account's photo (the portal's proxy), the icons, the page and its files
+  where the gateway isn't given what they need (the apps: their Node keeps
+  them), and every route of the other universities, sign-in and
+  applications included.
   `routes.rs` lists them with what keeps each there. The moved routes are
   still Node's for the sessions the gateway doesn't hold: nobody signed in,
   another university.
@@ -89,6 +117,20 @@ crates/tafac-gateway/
    │  ├─ settled.rs       routes answered to their end here, failures included: the two files below
    │  ├─ launch.rs        GET /launch and /launch-preview: the target, who asks, the walk
    │  └─ student.rs       the student's own files: ScoDoc's photo, the school certificate
+   │
+   ├─ own/                Tafac's own routes, which no university answers
+   │  ├─ universities.rs  the universities served, the one a request is for, GET /universities and the logos
+   │  ├─ shell.rs         the page itself: index.html filled for each request, and the sitemap
+   │  ├─ analytics.rs     POST /analytics: the statistics, the allowlist (analytics/schema.rs), sent on to PostHog (analytics/posthog.rs)
+   │  ├─ icons.rs         POST /app-icons: Node's file, the picking of src/appIconPicks.js from icons.json (scripts/gateway-data.mjs writes it)
+   │  ├─ js.rs            what JavaScript does to text where Rust does otherwise
+   │  │                   tafac.fr's server's alone, answered before the gateway and Node:
+   │  ├─ express.rs       what Express does around a route of Node's: the path matched, HEAD, the headers, a redirect
+   │  ├─ settings.rs      GET /app/settings.json and its .sig; settings/: the apps' checks of the file (minisign, what it says, what a patch may not do), not called yet
+   │  ├─ desktop_update.rs   GET /desktop/latest.json, /desktop/download/*; desktop_update/: the manifest, the releases followed
+   │  ├─ statics.rs       the page's built files, robots.txt, Apple's file
+   │  ├─ conditional.rs   what Express puts in a file's answer: ETags, dates, a copy still good, a range
+   │  └─ page_headers.rs  the page's security headers, for whoever serves the page
    │
    ├─ session/            the student's session
    │  ├─ cookie.rs        its cookie, read and written, in the format Node reads
@@ -166,6 +208,12 @@ crates/tafac-gateway/
 - **One User-Agent.** The CAS binds its ticket to the User-Agent that signed
   in. The gateway and Node present themselves under the same one
   (`node.rs`, `server/upstreamAgent`; `tests/upstreamAgent.test.js`).
+- **Node's lists are not typed again.** The icons' keywords, concepts,
+  hues and each university's look come from `own/icons.json`, which
+  `scripts/gateway-data.mjs` writes from `src/appIconPicks.js`; the same
+  script writes the fixtures the icons and the page's files are held to
+  on both sides (`tests/fixtures/app-icon-picks.json`, `static-files.json`).
+  The Node tests fail when one is out of date.
 - **The page changes one screen at a time.** A moved route is answered
   here in the JSON and the status the page reads today, which are Node's
   (`translate/`), until its screen reads tonAPI's own model: the
@@ -336,4 +384,5 @@ log says each moved route that failed, and why; the page gets the reason
 too, as from the development server. The statistics are off there, as the
 development server's are, unless the gateway is started with
 `POSTHOG_IN_DEV=1` and `POSTHOG_PROJECT_KEY` as that server is (the gateway
-reads its environment only, not `.env.local`).
+reads its environment only, not `.env.local`; `POSTHOG_HOST` and
+`ANALYTICS_EXCLUDED_USERS` too, which it then sends with).

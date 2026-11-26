@@ -1,0 +1,100 @@
+{
+  "neutral": {
+    "appName": "Tafac",
+    "seoTitle": "Tafac – Tout votre ENT en une seule app",
+    "seoDescription": "Emploi du temps, notes, messagerie et rendus Moodle dans une seule app. Projet étudiant libre, non affilié aux universités.",
+    "repoUrl": "https://github.com/l-ent-univ/tafac",
+    "alternateNames": [
+      "l'ent"
+    ]
+  },
+  "universities": [
+    {
+      "id": "example-minimal",
+      "name": "Mon Université",
+      "shortName": "MonUniv",
+      "slug": "monuniv",
+      "devOnly": false,
+      "logoShape": "wide",
+      "hostnames": [],
+      "logo": "svg",
+      "page": {
+        "appName": "Tafac",
+        "seoTitle": "Tafac | Client alternatif ENT Mon Université",
+        "seoDescription": "Client alternatif non officiel à l'ENT de Mon Université.",
+        "repoUrl": "",
+        "alternateNames": []
+      }
+    },
+    {
+      "id": "univ-exemple",
+      "name": "Université Exemple",
+      "shortName": "Exemple",
+      "slug": "exemple",
+      "devOnly": true,
+      "logoShape": "wide",
+      "hostnames": [],
+      "logo": "png",
+      "page": {
+        "appName": "Tafac",
+        "seoTitle": "Tafac | Client alternatif ENT Université Exemple",
+        "seoDescription": "Instance de démonstration de Tafac pour l'Université Exemple : découvrez le client alternatif d'ENT avec le compte de démo.",
+        "repoUrl": "https://github.com/l-ent-univ/tafac",
+        "alternateNames": []
+      }
+    },
+    {
+      "id": "univ-rennes",
+      "name": "Université de Rennes",
+      "shortName": "Rennes",
+      "slug": "rennes",
+      "devOnly": false,
+      "logoShape": "wide",
+      "hostnames": [],
+      "logo": "svg",
+      "page": {
+        "appName": "Tafac",
+        "seoTitle": "Tafac – Votre ENT de l'Université de Rennes en une app",
+        "seoDescription": "Emploi du temps ADE, notes ScoDoc, messagerie Partage et rendus Moodle de l'Université de Rennes dans une seule app. Projet étudiant libre, non affilié à l'université.",
+        "repoUrl": "https://github.com/l-ent-univ/tafac",
+        "alternateNames": [
+          "l'ent"
+        ]
+      }
+    },
+    {
+      "id": "univ-rennes-2",
+      "name": "Université Rennes 2",
+      "shortName": "Rennes 2",
+      "slug": "rennes2",
+      "devOnly": false,
+      "logoShape": "square",
+      "hostnames": [],
+      "logo": "svg",
+      "page": {
+        "appName": "Tafac",
+        "seoTitle": "Tafac | Client alternatif ENT Université Rennes 2",
+        "seoDescription": "Client alternatif non officiel aux services numériques de l'Université Rennes 2. Projet étudiant libre, non affilié à l'université.",
+        "repoUrl": "https://github.com/l-ent-univ/tafac",
+        "alternateNames": []
+      }
+    },
+    {
+      "id": "univ-sorbonne-nouvelle",
+      "name": "Université Sorbonne Nouvelle",
+      "shortName": "Sorbonne Nouvelle",
+      "slug": "sorbonne-nouvelle",
+      "devOnly": true,
+      "logoShape": "wide",
+      "hostnames": [],
+      "logo": "svg",
+      "page": {
+        "appName": "Tafac",
+        "seoTitle": "Tafac | Client alternatif ENT Université Sorbonne Nouvelle",
+        "seoDescription": "Client alternatif non officiel aux services numériques de l'Université Sorbonne Nouvelle. Projet étudiant libre, non affilié à l'université.",
+        "repoUrl": "https://github.com/l-ent-univ/tafac",
+        "alternateNames": []
+      }
+    }
+  ]
+}

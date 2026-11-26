@@ -7,6 +7,10 @@
 // it there, so this file says where the move stands. A route not listed is
 // Node's.
 //
+// The page's own files are at the end: tafac.fr's server answers them when
+// it is given the build, and the last line takes every GET left (a file of
+// the build, or Node's page where there is none).
+//
 // A moved route is written once more in translate/ (tonAPI's answer as the
 // page reads it today, its errors too). It is still Node's for the sessions
 // the gateway doesn't hold: nobody signed in, another university.
@@ -40,11 +44,42 @@ pub enum Moved {
     StudentPicture,
     CertificateStatus,
     Certificate,
+    // Tafac's own (own/): no university answers them, and tonAPI is asked
+    // nothing.
+    Universities,
+    UniversityLogo,
+    Analytics,
+    AppIcons,
+}
+
+// A route of tafac.fr's own that its server answers itself, before Node
+// (own/): the apps ask tafac.fr for these over the network, never their
+// bridge, and carry their own files.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Servers {
+    AppSettings,
+    AppSettingsSignature,
+    DesktopManifest,
+    DesktopInstaller,
+    // With the page's build (own/statics.rs).
+    Robots,
+    AppleAssociation,
+    // The page itself, and its sitemap (own/page.rs).
+    Page,
+    PageFile,
+    Sitemap,
+    // A file of the build, when there is one at that address; the page
+    // where there is none.
+    BuiltFile,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Backend {
     TonApi(Moved),
+    // tafac.fr's server: always for the apps' settings and updates, and
+    // given the build (TAFAC_GATEWAY_DIST) for the page's files; Node
+    // otherwise, and in the apps.
+    Server(Servers),
     Node,
 }
 
@@ -60,6 +95,10 @@ pub struct Route {
 
 const fn moved(method: &'static str, path: &'static str, to: Moved) -> Route {
     Route { method, path, backend: Backend::TonApi(to), why: "" }
+}
+
+const fn servers(method: &'static str, path: &'static str, to: Servers) -> Route {
+    Route { method, path, backend: Backend::Server(to), why: "" }
 }
 
 const fn node(method: &'static str, path: &'static str, why: &'static str) -> Route {
@@ -80,13 +119,15 @@ pub const ROUTES: &[Route] = &[
     moved("GET", "/__ent_auth/grades/department-message", Moved::GradesMessage),
     moved("GET", "/__ent_auth/grades/evaluation-distribution", Moved::GradesDistribution),
     moved("GET", "/__ent_auth/grades/report.pdf", Moved::GradesTranscript),
-    // Tafac's own.
-    node("GET", "/__ent_auth/universities", "Tafac's own list of universities"),
-    node("GET", "/__ent_auth/universities/*", "Tafac's own logos"),
-    node("POST", "/__ent_auth/analytics", "Tafac's own statistics"),
+    // Tafac's own: the universities this server serves, and their logos
+    // (own/universities.rs). Node's still where the gateway isn't told what
+    // is served: the apps.
+    moved("GET", "/__ent_auth/universities", Moved::Universities),
+    moved("GET", "/__ent_auth/universities/*", Moved::UniversityLogo),
+    moved("POST", "/__ent_auth/analytics", Moved::Analytics),
     // The portal.
     node("*", "/__ent_proxy/*", "the account's photo, and an old link to a page of the portal's (sent on to the launch relay)"),
-    node("POST", "/__ent_auth/app-icons", "Tafac's own icons"),
+    moved("POST", "/__ent_auth/app-icons", Moved::AppIcons),
     // Tafac's own relay: a service opened signed in (launch/).
     moved("GET", "/__ent_auth/launch", Moved::Launch),
     moved("GET", "/__ent_auth/launch-preview", Moved::LaunchPreview),
@@ -101,11 +142,35 @@ pub const ROUTES: &[Route] = &[
     node("*", "/__ent_auth/mail/*", "tonAPI reads an inbox only, and Rennes' stops at the SAML step: no message, folder, draft or send"),
     // Tafac's own, for the apps' Moodle page: what its view may show.
     moved("GET", "/__ent_auth/moodle/view", Moved::MoodleView),
+    // tafac.fr's own, for the apps: their remote settings, the desktop app's
+    // update. Answered by its server whatever the session (own/).
+    servers("GET", "/app/settings.json", Servers::AppSettings),
+    servers("GET", "/app/settings.json.sig", Servers::AppSettingsSignature),
+    servers("GET", "/desktop/latest.json", Servers::DesktopManifest),
+    servers("GET", "/desktop/download/*", Servers::DesktopInstaller),
+    // The page, its files and the addresses beside them, answered by
+    // tafac.fr's server when it is given the build (own/statics.rs,
+    // own/page.rs).
+    servers("GET", "/", Servers::Page),
+    servers("GET", "/index.html", Servers::PageFile),
+    servers("GET", "/sitemap.xml", Servers::Sitemap),
+    servers("GET", "/robots.txt", Servers::Robots),
+    servers("GET", "/.well-known/apple-app-site-association", Servers::AppleAssociation),
+    // Last: any other address but the page's API. A file of the build where
+    // there is one; the page where there isn't.
+    servers("GET", "/*", Servers::BuiltFile),
 ];
+
+// The page's API: never a file.
+fn is_api(path: &str) -> bool {
+    ["/__ent_auth", "/__ent_proxy"].iter().any(|api| path.strip_prefix(api).is_some_and(|rest| rest.is_empty() || rest.starts_with('/')))
+}
 
 fn matches(route: &Route, method: &Method, path: &str) -> bool {
     let method_matches = route.method == "*" || route.method == method.as_str();
     let path_matches = match route.path.strip_suffix("/*") {
+        // The whole site: every address but the page's API.
+        Some("") => path.starts_with('/') && !is_api(path),
         Some(folder) => path.strip_prefix(folder).is_some_and(|rest| rest.starts_with('/')),
         None => path == route.path,
     };
@@ -122,7 +187,15 @@ pub fn backend(method: &Method, path: &str) -> Backend {
 pub fn moved_route(method: &Method, path: &str) -> Option<Moved> {
     match backend(method, path) {
         Backend::TonApi(route) => Some(route),
-        Backend::Node => None,
+        Backend::Server(_) | Backend::Node => None,
+    }
+}
+
+// What tafac.fr's server answers itself, when it is given the build.
+pub fn server_route(method: &Method, path: &str) -> Option<Servers> {
+    match backend(method, path) {
+        Backend::Server(route) => Some(route),
+        Backend::TonApi(_) | Backend::Node => None,
     }
 }
 
@@ -170,6 +243,8 @@ mod tests {
             ("/__ent_auth/student-pic", Moved::StudentPicture),
             ("/__ent_auth/documents/school-certificate/status", Moved::CertificateStatus),
             ("/__ent_auth/documents/school-certificate", Moved::Certificate),
+            ("/__ent_auth/universities", Moved::Universities),
+            ("/__ent_auth/universities/univ-rennes/logo", Moved::UniversityLogo),
         ] {
             assert_eq!(backend(&Method::GET, path), Backend::TonApi(route), "{path}");
         }
@@ -197,11 +272,28 @@ mod tests {
             (Method::POST, "/__ent_auth/mail/send"),
             (Method::GET, "/__ent_proxy/api/v4-3/dlm/layout.json"),
             (Method::GET, "/__ent_auth/something-new"),
-            (Method::GET, "/"),
-            (Method::GET, "/assets/index.js"),
+            (Method::GET, "/__ent_auth"),
+            (Method::GET, "/__ent_proxy"),
+            (Method::POST, "/"),
+            (Method::POST, "/sitemap.xml"),
+            (Method::POST, "/desktop/latest.json"),
+            (Method::POST, "/app/settings.json"),
+            (Method::POST, "/assets/index.js"),
         ] {
             assert_eq!(backend(&method, path), Backend::Node, "{method} {path}");
             assert_eq!(moved_route(&method, path), None);
+            assert_eq!(server_route(&method, path), None);
+        }
+    }
+
+    #[test]
+    fn the_pages_files_are_the_servers_when_it_has_them() {
+        assert_eq!(backend(&Method::POST, "/__ent_auth/app-icons"), Backend::TonApi(Moved::AppIcons));
+        assert_eq!(server_route(&Method::GET, "/robots.txt"), Some(Servers::Robots));
+        assert_eq!(server_route(&Method::GET, "/.well-known/apple-app-site-association"), Some(Servers::AppleAssociation));
+        for path in ["/assets/index.js", "/sw.js", "/icon.png", "/__ent_authx", "/desktop", "/app/other.json", "/univ-rennes"] {
+            assert_eq!(server_route(&Method::GET, path), Some(Servers::BuiltFile), "{path}");
+            assert_eq!(moved_route(&Method::GET, path), None);
         }
     }
 
@@ -218,29 +310,65 @@ mod tests {
     #[test]
     fn every_line_is_a_route_of_the_page_and_says_why_it_stays() {
         for route in ROUTES {
-            assert!(route.path.starts_with("/__ent_auth/") || route.path.starts_with("/__ent_proxy/"), "{}", route.path);
+            // A moved route is one of the page's API; the server's own are
+            // the site's other addresses.
+            match route.backend {
+                Backend::TonApi(_) => assert!(route.path.starts_with("/__ent_auth/"), "{}", route.path),
+                Backend::Server(_) => assert!(route.path.starts_with('/') && !is_api(route.path), "{}", route.path),
+                Backend::Node => assert!(route.path.starts_with('/'), "{}", route.path),
+            }
             assert!(["GET", "POST", "*"].contains(&route.method), "{}", route.method);
             assert_eq!(route.backend == Backend::Node, !route.why.is_empty(), "{}", route.path);
         }
+        // The whole site's line is the last: every line above it counts.
+        assert_eq!(ROUTES.iter().position(|route| route.path == "/*"), Some(ROUTES.len() - 1));
+    }
+
+    #[test]
+    fn the_servers_own_routes_are_never_the_gateways() {
+        for (path, route) in [
+            ("/app/settings.json", Servers::AppSettings),
+            ("/app/settings.json.sig", Servers::AppSettingsSignature),
+            ("/desktop/latest.json", Servers::DesktopManifest),
+            ("/desktop/download/darwin-aarch64", Servers::DesktopInstaller),
+        ] {
+            assert_eq!(backend(&Method::GET, path), Backend::Server(route), "{path}");
+            // Gateway::answer, which the apps' bridge calls, leaves them.
+            assert_eq!(moved_route(&Method::GET, path), None, "{path}");
+        }
+        assert_eq!(backend(&Method::POST, "/desktop/latest.json"), Backend::Node);
+        // No platform named: an address like any other of the site's, a
+        // file of the build if there were one, as for Node.
+        assert_eq!(backend(&Method::GET, "/desktop/download"), Backend::Server(Servers::BuiltFile));
     }
 
     // Node's routes, read from its source: one added there shows here, to be
-    // listed above with the side that answers it.
+    // listed above with the side that answers it. The API's, and the ones
+    // server.js answers before the page's files (its own, and those of the
+    // routers it mounts for tafac.fr's own).
     #[test]
     fn every_route_node_has_is_in_the_table() {
         let mut missing = Vec::new();
-        for source in [include_str!("../../../../server/entAuthApp.js"), include_str!("../../../../server/universitiesApp.js")] {
+        let sources = [
+            (include_str!("../../../../server/entAuthApp.js"), true),
+            (include_str!("../../../../server/universitiesApp.js"), true),
+            (include_str!("../../../../server.js"), false),
+            (include_str!("../../../../server/desktopUpdate/index.ts"), false),
+            (include_str!("../../../../server/remoteSettings/index.ts"), false),
+        ];
+        for (source, api_only) in sources {
             for line in source.lines() {
                 let line = line.trim_start();
-                let Some(rest) = ["app.get(", "app.post(", "app.all(", "app.use("].iter().find_map(|call| line.strip_prefix(call)) else { continue };
+                let Some(rest) = ["app.get(", "app.post(", "app.all(", "app.use(", "router.get(", "router.post(", "router.all("].iter().find_map(|call| line.strip_prefix(call)) else { continue };
                 let is_use = line.starts_with("app.use(");
                 let Some(path) = rest.strip_prefix('\'').and_then(|rest| rest.split('\'').next()) else { continue };
-                if !path.starts_with("/__ent_auth/") && !path.starts_with("/__ent_proxy") {
+                if api_only && !path.starts_with("/__ent_auth/") && !path.starts_with("/__ent_proxy") {
                     continue;
                 }
                 // A parameter is a folder's content; a mounted prefix too.
                 let path = path.split("/:").next().unwrap_or(path);
-                let listed = ROUTES.iter().any(|route| {
+                // The whole site's line lists nothing by itself.
+                let listed = ROUTES.iter().filter(|route| route.path != "/*").any(|route| {
                     let folder = route.path.strip_suffix("/*");
                     route.path == path || folder.is_some_and(|folder| path == folder || path.starts_with(&format!("{folder}/")))
                 });

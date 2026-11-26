@@ -25,6 +25,7 @@ import {
 } from '../server/appIcons.js'
 import { createEntAuthApp } from '../server/entAuthApp.js'
 import { loadServerConfig } from '../universities/index.js'
+import { buildIconData, buildIconFixture, outputPath } from '../scripts/gateway-data.mjs'
 
 const silentLogger = { warn() {} }
 
@@ -432,3 +433,44 @@ test('POST /__ent_auth/app-icons needs a session and stores only demo services f
     await app.locals.analytics.shutdown?.()
   }
 }))
+
+// --- The gateway's copy ----------------------------------------------------------
+// The gateway (back/crates/tafac-gateway, own/icons.rs) answers this route
+// for the sessions it holds, from a copy of these lists that
+// scripts/gateway-data.mjs writes, and holds itself to the fixture below.
+// Both fail here when a list or a pick changes and the script wasn't run
+// again (node scripts/gateway-data.mjs).
+
+// A fold table's code points, those this Node's Unicode knows: a newer
+// Node's table may name marks an older one hasn't heard of.
+function foldedByCode(fold) {
+  const assigned = /\p{Assigned}/u
+  const byCode = new Map()
+  for (const [first, last, folded] of fold) {
+    for (let code = first; code <= last; code += 1) {
+      if (assigned.test(String.fromCodePoint(code))) byCode.set(code, folded)
+    }
+  }
+  return byCode
+}
+
+test('the gateway picks from the lists the JS has', async () => {
+  const written = JSON.parse(await readFile(outputPath('back/crates/tafac-gateway/src/own/icons.json'), 'utf8'))
+  const made = await buildIconData()
+  assert.deepEqual({ ...written, fold: null }, { ...made, fold: null })
+  assert.deepEqual(foldedByCode(written.fold), foldedByCode(made.fold))
+})
+
+// The day a store wrote down, in the files of the fixture's routes.
+function withoutToday(fixture) {
+  const routes = fixture.routes.map((route) => ({
+    ...route,
+    requests: route.requests.map((request) => ({ ...request, file: request.file?.replaceAll(`"assignedAt": "${fixture.today}"`, '"assignedAt": "today"') ?? null })),
+  }))
+  return { ...fixture, today: null, routes }
+}
+
+test('the JS picks what the fixture the gateway holds to says', async () => {
+  const written = JSON.parse(await readFile(outputPath('tests/fixtures/app-icon-picks.json'), 'utf8'))
+  assert.deepEqual(withoutToday(written), withoutToday(await buildIconFixture()))
+})

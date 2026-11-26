@@ -13,19 +13,24 @@
 // university (server/appIcons.js), and the page picks with it for the demo
 // account, which asks no server (src/demoServer.js). Tested through the
 // server's module (tests/appIcons.test.js).
+//
+// The gateway (back/crates/tafac-gateway, own/icons.rs) picks the same way
+// from a copy of these lists: after a change here, run
+// `node scripts/gateway-data.mjs`, which writes it and the fixture both
+// sides hold to (tests/appIcons.test.js fails until then).
 // ============================================================================
 
 // Per request.
 export const MAX_REQUEST_SERVICES = 200
 export const MAX_TITLE_LENGTH = 120
-const MAX_DESCRIPTION_LENGTH = 300
-const MAX_CATEGORY_LENGTH = 40
+export const MAX_DESCRIPTION_LENGTH = 300
+export const MAX_CATEGORY_LENGTH = 40
 
 // Portal fnames, portlet ids and local service ids ("moodle-foad",
 // "lent-iutlan-notes9"…). Anything else is ignored.
 export const SERVICE_ID_PATTERN = /^[A-Za-z0-9][A-Za-z0-9_.-]{0,63}$/
 // "prefix:name", as Iconify writes it. Lets admins pin any icon of any set.
-const ICON_NAME_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*:[a-z0-9]+(?:-[a-z0-9]+)*$/
+export const ICON_NAME_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*:[a-z0-9]+(?:-[a-z0-9]+)*$/
 
 // --- Icons -------------------------------------------------------------------
 
@@ -102,7 +107,7 @@ export const APP_ICON_CONCEPTS = Object.keys(ICONS_BY_CONCEPT)
 
 // Concepts drawn with the service's own logo: they win over a stored concept
 // (see resolve), so a brand added later reaches tiles picked before it.
-const BRAND_CONCEPTS = new Set(['moodle'])
+export const BRAND_CONCEPTS = new Set(['moodle'])
 
 // The weight suffix only exists on Phosphor icons, not on brand logos.
 function pickColumn(column, suffix = '') {
