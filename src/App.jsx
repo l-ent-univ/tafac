@@ -21,6 +21,7 @@ import WelcomeFromLent from './components/WelcomeFromLent'
 import { settingsTransfer } from './settingsTransferBoot'
 import { appendPreviewToken, findProfilePhotoCandidate } from './profilePhoto'
 import { DEMO_CREDENTIALS, DEMO_SESSION_MODE, DEMO_SIGNATURE_LOGIN } from './demoAccount'
+import { onDemoSessionChange, readDemoSession } from './demoSession'
 import { isDesktopApp, isIosApp, isMacDesktopApp, isMicaDesktopApp, isNativeApp } from './desktopApp'
 import { syncWindowTheme } from './desktopWindowTheme'
 import { syncIosAppearance } from './iosApp'
@@ -1266,6 +1267,18 @@ function App() {
   const sessionUser = sessionState.authenticated ? sessionState.user : null
   useEffect(() => onSessionExpired(() => void signOutExpiredSession(sessionUser)), [signOutExpiredSession, sessionUser])
 
+  // Another tab signed in to the demo or out of it (its sign-in is the
+  // browser's, src/demoSession.js): a tab that shows an account follows,
+  // rather than show one account with another's answers. A tab signed out
+  // stays as it is (someone may be typing their login there).
+  const isShowingAccount = sessionState.authenticated && !sessionState.checking
+  useEffect(() => {
+    if (!isShowingAccount) return undefined
+    return onDemoSessionChange(() => {
+      if (Boolean(readDemoSession()) !== (sessionUser === DEMO_CREDENTIALS.username)) void refreshSession()
+    })
+  }, [isShowingAccount, sessionUser, refreshSession])
+
   useEffect(() => {
     clearLegacySensitiveClientCaches()
   }, [])
@@ -2008,29 +2021,33 @@ function App() {
     user: sessionState.user,
   })
   const gradesSupported = gradesFormation !== 'other'
+  // What the navigation is built from (navItems.js): the demo account's
+  // links go to the services themselves.
+  const isDemoAccount = sessionState.authenticated && sessionState.user === DEMO_CREDENTIALS.username
+  const navOptions = useMemo(() => ({ gradesSupported, demo: isDemoAccount }), [gradesSupported, isDemoAccount])
   const hasGradesPage = useMemo(
-    () => getMobileTabItems(establishment, { gradesSupported }).some((item) => item.page === 'grades'),
-    [establishment, gradesSupported],
+    () => getMobileTabItems(establishment, navOptions).some((item) => item.page === 'grades'),
+    [establishment, navOptions],
   )
   // The in-app planning page, on the same terms as its nav item
   // (features.planning): the planning service's links open it instead.
   const hasPlanningPage = useMemo(
-    () => getMobileTabItems(establishment, { gradesSupported }).some((item) => item.page === 'planning'),
-    [establishment, gradesSupported],
+    () => getMobileTabItems(establishment, navOptions).some((item) => item.page === 'planning'),
+    [establishment, navOptions],
   )
   // The in-app mail page (features.mail, mail.page in client.js): the
   // dashboard's mail card opens it, Réglages › Messagerie comes with it.
   const hasMailPage = useMemo(
-    () => getMobileTabItems(establishment, { gradesSupported }).some((item) => item.page === 'mail'),
-    [establishment, gradesSupported],
+    () => getMobileTabItems(establishment, navOptions).some((item) => item.page === 'mail'),
+    [establishment, navOptions],
   )
   // « Moodle » as a page of the app (the desktop app's, navItems.js):
   // Moodle's links and its tile open it instead of the site.
   const hasMoodlePage = useMemo(
-    () => getMobileTabItems(establishment, { gradesSupported }).some((item) => item.page === 'moodle'),
-    [establishment, gradesSupported],
+    () => getMobileTabItems(establishment, navOptions).some((item) => item.page === 'moodle'),
+    [establishment, navOptions],
   )
-  const hasMobileTabBar =useMemo(() => getMobileTabItems(establishment, { gradesSupported }).length > 0, [establishment, gradesSupported])
+  const hasMobileTabBar =useMemo(() => getMobileTabItems(establishment, navOptions).length > 0, [establishment, navOptions])
   // « Nouveautés » about « Mes notes » only reach students who have it: a
   // school with the page and a relevé confirmed BUT (not while unknown, so
   // the pill doesn't come and go). Those about the Planning page, students
@@ -2052,23 +2069,23 @@ function App() {
   // Falls back to « Accueil » if the grades item goes away (establishment
   // without grade widgets, feature switched off, a relevé that isn't BUT).
   const isGradesPage = useMemo(
-    () => activePage === 'grades' && getMobileTabItems(establishment, { gradesSupported }).some((item) => item.page === 'grades'),
-    [activePage, establishment, gradesSupported],
+    () => activePage === 'grades' && getMobileTabItems(establishment, navOptions).some((item) => item.page === 'grades'),
+    [activePage, establishment, navOptions],
   )
   // Likewise for the planning page (features.planning).
   const isPlanningPage = useMemo(
-    () => activePage === 'planning' && getMobileTabItems(establishment, { gradesSupported }).some((item) => item.page === 'planning'),
-    [activePage, establishment, gradesSupported],
+    () => activePage === 'planning' && getMobileTabItems(establishment, navOptions).some((item) => item.page === 'planning'),
+    [activePage, establishment, navOptions],
   )
   // Likewise for the mail page (features.mail).
   const isMailPage = useMemo(
-    () => activePage === 'mail' && getMobileTabItems(establishment, { gradesSupported }).some((item) => item.page === 'mail'),
-    [activePage, establishment, gradesSupported],
+    () => activePage === 'mail' && getMobileTabItems(establishment, navOptions).some((item) => item.page === 'mail'),
+    [activePage, establishment, navOptions],
   )
   // Likewise for « Assiduité » (the ScoDoc relevé's absences, with « Mes notes »).
   const isAssiduityPage = useMemo(
-    () => activePage === 'assiduity' && getMobileTabItems(establishment, { gradesSupported }).some((item) => item.page === 'assiduity'),
-    [activePage, establishment, gradesSupported],
+    () => activePage === 'assiduity' && getMobileTabItems(establishment, navOptions).some((item) => item.page === 'assiduity'),
+    [activePage, establishment, navOptions],
   )
   // « Accueil » (HomeDraftPage), every university: the page shown when no
   // other is.
@@ -2203,8 +2220,8 @@ function App() {
   // native tab's (src/keptPages.js), for this account and the pages there
   // are: signed out, or with other pages, the hidden ones go.
   const pagesOnOffer = useMemo(
-    () => ['home', ...getMobileTabItems(establishment, { gradesSupported }).map((item) => item.page).filter(Boolean)],
-    [establishment, gradesSupported],
+    () => ['home', ...getMobileTabItems(establishment, navOptions).map((item) => item.page).filter(Boolean)],
+    [establishment, navOptions],
   )
   const { pages: keptPages, leave: leaveKeptPage } = useKeptPages({
     owner: isIosApp() && sessionState.authenticated ? `${universityConfig.id}:${sessionState.user ?? ''}` : null,
@@ -2319,8 +2336,8 @@ function App() {
   // the university has no Moodle. The apps': « Toutes les applications »,
   // the drawer of the app list, which opens on each new request.
   const moodleNavItem = useMemo(
-    () => buildNavItems(establishment, { gradesSupported }).find((item) => item.id === 'moodle') ?? null,
-    [establishment, gradesSupported],
+    () => buildNavItems(establishment, navOptions).find((item) => item.id === 'moodle') ?? null,
+    [establishment, navOptions],
   )
   const handleOpenMoodleFromIcon = useMemo(() => {
     if (!moodleNavItem) return null
@@ -2348,8 +2365,8 @@ function App() {
   // own, there only where Moodle is a page.
   const isSignedIn = sessionState.authenticated && !sessionState.checking
   const desktopMenuPages = useMemo(
-    () => (isSignedIn ? buildNavItems(establishment, { gradesSupported }).filter((item) => item.page).map((item) => ({ id: item.page, label: item.label })) : []),
-    [isSignedIn, establishment, gradesSupported],
+    () => (isSignedIn ? buildNavItems(establishment, navOptions).filter((item) => item.page).map((item) => ({ id: item.page, label: item.label })) : []),
+    [isSignedIn, establishment, navOptions],
   )
   useEffect(() => {
     if (!isMacDesktopApp()) return
@@ -2437,7 +2454,7 @@ function App() {
   }, [sessionState.user])
   // Réglages › Apparence offers it where there's an « Assiduité » page;
   // its words say whether Moodle gives way.
-  const tabBarShortcuts = useMemo(() => getMobileTabItems(establishment, { gradesSupported }), [establishment, gradesSupported])
+  const tabBarShortcuts = useMemo(() => getMobileTabItems(establishment, navOptions), [establishment, navOptions])
   const hasAssiduityPage = tabBarShortcuts.some((item) => item.page === 'assiduity')
   const hasMoodleTab = tabBarShortcuts.some((item) => item.id === 'moodle')
 
@@ -3155,6 +3172,7 @@ function App() {
             showUniversityLogo={showUniversityLogo}
             logoSource={logoSource}
             gradesSupported={gradesSupported}
+            demoAccount={isDemoAccount}
             activePage={shownPage}
             onNavigatePage={handleNavigatePage}
             nextClassSelection={hasPlanningPage ? selectedTp : null}
@@ -3273,7 +3291,6 @@ function App() {
               <MoodlePage
                 target={pendingMoodleTarget}
                 onTargetHandled={clearPendingMoodleTarget}
-                signsInOnMoodle={sessionState.user === DEMO_CREDENTIALS.username}
                 onHistoryChange={setMoodleHistory}
               />
             ) : null}
@@ -3301,6 +3318,7 @@ function App() {
           <MobileTabBar
             establishment={establishment}
             gradesSupported={gradesSupported}
+            demoAccount={isDemoAccount}
             activePage={shownPage}
             showAssiduity={showAssiduityTab}
             onNavigatePage={handleNavigatePage}

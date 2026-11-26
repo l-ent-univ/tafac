@@ -9,7 +9,6 @@
 //       student's report, whatever the request says.
 //   502 { error }: the gateway gave no PDF (tonAPI's `not_found`). Node.
 //   401 { error }: nobody signed in. Node.
-//   404 for the demo account: Node.
 //   400 { error }: a semester id that isn't one. Node.
 //   500 { error }: ScoDoc down or answering something else. Node.
 

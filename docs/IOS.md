@@ -93,8 +93,10 @@ it answers.
   signs out.
 - **Node**, behind it: every other route, as before (the portal's
   applications, the planning, the mail, the documents, Rennes 2, Sorbonne
-  Nouvelle, the demo account), and what the gateway asks it for (a second
-  factor, the portal signed in to again, a moved route's error).
+  Nouvelle), and what the gateway asks it for (a second factor, the portal
+  signed in to again, a moved route's error).
+- **The demo account** is neither's: the page serves it by itself, with no
+  session (`src/demoServer.js`, `docs/DESKTOP.md`).
 - **One session**, in one cookie, read by both: the bridge's jar holds it
   whoever set it.
 - **Asked as the app starts**: the session check is the page's first
@@ -352,6 +354,10 @@ Moodle page pins to its bottom stays above the bar).
   app, print).
 - A link to Moodle anywhere in the app (a deadline, its tile, a link in a
   mail) opens in « Moodle », as on the desktop.
+- **Not for the demo account.** The view opens on what the server says of
+  the session's university, and the demo has no session: its « Moodle » is
+  a link to Moodle's own address (`src/navItems.js`), which opens over the
+  app as any web address does.
 
 ## Links
 
@@ -664,10 +670,15 @@ shows, signing in, the Keychain keeping the login.
   Fichiers », AirDrop, or the sheet closed; a file of the app's downloaded
   as it is, where the page didn't make a blob of it first (an app route
   answering with a file WebKit can't show), which may fail as on macOS.
+- **The demo account, since the page serves it** (`src/demoServer.js`):
+  not run in the app. What « Checked » says of the demo account was seen
+  when the server answered it; its « Moodle » was the view then, and is a
+  link now.
 - **Moodle, signed in**: only Moodle's sign-in page was seen (the demo
-  account). The relay's sign-in (Rennes' goes through a page that posts
-  itself), Tafac's look on Moodle's own pages, a file's share sheet, a new
-  sign-in when Moodle's session runs out: unverified.
+  account, when it opened the view). The relay's sign-in (Rennes' goes
+  through a page that posts itself), Tafac's look on Moodle's own pages, a
+  file's share sheet, a new sign-in when Moodle's session runs out:
+  unverified.
 - **Saved passwords** (the system's sheet for tafac.fr): the desktop's code
   is AppKit's.
 - **Updates**: the App Store's. Remote settings mend what settings can

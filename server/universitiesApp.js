@@ -60,7 +60,8 @@ function getRequestHost(req) {
 //   production: Secure __Host- cookie, mandatory SESSION_SECRET;
 //   session: { secret, previousSecrets } (defaults: the environment);
 //   listDevOnly: list devOnly universities (default: not in production);
-//   analytics, appIcons, trustProxy: passed to every entAuthApp.
+//   analytics, appIcons, trustProxy, demoAccount: passed to every
+//   entAuthApp (demoAccount: false where the server runs, see there).
 export async function createUniversitiesApp({
   universityIds = [],
   defaultUniversityId,
@@ -71,6 +72,7 @@ export async function createUniversitiesApp({
   analytics,
   appIcons,
   trustProxy,
+  demoAccount,
   // The apps' remote settings (server/remoteSettings/), or none.
   remoteSettings = null,
 } = {}) {
@@ -128,6 +130,7 @@ export async function createUniversitiesApp({
       analytics,
       appIcons,
       trustProxy,
+      demoAccount,
       session: {
         secret: secrets.current,
         previousSecrets: secrets.previous,
@@ -155,6 +158,11 @@ export async function createUniversitiesApp({
   function sessionUniversityId(req) {
     const data = readSessionCookies(req.cookies, { codec, cookieName })?.data
     if (!data || typeof data.id !== 'string' || !data.id || isSessionDataExpired(data)) {
+      return null
+    }
+    // The demo account's cookie, from before the page served the demo by
+    // itself: nobody's session (entAuthApp.js, options.demoAccount).
+    if (data.mode === 'demo' && demoAccount === false) {
       return null
     }
     const id = getSessionUniversityId(data, legacyUniversityId(req))

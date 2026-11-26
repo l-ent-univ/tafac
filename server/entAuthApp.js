@@ -174,6 +174,15 @@ function resolveTrustProxy(value) {
 // server/appIcons.js).
 // options.trustProxy — Express 'trust proxy' value, defaults to TRUST_PROXY,
 // else local and private peers.
+// options.demoAccount: false — the demo account is no longer this server's.
+// The page serves it by itself, with no session here (src/demoServer.js),
+// so the server's own entry points (server.js, the Vite mount) pass false:
+// the demo's login is then a login like any other, and a session cookie
+// that says `demo` (one from before) is nobody's. What stays on without it
+// is what this server answered a demo session with, kept for the route
+// tests: the demo's is their one session that needs no university
+// (tests/mailRateLimit.test.js, mailUpload, mailSend, launchTargets…). It
+// goes with the routes themselves.
 export function createEntAuthApp(universityConfig, options = {}) {
 const app = express()
 // Behind a reverse proxy (Caddy in deploy/), req.ip is the proxy's address
@@ -212,6 +221,7 @@ const GRADES_UNAVAILABLE_MESSAGE = [
 ].filter(Boolean).join('. ')
 
 const FEATURES = universityConfig.features ?? {}
+const SERVES_DEMO_ACCOUNT = options.demoAccount !== false
 
 const ENT_ORIGIN = universityConfig.origins.ent
 const CAS_ORIGIN = universityConfig.origins.cas
@@ -1460,6 +1470,12 @@ function getSessionFromRequest(req) {
     return null
   }
 
+  // The demo account's cookie, from before the page served the demo by
+  // itself: nobody signed in.
+  if (data.mode === DEMO_SESSION_MODE && !SERVES_DEMO_ACCOUNT) {
+    return null
+  }
+
   const runtimeSession = runtimeSessions.get(data.id)
   if (runtimeSession) {
     runtimeSession.sessionSource = 'runtime'
@@ -2499,7 +2515,7 @@ app.use('/__ent_auth/mail', (req, res, next) => {
 // logout itself (back/crates/tafac-gateway, routes.rs and translate/). This
 // server is behind it: it reads the session's cookie as before, and still
 // gets these four for what the gateway leaves it (node.rs there): another
-// university, the demo account, nobody signed in, the CAS's second factor,
+// university, nobody signed in, the CAS's second factor,
 // and the session check when the portal's own session lapsed, which signs
 // in to the portal again for /__ent_proxy below. A field added, renamed or
 // removed here changes there too.
@@ -2608,7 +2624,8 @@ app.post('/__ent_auth/login', async (req, res) => {
 
     // The demo account is public: nothing to guess, so no limit holds it
     // back, and it counts for nothing in the limits of the real logins.
-    if (FEATURES.demo !== false && isDemoCredentials(username, password)) {
+    // Only where this server still answers it (options.demoAccount).
+    if (SERVES_DEMO_ACCOUNT && FEATURES.demo !== false && isDemoCredentials(username, password)) {
       const session = createDemoSession()
       setSessionCookie(res, session)
 
@@ -3093,8 +3110,8 @@ app.get('/__ent_auth/launch', async (req, res) => {
 // evaluation's distribution, the PDF) have moved to tonAPI where the gateway
 // runs before this server: it answers while the session lives, with
 // ScoDoc's shape written back from tonAPI's report, ends a session the CAS
-// no longer knows, and leaves the rest here (nobody signed in, the demo
-// account, a refused parameter, an error). It writes only the fields the
+// no longer knows, and leaves the rest here (nobody signed in, a refused
+// parameter, an error). It writes only the fields the
 // page reads: one the page starts to read goes in
 // back/crates/tafac-gateway, translate/grades/report.rs, too.
 app.get('/__ent_auth/grades', async (req, res) => {
@@ -5793,8 +5810,8 @@ app.get('/__ent_auth/moodle/view', (req, res) => {
 // 6d. Moodle deadlines endpoint
 // Moved to tonAPI where the gateway runs before this server: it answers
 // while the session lives, ends a session the CAS no longer knows, and
-// leaves the rest to this route (nobody signed in, the demo account, an
-// error). What it does as this route does is in back/crates/tafac-gateway,
+// leaves the rest to this route (nobody signed in, an error). What it
+// does as this route does is in back/crates/tafac-gateway,
 // translate/moodle_deadlines.rs: a change to an item's fields or to
 // selectMoodleDeadlines goes there too.
 app.get('/__ent_auth/moodle/deadlines', async (req, res) => {
@@ -6746,8 +6763,8 @@ app.post('/__ent_auth/logout', async (req, res) => {
 // the portal: { id, title, description, url, iconUrl, category, favorite },
 // tonAPI's own model (back/crates/tafac-gateway/src/translate/apps.rs). The
 // gateway answers it for the portals tonAPI reads (uPortal: Rennes). Here:
-// the demo account's, and the portals this server reads itself, from their
-// catalogue page (catalog.path).
+// the portals this server reads itself, from their catalogue page
+// (catalog.path).
 async function fetchPortalCatalogPage(session) {
   const page = await followRedirectChain(PORTAL_CATALOG_URL, session.jar, {
     headers: { Accept: HTML_ACCEPT_HEADER },

@@ -2,7 +2,8 @@ import { createElement } from 'react'
 
 // Dev only: which side answered each of the page's requests. The Rust
 // gateway (back/crates/tafac-gateway) says so on the answers it makes itself
-// (`x-tafac-answered-by: tonapi`); every other answer is the Node server's.
+// (`x-tafac-answered-by: tonapi`); every other answer is the Node server's,
+// but the demo account's, which the page makes itself (src/demoServer.js).
 // src/entApi.js notes each answer here, and src/dev/BackendMarks.jsx draws
 // what was noted: an outline around what a route feeds, and a panel listing
 // every route asked.
@@ -18,7 +19,8 @@ function routeOf(pathname) {
   return pathname.replace(/\/\d+(?=\/|$)/g, '/:id')
 }
 
-export function noteBackendAnswer(url, response, milliseconds) {
+// `by`: 'page' for an answer the page made itself, else read from the answer.
+export function noteBackendAnswer(url, response, milliseconds, by = null) {
   let pathname
   try {
     pathname = new URL(url, window.location.origin).pathname
@@ -31,7 +33,7 @@ export function noteBackendAnswer(url, response, milliseconds) {
   const previous = answers.get(route)
   answers.set(route, {
     route,
-    by: response.headers.get(ANSWERED_BY_HEADER) === 'tonapi' ? 'rust' : 'node',
+    by: by ?? (response.headers.get(ANSWERED_BY_HEADER) === 'tonapi' ? 'rust' : 'node'),
     status: response.status,
     milliseconds: Math.round(milliseconds),
     count: (previous?.count ?? 0) + 1,

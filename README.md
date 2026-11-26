@@ -73,6 +73,8 @@ Utiliser l’accès démo de la page de connexion, ou saisir :
 
 Les données universitaires de démonstration sont fictives. Ce mode permet de parcourir l’application sans se connecter à un ENT réel ; il ne valide pas le fonctionnement des intégrations universitaires.
 
+La démonstration est servie par la page elle-même, sans le serveur : l’identifiant et le mot de passe de démonstration sont reconnus dans le navigateur et ne sont envoyés nulle part, il n’y a pas de cookie de session, et chaque écran reçoit ses données d’exemple de `src/demoServer.js` (qui répond à la place du serveur, route par route) et de `src/demoAccount.js`. La connexion à la démo est gardée dans le navigateur (`src/demoSession.js`), les mails écrits dans la démo le temps de l’onglet (`src/demoMail.js`).
+
 ### Choisir les universités servies
 
 Sans variable `UNIVERSITY`, le serveur propose les universités configurées. Pour travailler sur Rennes uniquement :
@@ -143,7 +145,7 @@ Au démarrage, le navigateur consulte `/__ent_auth/universities`, puis charge le
 | `server/sessionCookie.js` | Chiffrement, durée de vie et rotation des cookies de session. |
 | `planningPortalApi.js` | Adaptateur du portail planning REST, utilisé pour Rennes. |
 | `planningRpc.js`, `adeApi.js`, `adeUpcomingResolver.js` | Adaptateurs planning GWT et ADE mobile, résolution des cours à venir. |
-| `server/appIcons.js` | Attribution et persistance des icônes des applications. |
+| `server/appIcons.js`, `src/appIconPicks.js` | Attribution et persistance des icônes des applications ; les règles du choix, partagées avec la page pour la démonstration. |
 | `universities/` | Configuration, identité et ressources de chaque université. |
 | `tests/` | Tests des calculs, adaptateurs, sessions, routage, exports et comportements de l’interface. |
 | `deploy/`, `Dockerfile` | Image de production et déploiement avec Caddy. |

@@ -14,6 +14,7 @@ import {
   writeUniversityChoice,
 } from './universityRuntime'
 import { switchUniversityStorage } from './universityStorage'
+import { endDemoSession, readDemoSession } from './demoSession'
 import { resolveRegister, setRegister } from './register.js'
 import { mergeSettings } from './remoteSettings.js'
 
@@ -50,15 +51,30 @@ function replacePath(path) {
   }
 }
 
+// The university this browser is signed in to, as the page boots for it:
+// the session's, as the server says it, else the demo account's, whose
+// sign-in is the page's own (src/demoSession.js). Signed in for real, the
+// demo is over: one sign-in at a time.
+function readSignedInUniversity(info) {
+  if (info?.session) {
+    endDemoSession()
+    return info.session
+  }
+  return readDemoSession()?.university ?? null
+}
+
 export async function bootUniversity() {
-  const info = await fetchUniversityDirectory()
-  setUniversityDirectory(info)
+  const directory = await fetchUniversityDirectory()
+  setUniversityDirectory(directory)
+  const signedIn = readSignedInUniversity(directory)
+  const info = directory ? { ...directory, session: signedIn } : null
 
   const entry = readEntryPath(window.location.pathname, info?.universities ?? [])
   if (entry?.kind === 'picker') replacePath(LOGIN_ENTRY_PATH)
   else if (entry && info?.session) replacePath('/')
 
-  const id = pickBootUniversity({ info, entry, storedChoice: readUniversityChoice() })
+  // Without an answer from the server, the demo still boots for its own.
+  const id = pickBootUniversity({ info, entry, storedChoice: signedIn ?? readUniversityChoice() })
   let config = null
   if (id) {
     try {

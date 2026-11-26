@@ -111,7 +111,7 @@ fn a_portal_that_cant_be_reached_is_nodes_to_word() {
     let node = Node::default();
     assert!(get(&gateway, &node, &campus.alive()).is_none());
 
-    // Nobody signed in, the demo account, another university: Node's.
+    // Nobody signed in, a demo cookie from before, another university: Node's.
     let demo = campus.cookie(serde_json::json!({ "mode": "demo" }), &[]);
     let elsewhere = campus.cookie(serde_json::json!({ "uni": "univ-rennes-2" }), &[("JSESSIONID", "alive")]);
     for cookie in [Some(demo), Some(elsewhere), None] {

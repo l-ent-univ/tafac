@@ -13,7 +13,6 @@
 //   404 { error }: an evaluation that isn't in the student's own report
 //       (tonAPI's `not_found`: it checks the same). Node, which words it.
 //   200 { authenticated: false, … 'signed-out' }: nobody signed in. Node.
-//   200 or 404 for the demo account: Node.
 //   400 { error }: ids that aren't ids. Node.
 //   500 { error }: ScoDoc down or answering something else. Node.
 

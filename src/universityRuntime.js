@@ -36,6 +36,11 @@ export function getLoadedUniversityId() {
   return state.loadedId
 }
 
+// The university a login without a pick is for (the neutral page).
+export function getDefaultUniversityId() {
+  return state.defaultUniversity
+}
+
 // Several universities on this server: the login page offers a picker.
 export function isMultiUniversity() {
   return state.mode === 'multi'

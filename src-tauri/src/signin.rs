@@ -9,9 +9,11 @@
 // login page doesn't show.
 //
 //   kept       after a login the page sent went through (POST
-//              /__ent_auth/login, 200): not the demo account's, nor one that
-//              needed a one-time code (it can't be signed in again without
-//              the student)
+//              /__ent_auth/login, 200): not one that needed a one-time code
+//              (it can't be signed in again without the student). The demo
+//              account's login never comes here: the page signs in to the
+//              demo by itself (src/demoSession.js), after a sign-out of its
+//              own, which forgets what is kept
 //   forgotten  on the student's own sign-out (POST /__ent_auth/logout without
 //              `X-Tafac-Logout: expired`), when the university refuses it
 //              (`code: 'login_refused'`, server/casLogin/refusal.ts) or asks
@@ -43,7 +45,6 @@ pub const UNIVERSITY_HEADER: &str = "x-tafac-university";
 pub const SESSION_HEADER: &str = "x-tafac-session";
 // The page's sign-out when the session expired (src/entApi.js logoutFromEnt).
 pub const LOGOUT_REASON_HEADER: &str = "x-tafac-logout";
-const DEMO_SESSION_MODE: &str = "demo";
 
 // After a sign-in that couldn't be tried, how long signed-out answers are
 // passed on as they are: a burst of them, or a page asking again and again,
@@ -95,8 +96,6 @@ struct LoginBody {
 #[serde(default)]
 struct LoginAnswer {
     authenticated: bool,
-    #[serde(rename = "sessionMode")]
-    session_mode: Option<String>,
     code: Option<String>,
 }
 
@@ -107,8 +106,7 @@ pub fn capture(request_body: &[u8], university_header: Option<&str>, status: u16
     }
     let Ok(body) = serde_json::from_slice::<LoginBody>(request_body) else { return Capture::Forget };
     let needed_code = body.otp.as_deref().is_some_and(|otp| !otp.trim().is_empty());
-    let demo = answer.session_mode.as_deref() == Some(DEMO_SESSION_MODE);
-    if needed_code || demo || body.username.trim().is_empty() || body.password.is_empty() {
+    if needed_code || body.username.trim().is_empty() || body.password.is_empty() {
         return Capture::Forget;
     }
     let university = body
@@ -135,7 +133,7 @@ pub enum Outcome {
 pub fn outcome(status: u16, response_body: &[u8]) -> Outcome {
     let answer: LoginAnswer = serde_json::from_slice(response_body).unwrap_or_default();
     match (status, answer.code.as_deref()) {
-        (200, _) if answer.authenticated && answer.session_mode.as_deref() != Some(DEMO_SESSION_MODE) => Outcome::SignedIn,
+        (200, _) if answer.authenticated => Outcome::SignedIn,
         (401, Some("login_refused")) => Outcome::Refused,
         (401, Some(code)) if code.starts_with("mfa_") => Outcome::SecondFactor,
         _ => Outcome::NotNow,
@@ -424,7 +422,6 @@ mod tests {
     use super::*;
 
     const SIGNED_IN: &[u8] = br#"{"authenticated":true,"user":"jdoe","sessionMode":null,"university":"univ-rennes"}"#;
-    const DEMO: &[u8] = br#"{"authenticated":true,"user":"demo","sessionMode":"demo","university":"univ-rennes"}"#;
 
     fn login(university: Option<&str>) -> KeptLogin {
         KeptLogin { username: "jdoe".into(), password: "right horse".into(), university: university.map(str::to_string) }
@@ -441,11 +438,9 @@ mod tests {
     }
 
     #[test]
-    fn a_login_with_a_code_or_the_demo_replaces_what_is_kept_with_nothing() {
+    fn a_login_with_a_code_replaces_what_is_kept_with_nothing() {
         let with_code = br#"{"username":"jdoe","password":"right horse","otp":"123456"}"#;
         assert_eq!(capture(with_code, None, 200, SIGNED_IN), Capture::Forget);
-        let demo = br#"{"username":"demo","password":"demo"}"#;
-        assert_eq!(capture(demo, None, 200, DEMO), Capture::Forget);
     }
 
     #[test]
@@ -468,7 +463,6 @@ mod tests {
         assert_eq!(outcome(429, br#"{"error":"Too many login attempts. Please try again later."}"#), Outcome::NotNow);
         assert_eq!(outcome(500, b""), Outcome::NotNow);
         assert_eq!(outcome(502, b"Le serveur local"), Outcome::NotNow);
-        assert_eq!(outcome(200, DEMO), Outcome::NotNow);
     }
 
     #[test]

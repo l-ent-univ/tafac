@@ -17,8 +17,7 @@
 //       and Node is told.
 //   200 { authenticated: false, … }: nobody signed in. Node, which knows
 //       which university the address is for.
-//   200 for the demo account, and 200 { degraded: true } without a CAS
-//       ticket: Node.
+//   200 { degraded: true } without a CAS ticket: Node.
 //   500 { error }: the portal down, slow, or answering something else
 //       (the CAS still knowing the ticket). Node, which asks it itself and
 //       words the error.

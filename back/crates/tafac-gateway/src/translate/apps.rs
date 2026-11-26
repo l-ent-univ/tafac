@@ -1,8 +1,8 @@
 // GET /__ent_auth/apps: the applications the portal lists for the student.
 //
 // The page reads tonAPI's own model here, not a portal's layout: one list,
-// the same whatever the portal (Node gives the same list for the demo
-// account and for the portals it reads itself, server/entAuthApp.js).
+// the same whatever the portal (Node gives the same list for the portals
+// it reads itself, server/entAuthApp.js).
 //
 //   200 { authenticated: true, sessionMode: null, apps: [{ id, title,
 //       description, url, iconUrl, category, favorite }] }
@@ -17,8 +17,7 @@
 //       (translate/expired.rs), and Node is told.
 //   502 { error }: the portal is down or slow, or answered what tonAPI
 //       doesn't read. Node, which words it for the page.
-//   401 for nobody signed in; the demo account's list; another
-//       university's: Node.
+//   401 for nobody signed in; another university's list: Node.
 
 use tonapi_core::App;
 

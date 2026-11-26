@@ -11,7 +11,6 @@
 //       asked for. tonAPI reads the same answer into its own report:
 //       answered here, with ScoDoc's shape written back from it.
 //   200 { authenticated: false, grades: null }: nobody signed in. Node.
-//   200 for the demo account: Node.
 //   400 { error }: a semester id that isn't one. Node.
 //   401 with X-Tafac-Session: expired: the CAS no longer knows the ticket.
 //       Answered here (translate/expired.rs), and Node is told.

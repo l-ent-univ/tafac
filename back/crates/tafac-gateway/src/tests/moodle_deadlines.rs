@@ -193,7 +193,7 @@ fn what_is_not_a_plain_signed_in_session_is_nodes_without_a_request() {
     let gateway = campus.gateway();
     let alive = [("JSESSIONID", "alive")];
     for (why, cookie) in [
-        ("the demo account", campus.cookie(serde_json::json!({ "mode": "demo" }), &alive)),
+        ("a demo cookie from before", campus.cookie(serde_json::json!({ "mode": "demo" }), &alive)),
         ("another university", campus.cookie(serde_json::json!({ "uni": "univ-rennes-2" }), &alive)),
         ("no CAS ticket", campus.cookie(serde_json::json!({ "jar": [["JSESSIONID", "alive", "127.0.0.1", "/", 1, 1, null]] }), &[])),
     ] {

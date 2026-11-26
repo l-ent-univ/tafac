@@ -7,7 +7,6 @@
 //                  else the X-Tafac-University header), when it is one of
 //                  routes.rs'. Any other, and a body Node would refuse, is
 //                  Node's
-//   the demo       the demo account never reaches a university: Node's
 //   the limits     too many failed attempts from this address or for this
 //                  login wait (attempts.rs)
 //   tonAPI         signs in at the CAS: the form, the password posted once,
@@ -56,10 +55,6 @@ use crate::tonapi::{self, bounded, PORTAL_PATIENCE};
 use crate::translate::signin as said;
 use crate::universities::University;
 
-// The demo account's login, which is public (src/demoAccount.js:
-// DEMO_CREDENTIALS; a test below reads them there).
-const DEMO_USERNAME: &str = "demo@tafac.fr";
-const DEMO_PASSWORD: &str = "tafac-demo";
 // A login or a password longer than this is nobody's: Node's to answer.
 const MAX_USERNAME_BYTES: usize = 256;
 const MAX_PASSWORD_BYTES: usize = 1024;
@@ -136,10 +131,6 @@ fn read_login(asked: &Asked<'_>) -> Option<Login> {
     Some(Login { username, password, university: Some(university).filter(|id| !id.is_empty()), code, send, quiet })
 }
 
-fn is_demo(login: &Login) -> bool {
-    login.username.to_lowercase() == DEMO_USERNAME && login.password == DEMO_PASSWORD
-}
-
 impl Gateway {
     // The university a login is for, when it is one answered here: the one
     // the body names, else the one the header names (Node's resolveUniversity,
@@ -154,13 +145,12 @@ impl Gateway {
     }
 
     // POST /__ent_auth/login. None: a sign-in that is Node's (another
-    // university, the demo account, a body Node reads its own way).
+    // university, a body Node reads its own way). The demo account's login
+    // never comes: the page signs in to the demo by itself
+    // (src/demoSession.js), and here it would be a login like any other.
     pub(super) async fn sign_in(&self, asked: &Asked<'_>) -> Option<http::Response<Vec<u8>>> {
         let login = read_login(asked)?;
         let university = self.chosen(&login, asked)?;
-        if is_demo(&login) {
-            return None;
-        }
         let who = Who::new(requester(asked.peer, asked.headers, self.trusted), &login.username);
         if let Some(seconds) = self.attempts.blocked(&who) {
             return Some(said::too_many(seconds));
@@ -376,14 +366,5 @@ mod tests {
         }
         let long = format!(r#"{{"username":"{}","password":"p"}}"#, "x".repeat(MAX_USERNAME_BYTES + 1));
         assert!(read(JSON, &long).is_none());
-    }
-
-    // The demo account's login is Node's own: held to what Node has.
-    #[test]
-    fn the_demo_account_is_the_one_node_knows() {
-        let source = include_str!("../../../../../src/demoAccount.js");
-        assert!(source.contains(&format!("username: '{DEMO_USERNAME}'")) && source.contains(&format!("password: '{DEMO_PASSWORD}'")));
-        assert!(is_demo(&read(JSON, r#"{"username":" Demo@Tafac.fr ","password":"tafac-demo"}"#).unwrap()));
-        assert!(!is_demo(&read(JSON, r#"{"username":"demo@tafac.fr","password":"Tafac-Demo"}"#).unwrap()));
     }
 }

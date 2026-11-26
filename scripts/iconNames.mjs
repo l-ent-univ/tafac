@@ -11,12 +11,12 @@ export const ICON_PREFIXES = ['carbon', 'ph', 'tabler', 'mdi', 'devicon-plain']
 const SCANNED_DIRS = ['src', 'server', 'universities']
 const SCANNED_FILE = /\.(js|jsx|mjs|json)$/
 // A university's app icon style (appIcons.style) may be a Phosphor weight,
-// drawn as the regular names plus a suffix (server/appIcons.js,
+// drawn as the regular names plus a suffix (src/appIconPicks.js,
 // src/subjectIcons.js): those variants are named nowhere in the code.
 const PHOSPHOR_STYLE = /style:\s*'phosphor-(fill|duotone)'/g
 const PHOSPHOR_WEIGHT_SUFFIX = /-(fill|duotone|bold|light|thin)$/
 // Where those styles' icons are named (the tiles', the subjects').
-const STYLED_ICON_FILES = new Set(['server/appIcons.js', 'src/subjectIcons.js'])
+const STYLED_ICON_FILES = new Set(['src/appIconPicks.js', 'src/subjectIcons.js'])
 const ICON_NAME = new RegExp(`['"\`](${ICON_PREFIXES.join('|')}):([a-z0-9]+(?:-[a-z0-9]+)*)['"\`]`, 'g')
 
 async function listFiles(dir) {

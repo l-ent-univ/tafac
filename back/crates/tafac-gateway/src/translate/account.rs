@@ -17,7 +17,6 @@
 //       cookie cleared: the CAS no longer knows the ticket. Answered here
 //       (translate/expired.rs), and Node is told.
 //   200 { authenticated: false, account: null }: nobody signed in. Node.
-//   200 for the demo account: Node.
 //   500 { error }: Node, which asks the portal itself and words the error.
 
 use tonapi_core::Profile;

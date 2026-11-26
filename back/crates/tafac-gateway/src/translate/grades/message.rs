@@ -8,7 +8,6 @@
 //       wrote nothing. The page shows it as plain text. tonAPI reads the
 //       same and gives the text, a line per paragraph: answered here.
 //   200 { authenticated: false, message: null }: nobody signed in. Node.
-//   200 for the demo account: Node.
 //   400 { error }: a `dep` that isn't a department's name. Node.
 //   500 { error }: ScoDoc down or answering something else. Node.
 

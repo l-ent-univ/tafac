@@ -12,7 +12,6 @@
 //       three latest overdue then what is coming, six in all, `overdue`,
 //       and each link through the launch relay (which is still Node's).
 //   200 { authenticated: false, deadlines: null }: nobody signed in. Node.
-//   200 for the demo account: Node.
 //   401 with X-Tafac-Session: expired: the CAS no longer knows the ticket
 //       (tonAPI's `session_expired`, and the CAS asked says so). Answered
 //       here (translate/expired.rs), and Node is told.

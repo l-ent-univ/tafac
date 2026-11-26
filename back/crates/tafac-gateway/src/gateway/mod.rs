@@ -17,9 +17,9 @@
 // got from the university, and says when the session is over. Node is behind
 // it for what hasn't moved (routes.rs), and for what a moved route still
 // needs of it (node.rs). None from here means the request goes to Node as it
-// came: a route of Node's, another university, the demo account, nobody
-// signed in, a portal session to sign in to again, a service that is down
-// or slow (Node words those errors).
+// came: a route of Node's, another university, nobody signed in, a portal
+// session to sign in to again, a service that is down or slow (Node words
+// those errors).
 
 mod attempts;
 pub(crate) mod portal;
@@ -305,13 +305,12 @@ impl Gateway {
         self.memory.end(&session.id, why);
     }
 
-    // The session a cookie holds, when it is one answered from here: a real
-    // account's, at one of the universities of routes.rs, with its CAS
-    // ticket, and not ended.
+    // The session a cookie holds, when it is one answered from here: at one
+    // of the universities of routes.rs, with its CAS ticket, and not ended.
     pub(crate) fn signed_in(&self, cookie: Option<&str>) -> Option<Held<'_>> {
         let session = self.codec.read(cookie?, now_ms())?;
         let university = self.universities.get(&session.university)?;
-        if session.demo || !session.has_cookie(&university.cas_host, CAS_TICKET) || self.memory.ended(&session.id).is_some() {
+        if !session.has_cookie(&university.cas_host, CAS_TICKET) || self.memory.ended(&session.id).is_some() {
             return None;
         }
         let memory = self.memory.of(&session.id);
