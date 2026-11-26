@@ -21,8 +21,7 @@
 // mobile API there), every one of which is under a domain of `domains`,
 // which is Node's list as it was.
 //
-// Still Node's: 404 for nobody signed in, the demo account, another
-// university.
+// Still Node's: 404 for nobody signed in, another university.
 
 use std::collections::BTreeSet;
 

@@ -43,6 +43,8 @@ async function mountEntAuthApp(server) {
     },
     analytics: env.POSTHOG_IN_DEV === '1' ? readAnalyticsConfig(env) : { projectKey: null },
     appIcons: { dataDir: resolveDataDir(env) },
+    // The page serves the demo account by itself (src/demoServer.js).
+    demoAccount: false,
   })
 
   server.middlewares.use(universitiesApp)

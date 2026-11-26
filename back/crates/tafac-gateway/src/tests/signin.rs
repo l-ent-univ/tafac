@@ -67,7 +67,7 @@ fn a_sign_in_makes_the_session_and_node_is_asked_nothing() {
     // portal's session, which the portal knows.
     let cookie = cookie_set(&response).unwrap();
     let held = gateway.signed_in(Some(&cookie)).unwrap();
-    assert_eq!((held.session.user.as_str(), held.session.university.as_str(), held.session.demo), ("jdoe", UNIVERSITY, false));
+    assert_eq!((held.session.user.as_str(), held.session.university.as_str()), ("jdoe", UNIVERSITY));
     assert_eq!(format!("{:?}", held.session.cookies), "[TGC@localhost/cas, JSESSIONID@127.0.0.1/]");
     let asked_before = campus.paths().len();
     assert_eq!(ask(&gateway, SESSION, &cookie).unwrap()["user"], "jdoe");
@@ -100,6 +100,22 @@ fn a_password_the_cas_refuses_is_said_as_node_says_it() {
     assert_eq!(body_of(&response), serde_json::json!({ "error": "Invalid credentials.", "code": "login_refused" }));
     assert!(cookie_set(&response).is_none());
     // Posted once: a refused password isn't tried again, by Node either.
+    assert_eq!(campus.posted_to("/cas/login"), 1);
+    assert!(node.got().is_empty());
+}
+
+// The page signs in to the demo account by itself and never posts its
+// login (src/demoSession.js). Posted all the same (a page from before), it
+// is a login like any other: the CAS refuses it, Node is asked nothing.
+#[test]
+fn the_demo_accounts_login_is_a_login_like_any_other() {
+    let campus = campus();
+    let gateway = campus.gateway();
+    let node = Node::default();
+    let response = sign_in(&gateway, &node, &login("demo@tafac.fr", "tafac-demo")).unwrap();
+    assert_eq!(response.status(), 401);
+    assert_eq!(body_of(&response)["code"], "login_refused");
+    assert!(cookie_set(&response).is_none());
     assert_eq!(campus.posted_to("/cas/login"), 1);
     assert!(node.got().is_empty());
 }
@@ -326,7 +342,6 @@ fn what_is_not_a_sign_in_at_a_university_answered_here_is_nodes() {
         None => serde_json::json!({ "username": STUDENT, "password": PASSWORD }).to_string(),
     };
     for (why, headers, body) in [
-        ("the demo account", &json, serde_json::json!({ "username": "demo@tafac.fr", "password": "tafac-demo", "university": UNIVERSITY }).to_string()),
         ("another university", &json, credentials(Some("univ-rennes-2"))),
         ("another university, by the header", &elsewhere, credentials(None)),
         ("the body's choice before the header's", &by_header, credentials(Some("univ-rennes-2"))),

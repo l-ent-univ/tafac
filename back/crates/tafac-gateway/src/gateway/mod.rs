@@ -23,7 +23,7 @@
 // (translate/failed.rs). Node is behind it for what hasn't moved
 // (routes.rs), and is told when a session ends (node.rs). None from here
 // means the request goes to Node as it came: a route of Node's, another
-// university, the demo account, nobody signed in, a cookie that isn't read.
+// university, nobody signed in, a cookie that isn't read.
 
 mod attempts;
 mod launch;
@@ -351,13 +351,12 @@ impl Gateway {
         self.memory.end(&session.id, why);
     }
 
-    // The session a cookie holds, when it is one answered from here: a real
-    // account's, at one of the universities of routes.rs, with its CAS
-    // ticket, and not ended.
+    // The session a cookie holds, when it is one answered from here: at one
+    // of the universities of routes.rs, with its CAS ticket, and not ended.
     pub(crate) fn signed_in(&self, cookie: Option<&str>) -> Option<Held<'_>> {
         let session = self.codec.read(cookie?, now_ms())?;
         let university = self.universities.get(&session.university)?;
-        if session.demo || !session.has_cookie(&university.cas_host, CAS_TICKET) || self.memory.ended(&session.id).is_some() {
+        if !session.has_cookie(&university.cas_host, CAS_TICKET) || self.memory.ended(&session.id).is_some() {
             return None;
         }
         let memory = self.memory.of(&session.id);

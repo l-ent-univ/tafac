@@ -142,6 +142,38 @@ test('single-university mode ignores choices and addresses', () => withUniversit
   assert.equal((await getSession(base, { value: legacyDemoCookie() })).authenticated, true)
 }))
 
+// Where the server runs (server.js, the Vite mount: demoAccount false), the
+// demo account is the page's own (src/demoServer.js).
+test('the demo account is no longer the server\'s: its login is a login like any other, its cookie nobody\'s', () => withUniversitiesApp({ demoAccount: false }, async (base) => {
+  // univ-exemple's CAS is on a .example host: the login fails there without
+  // leaving the machine, as any login would.
+  const login = await fetch(`${base}/__ent_auth/login`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'X-Tafac-University': 'univ-exemple' },
+    body: JSON.stringify({ username: 'demo@tafac.fr', password: 'tafac-demo' }),
+  })
+  assert.equal(login.status, 401)
+  assert.equal(cookieValue(login), null)
+  assert.equal((await login.json()).sessionMode, undefined)
+
+  // A cookie from before, the demo account's: nobody signed in, at no
+  // university.
+  const value = codec.encode({ id: 'from-before', uni: 'univ-exemple', user: 'demo@tafac.fr', mode: 'demo', demoState: { favoritePortletIds: [] }, createdAt: Date.now(), jar: [] })
+  const headers = { cookie: `${SESSION_COOKIE_NAME}=${value}` }
+  const session = await getSession(base, { value })
+  assert.deepEqual([session.authenticated, session.sessionMode, session.university], [false, null, 'univ-rennes'])
+  assert.equal((await fetch(`${base}/__ent_auth/universities`, { headers }).then((response) => response.json())).session, null)
+  const grades = await fetch(`${base}/__ent_auth/grades`, { headers })
+  assert.deepEqual(await grades.json(), { authenticated: false, grades: null })
+  assert.equal((await fetch(`${base}/__ent_auth/mail/folders`, { headers })).status, 401)
+  assert.equal((await fetch(`${base}/__ent_auth/app-icons`, { method: 'POST', headers: { ...headers, 'Content-Type': 'application/json' }, body: '{"services":[]}' })).status, 401)
+
+  // A sign-out takes the cookie away, as any other's.
+  const logout = await fetch(`${base}/__ent_auth/logout`, { method: 'POST', headers })
+  assert.deepEqual(await logout.json(), { authenticated: false })
+  assert.ok(logout.headers.getSetCookie().some((cookie) => cookie.startsWith(`${SESSION_COOKIE_NAME}=;`)))
+}))
+
 test('requests outside the API fall through', () => withUniversitiesApp({}, async (base) => {
   assert.equal((await fetch(`${base}/some/page`)).status, 404)
 }))

@@ -90,6 +90,8 @@ const universitiesApp = await createUniversitiesApp({
   defaultUniversityId,
   multi: MULTI_UNIVERSITY,
   production: true,
+  // The page serves the demo account by itself (src/demoServer.js).
+  demoAccount: false,
   remoteSettings,
 })
 

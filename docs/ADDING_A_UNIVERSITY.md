@@ -84,7 +84,7 @@ export const features = {
   sidebarLatestGrade: false, // « Dernière note » en bas de la barre latérale, qui ouvre « Mes notes » sur cette note (requiert `grades`)
   weather: { enabled: true, defaultCity: 'Paris' },
   serviceCategories: false, // filtres par catégorie au-dessus de la grille d'applications (voir services.categories)
-  demo: true,        // compte de démonstration (demo@tafac.fr)
+  demo: true,        // compte de démonstration (demo@tafac.fr), servi par la page sans le serveur (src/demoServer.js)
 }
 ```
 
@@ -195,13 +195,13 @@ appIcons: {
 
 Chaque mode de couleur a sa variante sombre. Le fichier ne garde que le concept et la teinte : changer de style ou de mode redessine toutes les tuiles sans rien remélanger. Une valeur inconnue empêche le serveur de démarrer (comme un id d'université inconnu). Exemples : Rennes en `carbon` + `pastel`, l'université de démo en `phosphor-duotone` + `soft`.
 
-Pour améliorer les choix, ajoutez des mots-clés dans `APP_ICON_RULES` (`server/appIcons.js`, test dans `tests/appIcons.test.js`) ; un nouveau concept doit avoir une icône dans chaque style (`ICONS_BY_CONCEPT`). Pour corriger une tuile déjà attribuée, éditez le fichier JSON (voir SELF_HOSTING) ou ajoutez une icône faite main.
+Pour améliorer les choix, ajoutez des mots-clés dans `APP_ICON_RULES` (`src/appIconPicks.js`, que le serveur et la page partagent ; test dans `tests/appIcons.test.js`) ; un nouveau concept doit avoir une icône dans chaque style (`ICONS_BY_CONCEPT`). Pour corriger une tuile déjà attribuée, éditez le fichier JSON (voir SELF_HOSTING) ou ajoutez une icône faite main.
 
 ## Checklist de validation
 
 1. `npm run lint && npm run typecheck && npm test && npm run build` — tout doit passer.
 2. `npm run dev`, puis `/<slug>` et son bouton « Se connecter à mon ENT » — page de connexion : logo, textes, liens d'aide corrects ; votre université figure dans la liste de `/universites`.
-3. Connexion démo (`demo@tafac.fr` / `tafac-demo`) si `features.demo` — dashboard, grille d'applications.
+3. Connexion démo (`demo@tafac.fr` / `tafac-demo`) si `features.demo` — dashboard, grille d'applications. La page sert la démo elle-même (`src/demoServer.js`), selon les `features` de `shared.js` : rien à écrire côté serveur pour elle.
 4. **Connexion réelle** avec un compte étudiant — c'est le seul test qui exerce CAS, le proxy ENT et les services activés.
 5. `grep -ri '<votre-univ>' src/ server/` ne doit rien retourner : tout doit vivre dans `universities/<id>/`.
 

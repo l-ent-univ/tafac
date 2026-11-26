@@ -116,7 +116,7 @@ fn a_portal_that_cant_be_reached_is_said_in_the_sentence_the_page_shows() {
     campus.cas_is_down(false);
     assert_eq!(ask(&gateway, APPS, &cookie).unwrap()["apps"].as_array().unwrap().len(), 3);
 
-    // Nobody signed in, the demo account, another university: Node's.
+    // Nobody signed in, a demo cookie from before, another university: Node's.
     let demo = campus.cookie(serde_json::json!({ "mode": "demo" }), &[]);
     let elsewhere = campus.cookie(serde_json::json!({ "uni": "univ-rennes-2" }), &[("JSESSIONID", "alive")]);
     for cookie in [Some(demo), Some(elsewhere), None] {

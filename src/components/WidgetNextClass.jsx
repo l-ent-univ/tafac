@@ -4,6 +4,7 @@ import universityConfig from '@university'
 import { useWidgetLoadReport } from '../analytics'
 import { publishBriefingSource } from '../briefingSources'
 import { ENT_AUTH_PREFIX, getRecentEntLoginAgeMs, getRequestErrorKind } from '../entApi'
+import { isDemoSignedIn } from '../demoRuntime'
 import { accentStyle } from '../eventAccents'
 import { toDayKey } from '../planningDates'
 import { classCopyText } from '../contextMenuItems'
@@ -744,7 +745,9 @@ function WidgetNextClass({
       return
     }
 
-    window.open(ADE_HREF, '_blank', 'noopener,noreferrer')
+    // The demo account has no session for the launch relay to sign in
+    // with: the service's own address.
+    window.open(isDemoSignedIn() ? PLANNING_SERVICE_URL : ADE_HREF, '_blank', 'noopener,noreferrer')
   }, [nextClassDay, onOpenPlanning])
   const handleKeyDown = useCallback((event) => {
     if (event.key !== 'Enter' && event.key !== ' ') {

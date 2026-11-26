@@ -5,13 +5,15 @@ import { evaluationTypeLabel, listGradesSemesters, summarizeAverage } from './gr
 import { readDistributionCounts } from './evaluationDistribution'
 import { pickAdeGroupForAlias } from './adeGroupMatch'
 import { buildParcoursTpAliases } from './scodocParcoursGroups'
-import { getLoadedUniversityId, getUniversityRequestHeaders } from './universityRuntime'
+import { getDefaultUniversityId, getLoadedUniversityId, getUniversityRequestHeaders } from './universityRuntime'
 import { buildUploadDisposition, normalizeAttachmentType, readAttachmentLimits, sanitizeAttachmentName } from './mailAttachments'
 import { isValidAddress, sanitizeDisplayName } from './mailCompose'
 import { readMailSignatures } from './mailSignatureChoice'
 import { r } from './register.js'
 import { createSessionSignal, logoutHeaders } from './sessionSignal'
 import { isNativeApp } from './desktopApp'
+import { DEMO_ACCOUNT, DEMO_SESSION_MODE, isDemoCredentials } from './demoAccount'
+import { answerDemoRequest, isDemoSignedIn, signInToDemo, signOutOfDemo, uploadDemoFile } from './demoRuntime'
 
 // Null on the neutral page (no university picked yet).
 export const ENT_ORIGIN = universityConfig.origins.ent
@@ -46,9 +48,32 @@ export const onSessionExpired = sessionSignal.subscribe
 // The server said so to the desktop app (its Moodle view's 'expired').
 export const reportSessionExpired = () => sessionSignal.expire()
 
+// Whether the page shows the demo account, as its last session check said.
+let showsDemo = false
+
 // fetch() for this app's server, its answer checked for the session (also
-// for src/appIcons.js and the applications' launch preview).
+// for src/appIcons.js and the applications' launch preview). The demo
+// account's requests are answered by the page itself (src/demoRuntime.js):
+// nothing of it is sent.
 export async function serverFetch(url, init) {
+  if (!isDemoSignedIn()) {
+    // The demo the page shows is over without a sign-out here (its thirty
+    // days ran out): said as a session that expired, as the cookie's end
+    // was, rather than left with a server that knows nobody.
+    if (showsDemo) {
+      showsDemo = false
+      signOutOfDemo()
+      sessionSignal.expire()
+    }
+    return sendToServer(url, init)
+  }
+  const startedAt = import.meta.env.DEV ? performance.now() : 0
+  const response = await answerDemoRequest(url, init)
+  if (import.meta.env.DEV) noteBackendAnswer(url, response, performance.now() - startedAt, 'page')
+  return response
+}
+
+async function sendToServer(url, init) {
   const sentUnder = sessionSignal.current
   const startedAt = import.meta.env.DEV ? performance.now() : 0
   const response = await fetch(url, init)
@@ -259,7 +284,14 @@ export async function requestEnt(path, options = {}) {
   return parseResponse(response)
 }
 
+// Whether the server measures its audience, as its last answer said: the
+// demo's sign-in keeps it (src/demoSession.js).
+let serverMeasuresAudience = false
+
 export async function getAuthSession() {
+  // The check itself says who is signed in now: the demo, or what the
+  // server knows.
+  showsDemo = false
   const response = await serverFetch(`${ENT_AUTH_PREFIX}/session`, {
     credentials: 'same-origin',
     headers: getUniversityRequestHeaders(),
@@ -267,12 +299,36 @@ export async function getAuthSession() {
 
   const payload = await parseJsonPayload(response)
   sessionSignal.mark(Boolean(payload?.authenticated))
+  showsDemo = payload?.sessionMode === DEMO_SESSION_MODE
+  if (!showsDemo) serverMeasuresAudience = payload?.analyticsEnabled === true
 
   if (!payload?.authenticated) {
     clearRecentLoginMarker()
   }
 
   return payload
+}
+
+// How long the demo's sign-in waits for the server to end a session left
+// open (endServerSession).
+const DEMO_SIGN_IN_PATIENCE_MS = 3000
+
+// One sign-in at a time: a session still open in this browser (another
+// tab's) ends when the demo starts, as a new login's cookie replaced the
+// one before, and the desktop app forgets the login it kept
+// (src-tauri/src/signin.rs). The server is told nothing of the demo;
+// without an answer, the demo starts all the same.
+async function endServerSession() {
+  try {
+    await fetch(`${ENT_AUTH_PREFIX}/logout`, {
+      method: 'POST',
+      credentials: 'same-origin',
+      headers: logoutHeaders({ desktop: isNativeApp() }),
+      signal: AbortSignal.timeout(DEMO_SIGN_IN_PATIENCE_MS),
+    })
+  } catch {
+    // No server, or a slow one.
+  }
 }
 
 // `otp`: the one-time code, once the server asked for it ('mfa_required').
@@ -285,7 +341,21 @@ export async function loginToEnt({ username, password, otp, sendCode }) {
   // Signed out, the server routes the login to the university picked on the
   // login page (none on the neutral page: the default one).
   const university = getLoadedUniversityId()
-  const response = await serverFetch(`${ENT_AUTH_PREFIX}/login`, {
+
+  // The demo account never reaches a university, nor a server: its login is
+  // checked here and sent nowhere, and the page signs in to it by itself
+  // (src/demoRuntime.js), for the university it runs for.
+  const demoUniversity = university ?? getDefaultUniversityId()
+  if (universityConfig.features?.demo !== false && demoUniversity && isDemoCredentials(username, password)) {
+    await endServerSession()
+    signInToDemo({ university: demoUniversity, analyticsEnabled: serverMeasuresAudience })
+    sessionSignal.restart(true)
+    setRecentLoginMarker()
+    return { authenticated: true, user: DEMO_ACCOUNT.preferred_username, sessionMode: DEMO_SESSION_MODE, university: demoUniversity }
+  }
+
+  // A login is the server's to answer, whatever another tab is signed in to.
+  const response = await sendToServer(`${ENT_AUTH_PREFIX}/login`, {
     method: 'POST',
     credentials: 'same-origin',
     headers: {
@@ -299,6 +369,8 @@ export async function loginToEnt({ username, password, otp, sendCode }) {
   sessionSignal.restart(Boolean(payload?.authenticated))
 
   if (payload?.authenticated) {
+    // Signed in for real: the demo ends, in every tab.
+    signOutOfDemo()
     setRecentLoginMarker()
   } else {
     clearRecentLoginMarker()
@@ -317,6 +389,14 @@ export async function logoutFromEnt({ expired = false } = {}) {
   forgetSchoolCertificateStatus()
   localStorage.removeItem(ADE_TIMETABLE_CACHE_KEY)
   clearRecentLoginMarker()
+
+  // The demo's sign-in is the page's: ended here, with what the visitor did
+  // in it (src/demoRuntime.js).
+  if (isDemoSignedIn()) {
+    showsDemo = false
+    signOutOfDemo()
+    return { authenticated: false }
+  }
 
   const response = await serverFetch(`${ENT_AUTH_PREFIX}/logout`, {
     method: 'POST',
@@ -754,6 +834,8 @@ export async function getMailDraft(id) {
 // 'rate', 'retry' — the webmail session was renewed, try once more —,
 // 'expired', 'failed').
 export function uploadMailAttachment(file, { name, onProgress } = {}) {
+  if (isDemoSignedIn()) return uploadDemoAttachment(file, { name, onProgress })
+
   const xhr = new XMLHttpRequest()
   const sentUnder = sessionSignal.current
   let settled = false
@@ -782,30 +864,7 @@ export function uploadMailAttachment(file, { name, onProgress } = {}) {
       } catch {
         payload = null
       }
-      const status = xhr.status
-      const attachment = payload?.attachment
-      if (status === 200 && typeof attachment?.aid === 'string' && attachment.aid) {
-        finish({
-          status: 'ok',
-          attachment: {
-            aid: attachment.aid,
-            name: sanitizeAttachmentName(attachment.name ?? name ?? file.name),
-            size: Number.isSafeInteger(attachment.size) ? attachment.size : file.size,
-            contentType: normalizeAttachmentType(attachment.contentType ?? file.type),
-          },
-        })
-        return
-      }
-      if (isSessionRefused({ status })) {
-        finish({ status: 'error', code: 'expired' })
-        return
-      }
-      const code = status === 413 ? 'too-large'
-        : status === 429 ? 'rate'
-          : payload?.error === 'mail_upload_retry' ? 'retry'
-            : 'failed'
-      const retryAfter = Number(xhr.getResponseHeader('Retry-After')) || null
-      finish({ status: 'error', code, retryAfter, maxBytes: Number.isSafeInteger(payload?.maxBytes) ? payload.maxBytes : null })
+      finish(readUploadAnswer(xhr.status, payload, { file, name, retryAfter: Number(xhr.getResponseHeader('Retry-After')) || null }))
     })
     xhr.send(file)
   })
@@ -813,6 +872,47 @@ export function uploadMailAttachment(file, { name, onProgress } = {}) {
     promise,
     abort: () => {
       if (!settled) xhr.abort()
+    },
+  }
+}
+
+// The upload route's answer, as uploadMailAttachment gives it.
+function readUploadAnswer(status, payload, { file, name, retryAfter = null }) {
+  const attachment = payload?.attachment
+  if (status === 200 && typeof attachment?.aid === 'string' && attachment.aid) {
+    return {
+      status: 'ok',
+      attachment: {
+        aid: attachment.aid,
+        name: sanitizeAttachmentName(attachment.name ?? name ?? file.name),
+        size: Number.isSafeInteger(attachment.size) ? attachment.size : file.size,
+        contentType: normalizeAttachmentType(attachment.contentType ?? file.type),
+      },
+    }
+  }
+  if (isSessionRefused({ status })) {
+    return { status: 'error', code: 'expired' }
+  }
+  const code = status === 413 ? 'too-large'
+    : status === 429 ? 'rate'
+      : payload?.error === 'mail_upload_retry' ? 'retry'
+        : 'failed'
+  return { status: 'error', code, retryAfter, maxBytes: Number.isSafeInteger(payload?.maxBytes) ? payload.maxBytes : null }
+}
+
+// The demo account's file: read by the page and kept or dropped there
+// (src/demoServer.js), nothing sent, the same answers.
+function uploadDemoAttachment(file, { name, onProgress }) {
+  let aborted = false
+  const promise = uploadDemoFile(file, { name }).then(({ status, body }) => {
+    if (aborted) return { status: 'aborted' }
+    if (status === 200) onProgress?.(file.size, file.size)
+    return readUploadAnswer(status, body, { file, name })
+  }, () => ({ status: 'error', code: 'failed' }))
+  return {
+    promise,
+    abort: () => {
+      aborted = true
     },
   }
 }
@@ -1006,7 +1106,9 @@ export function openGradesService() {
     return
   }
 
-  window.open(GRADES_LAUNCH_HREF, '_blank', 'noopener,noreferrer')
+  // The demo account has no session for the launch relay to sign in with:
+  // the service's own address.
+  window.open(isDemoSignedIn() ? GRADES_SERVICE_URL : GRADES_LAUNCH_HREF, '_blank', 'noopener,noreferrer')
 }
 
 async function requestSemesterGrades(semesterId) {

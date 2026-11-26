@@ -46,11 +46,17 @@ the page ──▶ the gateway (Rust) ──▶ tonAPI ──▶ the university
   `gateway/settled.rs` for the launch relay, Moodle's view, the photo and
   the certificate).
 - **Node** answers everything else: the planning and ADE, the mail, the
-  icons, the statistics, the account's photo (the portal's proxy), the demo
-  account, and every route of the other universities, sign-in and
-  applications included. `routes.rs` lists them with what keeps each there.
-  The moved routes are still Node's for the sessions the gateway doesn't
-  hold: nobody signed in, the demo account, another university.
+  icons, the statistics, the account's photo (the portal's proxy), and
+  every route of the other universities, sign-in and applications included.
+  `routes.rs` lists them with what keeps each there. The moved routes are
+  still Node's for the sessions the gateway doesn't hold: nobody signed in,
+  another university.
+- **The demo account is nobody's here.** The page serves it by itself,
+  with no session (`src/demoServer.js`, `src/demoSession.js`): its login
+  is never posted, and posted all the same it is a login like any other,
+  which the CAS refuses. A session cookie that says `demo` (Node made
+  those when it served the demo) is read as nobody signed in, by the
+  gateway (`session/cookie.rs`) as by Node.
 - **Node is told** when a session ends here (signed out, or found expired:
   `node.rs`), for what it kept of it. The gateway asks it nothing else: a
   sign-in at Rennes is made here, the CAS's second factor included; a
@@ -159,12 +165,12 @@ crates/tafac-gateway/
   here in the JSON and the status the page reads today, which are Node's
   (`translate/`), until its screen reads tonAPI's own model: the
   applications do (`translate/apps.rs`, `src/portalApps.js`), and Node
-  gives the same list for the demo account and the portals it reads
-  itself. A route's errors are Node's words too (`translate/failed.rs`):
-  one fixed sentence where Node runs in production, the reason on a
-  development server (which the session cookie's name tells apart). Each
-  translator lists Node's answers, and the ones that are still Node's to
-  give: those of a session the gateway doesn't hold.
+  gives the same list for the portals it reads itself. A route's errors
+  are Node's words too (`translate/failed.rs`): one fixed sentence where
+  Node runs in production, the reason on a development server (which the
+  session cookie's name tells apart). Each translator lists Node's answers,
+  and the ones that are still Node's to give: those of a session the
+  gateway doesn't hold.
 - **Nothing of tonAPI is copied here.** Its code and its settings come from
   the commit named in `Cargo.toml`.
 - **The relay opens the university's services only.** The launch relay

@@ -11,7 +11,6 @@
 //       that isn't one). Answered here, in Node's words
 //       (translate/failed.rs).
 //   401 { error }: nobody signed in. Node.
-//   404 for the demo account: Node.
 //   400 { error }: a semester id that isn't one. Answered here, in Node's
 //       words.
 //   500 { error }: ScoDoc down or answering something else. Answered here

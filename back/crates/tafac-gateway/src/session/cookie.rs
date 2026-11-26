@@ -50,6 +50,9 @@ const MAX_VALUE_BYTES: usize = 3800;
 // A cookie of the university's longer than this isn't written
 // (MAX_PERSISTED_COOKIE_VALUE_LENGTH).
 const MAX_UPSTREAM_VALUE_BYTES: usize = 1024;
+// `mode` of a cookie Node made for the demo account, when Node served it.
+// The page serves the demo by itself now (src/demoSession.js), with no
+// session: such a cookie is one from before.
 const DEMO_MODE: &str = "demo";
 
 // One of the university's cookies, as Node's jar holds it
@@ -100,8 +103,6 @@ pub struct Session {
     pub university: String,
     // The portal's name for the student, or the login where it has none.
     pub user: String,
-    // The demo account's: it never reaches a university.
-    pub demo: bool,
     pub cookies: Vec<UpstreamCookie>,
 }
 
@@ -188,11 +189,12 @@ impl Codec {
 
     // The session a cookie's value holds, at `now_ms` (milliseconds since
     // the epoch). None: not one of this server's, tampered with, past its
-    // lifetime, or not understood.
+    // lifetime, not understood, or the demo account's from before (nobody
+    // signed in, as for Node).
     pub fn read(&self, value: &str, now_ms: i64) -> Option<Session> {
         let stored: Stored = serde_json::from_slice(&self.open(value)?).ok()?;
         let created_at = stored.created_at.filter(|created_at| created_at.is_finite())?;
-        if now_ms as f64 - created_at > ABSOLUTE_TTL_MS || stored.id.is_empty() {
+        if now_ms as f64 - created_at > ABSOLUTE_TTL_MS || stored.id.is_empty() || stored.mode.as_deref() == Some(DEMO_MODE) {
             return None;
         }
         let cookies = stored
@@ -212,7 +214,6 @@ impl Codec {
             id: stored.id,
             university: stored.uni.filter(|id| !id.is_empty())?,
             user: stored.user.filter(|user| !user.is_empty())?,
-            demo: stored.mode.as_deref() == Some(DEMO_MODE),
             cookies,
         })
     }
@@ -224,7 +225,7 @@ impl Codec {
         let id = new_id()?;
         let (payload, kept) = Self::payload(&id, new, now_ms);
         let value = self.seal(&payload, <[u8; IV_BYTES]>::try_generate().ok()?)?;
-        let session = Session { id, university: new.university.to_string(), user: new.user.to_string(), demo: false, cookies: kept };
+        let session = Session { id, university: new.university.to_string(), user: new.user.to_string(), cookies: kept };
         Some((value, session))
     }
 
@@ -379,7 +380,6 @@ mod tests {
         assert_eq!(session.id, "3f2a9c1e-7b64-4d0f-9a51-2c8e6d7f0b13");
         assert_eq!(session.university, "univ-exemple");
         assert_eq!(session.user, "jdoe");
-        assert!(!session.demo);
         assert_eq!(format!("{:?}", session.cookies), "[TGC@cas.exemple.test/cas, JSESSIONID@ent.exemple.test/, lang@exemple.test/]");
         let ticket = &session.cookies[0];
         assert_eq!((ticket.value.as_str(), ticket.host_only, ticket.expires_at_ms), ("TGT-made-up-ticket", true, None));
@@ -428,14 +428,20 @@ mod tests {
     #[test]
     fn what_the_test_seals_reads_back() {
         let session = Codec::new(SECRET).read(&seal(SECRET, &payload(serde_json::json!({}))), NOW).unwrap();
-        assert_eq!((session.id.as_str(), session.user.as_str(), session.demo), ("one-session", "jdoe", false));
+        assert_eq!((session.id.as_str(), session.user.as_str()), ("one-session", "jdoe"));
         assert!(session.has_cookie("cas.exemple.test", "TGC"));
     }
 
+    // The page serves the demo by itself: a cookie Node made for it, when
+    // Node did, holds nobody's session, whatever else it says.
     #[test]
-    fn the_demo_account_is_told_apart() {
+    fn a_demo_cookie_from_before_is_nobodys() {
         let demo = payload(serde_json::json!({ "mode": "demo", "user": "demo", "jar": [] }));
-        assert!(Codec::new(SECRET).read(&seal(SECRET, &demo), NOW).unwrap().demo);
+        assert!(Codec::new(SECRET).read(&seal(SECRET, &demo), NOW).is_none());
+        let with_a_ticket = payload(serde_json::json!({ "mode": "demo" }));
+        assert!(Codec::new(SECRET).read(&seal(SECRET, &with_a_ticket), NOW).is_none());
+        let another_mode = payload(serde_json::json!({ "mode": "something else" }));
+        assert!(Codec::new(SECRET).read(&seal(SECRET, &another_mode), NOW).is_some());
     }
 
     #[test]
@@ -511,7 +517,7 @@ mod tests {
         let new = NewSession { university: "univ-exemple", user: "jdoe", ticket: &cookies[..1], others: &cookies[1..], secure: true };
         let (value, made) = codec.write(&new, NOW).unwrap();
         let read = codec.read(&value, NOW).unwrap();
-        assert_eq!((read.id.as_str(), read.university.as_str(), read.user.as_str(), read.demo), (made.id.as_str(), "univ-exemple", "jdoe", false));
+        assert_eq!((read.id.as_str(), read.university.as_str(), read.user.as_str()), (made.id.as_str(), "univ-exemple", "jdoe"));
         assert_eq!(read.cookies, cookies);
         assert_eq!(made.cookies, cookies);
 

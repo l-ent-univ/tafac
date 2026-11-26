@@ -29,8 +29,7 @@
 //         Node took the CAS's login form in place of the school records
 //         for « no certificate », and kept that answer a quarter of an
 //         hour.
-//     401 for nobody signed in, and the demo account's own certificate:
-//         Node.
+//     401 for nobody signed in: Node.
 
 use http::header::{CACHE_CONTROL, CONTENT_DISPOSITION, CONTENT_TYPE};
 use http::HeaderValue;

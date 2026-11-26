@@ -9,8 +9,7 @@
 //
 // A moved route is written once more in translate/ (tonAPI's answer as the
 // page reads it today, its errors too). It is still Node's for the sessions
-// the gateway doesn't hold: nobody signed in, the demo account, another
-// university.
+// the gateway doesn't hold: nobody signed in, another university.
 
 use http::Method;
 

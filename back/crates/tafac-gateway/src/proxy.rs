@@ -446,7 +446,8 @@ mod tests {
     fn what_the_gateway_leaves_is_nodes_own_answer() {
         let (campus, node) = (campus(), node());
         let address = gateway_before(&node, Some(&campus));
-        // A session the gateway doesn't hold (the demo account's): Node's.
+        // A session the gateway doesn't hold (a cookie from when Node
+        // served the demo account, read as nobody's): Node's.
         let demo = campus.cookie(serde_json::json!({ "mode": "demo" }), &[]);
         let (head, body) = get(&address, "/__ent_auth/session", &session_cookie(&demo));
         assert_eq!(header_of(&head, crate::ANSWERED_BY), "");
@@ -494,12 +495,12 @@ mod tests {
     fn a_sign_in_that_is_nodes_reaches_it_whole() {
         let (campus, node) = (campus(), node());
         let address = gateway_before(&node, Some(&campus));
-        // The demo account; another university; a body Node reads its own
-        // way; one too large to be read here.
-        let demo = r#"{"username":"demo@tafac.fr","password":"tafac-demo","university":"univ-rennes"}"#.to_string();
+        // Another university; a body Node reads its own way; one too large
+        // to be read here.
+        let here = r#"{"username":"jdoe","password":"p","university":"univ-rennes"}"#.to_string();
         let elsewhere = r#"{"username":"jdoe","password":"p","university":"univ-rennes-2"}"#.to_string();
         let large = format!(r#"{{"username":"jdoe","password":"{}","university":"univ-rennes"}}"#, "p".repeat(MAX_SIGN_IN_BYTES as usize));
-        for (headers, sent) in [(JSON, &demo), (JSON, &elsewhere), ("content-type: text/plain\r\n", &demo), (JSON, &large)] {
+        for (headers, sent) in [(JSON, &elsewhere), ("content-type: text/plain\r\n", &here), (JSON, &large)] {
             let (head, body) = post(&address, "/__ent_auth/login", headers, sent);
             assert!(head.starts_with("HTTP/1.1 200 OK"), "{head}");
             assert_eq!(header_of(&head, crate::ANSWERED_BY), "");
@@ -510,8 +511,8 @@ mod tests {
         }
         assert!(campus.seen.lock().unwrap().is_empty());
         let received = node.heads();
-        assert_eq!(received.len(), 4);
-        assert_eq!(header_of(&received[0], "content-length"), demo.len().to_string());
+        assert_eq!(received.len(), 3);
+        assert_eq!(header_of(&received[0], "content-length"), elsewhere.len().to_string());
         assert_eq!(header_of(&received[0], "host"), "tafac.exemple.test");
 
         // Without a gateway, every sign-in is Node's.

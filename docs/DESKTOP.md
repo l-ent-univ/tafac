@@ -209,16 +209,22 @@ What is still Node's, and why:
 
 - **Every route that hasn't moved** (`routes.rs` says what tonAPI lacks for
   each): the planning and ADE, the mail,
-  the icons, the statistics, the demo account, and the portal's proxy for
+  the icons, the statistics, and the portal's proxy for
   what is left of it (the account's photo, an old link to a page of the
   portal's).
 - **The moved routes, for a session the gateway doesn't hold**: nobody
-  signed in, the demo account, another university, a cookie it can't read.
+  signed in, another university, a cookie it can't read.
   The request goes to Node's own route as it came. Each translator lists
   the cases.
 - **A session that ended**: Node is told (its own sign-out, with the
   session's cookie), for what it kept of the session. It is the one thing
   the gateway goes to Node for.
+
+Neither's: **the demo account**. The page serves it by itself
+(`src/demoServer.js`), with no session: its login is checked in the page
+and posted nowhere, so the bridge never sees it, and its sign-in is kept
+in the window's own storage (`src/demoSession.js`). The page signs out of
+the server as the demo starts, which forgets a login kept (below).
 
 - **To move a route**: its line in `routes.rs`, its question in `tonapi/`,
   a translator in `translate/`, three lines in `gateway/`, and the answer
@@ -296,9 +302,12 @@ after « Se déconnecter » (`src-tauri/src/signin.rs`, used by `bridge.rs`).
 - **Kept**: after a login of the page's that went through (`POST
   /__ent_auth/login`, 200), the bridge keeps its login, password and
   university (`university` of the body, else the `X-Tafac-University`
-  header). Not the demo account's, nor a login that needed a one-time code:
-  only the student can type that one, so it would never sign in alone. Any
-  login that goes through replaces what was kept.
+  header). Not a login that needed a one-time code: only the student can
+  type that one, so it would never sign in alone. Any login that goes
+  through replaces what was kept. The demo account's login never reaches
+  the bridge (the page signs in to the demo by itself); the sign-out the
+  page sends as the demo starts forgets what was kept, as the student's
+  own does.
 - **Where**: a packaged app keeps it in the system's credential store (macOS
   Keychain: service `fr.tafac.desktop`, account `sign-in`), read once per
   launch. A debug build keeps it in memory only, for the run (no file, and no

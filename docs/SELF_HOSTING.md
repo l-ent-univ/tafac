@@ -74,7 +74,7 @@ Le serveur donne à chaque application du portail une icône et une couleur (voi
 
 - un fichier JSON par université : `$DATA_DIR/app-icons/<université>.json` (dans le conteneur : `/app/data/app-icons/univ-rennes.json`…), sur le volume `lent_data` ;
 - par service : son identifiant de portail, le concept d'icône, la teinte, le titre et la date du premier passage. **Aucune donnée d'étudiant** : ce sont les mêmes services pour tout le monde ;
-- écriture atomique (fichier temporaire puis renommage), 500 services au plus par université. Une session démo n'y écrit que les services de démonstration.
+- écriture atomique (fichier temporaire puis renommage), 500 services au plus par université. Le compte démo n'y écrit rien : la page choisit elle-même les icônes de ses tuiles (`src/appIconPicks.js`), sans le serveur.
 
 Sans volume, ou si le dossier n'est pas accessible en écriture, tout continue de fonctionner : les icônes sont choisies en mémoire (de façon déterministe) et un avertissement `[app-icons]` apparaît dans les logs ; elles ne sont simplement pas gardées d'un redémarrage à l'autre.
 
@@ -89,7 +89,7 @@ docker compose exec lent vi /app/data/app-icons/univ-rennes.json   # ou docker c
 "moodle-foad": { "icon": "course", "color": "blue", "title": "Moodle - FOAD", "assignedAt": "2026-10-12" }
 ```
 
-- **Changer une tuile** : remplacer `icon` par un autre concept (`library`, `sport`… : liste dans `server/appIcons.js`, dessiné dans le style de l'université) ou par un nom Iconify précis (`ph:basketball`, utilisé tel quel), et/ou `color` par une teinte (`red`, `orange`, `yellow`, `lime`, `green`, `teal`, `cyan`, `sky`, `blue`, `indigo`, `violet`, `fuchsia`, `pink`). Une entrée invalide est ignorée et choisie à nouveau.
+- **Changer une tuile** : remplacer `icon` par un autre concept (`library`, `sport`… : liste dans `src/appIconPicks.js`, dessiné dans le style de l'université) ou par un nom Iconify précis (`ph:basketball`, utilisé tel quel), et/ou `color` par une teinte (`red`, `orange`, `yellow`, `lime`, `green`, `teal`, `cyan`, `sky`, `blue`, `indigo`, `violet`, `fuchsia`, `pink`). Une entrée invalide est ignorée et choisie à nouveau.
 - Le style d'icônes et le mode de couleur se règlent par université dans le code (`appIcons` dans `universities/<id>/server.js`, voir [ADDING_A_UNIVERSITY.md](ADDING_A_UNIVERSITY.md#style-des-icônes-et-couleurs-serverjs--appicons)).
 - **Refaire le choix d'un service** : supprimer son entrée. **Tout réinitialiser** : supprimer le fichier.
 - Un fichier JSON illisible n'est jamais écrasé : le serveur passe en mémoire seule jusqu'à ce qu'il soit réparé.

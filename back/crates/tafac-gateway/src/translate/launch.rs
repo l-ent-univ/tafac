@@ -32,8 +32,8 @@
 // Node gave the chain as JSON for `?debug=1` on a development server (it
 // holds the service tickets): never given here.
 //
-// Still Node's: nobody signed in (which university?), the demo account,
-// another university, a session without its CAS ticket.
+// Still Node's: nobody signed in (which university?), another university,
+// a session without its CAS ticket.
 
 use http::header::{CACHE_CONTROL, CONTENT_TYPE, LOCATION, SET_COOKIE};
 use http::HeaderValue;

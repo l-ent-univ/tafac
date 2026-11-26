@@ -4,12 +4,14 @@ import { getBackendAnswers, subscribeBackendAnswers } from './backendTrace.js'
 // Dev only (App.jsx mounts it under `import.meta.env.DEV`): shows which
 // side answered what the page displays. An outline around each marked
 // component (src/dev/backendTrace.js#markBackend), orange when the Rust
-// gateway answered its route and green when the Node server did, and a
-// panel with every route asked, who answered, and how long it took.
+// gateway answered its route, green when the Node server did and blue when
+// the page did (the demo account), and a panel with every route asked, who
+// answered, and how long it took.
 
 const SIDES = {
   rust: { label: 'RUST', color: '#CE422B' },
   node: { label: 'NODE', color: '#3C873A' },
+  page: { label: 'PAGE', color: '#2563EB' },
   none: { label: '…', color: '#8A8A8A' },
 }
 const SHOWN_KEY = 'l-ent:dev-backend-marks'
@@ -83,15 +85,17 @@ function Outline({ box }) {
 
 function Panel({ answers, shown, onToggleShown }) {
   const [open, setOpen] = useState(true)
-  const byRust = answers.filter((answer) => answer.by === 'rust').length
+  const count = (side) => answers.filter((answer) => answer.by === side).length
+  const byPage = count('page')
   return (
     <div style={{ position: 'fixed', left: 12, bottom: 12, maxWidth: 'min(460px, calc(100vw - 24px))', background: 'rgba(20, 20, 22, 0.94)', color: '#f4f4f5', borderRadius: 12, font: '12px/1.4 ui-monospace, SFMono-Regular, Menlo, monospace', boxShadow: '0 8px 30px rgba(0, 0, 0, 0.35)', pointerEvents: 'auto' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 10px' }}>
         <button type="button" onClick={() => setOpen((current) => !current)} style={{ all: 'unset', cursor: 'pointer', fontWeight: 700 }} aria-expanded={open}>
           {open ? '▾' : '▸'} Qui répond ?
         </button>
-        <Tag side={SIDES.rust}>RUST {byRust}</Tag>
-        <Tag side={SIDES.node}>NODE {answers.length - byRust}</Tag>
+        <Tag side={SIDES.rust}>RUST {count('rust')}</Tag>
+        <Tag side={SIDES.node}>NODE {count('node')}</Tag>
+        {byPage ? <Tag side={SIDES.page}>PAGE {byPage}</Tag> : null}
         <label style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 4, cursor: 'pointer' }}>
           <input type="checkbox" checked={shown} onChange={onToggleShown} />
           contours

@@ -16,8 +16,7 @@
 //                           answer
 //
 // Node is still behind for who isn't held: nobody signed in (the gateway
-// doesn't know which university an address is for), the demo account,
-// another university.
+// doesn't know which university an address is for), another university.
 
 use std::future::Future;
 

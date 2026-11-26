@@ -247,7 +247,7 @@ fn what_is_not_a_plain_signed_in_session_is_nodes_without_a_request() {
     let gateway = campus.gateway();
     let alive = [("JSESSIONID", "alive")];
     for (why, cookie) in [
-        ("the demo account", campus.cookie(serde_json::json!({ "mode": "demo" }), &alive)),
+        ("a demo cookie from before", campus.cookie(serde_json::json!({ "mode": "demo" }), &alive)),
         ("another university", campus.cookie(serde_json::json!({ "uni": "univ-rennes-2" }), &alive)),
         ("no CAS ticket", campus.cookie(serde_json::json!({ "jar": [["JSESSIONID", "alive", "127.0.0.1", "/", 1, 1, null]] }), &[])),
         ("past its lifetime", campus.cookie(serde_json::json!({ "createdAt": crate::gateway::now_ms() - 31 * 24 * 60 * 60 * 1000 }), &alive)),
@@ -395,7 +395,7 @@ fn the_statistics_are_said_on_as_node_is_set_up_without_asking_it() {
 }
 
 fn node_session(user: &str) -> Session {
-    Session { id: "one-session".into(), university: UNIVERSITY.into(), user: user.into(), demo: false, cookies: Vec::new() }
+    Session { id: "one-session".into(), university: UNIVERSITY.into(), user: user.into(), cookies: Vec::new() }
 }
 
 #[test]

@@ -816,7 +816,7 @@ const DEMO_MAIL_MESSAGES = Object.freeze([
 
 // Demo sessions open the same demo webmail as the "Messagerie" app tile,
 // never the real university webmail.
-const DEMO_WEBMAIL_HREF = DEMO_APPLICATIONS.find((application) => application.id === 'demo-mail')?.href ?? null
+export const DEMO_WEBMAIL_HREF = DEMO_APPLICATIONS.find((application) => application.id === 'demo-mail')?.href ?? null
 
 export function buildDemoMailPayload({ now = Date.now(), webmailHref = DEMO_WEBMAIL_HREF } = {}) {
   const messages = DEMO_MAIL_MESSAGES.map(({ minutesAgo, ...message }) => ({
