@@ -16,12 +16,15 @@
 //                         view may show: answered to their end here
 //   student.rs            the student's photo and school certificate: the
 //                         same
+//   other_portals.rs      the same routes at a university whose portal is
+//                         not uPortal (Drupal, iSorbonne): not switched on
 
 mod apps;
 mod expiry;
 mod grades;
 mod launch;
 mod moodle_deadlines;
+mod other_portals;
 mod portal;
 mod signin;
 mod student;
