@@ -24,19 +24,24 @@ access to it.
 
 ```
 the page ──▶ the gateway (Rust) ──▶ tonAPI ──▶ the university
-                   │                            (CAS, portal, Moodle, ScoDoc)
+                   │                            (CAS, portal, Moodle, ScoDoc,
+                   │                             school records)
                    └──▶ Node ──────────────────▶ the university
-                        the routes that haven't moved,    (planning, mail,
-                        with the session made above        documents)
+                        the routes that haven't moved,    (planning, ADE,
+                        with the session made above        mail)
 ```
 
 - **The gateway** answers `POST /login`, `POST /logout`, `GET /session`,
   `GET /account`, the portal's applications (`GET /apps`), the Moodle
   deadlines and the five grades routes, for the universities of `routes.rs`
   (today: Rennes). It makes the session at the
-  sign-in and says when it is over.
-- **Node** answers everything else: the launch relay, the planning and
-  ADE, the mail, the documents, the icons, the statistics, the account's
+  sign-in and says when it is over. It is also the launch relay (`GET
+  /launch`, `/launch-preview`: a service opened signed in, `launch/`), and
+  answers what Moodle's view in the apps may show (`GET /moodle/view`), the
+  student's photo (`GET /student-pic`, from ScoDoc) and the school
+  certificate (`GET /documents/school-certificate`, and its `/status`).
+- **Node** answers everything else: the planning and
+  ADE, the mail, the icons, the statistics, the account's
   photo (the portal's proxy), the demo account, and every route of the
   other universities, sign-in and applications included. `routes.rs` lists
   them with what keeps each there.
@@ -44,7 +49,9 @@ the page ──▶ the gateway (Rust) ──▶ tonAPI ──▶ the university
   route that fails goes to Node's own route), and for what it is set up for
   (`node.rs`). A sign-in at Rennes asks Node nothing, the CAS's second
   factor included; nor does a portal session that lapsed, which tonAPI
-  opens again with the CAS ticket.
+  opens again with the CAS ticket. The launch relay, Moodle's view, the
+  photo and the certificate never go to Node for a session the gateway
+  holds: they word their own failures (`gateway/settled.rs`).
 
 ## Where things are
 
@@ -63,7 +70,10 @@ crates/tafac-gateway/
    │  ├─ signin.rs        POST /login and /logout: the session made (tonAPI signs in, one-time code included), and ended
    │  ├─ attempts.rs      the sign-in's limits, the codes sent, and the address a request came from
    │  ├─ portal.rs        routes the portal answers: the session check, the account
-   │  └─ services.rs      routes a service answers: the portal's applications, Moodle's deadlines, ScoDoc's grades
+   │  ├─ services.rs      routes a service answers: the portal's applications, Moodle's deadlines, ScoDoc's grades
+   │  ├─ settled.rs       routes answered to their end here, failures included: the two files below
+   │  ├─ launch.rs        GET /launch and /launch-preview: the target, who asks, the walk
+   │  └─ student.rs       the student's own files: ScoDoc's photo, the school certificate
    │
    ├─ session/            the student's session
    │  ├─ cookie.rs        its cookie, read and written, in the format Node reads
@@ -76,7 +86,17 @@ crates/tafac-gateway/
    │  ├─ profile.rs       the portal: who the student is
    │  ├─ apps.rs          the portal: the applications it lists
    │  ├─ homework.rs      Moodle: what is due
-   │  └─ grades.rs        ScoDoc: the report, a department's notice, a distribution, the PDF
+   │  ├─ grades.rs        ScoDoc: the report, a department's notice, a distribution, the PDF
+   │  ├─ picture.rs       ScoDoc: the student's photo
+   │  └─ documents.rs     the school records: the documents listed, the file of one
+   │
+   ├─ launch/             the launch relay, Tafac's own: a service's sign-in walked with the CAS ticket
+   │  ├─ targets.rs       which addresses it may ask and send to: the university's services, over https
+   │  ├─ site.rs          a request another site started is not the student asking
+   │  ├─ walk.rs          the steps: the chain followed for the preview, and for the launch
+   │  ├─ moodle.rs        Moodle behind the federation: the chain as far as the form the browser posts
+   │  ├─ html.rs, page.rs what a page of a chain says of where to go next; the page that hands a form over
+   │  └─ tickets.rs       a service ticket's value never goes to the page
    │
    ├─ translate/          one translator per moved route: tonAPI's answer as the page reads it today
    │  ├─ mod.rs           what they share: the answer's headers, « Node answers », « the session is lost »
@@ -86,11 +106,16 @@ crates/tafac-gateway/
    │  ├─ account.rs       GET /__ent_auth/account
    │  ├─ apps.rs          GET /__ent_auth/apps: tonAPI's own list, as the page reads it
    │  ├─ moodle_deadlines.rs   GET /__ent_auth/moodle/deadlines
-   │  └─ grades/          the grades' routes: ScoDoc's shape written back from tonAPI's report
-   │     ├─ report.rs        GET /__ent_auth/grades and /grades/semester/<id>
-   │     ├─ message.rs       GET /__ent_auth/grades/department-message
-   │     ├─ distribution.rs  GET /__ent_auth/grades/evaluation-distribution
-   │     └─ transcript.rs    GET /__ent_auth/grades/report.pdf
+   │  ├─ grades/          the grades' routes: ScoDoc's shape written back from tonAPI's report
+   │  │  ├─ report.rs        GET /__ent_auth/grades and /grades/semester/<id>
+   │  │  ├─ message.rs       GET /__ent_auth/grades/department-message
+   │  │  ├─ distribution.rs  GET /__ent_auth/grades/evaluation-distribution
+   │  │  └─ transcript.rs    GET /__ent_auth/grades/report.pdf
+   │  ├─ settled.rs       what a route answered to its end comes to: its answer, or a session to ask the CAS about
+   │  ├─ launch.rs        GET /__ent_auth/launch and /launch-preview
+   │  ├─ moodle_view.rs   GET /__ent_auth/moodle/view
+   │  ├─ student_pic.rs   GET /__ent_auth/student-pic
+   │  └─ school_certificate.rs   GET /__ent_auth/documents/school-certificate and its /status
    │
    ├─ node.rs             Node behind: what it is asked and told, and the User-Agent the two share
    ├─ universities.rs     tonAPI's settings, and where each university's services are
@@ -98,7 +123,7 @@ crates/tafac-gateway/
    ├─ proxy.rs            tafac.fr: the HTTP server in front of Node
    ├─ main.rs             tafac.fr: the binary, and its settings
    │
-   ├─ testing/            a made-up campus (portal, CAS, Moodle, ScoDoc) for the tests, here and in the apps
+   ├─ testing/            a made-up campus (portal, CAS, Moodle, ScoDoc, school records, a federation) for the tests, here and in the apps
    └─ tests/              the gateway on that campus, one file per kind of route
 ```
 
@@ -132,6 +157,13 @@ crates/tafac-gateway/
   Node as it came: each translator lists the cases.
 - **Nothing of tonAPI is copied here.** Its code and its settings come from
   the commit named in `Cargo.toml`.
+- **The relay opens the university's services only.** The launch relay
+  asks a target with the student's CAS ticket and sends the browser where
+  the CAS sends it: only an address of the university's own services, over
+  https, is asked or sent to (`launch/targets.rs`: the hosts tonAPI's
+  settings name, and Tafac's own list of domains, held to Node's settings
+  by a test). A request another site started gets no sign-in, and a service
+  ticket's value never goes to the page.
 
 ## To move a route
 

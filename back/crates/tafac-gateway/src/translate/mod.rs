@@ -10,6 +10,9 @@
 //   session.rs, account.rs, moodle_deadlines.rs, grades/   the routes' own
 //   apps.rs      GET /__ent_auth/apps: tonAPI's own list, which the page
 //                reads as it is
+//   launch.rs, moodle_view.rs, student_pic.rs, school_certificate.rs
+//                the routes answered to their end here (settled.rs): the
+//                launch relay, Moodle's view, the photo, the certificate
 //
 // A translator says one of three things: the page's answer; « Node
 // answers », where the answer is one only Node gives today (it signs in to
@@ -21,9 +24,14 @@ pub mod account;
 pub mod apps;
 pub mod expired;
 pub mod grades;
+pub mod launch;
 pub mod moodle_deadlines;
+pub mod moodle_view;
+pub mod school_certificate;
 pub mod session;
+pub mod settled;
 pub mod signin;
+pub mod student_pic;
 
 use tonapi_core::{ErrorCode, Profile};
 

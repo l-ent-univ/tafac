@@ -10,13 +10,19 @@
 //   moodle_deadlines.rs   a route another service answers: the CAS ticket,
 //                         the session held, the answer kept
 //   grades.rs             the grades' routes: ScoDoc's shape written back
+//   launch.rs             the launch relay, its preview, and what Moodle's
+//                         view may show: answered to their end here
+//   student.rs            the student's photo and school certificate: the
+//                         same
 
 mod apps;
 mod expiry;
 mod grades;
+mod launch;
 mod moodle_deadlines;
 mod portal;
 mod signin;
+mod student;
 
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{LazyLock, Mutex};

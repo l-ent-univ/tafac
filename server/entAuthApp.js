@@ -2898,6 +2898,13 @@ app.get('/__ent_auth/planning', async (req, res) => {
 })
 
 // 5. CAS Launch Endpoint — resolves CAS SSO for external app links
+// The preview and the launch below have moved to the gateway where it runs
+// before this server (back/crates/tafac-gateway: launch/, gateway/launch.rs,
+// translate/launch.rs). It answers them to the end for a session it holds,
+// with the checks made here (the target, who asks, a service ticket's value
+// kept) and these answers, and leaves this server who it holds no session
+// for: nobody signed in, the demo account, another university. A check
+// added or changed here goes there too.
 app.get('/__ent_auth/launch-preview', async (req, res) => {
   const targetUrl = req.query.url
 
@@ -5781,6 +5788,9 @@ function fetchMoodleDeadlinesOnce(session) {
 // The desktop app's Moodle view: where Moodle is and which addresses are
 // the university's (server/moodleView/policy.ts). Signed in only: the
 // answer is the session's university's.
+// Moved to the gateway where it runs before this server (translate/
+// moodle_view.rs there): this route is left nobody signed in, the demo
+// account and the other universities.
 app.get('/__ent_auth/moodle/view', (req, res) => {
   res.setHeader('Cache-Control', 'no-store')
   const policy = getSessionFromRequest(req) ? buildMoodleViewPolicy(universityConfig, launchTargets) : null
@@ -5843,6 +5853,10 @@ app.get('/__ent_auth/moodle/deadlines', async (req, res) => {
   }
 })
 
+// The student's photo, from ScoDoc. Moved to tonAPI where the gateway runs
+// before this server (translate/student_pic.rs there): it answers for a
+// session it holds, a failure included, and leaves this route nobody signed
+// in and the demo account.
 app.get('/__ent_auth/student-pic', async (req, res) => {
   try {
     const wantsMeta = req.query.meta === '1'
@@ -6042,6 +6056,11 @@ function buildAttachmentHeader(filename) {
   return `attachment; filename="${ascii}"; filename*=UTF-8''${encodeURIComponent(filename)}`
 }
 
+// This route and the PDF's below have moved to tonAPI where the gateway runs
+// before this server (its `mon-dossier-web` provider plays these steps;
+// translate/school_certificate.rs there): it answers for a session it holds,
+// a failure included, and leaves these routes nobody signed in and the demo
+// account.
 // GET /__ent_auth/documents/school-certificate/status
 //   200 { available: true, schoolYear: '2026-2027' } | { available: false }
 //   401 no session · 404 feature off for this university

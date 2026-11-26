@@ -12,6 +12,9 @@
 //   services.rs   the routes another service answers (Moodle, ScoDoc): its
 //                 turn, the answer kept, the question, what the session
 //                 holds of the service
+//   settled.rs    the routes answered to their end here, failures included:
+//                 launch.rs (the launch relay, its preview) and student.rs
+//                 (the photo, the school certificate)
 //
 // The session is the gateway's: it signs the student in, holds what tonAPI
 // got from the university, and says when the session is over. Node is behind
@@ -22,9 +25,12 @@
 // or slow (Node words those errors).
 
 mod attempts;
+mod launch;
 pub(crate) mod portal;
 mod services;
+mod settled;
 mod signin;
+mod student;
 
 use std::collections::BTreeMap;
 use std::future::Future;
@@ -156,6 +162,10 @@ impl Gateway {
             return self.sign_in(asked).await;
         }
         let value = cookie()?;
+        // The routes answered to their end here, failures included.
+        if Self::settles(route) {
+            return self.settled(route, asked, &value, &cookie, &node).await;
+        }
         if route != Moved::Logout {
             if let Some(expired) = self.found_expired_already(route, &value, &node).await {
                 return Some(expired);
@@ -165,7 +175,9 @@ impl Gateway {
         let query = asked.query;
 
         let translated = match route {
-            Moved::Login => return None,
+            // A sign-in was answered above, and so were the routes of
+            // settled.rs.
+            Moved::Login | Moved::Launch | Moved::LaunchPreview | Moved::MoodleView | Moved::StudentPicture | Moved::CertificateStatus | Moved::Certificate => return None,
             // The session ends: nothing to check of it after.
             Moved::Logout => return Some(self.sign_out(&held, &value, &node).await),
             Moved::Session => self.session_check(&held, &node).await,

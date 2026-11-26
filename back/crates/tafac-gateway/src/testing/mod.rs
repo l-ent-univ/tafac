@@ -1,7 +1,7 @@
 // A made-up campus for the tests, here and in what uses the crate (the
-// apps' bridge): a portal, its CAS, a Moodle and an IUT's ScoDoc gateway on
-// this computer, as much of them as tonAPI asks, and the session cookie of
-// a student there.
+// apps' bridge): a portal, its CAS, a Moodle, an IUT's ScoDoc gateway, the
+// school records and a library on this computer, as much of them as tonAPI
+// and the launch relay ask, and the session cookie of a student there.
 
 use std::future::Future;
 use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
@@ -66,7 +66,13 @@ where
 // /moodle/ on the portal's host: it signs in through the CAS and answers its
 // calendar's two lists. The ScoDoc gateway is under /scodoc/: it signs in
 // through the CAS too and answers one student's reports, a department's
-// notice, a distribution and a PDF.
+// notice, a distribution, a PDF and the student's photo. The school records
+// (ESUP MonDossierWeb, a Vaadin application) are under /mdw/: behind the CAS,
+// they list two school certificates and give the file of each. The library
+// under /library/ is a service like any other behind the CAS, for the
+// launch relay to open. And the federation Moodle signs in through when the
+// campus is asked for one (federated_settings): its discovery page under
+// /wayf/, the university's IdP under /idp/.
 pub struct Campus {
     port: String,
     // Each request received: its path and query, and its cookies.
@@ -90,6 +96,11 @@ struct State {
     // Each code the API was asked to send: « student method transport », and
     // « auto » when it was told the student didn't ask.
     codes_sent: Mutex<Vec<String>>,
+    // ScoDoc has no photo of the student.
+    no_photo: AtomicBool,
+    // The school records list no certificate; answer nothing but an error.
+    no_certificate: AtomicBool,
+    records_down: AtomicBool,
 }
 
 // Moodle's state: the session it knows (a number: it forgets the one before
@@ -281,6 +292,12 @@ fn moodle_answer(path: &str, cookies: &str, port: &str, moodle: &Moodle) -> Answ
                 Answer::redirect(&format!("http://localhost:{port}/cas/login?service={}", percent_encoded(&entry)))
             }
         }
+        // Moodle's entry by the federation: to the discovery page, with the
+        // page to land on after.
+        "/moodle/auth/shibboleth/index.php" => {
+            let landing = query_of(path, "target").unwrap_or_else(|| format!("http://127.0.0.1:{port}/moodle/my/"));
+            Answer::redirect(&format!("http://127.0.0.1:{port}/wayf/?return={}", percent_encoded(&landing)))
+        }
         "/moodle/my/" if signed_in => Answer::of("200 OK", "text/html; charset=utf-8", dashboard(&format!("CAMPUSKEY{generation}"))),
         "/moodle/my/" => Answer::of("200 OK", "text/html; charset=utf-8", r#"<html><body class="notloggedin">Connexion</body></html>"#.to_string()),
         "/moodle/lib/ajax/service.php" => {
@@ -359,9 +376,12 @@ fn scodoc_first_connection() -> serde_json::Value {
     })
 }
 
+// The photo ScoDoc keeps of the student (what stands for one).
+pub const SCODOC_PHOTO: &str = "PNG a photo of the campus";
+
 // The IUT's ScoDoc gateway: a PHP session opened through the CAS, then
 // data.php's actions and the PDF.
-fn scodoc_answer(path: &str, cookies: &str, port: &str) -> Answer {
+fn scodoc_answer(path: &str, cookies: &str, port: &str, has_photo: bool) -> Answer {
     const SESSION: &str = "PHPSESSID=notes-open";
     let signed_in = cookies.contains(SESSION);
     let root = format!("http://127.0.0.1:{port}/scodoc/");
@@ -391,12 +411,130 @@ fn scodoc_answer(path: &str, cookies: &str, port: &str) -> Answer {
                 Some("relevéEtudiant") if query_of(path, "semestre").as_deref() == Some("901") => json(serde_json::json!({ "relevé": scodoc_report(), "absences": [] })),
                 Some("getReportPageMessage") => json(serde_json::json!({ "message": "<p>Jury le 12 f&eacute;vrier.</p><p>Salle A.</p>" })),
                 Some("listeNotes") => json(serde_json::json!([4.5, 9.0, 9.5, 11.0, 12.25, 13.0, 13.5, 16.0, 20.0])),
+                Some("getStudentPic") if has_photo => Answer::of("200 OK", "image/png", SCODOC_PHOTO.to_string()),
+                // As a gateway without a photo to give: a page, no image.
+                Some("getStudentPic") => Answer::of("200 OK", "text/html; charset=utf-8", String::new()),
                 _ => json(serde_json::json!({ "erreur": "Mauvaise requête." })),
             }
         }
         "/scodoc/services/bulletin_PDF.php" if signed_in => Answer::of("200 OK", "application/pdf", "%PDF-1.4 a report of the campus".to_string()),
         "/scodoc/services/bulletin_PDF.php" => Answer::of("200 OK", "text/html; charset=utf-8", "<html>Connexion</html>".to_string()),
         _ => Answer::of("404 Not Found", "text/plain", String::new()),
+    }
+}
+
+// The school records (ESUP MonDossierWeb): a Vaadin application behind the
+// CAS. Its page names the application; a first request opens its interface
+// (the menu's buttons, a key to send back); a click on « Inscriptions »
+// lists the files, one certificate a school year; each file is a PDF.
+pub const CERTIFICATE_FILE: &str = "Certificat_de_Scolarité_X0001_2026-2027_JEANNE_DOE.pdf";
+pub const CERTIFICATE_PDF: &str = "%PDF-1.4 a certificate of the campus";
+const CERTIFICATE_PATH: &str = "/mdw/APP/connector/3/646/dl/Certificat_de_Scolarit%C3%A9_X0001_2026-2027_JEANNE_DOE.pdf";
+
+fn records_answer(received: &Received<'_>, port: &str, state: &State) -> Answer {
+    const SESSION: &str = "JSESSIONID=records-open";
+    let Received { method, path, cookies, body, .. } = *received;
+    if state.records_down.load(Ordering::SeqCst) {
+        return Answer::of("503 Service Unavailable", "text/html; charset=utf-8", "<html>Maintenance</html>".to_string());
+    }
+    let signed_in = cookies.contains(SESSION);
+    let root = format!("http://127.0.0.1:{port}/mdw/");
+    let route = path.split('?').next().unwrap_or_default();
+    match (method, route) {
+        ("GET", "/mdw/login/cas") if query_of(path, "ticket").as_deref() == Some("ST-campus") => Answer::redirect(&root).with(format!("set-cookie: {SESSION}; Path=/mdw")),
+        (_, "/mdw/") if !signed_in => Answer::redirect(&format!("http://localhost:{port}/cas/login?service={}", percent_encoded(&format!("{root}login/cas")))),
+        ("GET", "/mdw/") => Answer::of(
+            "200 OK",
+            "text/html; charset=utf-8",
+            r#"<html><body><div id="ROOT-2521314" class="v-app"></div><script>vaadin.initApplication("ROOT-2521314",{"theme":"valo-ul","serviceUrl":"."});</script></body></html>"#.to_string(),
+        ),
+        ("POST", "/mdw/") => {
+            let interface = serde_json::json!({
+                "Vaadin-Security-Key": "the-key-of-the-campus", "syncId": 0, "clientId": 0,
+                "state": { "544": { "caption": "Etat-civil" }, "547": { "caption": "Inscriptions" }, "549": { "caption": "Notes & résultats" } },
+            });
+            Answer::of("200 OK", "application/json; charset=utf-8", serde_json::json!({ "v-uiId": 3, "uidl": interface.to_string() }).to_string())
+        }
+        ("POST", "/mdw/UIDL/") if signed_in => {
+            let click: serde_json::Value = serde_json::from_str(body).unwrap_or_default();
+            if click["csrfToken"] != "the-key-of-the-campus" || click["rpc"][0][0] != "547" {
+                return Answer::of("403 Forbidden", "application/json", "{}".to_string());
+            }
+            let file = |year: &str, connector: u32| {
+                serde_json::json!({ "resources": { "dl": { "uRL": format!("app://APP/connector/3/{connector}/dl/Certificat_de_Scolarit%C3%A9_X0001_{year}_JEANNE_DOE.pdf") } } })
+            };
+            let files = match state.no_certificate.load(Ordering::SeqCst) {
+                true => serde_json::json!({}),
+                false => serde_json::json!({ "645": { "caption": "Certificat de scolarité " }, "646": file("2026-2027", 646), "652": file("2025-2026", 652) }),
+            };
+            Answer::of("200 OK", "application/json; charset=utf-8", format!("for(;;);{}", serde_json::json!([{ "syncId": 1, "state": files }])))
+        }
+        ("GET", CERTIFICATE_PATH) if signed_in => Answer::of("200 OK", "application/pdf", CERTIFICATE_PDF.to_string()),
+        _ => Answer::of("404 Not Found", "text/plain", String::new()),
+    }
+}
+
+// The library: a service behind the CAS as most are, for the launch relay.
+// Its catalogue wants a visitor signed in (the CAS, then back with a
+// ticket); the rest is what a service's address may answer instead.
+fn library_answer(path: &str, port: &str) -> Answer {
+    let cas = |service: &str| format!("http://localhost:{port}/cas/login?service={}", percent_encoded(service));
+    let page = |body: &str| Answer::of("200 OK", "text/html; charset=utf-8", format!("<html><body>{body}</body></html>"));
+    match path.split('?').next().unwrap_or_default() {
+        "/library/catalogue" => match query_of(path, "ticket") {
+            Some(_) => page("Catalogue"),
+            None => Answer::redirect(&cas(&format!("http://127.0.0.1:{port}/library/catalogue"))),
+        },
+        // Open to anyone.
+        "/library/hours" => page("Horaires"),
+        // Sends to the CAS from the page itself, not by a redirect.
+        "/library/reader" => Answer::of(
+            "200 OK",
+            "text/html; charset=utf-8",
+            format!(r#"<html><head><meta http-equiv="refresh" content="0; url={}"></head></html>"#, cas(&format!("http://127.0.0.1:{port}/library/reader")).replace('&', "&amp;")),
+        ),
+        // Signs in through a federation: the CAS answers an IdP elsewhere.
+        "/library/federated" => Answer::redirect(&cas("https://idp.exemple.test/sso")),
+        // Another site's.
+        "/library/partner" => Answer::redirect("https://elsewhere.exemple.test/books"),
+        "/library/loop" => Answer::redirect(&format!("http://127.0.0.1:{port}/library/loop")),
+        _ => Answer::of("404 Not Found", "text/plain", String::new()),
+    }
+}
+
+// The federation's name for the campus's IdP, in its discovery page.
+pub const IDP_ENTITY: &str = "urn:test:campus:idp";
+// The message the IdP has Moodle told the student is signed in with.
+pub const SAML_RESPONSE: &str = "PHNhbWw+Y2FtcHVzPC9zYW1sPg==";
+
+// The federation: the discovery page (which university?), then the
+// university's IdP, which signs in by the CAS and answers a page that posts
+// its message to Moodle.
+fn federation_answer(received: &Received<'_>, port: &str) -> Answer {
+    let Received { method, path, body, .. } = *received;
+    let page = |body: String| Answer::of("200 OK", "text/html; charset=utf-8", body);
+    let idp = format!("http://127.0.0.1:{port}/idp/sso");
+    match (method, path.split('?').next().unwrap_or_default()) {
+        ("GET", "/wayf/") => page(format!(
+            r#"<html><body><form action="/wayf/select" method="post"><input type="hidden" name="return" value="{}">
+            <select name="user_idp"><option value="urn:test:another">Une autre</option><option value="{IDP_ENTITY}">Le campus</option></select>
+            <input type="submit" name="Select" value="Sélection"></form></body></html>"#,
+            query_of(path, "return").unwrap_or_default()
+        )),
+        ("POST", "/wayf/select") if form_field(body, "user_idp").as_deref() == Some(IDP_ENTITY) && form_field(body, "Select").is_some() => {
+            Answer::redirect(&format!("{idp}?relay={}", percent_encoded(&form_field(body, "return").unwrap_or_default())))
+        }
+        ("GET", "/idp/sso") if query_of(path, "ticket").as_deref() == Some("ST-campus") => page(format!(
+            r#"<html><body onload="document.forms[0].submit()"><form method="post" action="http://127.0.0.1:{port}/moodle/Shibboleth.sso/SAML2/POST">
+            <input type="hidden" name="RelayState" value="{}"><input type="hidden" name="SAMLResponse" value="{SAML_RESPONSE}">
+            <noscript><input type="submit" value="Continuer"></noscript></form></body></html>"#,
+            query_of(path, "relay").unwrap_or_default()
+        )),
+        ("GET", "/idp/sso") => {
+            let back = format!("{idp}?relay={}", percent_encoded(&query_of(path, "relay").unwrap_or_default()));
+            Answer::redirect(&format!("http://localhost:{port}/cas/login?service={}", percent_encoded(&back)))
+        }
+        _ => Answer::of("400 Bad Request", "text/plain", String::new()),
     }
 }
 
@@ -552,7 +690,16 @@ fn campus_answer(received: &Received<'_>, port: &str, state: &State) -> Answer {
         return moodle_answer(path, cookies, port, &state.moodle);
     }
     if path.starts_with("/scodoc/") {
-        return scodoc_answer(path, cookies, port);
+        return scodoc_answer(path, cookies, port, !state.no_photo.load(Ordering::SeqCst));
+    }
+    if path.starts_with("/mdw/") {
+        return records_answer(received, port, state);
+    }
+    if path.starts_with("/library/") {
+        return library_answer(path, port);
+    }
+    if path.starts_with("/wayf/") || path.starts_with("/idp/") {
+        return federation_answer(received, port);
     }
     Answer::of("404 Not Found", "text/plain", String::new())
 }
@@ -638,6 +785,25 @@ impl Campus {
 
     // tonAPI's settings for it, as a university.toml says them.
     pub fn settings(&self) -> ResolvedUniversity {
+        self.settings_with("cas", "")
+    }
+
+    // The same campus, its Moodle behind the federation (Shibboleth) as
+    // Rennes' is: the discovery page, then the university's IdP.
+    pub fn federated_settings(&self) -> ResolvedUniversity {
+        let federation = format!(
+            r#"
+            [sso.saml]
+            wayf-url = "http://127.0.0.1:{port}/wayf/"
+            idp-entity-id = "{IDP_ENTITY}"
+            allowed-hosts = ["127.0.0.1", "localhost"]
+            "#,
+            port = self.port
+        );
+        self.settings_with("shibboleth", &federation)
+    }
+
+    fn settings_with(&self, moodle_entry: &str, federation: &str) -> ResolvedUniversity {
         let file = format!(
             r#"
             id = "{UNIVERSITY}"
@@ -645,6 +811,7 @@ impl Campus {
             [sso]
             kind = "cas"
             base-url = "http://localhost:{port}/cas/"
+            {federation}
             [portal]
             kind = "uportal5"
             base-url = "http://127.0.0.1:{port}/"
@@ -655,13 +822,16 @@ impl Campus {
             [services.homework]
             provider = "moodle-ajax"
             base-url = "http://127.0.0.1:{port}/moodle/"
-            entry = "cas"
+            entry = "{moodle_entry}"
             [services.grades]
             provider = "scodoc-gateway"
             base-url = "http://127.0.0.1:{port}/scodoc/"
             [services.absences]
             provider = "scodoc-gateway"
             base-url = "http://127.0.0.1:{port}/scodoc/"
+            [services.documents]
+            provider = "mon-dossier-web"
+            base-url = "http://127.0.0.1:{port}/mdw/"
             "#,
             port = self.port
         );
@@ -670,6 +840,11 @@ impl Campus {
 
     pub fn gateway(&self) -> Gateway {
         Gateway::for_tests(vec![self.settings()], SECRET, COOKIE_NAME)
+    }
+
+    // The gateway of the campus whose Moodle is behind the federation.
+    pub fn federated_gateway(&self) -> Gateway {
+        Gateway::for_tests(vec![self.federated_settings()], SECRET, COOKIE_NAME)
     }
 
     // The session cookie (its value) of a student with these portal cookies.
@@ -728,6 +903,22 @@ impl Campus {
     // ticket of the CAS's, is another.
     pub fn portal_forgets(&self) {
         self.state.portal_sessions.fetch_add(1, Ordering::SeqCst);
+    }
+
+    // ScoDoc has (or no longer has) a photo of the student.
+    pub fn scodoc_has_a_photo(&self, has: bool) {
+        self.state.no_photo.store(!has, Ordering::SeqCst);
+    }
+
+    // The school records list (or no longer list) a certificate.
+    pub fn records_have_a_certificate(&self, have: bool) {
+        self.state.no_certificate.store(!have, Ordering::SeqCst);
+    }
+
+    // The school records stop (or start again) answering anything but an
+    // error.
+    pub fn records_are_down(&self, down: bool) {
+        self.state.records_down.store(down, Ordering::SeqCst);
     }
 
     // Esup OTP's API stops (or starts again) answering anything but an error.

@@ -32,6 +32,12 @@ pub enum Moved {
     GradesMessage,
     GradesDistribution,
     GradesTranscript,
+    Launch,
+    LaunchPreview,
+    MoodleView,
+    StudentPicture,
+    CertificateStatus,
+    Certificate,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -79,17 +85,20 @@ pub const ROUTES: &[Route] = &[
     // The portal.
     node("*", "/__ent_proxy/*", "the account's photo, and an old link to a page of the portal's (sent on to the launch relay)"),
     node("POST", "/__ent_auth/app-icons", "Tafac's own icons"),
-    node("GET", "/__ent_auth/launch", "no launch relay in tonAPI"),
-    node("GET", "/__ent_auth/launch-preview", "no launch relay in tonAPI"),
+    // Tafac's own relay: a service opened signed in (launch/).
+    moved("GET", "/__ent_auth/launch", Moved::Launch),
+    moved("GET", "/__ent_auth/launch-preview", Moved::LaunchPreview),
     // The planning.
     node("GET", "/__ent_auth/planning", "tonAPI's timetable is the student's own groups only, without ADE's colours and ids"),
     node("*", "/__ent_auth/ade/*", "tonAPI's timetable takes no resource to ask for, and has no tree, search, rooms or teachers"),
-    // Grades.
-    node("GET", "/__ent_auth/student-pic", "no photo in tonAPI's profile"),
-    // Mail, Moodle, documents.
+    // The student's own files: the photo ScoDoc keeps, the school certificate.
+    moved("GET", "/__ent_auth/student-pic", Moved::StudentPicture),
+    moved("GET", "/__ent_auth/documents/school-certificate/status", Moved::CertificateStatus),
+    moved("GET", "/__ent_auth/documents/school-certificate", Moved::Certificate),
+    // Mail, Moodle.
     node("*", "/__ent_auth/mail/*", "tonAPI reads an inbox only, and Rennes' stops at the SAML step: no message, folder, draft or send"),
-    node("GET", "/__ent_auth/moodle/view", "Tafac's own, for the apps' Moodle page"),
-    node("GET", "/__ent_auth/documents/*", "the school certificate is a stub in tonAPI"),
+    // Tafac's own, for the apps' Moodle page: what its view may show.
+    moved("GET", "/__ent_auth/moodle/view", Moved::MoodleView),
 ];
 
 fn matches(route: &Route, method: &Method, path: &str) -> bool {
@@ -136,10 +145,20 @@ mod tests {
         ] {
             assert_eq!(backend(&Method::GET, path), Backend::TonApi(route), "{path}");
         }
+        for (path, route) in [
+            ("/__ent_auth/launch", Moved::Launch),
+            ("/__ent_auth/launch-preview", Moved::LaunchPreview),
+            ("/__ent_auth/moodle/view", Moved::MoodleView),
+            ("/__ent_auth/student-pic", Moved::StudentPicture),
+            ("/__ent_auth/documents/school-certificate/status", Moved::CertificateStatus),
+            ("/__ent_auth/documents/school-certificate", Moved::Certificate),
+        ] {
+            assert_eq!(backend(&Method::GET, path), Backend::TonApi(route), "{path}");
+        }
         for (method, path) in [
             (Method::POST, "/__ent_auth/session"),
             (Method::POST, "/__ent_auth/moodle/deadlines"),
-            (Method::GET, "/__ent_auth/moodle/view"),
+            (Method::POST, "/__ent_auth/moodle/view"),
             (Method::GET, "/__ent_auth/moodle/deadlines/"),
             (Method::GET, "/__ent_auth/session/"),
             (Method::POST, "/__ent_auth/apps"),
@@ -151,7 +170,11 @@ mod tests {
             (Method::POST, "/__ent_auth/grades"),
             (Method::GET, "/__ent_auth/grades/semester"),
             (Method::GET, "/__ent_auth/grades/something-new"),
-            (Method::GET, "/__ent_auth/student-pic"),
+            (Method::POST, "/__ent_auth/student-pic"),
+            (Method::POST, "/__ent_auth/launch"),
+            (Method::GET, "/__ent_auth/launch/"),
+            (Method::GET, "/__ent_auth/documents/school-certificate/"),
+            (Method::GET, "/__ent_auth/documents/something-new"),
             (Method::POST, "/__ent_auth/ade/upcoming"),
             (Method::POST, "/__ent_auth/mail/send"),
             (Method::GET, "/__ent_proxy/api/v4-3/dlm/layout.json"),

@@ -18,6 +18,8 @@
 //                    what of it tonAPI is handed, what it holds in this
 //                    process
 //   tonapi/          the questions to tonAPI, one file per thing asked
+//   launch/          the launch relay: a service's sign-in walked with the
+//                    CAS ticket, for the browser to finish
 //   translate/       one translator per moved route: tonAPI's answer as the
 //                    page reads it today, JSON and status
 //   node.rs          Node behind: what it is asked and told, and the
@@ -43,6 +45,7 @@ pub mod session;
 pub mod translate;
 
 mod gateway;
+mod launch;
 mod node;
 mod tonapi;
 mod universities;

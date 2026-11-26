@@ -78,7 +78,10 @@ the gateway (Rust)                           back/crates/tafac-gateway
    │  tonapi/        the questions to tonAPI, one file per thing asked
    │  translate/     tonAPI's answer as the page reads it today
    │  node.rs        what Node is asked and told
-   ├─ login, logout, session, account, deadlines, grades ──▶ tonAPI ──▶ the university
+   │  launch/        the launch relay: a service's sign-in walked for the browser
+   ├─ login, logout, session, account, deadlines, grades,
+   │  applications, photo, school certificate ──▶ tonAPI ──▶ the university
+   ├─ the launch relay ──▶ the university
    ▼  everything else, as it came, with the session's cookie
 Node (server.js)                             ──▶ the university
 ```
@@ -147,6 +150,27 @@ What the gateway does, for Rennes:
   forgot it. The session check does the same once the portal session of
   the session's cookie lapsed (`gateway/portal.rs`): Node isn't asked to
   sign in to the portal again, and the session's cookie isn't written.
+- **Opens a service signed in** (the launch relay: `GET
+  /__ent_auth/launch`, `launch/`). The gateway asks the target with the CAS
+  ticket and nothing else of the student's, and redirects the browser to
+  where the CAS sends it: the service, with a service ticket that signs in
+  once. For Moodle behind the federation (Rennes) it walks the chain
+  (Moodle, the discovery page, the IdP, the CAS) as far as the page that
+  posts a SAML message to Moodle, and hands that form to the browser. Only
+  the university's own services are asked or sent to, over https
+  (`launch/targets.rs`); a link from another site (`Sec-Fetch-Site`) gets no
+  sign-in; `GET /__ent_auth/launch-preview` tells the page whether the relay
+  signs in to an address, never with a service ticket's value. A session
+  found over on the way goes to `/login?session=expired`.
+- **Answers Moodle's view, the photo and the school certificate**
+  (`gateway/settled.rs`). `GET /__ent_auth/moodle/view` says what the apps'
+  Moodle view may show (the relay's own list). `GET
+  /__ent_auth/student-pic` is the photo the IUT's ScoDoc keeps, as tonAPI
+  reads it. `GET /__ent_auth/documents/school-certificate` and its
+  `/status` are the certificate of the school records (ESUP MonDossierWeb:
+  tonAPI plays the browser's part in its Vaadin application). These routes
+  word their own failures: nothing of them goes to Node for a session the
+  gateway holds.
 - **Says when the session is over** (`gateway/mod.rs`). When tonAPI says
   the university no longer knows the session, the gateway asks the CAS with
   the ticket: if the CAS wants the password again, the session ends here,
@@ -166,14 +190,17 @@ What the gateway does, for Rennes:
 What is still Node's, and why:
 
 - **Every route that hasn't moved** (`routes.rs` says what tonAPI lacks for
-  each): the launch relay, the planning and ADE, the mail, the documents,
+  each): the planning and ADE, the mail,
   the icons, the statistics, the demo account, and the portal's proxy for
   what is left of it (the account's photo, an old link to a page of the
   portal's).
 - **A moved route's errors.** When tonAPI can't give the page's answer (a
   service down or slow, a parameter to refuse, the demo account, nobody
   signed in), the request goes to Node's own route, which words it. Each
-  translator lists the cases.
+  translator lists the cases. Not for the launch relay, Moodle's view, the
+  photo and the certificate: only who the gateway holds no session for
+  (nobody signed in, the demo account, another university) is Node's
+  there.
 - **What Node is set up for** (`analyticsEnabled`, in the session check's
   answer): read from Node now and then.
 
@@ -231,6 +258,15 @@ list held the 31 applications and the 5 favourites the page read until
 then from the portal's layout, each with the address its tile's fragment
 gives; 2 to 3 s the first time (a portal session opened, 31 fragments
 read), 3 ms once kept.
+
+The launch relay, Moodle's view, the photo and the school certificate, as
+the gateway answers them, were run on the made-up campus only
+(`back/crates/tafac-gateway/src/testing/`): none on a real account yet.
+What a real account has to confirm: the service ticket the relay hands for
+a tile (the portal's pages, the planning, ScoDoc), Moodle's view opening
+signed in through the federation, the photo of a student of the IUT and of
+another component, and the certificate's status and file from the school
+records.
 
 ## Staying signed in
 
