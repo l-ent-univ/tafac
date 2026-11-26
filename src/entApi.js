@@ -1,3 +1,4 @@
+import { noteBackendAnswer } from './dev/backendTrace.js'
 import universityConfig from '@university'
 import { GRADES_UNAVAILABLE_MESSAGE } from './gradeFeatureState'
 import { evaluationTypeLabel, listGradesSemesters, summarizeAverage } from './gradesReport'
@@ -56,7 +57,11 @@ export const reportSessionExpired = () => sessionSignal.expire()
 // for src/appIcons.js and the applications' launch preview).
 export async function serverFetch(url, init) {
   const sentUnder = sessionSignal.current
+  const startedAt = import.meta.env.DEV ? performance.now() : 0
   const response = await fetch(url, init)
+  // Development: which side answered (the Rust gateway or the Node server),
+  // for src/dev/BackendMarks.jsx.
+  if (import.meta.env.DEV) noteBackendAnswer(url, response, performance.now() - startedAt)
   sessionSignal.note(sentUnder, (name) => response.headers.get(name))
   return response
 }

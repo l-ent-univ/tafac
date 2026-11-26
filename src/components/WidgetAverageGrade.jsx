@@ -1,3 +1,4 @@
+import { markBackend } from '../dev/backendTrace.js'
 import { useMemo } from 'react'
 import { buildGradesReport, summarizeAverage } from '../gradesReport'
 import { formatRank, nameGroupRanks } from '../gradesSubjects'
@@ -186,4 +187,5 @@ function WidgetAverageGrade({ releve = null, visible = false, icon = null }) {
   return <LiveWidgetAverageGrade releve={releve} visible={visible} icon={icon} />
 }
 
-export default WidgetAverageGrade
+// Development: outlined by who answered its route (src/dev/backendTrace.js).
+export default markBackend(WidgetAverageGrade, ['/__ent_auth/grades', '/__ent_auth/grades/semester/:id'])

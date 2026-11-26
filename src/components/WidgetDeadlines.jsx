@@ -1,3 +1,4 @@
+import { markBackend } from '../dev/backendTrace.js'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Icon } from '@iconify/react'
 import { Skeleton } from 'skullet/react'
@@ -367,4 +368,5 @@ function WidgetDeadlines({ visible = false, preview = null, icon = null, large =
   )
 }
 
-export default WidgetDeadlines
+// Development: outlined by who answered its route (src/dev/backendTrace.js).
+export default markBackend(WidgetDeadlines, ['/__ent_auth/moodle/deadlines'])

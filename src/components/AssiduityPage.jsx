@@ -1,3 +1,4 @@
+import { markBackend } from '../dev/backendTrace.js'
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { Icon } from '@iconify/react'
 import universityConfig from '@university'
@@ -756,4 +757,5 @@ function AssiduityPage({ arrivalSource = 'other', onComposeMail = null, absenceR
 // draws its cards and rows with these.
 export { AbsenceRow, SemesterLine, TotalsCard }
 
-export default AssiduityPage
+// Development: outlined by who answered its route (src/dev/backendTrace.js).
+export default markBackend(AssiduityPage, ['/__ent_auth/grades', '/__ent_auth/grades/semester/:id'])

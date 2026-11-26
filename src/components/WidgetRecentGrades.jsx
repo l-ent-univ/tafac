@@ -1,3 +1,4 @@
+import { markBackend } from '../dev/backendTrace.js'
 import { useMemo } from 'react'
 import { Skeleton } from 'skullet/react'
 import universityConfig from '@university'
@@ -115,4 +116,5 @@ function WidgetRecentGrades({ releve = null, config = null, semesterId = null, s
   )
 }
 
-export default WidgetRecentGrades
+// Development: outlined by who answered its route (src/dev/backendTrace.js).
+export default markBackend(WidgetRecentGrades, ['/__ent_auth/grades', '/__ent_auth/grades/semester/:id'])

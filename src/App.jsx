@@ -119,6 +119,9 @@ const DEBUG_MENU_ENABLED = import.meta.env.DEV
 // Dev only: a constant false in production builds, so the menu's chunk is
 // never emitted there.
 const DebugMenu = DEBUG_MENU_ENABLED ? lazy(() => import('./components/debug/DebugMenu')) : null
+// Dev only: outlines what the Rust gateway answered, and lists every route
+// asked (src/dev/BackendMarks.jsx).
+const BackendMarks = import.meta.env.DEV ? lazy(() => import('./dev/BackendMarks')) : null
 const ACCOUNT_MODAL_PROFILE_PHOTO_TIMEOUT_MS = 3000
 const ONBOARDING_COMPLETION_SCREEN_MS = 1000
 const LEGACY_SESSION_CACHE_KEY = 'l-ent:session-cache'
@@ -3379,6 +3382,12 @@ function App() {
         onUpdateAvailable={() => setHasPendingUpdate(true)}
         onApplyHandlerChange={(fn) => { applyUpdateRef.current = fn }}
       />
+
+      {BackendMarks ? (
+        <Suspense fallback={null}>
+          <BackendMarks />
+        </Suspense>
+      ) : null}
 
       {DebugMenu ? (
         <Suspense fallback={null}>

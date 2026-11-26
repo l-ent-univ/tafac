@@ -1,3 +1,4 @@
+import { markBackend } from '../dev/backendTrace.js'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Icon } from '@iconify/react'
 import universityConfig from '@university'
@@ -434,4 +435,5 @@ function GradesPage({ user = null, arrivalSource = 'other', initialGradeRequest 
   )
 }
 
-export default GradesPage
+// Development: outlined by who answered its route (src/dev/backendTrace.js).
+export default markBackend(GradesPage, ['/__ent_auth/grades', '/__ent_auth/grades/semester/:id'])

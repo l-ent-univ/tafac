@@ -1,3 +1,4 @@
+import { markBackend } from '../dev/backendTrace.js'
 import { useId, useState } from 'react'
 import { Icon } from '@iconify/react'
 import { BUCKET_COUNT, countLabel, describeBucket, summarizeDistribution } from '../gradeDetail'
@@ -224,4 +225,5 @@ function GradeHistogram({ state, studentBucket = null, isPending = false, onRetr
   )
 }
 
-export default GradeHistogram
+// Development: outlined by who answered its route (src/dev/backendTrace.js).
+export default markBackend(GradeHistogram, ['/__ent_auth/grades/evaluation-distribution'])
