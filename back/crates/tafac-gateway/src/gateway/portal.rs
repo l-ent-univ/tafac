@@ -6,23 +6,26 @@
 // asks it a third time before either, as it starts (check_early), so the
 // page's first check waits for nothing.
 //
-// The portal's own session is the one thing of a session Node keeps up: its
-// portal requests (/__ent_proxy, the applications) go with its own copy of
-// the cookies. So the question is asked with the portal's cookies and never
-// the CAS ticket (session/handed.rs), and a portal that no longer knows the
-// session is Node's to sign in to again, unless the CAS says the whole
-// session is over (mod.rs).
+// The question goes with the portal cookies of the session's cookie while
+// the portal knows them: one request, no other portal session opened. When
+// it no longer does (the portal's sessions are short), tonAPI opens one of
+// its own with the CAS ticket, which the session holds in this process from
+// then on (session/memory.rs): Node isn't asked to sign in to the portal
+// again. Only when the CAS refuses the ticket is the session lost, and then
+// over (mod.rs).
 
 use std::future::Future;
 use std::time::{Duration, Instant};
 
-use tonapi_core::Profile;
+use tonapi_config::ServiceKind;
+use tonapi_core::{ErrorCode, Profile};
 use tonapi_session::StoredCookie;
 
 use super::Gateway;
 use crate::node::{NodeAnswer, NodeRequest};
+use crate::session::memory::Turn;
 use crate::session::{handed, Held};
-use crate::tonapi::{self, Unanswered};
+use crate::tonapi::{self, Service, Unanswered};
 use crate::translate::{self, Translated};
 
 // How long the check an app makes as it starts stands for its page's first
@@ -47,6 +50,26 @@ pub(crate) struct EarlyCheck {
 }
 
 impl Gateway {
+    // Who the portal says the student is. `sent`: the portal cookies of
+    // the session's cookie, asked with first while no portal session is
+    // held here; once the portal no longer knows them (or there are none),
+    // with one tonAPI opens with the ticket, and from then on with that one.
+    async fn profile(&self, held: &Held<'_>, sent: &[StoredCookie]) -> Result<Profile, Unanswered> {
+        let Held { session, university, memory } = held;
+        if !memory.has_portal_session() {
+            match tonapi::profile::read(university, session, sent, self.net).await {
+                Err(Unanswered::Problem(ErrorCode::SessionExpired) | Unanswered::CookiesChanged | Unanswered::NoPortalSession) => {}
+                answered => return answered,
+            }
+        }
+        let _turn = memory.turn(Turn::Service(ServiceKind::Profile)).await;
+        let profile = tonapi::profile::read_own(&Service { held, net: self.net }).await;
+        if profile.is_ok() {
+            memory.portal_opened();
+        }
+        profile
+    }
+
     // GET /__ent_auth/session (translate/session.rs).
     pub(super) async fn session_check<N, Fut>(&self, held: &Held<'_>, node: &N) -> Translated
     where
@@ -62,7 +85,7 @@ impl Gateway {
         let profile = async {
             match early {
                 Some(check) => check.profile,
-                None => tonapi::profile::read(university, session, &sent, self.net).await,
+                None => self.profile(held, &sent).await,
             }
         };
         let (profile, facts) = tokio::join!(profile, self.node.facts(&session.university, node));
@@ -80,7 +103,7 @@ impl Gateway {
         let Held { session, university, memory } = held;
         let profile = match memory.profile() {
             Some(profile) => Ok(profile),
-            None => tonapi::profile::read(university, session, &handed::portal_cookies(university, session), self.net).await,
+            None => self.profile(held, &handed::portal_cookies(university, session)).await,
         };
         translate::account::translate(profile.as_ref().map_err(|why| *why), session)
     }
@@ -100,13 +123,13 @@ impl Gateway {
         {
             let mut early = self.early.check.lock().await;
             let sent = handed::portal_cookies(university, session);
-            let profile = tonapi::profile::read(university, session, &sent, self.net).await;
+            let profile = self.profile(&held, &sent).await;
             if let Err(why) = &profile {
                 self.left_to_node(&why.to_string());
             }
-            // A portal that no longer knows the session: the CAS is asked
-            // ahead too whether the session is over, and its « no » kept.
-            if profile == Err(Unanswered::Problem(tonapi_core::ErrorCode::SessionExpired)) {
+            // The CAS refused its ticket for the portal: it is asked ahead
+            // too whether the session is over, and its « no » kept.
+            if profile == Err(Unanswered::Problem(ErrorCode::SessionExpired)) {
                 let _ = self.cas_still_knows(&held).await;
             }
             *early = Some(EarlyCheck { session: session.id.clone(), sent, at: Instant::now(), profile });

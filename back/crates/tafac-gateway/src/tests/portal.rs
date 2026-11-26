@@ -135,13 +135,15 @@ fn the_check_made_at_the_start_answers_the_pages_first_one() {
 }
 
 #[test]
-fn a_session_found_lapsed_at_the_start_goes_to_node_at_once() {
+fn a_portal_session_found_lapsed_at_the_start_is_opened_again_ahead() {
     let campus = campus();
     let gateway = campus.gateway();
     let cookie = campus.lapsed();
     block_on(gateway.check_early(Some(&cookie), node_says));
+    // The portal was signed in to again while the page started: its first
+    // check waits for nothing.
     let asked = campus.paths().len();
-    assert_eq!(ask(&gateway, SESSION, &cookie), None);
+    assert_eq!(ask(&gateway, SESSION, &cookie).unwrap()["user"], "jdoe");
     assert_eq!(campus.paths().len(), asked);
 }
 
@@ -183,31 +185,44 @@ fn nothing_is_asked_at_the_start_when_nobody_is_signed_in() {
 }
 
 #[test]
-fn a_portal_that_no_longer_knows_the_session_is_nodes_to_sign_in_to_again() {
+fn a_portal_that_no_longer_knows_the_session_is_signed_in_to_again_here() {
     let campus = campus();
     let gateway = campus.gateway();
     let cookie = campus.lapsed();
-    assert_eq!(ask(&gateway, SESSION, &cookie), None);
-    // tonAPI went to the CAS for the portal, as it does for a lost session,
-    // and couldn't sign in: it wasn't given the ticket for that. Node's
-    // portal requests go with Node's own copy of the cookies, so Node is
-    // the one to open the portal's new session.
+    // Node is asked what it is set up for and nothing else (`ask`): the
+    // check is answered here, the session's cookie as it was.
+    assert_eq!(ask(&gateway, SESSION, &cookie).unwrap()["authenticated"], true);
     let seen = campus.seen.lock().unwrap().clone();
-    let (for_the_portal, about_the_session): (Vec<_>, Vec<_>) = seen.iter().filter(|(path, _)| path.starts_with("/cas/login")).partition(|(path, _)| path.contains("service="));
-    assert!(!for_the_portal.is_empty() && for_the_portal.iter().all(|(_, cookies)| !cookies.contains("TGC")));
-    // Then the CAS was asked, with the ticket, whether the session is
-    // over: it isn't.
-    assert_eq!(about_the_session.len(), 1);
-    assert!(about_the_session[0].1.contains("TGC=the-ticket"));
+    // Asked first with the cookie's own portal session, which the portal no
+    // longer knows; then with one tonAPI opened with the CAS ticket.
+    let at_the_portal: Vec<_> = seen.iter().filter(|(path, _)| path.starts_with("/api/v5-1/userinfo")).map(|(_, cookies)| cookies.as_str()).collect();
+    assert!(at_the_portal.first().unwrap().contains("JSESSIONID=lapsed"));
+    assert!(at_the_portal.last().unwrap().contains("JSESSIONID=alive"));
+    assert!(seen.iter().any(|(path, cookies)| path.starts_with("/cas/login?service=") && cookies.contains("TGC=the-ticket")));
+    // The portal is never shown the ticket.
     assert!(seen.iter().filter(|(path, _)| path.starts_with("/api/")).all(|(_, cookies)| !cookies.contains("TGC")));
 
-    // Its word stands a minute: the account asked next doesn't ask it again.
-    assert_eq!(ask(&gateway, ACCOUNT, &cookie), None);
-    let at_the_cas = |campus: &Campus| campus.seen.lock().unwrap().iter().filter(|(path, _)| path == "/cas/login").count();
-    assert_eq!(at_the_cas(&campus), 1);
-    gateway.signed_in(Some(&cookie)).unwrap().memory.age_cas_word();
-    assert_eq!(ask(&gateway, ACCOUNT, &cookie), None);
-    assert_eq!(at_the_cas(&campus), 2);
+    // The portal session opened is held here: the next check is one
+    // request with it, and the CAS isn't asked again.
+    let asked_before = campus.paths().len();
+    assert_eq!(ask(&gateway, SESSION, &cookie).unwrap()["user"], "jdoe");
+    assert_eq!(campus.paths()[asked_before..], ["/api/v5-1/userinfo"]);
+    let last = campus.seen.lock().unwrap().last().cloned().unwrap();
+    assert!(last.1.contains("JSESSIONID=alive") && !last.1.contains("lapsed"));
+
+    // And when the portal forgets that one too: opened again, by itself.
+    campus.portal_forgets();
+    assert_eq!(ask(&gateway, SESSION, &cookie).unwrap()["user"], "jdoe");
+    assert!(campus.seen.lock().unwrap().last().unwrap().1.contains("JSESSIONID=alive-1"));
+}
+
+#[test]
+fn a_session_without_a_portal_cookie_opens_the_portal_with_its_ticket() {
+    let campus = campus();
+    let gateway = campus.gateway();
+    let cookie = campus.cookie(serde_json::json!({}), &[]);
+    assert_eq!(ask(&gateway, SESSION, &cookie).unwrap()["cookieNames"], serde_json::json!([]));
+    assert_eq!(ask(&gateway, ACCOUNT, &cookie).unwrap()["account"]["sub"], "jdoe");
 }
 
 #[test]
@@ -218,7 +233,6 @@ fn what_is_not_a_plain_signed_in_session_is_nodes_without_a_request() {
     for (why, cookie) in [
         ("the demo account", campus.cookie(serde_json::json!({ "mode": "demo" }), &alive)),
         ("another university", campus.cookie(serde_json::json!({ "uni": "univ-rennes-2" }), &alive)),
-        ("no portal cookie", campus.cookie(serde_json::json!({}), &[])),
         ("no CAS ticket", campus.cookie(serde_json::json!({ "jar": [["JSESSIONID", "alive", "127.0.0.1", "/", 1, 1, null]] }), &[])),
         ("past its lifetime", campus.cookie(serde_json::json!({ "createdAt": crate::gateway::now_ms() - 31 * 24 * 60 * 60 * 1000 }), &alive)),
         ("not Node's cookie", "v1.AAAA.AAAA.AAAA".to_string()),

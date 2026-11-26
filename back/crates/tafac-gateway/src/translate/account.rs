@@ -10,10 +10,9 @@
 //       name, given_name, family_name, email); the token's own claims (aud,
 //       exp, iat, iss), which Node passes on and the page never reads, are
 //       not in tonAPI's profile and so not here.
-//   200 { authenticated: true, account: <the portal's guest> }: the portal's
-//       own session lapsed (tonAPI's `session_expired`) while the CAS still
-//       knows the ticket; the portal says so with a guest's token, which
-//       Node passes on. Node, as before.
+//   the same, the portal's own session lapsed while the CAS still knows
+//       the ticket: answered here, with a portal session tonAPI opens with
+//       the ticket (Node passed the portal's guest token on).
 //   401 { error: 'session_expired' } with X-Tafac-Session: expired, the
 //       cookie cleared: the CAS no longer knows the ticket. Answered here
 //       (translate/expired.rs), and Node is told.

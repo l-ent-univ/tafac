@@ -112,7 +112,7 @@ L’interface utilise **React 19**, **Vite 7**, **Tailwind CSS 4** et **Iconify*
 Navigateur : React / PWA
     │
     ├── /__ent_auth/*    Connexion, session et services intégrés
-    └── /__ent_proxy/*   Requêtes de la page vers le portail ENT (liste fermée)
+    └── /__ent_proxy/*   Photo du compte et anciens liens vers le portail ENT (liste fermée)
               │
        Serveur Express
               │

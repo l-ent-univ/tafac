@@ -24,6 +24,9 @@ const WINDOW: Duration = Duration::from_secs(15 * 60);
 const BLOCK: Duration = Duration::from_secs(5 * 60);
 const MAX_PER_ADDRESS: u32 = 30;
 const MAX_PER_LOGIN: u32 = 8;
+// LOGIN_CODE_SEND_MAX_PER_USERNAME: one-time codes sent to one student by
+// SMS or mail within the window, asked for or not, before the same block.
+const MAX_CODES_PER_LOGIN: u32 = 5;
 // Whose failure it was, kept no longer than this (MAX_TAG_LENGTH).
 const MAX_TAG_BYTES: usize = 256;
 // Addresses and logins counted at once: past it the oldest counts go first.
@@ -120,6 +123,8 @@ impl FailureWindow {
 struct Windows {
     by_address: FailureWindow,
     by_login: FailureWindow,
+    // Not failures: the codes sent to a login (Node's loginCodeSends).
+    codes: FailureWindow,
 }
 
 pub(crate) struct Attempts {
@@ -128,7 +133,12 @@ pub(crate) struct Attempts {
 
 impl Default for Attempts {
     fn default() -> Self {
-        Self { windows: Mutex::new(Windows { by_address: FailureWindow::new(MAX_PER_ADDRESS), by_login: FailureWindow::new(MAX_PER_LOGIN) }) }
+        let windows = Windows {
+            by_address: FailureWindow::new(MAX_PER_ADDRESS),
+            by_login: FailureWindow::new(MAX_PER_LOGIN),
+            codes: FailureWindow::new(MAX_CODES_PER_LOGIN),
+        };
+        Self { windows: Mutex::new(windows) }
     }
 }
 
@@ -161,6 +171,17 @@ impl Attempts {
         let mut windows = self.windows.lock().unwrap();
         windows.by_login.clear(&who.login);
         windows.by_address.forgive(&who.address, &who.login, Instant::now());
+    }
+
+    // Too many codes were sent to this login lately: the seconds until one
+    // more may be. Past the limit none is sent unasked, and asking waits.
+    pub(crate) fn codes_wait(&self, who: &Who) -> Option<u64> {
+        self.windows.lock().unwrap().codes.status(&who.login, Instant::now())
+    }
+
+    // One more code sent to this login.
+    pub(crate) fn code_sent(&self, who: &Who) {
+        self.windows.lock().unwrap().codes.record(&who.login, "", Instant::now());
     }
 
     fn blocked_at(&self, who: &Who, now: Instant) -> Option<u64> {

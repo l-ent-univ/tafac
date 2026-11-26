@@ -25,6 +25,7 @@ pub enum Moved {
     Logout,
     Session,
     Account,
+    Apps,
     MoodleDeadlines,
     Grades,
     GradesSemester,
@@ -64,6 +65,7 @@ pub const ROUTES: &[Route] = &[
     moved("GET", "/__ent_auth/session", Moved::Session),
     moved("GET", "/__ent_auth/account", Moved::Account),
     // What the university's services say.
+    moved("GET", "/__ent_auth/apps", Moved::Apps),
     moved("GET", "/__ent_auth/moodle/deadlines", Moved::MoodleDeadlines),
     moved("GET", "/__ent_auth/grades", Moved::Grades),
     moved("GET", "/__ent_auth/grades/semester/*", Moved::GradesSemester),
@@ -74,9 +76,8 @@ pub const ROUTES: &[Route] = &[
     node("GET", "/__ent_auth/universities", "Tafac's own list of universities"),
     node("GET", "/__ent_auth/universities/*", "Tafac's own logos"),
     node("POST", "/__ent_auth/analytics", "Tafac's own statistics"),
-    node("*", "/__ent_auth/demo/request", "the demo account never reaches a university"),
     // The portal.
-    node("*", "/__ent_proxy/*", "the page reads the portal's own layout; tonAPI gives a list of applications"),
+    node("*", "/__ent_proxy/*", "the account's photo, and an old link to a page of the portal's (sent on to the launch relay)"),
     node("POST", "/__ent_auth/app-icons", "Tafac's own icons"),
     node("GET", "/__ent_auth/launch", "no launch relay in tonAPI"),
     node("GET", "/__ent_auth/launch-preview", "no launch relay in tonAPI"),
@@ -125,6 +126,7 @@ mod tests {
         assert_eq!(backend(&Method::GET, "/__ent_auth/session"), Backend::TonApi(Moved::Session));
         assert_eq!(backend(&Method::GET, "/__ent_auth/account"), Backend::TonApi(Moved::Account));
         assert_eq!(backend(&Method::GET, "/__ent_auth/moodle/deadlines"), Backend::TonApi(Moved::MoodleDeadlines));
+        assert_eq!(backend(&Method::GET, "/__ent_auth/apps"), Backend::TonApi(Moved::Apps));
         for (path, route) in [
             ("/__ent_auth/grades", Moved::Grades),
             ("/__ent_auth/grades/semester/1234", Moved::GradesSemester),
@@ -140,6 +142,8 @@ mod tests {
             (Method::GET, "/__ent_auth/moodle/view"),
             (Method::GET, "/__ent_auth/moodle/deadlines/"),
             (Method::GET, "/__ent_auth/session/"),
+            (Method::POST, "/__ent_auth/apps"),
+            (Method::GET, "/__ent_auth/apps/"),
             (Method::GET, "/__ent_auth/sessions"),
             (Method::GET, "/__ent_auth/login"),
             (Method::GET, "/__ent_auth/logout"),

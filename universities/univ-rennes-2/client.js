@@ -128,8 +128,6 @@ export default {
   services: {
     getAppIcon: () => null,
     categories: [],
-    // The Drupal portal can't store favourites: they stay in the browser.
-    localFavorites: true,
   },
 
   grades: gradesCopy,

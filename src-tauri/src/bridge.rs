@@ -194,8 +194,7 @@ pub async fn start_ahead(bridge: &Bridge) {
 }
 
 // A request the gateway makes to the server (what the server is set up for,
-// its own sign-in for a second factor, a session that ended), and the
-// server's whole answer. It goes as the gateway wrote it, and nothing of
+// a session that ended), and the server's whole answer. It goes as the gateway wrote it, and nothing of
 // the answer is kept here: the gateway says what goes to the page.
 async fn server_asked(bridge: &Bridge, request: NodeRequest) -> NodeAnswer {
     let (parts, body) = request.into_parts();
@@ -366,7 +365,7 @@ mod tests {
     use std::sync::atomic::{AtomicU32, Ordering};
     use std::sync::{Arc, Mutex};
 
-    use tafac_gateway::testing::{campus, header_of, read_head, Campus, COOKIE_NAME, NODE_SAYS, PASSWORD, STUDENT, STUDENT_WITH_CODE};
+    use tafac_gateway::testing::{campus, header_of, read_head, Campus, CODE, COOKIE_NAME, NODE_SAYS, PASSWORD, STUDENT, STUDENT_WITH_CODE};
     use tafac_gateway::ANSWERED_BY;
     use tokio::io::AsyncWriteExt;
 
@@ -476,7 +475,16 @@ mod tests {
 
     // The page's sign-in, as src/entApi.js sends it.
     fn sign_in(bridge: &Bridge, username: &str, password: &str) -> http::Response<Vec<u8>> {
-        let body = serde_json::json!({ "username": username, "password": password, "university": "univ-rennes" }).to_string();
+        sign_in_with(bridge, username, password, None)
+    }
+
+    // `code`: the one-time code of a sign-in with a second factor.
+    fn sign_in_with(bridge: &Bridge, username: &str, password: &str, code: Option<&str>) -> http::Response<Vec<u8>> {
+        let mut body = serde_json::json!({ "username": username, "password": password, "university": "univ-rennes" });
+        if let Some(code) = code {
+            body["otp"] = code.into();
+        }
+        let body = body.to_string();
         let request = http::Request::builder()
             .method("POST")
             .uri("tafac://localhost/__ent_auth/login")
@@ -532,16 +540,28 @@ mod tests {
     }
 
     #[test]
-    fn a_second_factor_is_the_servers_own_sign_in() {
+    fn a_second_factor_is_answered_in_the_app() {
         let (campus, server) = (campus(), server());
         let bridge = signed_out_bridge(&server, &campus);
-        // The CAS answers the password with its code page: the server's own
-        // login answers, and the session it makes is the jar's.
+        // The CAS answers the password with its code page: a code is wanted,
+        // and the student's only way to one left unasked. No session yet.
         let response = sign_in(&bridge, STUDENT_WITH_CODE, PASSWORD);
-        assert!(!by_tonapi(&response));
-        assert_eq!(response.body(), SERVERS_LOGIN.as_bytes());
-        assert_eq!(bridge.session_cookie().as_deref(), Some(SERVERS_COOKIE));
-        assert_eq!(server.seen(), [("POST /__ent_auth/login".to_string(), false)]);
+        assert!(by_tonapi(&response));
+        assert_eq!(response.status(), 401);
+        let answer: serde_json::Value = serde_json::from_slice(response.body()).unwrap();
+        assert_eq!((&answer["code"], &answer["mfa"]["sent"]), (&serde_json::json!("mfa_required"), &serde_json::json!("mail")));
+        assert_eq!(bridge.session_cookie(), None);
+        assert_eq!(campus.codes_sent().len(), 1);
+
+        // The code: the session is made in the app, and a login that needed
+        // a code isn't one the app keeps to sign in again by itself.
+        let response = sign_in_with(&bridge, STUDENT_WITH_CODE, PASSWORD, Some(CODE));
+        assert!(by_tonapi(&response));
+        assert_eq!(response.status(), 200);
+        assert!(bridge.session_cookie().is_some());
+        assert!(!bridge.signin.has_kept());
+        // The server's own login was never asked.
+        assert!(server.seen().is_empty());
     }
 
     #[test]
@@ -607,7 +627,10 @@ mod tests {
     #[test]
     fn what_tonapi_leaves_is_the_servers_own_answer() {
         let (campus, server) = (campus(), server());
-        let bridge = bridge(&server, Some(&campus), &campus.lapsed());
+        // The portal answers for another name than the session's: nobody's
+        // answer here, the server's own to give.
+        let someone_else = campus.cookie(serde_json::json!({}), &[("JSESSIONID", "someone-else")]);
+        let bridge = bridge(&server, Some(&campus), &someone_else);
 
         let session = ask(&bridge, "GET", "/__ent_auth/session");
         assert!(!by_tonapi(&session));

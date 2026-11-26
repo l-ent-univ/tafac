@@ -1,5 +1,5 @@
-// The routes another service of the university answers: Moodle's deadlines,
-// ScoDoc's grades.
+// The routes another service of the university answers: the portal's
+// applications, Moodle's deadlines, ScoDoc's grades.
 //
 // Each goes the same way:
 //
@@ -34,6 +34,29 @@ fn refused_by_node(what: &str) -> Translated {
 }
 
 impl Gateway {
+    // GET /__ent_auth/apps (translate/apps.rs). The list is kept as long as
+    // tonAPI says (an hour): a portal's applications change with the year.
+    pub(super) async fn apps(&self, held: &Held<'_>) -> Translated {
+        const KEY: &str = "apps";
+        let _turn = held.memory.turn(Turn::Service(ServiceKind::Apps)).await;
+        if let Some(body) = held.memory.answer(KEY) {
+            return translate::kept_answer(body);
+        }
+        let service = Service { held, net: self.net };
+        let asked = tonapi::apps::read(&service).await;
+        let keep_secs = asked.as_ref().ok().and_then(|asked| asked.keep_secs);
+        if asked.is_ok() {
+            // The portal session tonAPI opened is the one the session
+            // check asks with from now on (portal.rs).
+            held.memory.portal_opened();
+        }
+        let translated = translate::apps::translate(asked.as_ref().map(|asked| asked.value.as_slice()).map_err(|why| *why));
+        if let (Translated::Answer(response), Some(seconds)) = (&translated, keep_secs) {
+            held.memory.keep_answer(KEY, seconds, response.body());
+        }
+        translated
+    }
+
     // GET /__ent_auth/moodle/deadlines (translate/moodle_deadlines.rs).
     pub(super) async fn moodle_deadlines(&self, held: &Held<'_>) -> Translated {
         const KEY: &str = "moodle/deadlines";

@@ -102,6 +102,17 @@ What the gateway does, for Rennes:
   'login_refused'` when the CAS refuses, `429` with `Retry-After` past the
   limits (Node's numbers: 8 failures per login, 30 per address, in 15
   minutes).
+- **Takes the second factor** (Esup OTP). When the CAS answers the password
+  with its code page, tonAPI reads it and asks the university's API what
+  the student can type a code from: the answer is Node's `401` with `code:
+  'mfa_required'` and `mfa: { methods, sent }`. The student's only way to a
+  code (no application, one of SMS and mail) is sent unasked, as the
+  university's own page sends it, except for a sign-in the student doesn't
+  see (`quiet`); `sendCode` has one sent by SMS or mail; `otp` is posted to
+  the CAS after the password. Five codes per login in 15 minutes, as Node
+  counts them (`mfa_send_limit`). Nothing is kept between the page's
+  requests: each posts the password again, and the code the university sent
+  stays good for the next.
 - **Makes the session** (`session/cookie.rs`): one encrypted cookie, the
   same as before, in the format Node reads, with the same
   `SESSION_SECRET`. It holds the CAS ticket and the portal's cookies:
@@ -121,6 +132,21 @@ What the gateway does, for Rennes:
   (`/__ent_auth/grades`, `/grades/semester/<id>`,
   `/grades/department-message`, `/grades/evaluation-distribution`,
   `/grades/report.pdf`), in the JSON the page reads today (`translate/`).
+- **Lists the portal's applications** (`GET /__ent_auth/apps`,
+  `gateway/services.rs`). tonAPI reads uPortal's layout into one list
+  (`{ id, title, description, url, iconUrl, category, favorite }`), with
+  the address each tile really opens (the portal says it tile by tile;
+  tonAPI keeps the addresses six hours, for everyone). The page reads that
+  list as it is (`src/portalApps.js`): it no longer reads a portal's
+  layout, nor asks for a tile's fragment. The list is kept an hour for a
+  session. The favourites stay in the browser, started once from the ones
+  the student starred on the portal.
+- **Keeps a portal session of its own.** The applications are asked with
+  the CAS ticket: tonAPI opens a portal session, held with the services'
+  (`session/memory.rs`), and opens it again by itself when the portal
+  forgot it. The session check does the same once the portal session of
+  the session's cookie lapsed (`gateway/portal.rs`): Node isn't asked to
+  sign in to the portal again, and the session's cookie isn't written.
 - **Says when the session is over** (`gateway/mod.rs`). When tonAPI says
   the university no longer knows the session, the gateway asks the CAS with
   the ticket: if the CAS wants the password again, the session ends here,
@@ -140,17 +166,10 @@ What the gateway does, for Rennes:
 What is still Node's, and why:
 
 - **Every route that hasn't moved** (`routes.rs` says what tonAPI lacks for
-  each): the portal's proxy, the launch relay, the planning and ADE, the
-  mail, the documents, the icons, the statistics, the demo account.
-- **The second factor.** tonAPI's esup-otp is another university's variant:
-  it doesn't read Rennes' code page, and has no code sent by SMS or mail.
-  When the CAS answers the password with that page, or when the page sends
-  a code, the request goes to Node's own login, which posts the password
-  itself. The session Node makes is one like any other.
-- **The portal signed in to again.** Node's portal proxy goes with Node's
-  own copy of the session's cookies. So when the portal's session lapses
-  (the CAS still knowing the ticket), the session check goes to Node, which
-  opens the portal's new session, as before.
+  each): the launch relay, the planning and ADE, the mail, the documents,
+  the icons, the statistics, the demo account, and the portal's proxy for
+  what is left of it (the account's photo, an old link to a page of the
+  portal's).
 - **A moved route's errors.** When tonAPI can't give the page's answer (a
   service down or slow, a parameter to refuse, the demo account, nobody
   signed in), the request goes to Node's own route, which words it. Each
@@ -194,10 +213,24 @@ ADE, the mail, the photo, the school certificate), and the answers of the
 moved routes were the ones of a session Node made, field for field, where
 they were before. A session over at the CAS was said so by the gateway; a
 portal session lost while the CAS still knew the ticket was not; and the
-gateway's sign-out ended the CAS's session. Not run on a real account: a
-second factor (no such account), the sign-in's refusals and limits (a wrong
-password is not tried on a real account), and the page itself in a browser
-or in the apps (the requests were a script's).
+gateway's sign-out ended the CAS's session. Not run on a real account: the
+sign-in's refusals and limits (a wrong password is not tried on a real
+account), and the page itself in a browser or in the apps (the requests
+were a script's).
+
+The second factor was run on a real account of Rennes on 26 November 2026,
+one whose only way to a code is the mail: the code left unasked, then asked
+for; the code typed signed in; and the session made answered the gateway's
+routes (session check, account, deadlines, grades) and Node's (the portal's
+layout, ADE's status, the mail's folders). A wrong code, an authenticator
+application, a code by SMS and the notification were not run through the
+gateway.
+
+The applications were run on the same account the same day: the gateway's
+list held the 31 applications and the 5 favourites the page read until
+then from the portal's layout, each with the address its tile's fragment
+gives; 2 to 3 s the first time (a portal session opened, 31 fragments
+read), 3 ms once kept.
 
 ## Staying signed in
 

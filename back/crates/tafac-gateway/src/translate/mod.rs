@@ -8,6 +8,8 @@
 //   signin.rs    POST /__ent_auth/login and /logout: the session made, ended
 //   expired.rs   any route, once the CAS says the session is over
 //   session.rs, account.rs, moodle_deadlines.rs, grades/   the routes' own
+//   apps.rs      GET /__ent_auth/apps: tonAPI's own list, which the page
+//                reads as it is
 //
 // A translator says one of three things: the page's answer; « Node
 // answers », where the answer is one only Node gives today (it signs in to
@@ -16,6 +18,7 @@
 // the gateway to ask the CAS whether it is over (gateway/mod.rs).
 
 pub mod account;
+pub mod apps;
 pub mod expired;
 pub mod grades;
 pub mod moodle_deadlines;

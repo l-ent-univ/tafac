@@ -3,6 +3,7 @@
 //   signin.rs     the CAS: a student signed in, signed out, and whether it
 //                 still knows a session
 //   profile.rs    the portal: who the student is (session check, account)
+//   apps.rs       the portal: the applications it lists
 //   homework.rs   Moodle: what is due
 //   grades.rs     ScoDoc: the report, a department's notice, a distribution,
 //                 the PDF
@@ -17,6 +18,7 @@
 // answer, and the second into « Node answers », or into « the session is
 // lost » for the gateway to ask the CAS about.
 
+pub(crate) mod apps;
 pub(crate) mod grades;
 pub(crate) mod homework;
 pub(crate) mod profile;

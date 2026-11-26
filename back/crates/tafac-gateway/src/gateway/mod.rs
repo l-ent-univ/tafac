@@ -153,7 +153,7 @@ impl Gateway {
         let route = routes::moved_route(asked.method, asked.path)?;
         // A sign-in is the one route without a session to answer for.
         if route == Moved::Login {
-            return self.sign_in(asked, cookie().as_deref(), &node).await;
+            return self.sign_in(asked).await;
         }
         let value = cookie()?;
         if route != Moved::Logout {
@@ -170,6 +170,7 @@ impl Gateway {
             Moved::Logout => return Some(self.sign_out(&held, &value, &node).await),
             Moved::Session => self.session_check(&held, &node).await,
             Moved::Account => self.account(&held).await,
+            Moved::Apps => self.apps(&held).await,
             Moved::MoodleDeadlines => self.moodle_deadlines(&held).await,
             Moved::Grades => self.grades(&held, None).await,
             Moved::GradesSemester => self.grades(&held, Some(asked.path.rsplit('/').next().unwrap_or_default())).await,
@@ -194,14 +195,13 @@ impl Gateway {
     }
 
     // tonAPI says the university no longer knows the session (its
-    // `session_expired`). That may be the portal's own session lapsed, or a
-    // service refusing for a reason of its own: only the CAS says a session
-    // is over, when its login page, asked with the ticket, wants the
-    // password again. Then the session ends here: the page is told (the
-    // route's answer, `X-Tafac-Session: expired`, the cookie taken away) and
-    // Node is told. Otherwise the request is Node's: it signs in to the
-    // portal again for the cookies its own portal requests go with, or words
-    // the service's error.
+    // `session_expired`): the CAS wouldn't sign it in to the portal or to a
+    // service, or a service refuses for a reason of its own. Only the CAS
+    // says a session is over, when its login page, asked with the ticket,
+    // wants the password again. Then the session ends here: the page is
+    // told (the route's answer, `X-Tafac-Session: expired`, the cookie
+    // taken away) and Node is told. Otherwise the request is Node's, which
+    // words the service's error.
     async fn lost<N, Fut>(&self, route: Moved, held: &Held<'_>, cookie: &str, node: &N) -> Option<http::Response<Vec<u8>>>
     where
         N: Fn(NodeRequest) -> Fut,

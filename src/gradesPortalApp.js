@@ -23,8 +23,7 @@ export function isGradesPortalHref(href, { gradesOrigin, ...options } = {}) {
   return isServiceHref(href, { ...options, serviceOrigin: gradesOrigin })
 }
 
-// A portal app's own `href` is often the ENT's link to it (/__ent_proxy/…):
-// where it really goes is its resolved launch link, so both are checked.
+// `resolvedHref`: another address the app is known to lead to, checked too.
 export function isGradesPortalApp(application, { gradesOrigin, ...options } = {}) {
   return isServiceApp(application, { ...options, serviceOrigin: gradesOrigin })
 }

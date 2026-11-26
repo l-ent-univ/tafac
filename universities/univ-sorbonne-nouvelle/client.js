@@ -67,8 +67,6 @@ export default {
   services: {
     getAppIcon: () => null,
     categories: [],
-    // iSorbonne's favourites are JSF actions, not an API: they stay in the browser.
-    localFavorites: true,
   },
 
   grades: gradesCopy,

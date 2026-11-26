@@ -7,7 +7,10 @@
 //
 //   the services' sessions   the cookies and tokens tonAPI got from a
 //                            service (MoodleSession, its sesskey…), handed
-//                            back with the next question
+//                            back with the next question. The portal's
+//                            among them, once tonAPI opened one of its own
+//                            (the applications, or a session check after
+//                            the cookie's own portal session lapsed)
 //   the student's component  found at the sign-in, or at the first question
 //                            that needs it (tonAPI asks the university)
 //   the student's profile    half a minute: the page asks who is signed in,
@@ -93,6 +96,9 @@ struct State {
     profile: Option<(Instant, Profile)>,
     // When the CAS last said it knew the ticket.
     cas_knew: Option<Instant>,
+    // tonAPI opened a portal session of its own for this session, which is
+    // among the cookies above: the portal is asked with it from then on.
+    portal_opened: bool,
 }
 
 struct KeptAnswer {
@@ -133,6 +139,7 @@ impl Memory {
                 answers: HashMap::new(),
                 profile: None,
                 cas_knew: None,
+                portal_opened: false,
             }),
             turns: Mutex::new(HashMap::new()),
         });
@@ -243,6 +250,15 @@ impl Remembered {
     pub(crate) fn profile(&self) -> Option<Profile> {
         let state = self.state.lock().unwrap();
         state.profile.as_ref().filter(|(at, _)| at.elapsed() < PROFILE_KEPT).map(|(_, profile)| profile.clone())
+    }
+
+    // tonAPI opened a portal session with the ticket, held here.
+    pub(crate) fn portal_opened(&self) {
+        self.state.lock().unwrap().portal_opened = true;
+    }
+
+    pub(crate) fn has_portal_session(&self) -> bool {
+        self.state.lock().unwrap().portal_opened
     }
 
     // The CAS said it knows the ticket.

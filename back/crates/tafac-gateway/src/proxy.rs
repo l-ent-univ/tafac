@@ -446,8 +446,9 @@ mod tests {
     fn what_the_gateway_leaves_is_nodes_own_answer() {
         let (campus, node) = (campus(), node());
         let address = gateway_before(&node, Some(&campus));
-        // The portal's session lapsed: Node's to sign in to again.
-        let (head, body) = get(&address, "/__ent_auth/session", &session_cookie(&campus.lapsed()));
+        // The portal answers for another name than the session's: Node's.
+        let someone_else = campus.cookie(serde_json::json!({}), &[("JSESSIONID", "someone-else")]);
+        let (head, body) = get(&address, "/__ent_auth/session", &session_cookie(&someone_else));
         assert_eq!(header_of(&head, crate::ANSWERED_BY), "");
         assert_eq!(body, NODES_SESSION.as_bytes());
         // Nobody signed in, and a route that hasn't moved.

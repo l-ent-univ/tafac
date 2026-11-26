@@ -96,43 +96,21 @@ export function parseDrupalToolCatalogue(html, portalOrigin) {
   }).filter((section) => section.title && section.tools.length > 0)
 }
 
-// The catalogue as a uPortal layout.json, the shape the applications grid
-// reads (same as the demo account's, src/demoAccount.js). Every tool opens
-// in a new tab.
-export function buildDrupalLayout(sections, user = null) {
-  const folders = sections.map((section, index) => ({
-    _objectType: 'folder',
-    ID: `portal-folder-${index + 1}`,
-    name: section.title,
-    content: section.tools.map((tool) => ({
-      _objectType: 'portlet',
-      ID: `portal-tool-${tool.id}`,
-      nodeId: `portal-tool-${tool.id}`,
-      title: tool.title,
-      name: tool.title,
-      description: tool.description,
-      portletName: 'app-launcher',
-      typeID: '2',
-      parameters: {
-        launchUrl: tool.href,
-        description: tool.description,
-        target: '_blank',
-        stopImmediately: 'true',
-      },
-      url: tool.href,
-      target: '_blank',
-    })),
-  }))
-
-  return {
-    authenticated: 'true',
-    user,
-    layout: {
-      navigation: {
-        tabs: [{ ID: 'portal-tab-tools', name: 'Outils', content: folders }],
-      },
-    },
-  }
+// The catalogue as the list of applications the page reads (GET
+// /__ent_auth/apps: tonAPI's model, which the gateway answers for the
+// portals tonAPI reads). `id` is what the page keeps a favourite by: it
+// doesn't change. Nothing is starred on the portal: these portals store no
+// favourites.
+export function buildPortalApps(sections) {
+  return sections.flatMap((section) => section.tools.map((tool) => ({
+    id: `portal-tool-${tool.id}`,
+    title: tool.title,
+    description: tool.description || null,
+    url: tool.href,
+    iconUrl: null,
+    category: section.title,
+    favorite: false,
+  })))
 }
 
 export function isDrupalSignedInPage(status, html) {

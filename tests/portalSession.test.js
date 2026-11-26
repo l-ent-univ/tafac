@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
-import { buildDrupalLayout, isDrupalSignedInPage, isIsorbonneSignedInPage, isPortalSignedInPage, parseDrupalProfileName, parseDrupalToolCatalogue, parseIsorbonneCatalogue, parseIsorbonneName, resolvePortalKind } from '../server/portalSession.js'
+import { buildPortalApps, isDrupalSignedInPage, isIsorbonneSignedInPage, isPortalSignedInPage, parseDrupalProfileName, parseDrupalToolCatalogue, parseIsorbonneCatalogue, parseIsorbonneName, resolvePortalKind } from '../server/portalSession.js'
 
 test('the profile name field gives the full, given and family names', () => {
   const html = `<section id="block-nometprenom" class="page-header block">
@@ -103,22 +103,20 @@ test('a page without the tool view has no catalogue', () => {
   assert.deepEqual(parseDrupalToolCatalogue(null, 'https://portail.example.fr'), [])
 })
 
-test('the catalogue becomes a uPortal-shaped layout of launcher portlets', () => {
-  const layout = buildDrupalLayout(parseDrupalToolCatalogue(CATALOGUE_PAGE, 'https://portail.example.fr'), 'etu')
-  assert.equal(layout.authenticated, 'true')
-  assert.equal(layout.user, 'etu')
-  const [tab] = layout.layout.navigation.tabs
-  assert.deepEqual(tab.content.map((folder) => [folder._objectType, folder.name, folder.content.length]), [
-    ['folder', 'Bureau', 2],
-    ['folder', 'Ressources', 1],
+test('the catalogue becomes the list of applications the page reads', () => {
+  const apps = buildPortalApps(parseDrupalToolCatalogue(CATALOGUE_PAGE, 'https://portail.example.fr'))
+  assert.deepEqual(apps.map((app) => [app.id.startsWith('portal-tool-'), app.category]), [
+    [true, 'Bureau'],
+    [true, 'Bureau'],
+    [true, 'Ressources'],
   ])
-  const tempo = tab.content[0].content[0]
-  assert.equal(tempo._objectType, 'portlet')
-  assert.equal(tempo.portletName, 'app-launcher')
-  assert.equal(tempo.ID, 'portal-tool-tempo')
-  assert.equal(tempo.parameters.launchUrl, 'https://tempo.example.fr/')
-  assert.equal(tempo.target, '_blank')
-  assert.equal(tempo.fname, undefined)
+  const [tempo] = apps
+  assert.deepEqual(Object.keys(tempo), ['id', 'title', 'description', 'url', 'iconUrl', 'category', 'favorite'])
+  // The id a favourite is kept by, as it always was.
+  assert.equal(tempo.id, 'portal-tool-tempo')
+  assert.equal(tempo.url, 'https://tempo.example.fr/')
+  assert.equal(tempo.iconUrl, null)
+  assert.equal(tempo.favorite, false)
 })
 
 // iSorbonne (Sorbonne Nouvelle), anonymised from a real page.
@@ -184,7 +182,10 @@ test('the iSorbonne tiles are grouped by their category button', () => {
   assert.equal(record.title, 'Mon dossier de scolarité')
   assert.ok(record.description.startsWith('Notes et certificat de scolarité.'))
   assert.ok(record.description.endsWith('…') && record.description.length <= 161)
-  assert.equal(buildDrupalLayout(sections).layout.navigation.tabs[0].content[1].content[0].url, 'https://apps.sorbonne-nouvelle.fr/esup-mdw/')
+  const recordApp = buildPortalApps(sections).find((app) => app.title === 'Mon dossier de scolarité')
+  assert.equal(recordApp.url, 'https://apps.sorbonne-nouvelle.fr/esup-mdw/')
+  // A tool without a description says so with nothing, not an empty text.
+  assert.equal(buildPortalApps(sections).find((app) => app.title === 'Mes documents U').description, null)
 })
 
 test('the isorbonne portal kind is known', () => {

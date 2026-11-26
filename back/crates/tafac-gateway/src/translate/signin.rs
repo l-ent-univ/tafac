@@ -12,13 +12,23 @@
 //       `invalid_credentials`. The desktop app forgets the login it kept on
 //       this code (src-tauri/src/signin.rs), so it is said for nothing else.
 //   401 { error }, no code: the sign-in couldn't be tried through (the CAS
-//       or the portal down). Answered here.
+//       or the portal down, a page of the CAS's tonAPI doesn't know).
+//       Answered here.
 //   429 { error }, Retry-After: too many failed attempts from this address
 //       or for this login. Answered here (gateway/attempts.rs).
-//   401 { error, code: 'mfa_required' | 'mfa_invalid' | 'mfa_send_failed',
-//       mfa }, 429 { code: 'mfa_send_limit' }: the CAS asks for a one-time
-//       code. Node: it reads Rennes' code page and has a code sent, which
-//       tonAPI doesn't. The session Node makes is one like any other.
+//   401 { error, code: 'mfa_required', mfa: { methods, sent } }: the CAS
+//       took the password and asks for a one-time code (Esup OTP).
+//       `methods`: what the student can type a code from ({ app, sms, mail }:
+//       an authenticator application, the masked number and address a code
+//       can be sent to), null when the university's API doesn't say; `sent`:
+//       the transport ('sms', 'mail') a code was just sent by. Answered
+//       here: tonAPI reads the code page and asks the API.
+//   401 { error, code: 'mfa_invalid' }: the CAS refused the code, or the
+//       code is not one (four to ten digits). Answered here.
+//   401 { error, code: 'mfa_send_failed', mfa }: the code asked for by SMS
+//       or mail didn't leave. Answered here.
+//   429 { error, code: 'mfa_send_limit' }, Retry-After: too many codes sent
+//       to this login. Answered here (gateway/attempts.rs).
 //   200 { …, sessionMode: 'demo' }: the demo account. Node.
 //   400 { error }: no login or no password. Node.
 //   any of these for another university than routes.rs': Node.
@@ -29,17 +39,32 @@
 
 use http::header::{RETRY_AFTER, SET_COOKIE};
 
+use tonapi_providers::OtpTransport;
+
 use super::json_response;
 use crate::session::cookie::{clear_cookie, set_cookie};
+use crate::tonapi::signin::Ways;
 
 // Node's own sentences.
 const REFUSED: &str = "CAS login failed. Check your username and password.";
 const NO_PORTAL_SESSION: &str = "CAS login completed, but the portal session was not established.";
 const TOO_MANY: &str = "Too many login attempts. Please try again later.";
+const CODE_WANTED: &str = "MFA required.";
+const CODE_REFUSED: &str = "Invalid OTP.";
+const CODE_NOT_SENT: &str = "Could not send the code.";
+const TOO_MANY_CODES: &str = "Too many codes requested. Please try again later.";
+// Node says what it couldn't read there; the page words both the same.
+const UNKNOWN_PAGE: &str = "The university's sign-in answered a page Tafac doesn't know.";
 // Node says « fetch failed » there, and the page words it from « fetch ».
 const UNREACHABLE: &str = "The university's sign-in could not be reached (fetch failed).";
 // What the desktop app forgets its kept login on (server/casLogin/refusal.ts).
 const LOGIN_REFUSED: &str = "login_refused";
+// The second factor's codes: a right password waiting for its code, a code
+// refused, a code that didn't leave, too many codes sent.
+const MFA_REQUIRED: &str = "mfa_required";
+const MFA_INVALID: &str = "mfa_invalid";
+const MFA_SEND_FAILED: &str = "mfa_send_failed";
+const MFA_SEND_LIMIT: &str = "mfa_send_limit";
 
 fn json(status: u16, body: &serde_json::Value) -> http::Response<Vec<u8>> {
     json_response(status, serde_json::to_vec(body).unwrap_or_default())
@@ -87,25 +112,45 @@ pub fn signed_out(cookie_name: &str) -> http::Response<Vec<u8>> {
     response
 }
 
-// What Node's own answer to a login says of the attempt, for the limits:
-// a right password waiting for its code is not a failed attempt
-// (`mfa_required`, `mfa_send_failed`), and Node's own « wait » (429) is not
-// one more.
-#[derive(Debug, PartialEq)]
-pub enum NodeSaid {
-    SignedIn,
-    Failed,
-    Neither,
+// `mfa` of a second factor's answer: `methods` and `sent`, as Node says them.
+fn second_factor(ways: Option<&Ways>, sent: Option<OtpTransport>) -> serde_json::Value {
+    let methods = ways.map(|ways| serde_json::json!({ "app": ways.app, "sms": ways.sms, "mail": ways.mail }));
+    serde_json::json!({ "methods": methods, "sent": sent.map(OtpTransport::as_str) })
 }
 
-pub fn node_said(status: u16, body: &[u8]) -> NodeSaid {
-    let answer: serde_json::Value = serde_json::from_slice(body).unwrap_or_default();
-    let code = answer.get("code").and_then(|code| code.as_str());
-    match status {
-        200 if answer.get("authenticated").and_then(|value| value.as_bool()) == Some(true) => NodeSaid::SignedIn,
-        401 if !matches!(code, Some("mfa_required" | "mfa_send_failed")) => NodeSaid::Failed,
-        _ => NodeSaid::Neither,
-    }
+// The CAS took the password and asks for a one-time code. `sent`: the
+// transport a code just left by.
+pub(crate) fn code_wanted(ways: Option<&Ways>, sent: Option<OtpTransport>) -> http::Response<Vec<u8>> {
+    json(401, &serde_json::json!({ "error": CODE_WANTED, "code": MFA_REQUIRED, "mfa": second_factor(ways, sent) }))
+}
+
+// The CAS refused the code, or it is not a code.
+pub fn code_refused() -> http::Response<Vec<u8>> {
+    json(401, &serde_json::json!({ "error": CODE_REFUSED, "code": MFA_INVALID }))
+}
+
+// The code the student asked for didn't leave.
+pub(crate) fn code_not_sent(ways: Option<&Ways>) -> http::Response<Vec<u8>> {
+    json(401, &serde_json::json!({ "error": CODE_NOT_SENT, "code": MFA_SEND_FAILED, "mfa": second_factor(ways, None) }))
+}
+
+// Too many codes sent to this login: `seconds` until one more may be asked.
+pub fn too_many_codes(seconds: u64) -> http::Response<Vec<u8>> {
+    let mut response = json(429, &serde_json::json!({ "error": TOO_MANY_CODES, "code": MFA_SEND_LIMIT }));
+    response.headers_mut().insert(RETRY_AFTER, seconds.into());
+    response
+}
+
+// After the code the CAS showed its login form again: Node's words for a
+// sign-in to start over, and no code (the desktop app keeps its login).
+pub fn started_over() -> http::Response<Vec<u8>> {
+    json(401, &serde_json::json!({ "error": REFUSED }))
+}
+
+// The CAS answered a page tonAPI doesn't know: nothing says the login is
+// wrong, so no code.
+pub fn unknown_page() -> http::Response<Vec<u8>> {
+    json(401, &serde_json::json!({ "error": UNKNOWN_PAGE }))
 }
 
 #[cfg(test)]
@@ -161,16 +206,33 @@ mod tests {
     }
 
     #[test]
-    fn nodes_own_answer_is_read_for_the_limits() {
-        assert_eq!(node_said(200, br#"{"authenticated":true,"user":"jdoe"}"#), NodeSaid::SignedIn);
-        assert_eq!(node_said(401, br#"{"error":"CAS login failed.","code":"login_refused"}"#), NodeSaid::Failed);
-        assert_eq!(node_said(401, br#"{"error":"Invalid OTP.","code":"mfa_invalid"}"#), NodeSaid::Failed);
-        assert_eq!(node_said(401, br#"{"error":"fetch failed"}"#), NodeSaid::Failed);
-        // A right password waiting for its code; Node's own limits; its refusals.
-        assert_eq!(node_said(401, br#"{"error":"MFA required.","code":"mfa_required","mfa":{"methods":null,"sent":null}}"#), NodeSaid::Neither);
-        assert_eq!(node_said(401, br#"{"error":"Could not send the code.","code":"mfa_send_failed"}"#), NodeSaid::Neither);
-        assert_eq!(node_said(429, br#"{"error":"Too many login attempts. Please try again later."}"#), NodeSaid::Neither);
-        assert_eq!(node_said(400, br#"{"error":"Username and password are required."}"#), NodeSaid::Neither);
-        assert_eq!(node_said(502, b"not json"), NodeSaid::Neither);
+    fn a_second_factor_is_said_as_node_says_it() {
+        let ways = Ways { app: false, sms: None, mail: Some("j***@exemple.test".to_string()) };
+        let response = code_wanted(Some(&ways), Some(OtpTransport::Mail));
+        assert_eq!(response.status(), 401);
+        assert_eq!(
+            body(&response),
+            serde_json::json!({ "error": "MFA required.", "code": "mfa_required", "mfa": { "methods": { "app": false, "sms": null, "mail": "j***@exemple.test" }, "sent": "mail" } })
+        );
+        // The API didn't say: no methods, and the form still takes a code.
+        assert_eq!(body(&code_wanted(None, None))["mfa"], serde_json::json!({ "methods": null, "sent": null }));
+
+        assert_eq!((code_refused().status(), body(&code_refused())), (http::StatusCode::UNAUTHORIZED, serde_json::json!({ "error": "Invalid OTP.", "code": "mfa_invalid" })));
+        let not_sent = code_not_sent(Some(&Ways { app: true, sms: Some("06******12".to_string()), mail: None }));
+        assert_eq!(not_sent.status(), 401);
+        assert_eq!(
+            body(&not_sent),
+            serde_json::json!({ "error": "Could not send the code.", "code": "mfa_send_failed", "mfa": { "methods": { "app": true, "sms": "06******12", "mail": null }, "sent": null } })
+        );
+        let wait = too_many_codes(120);
+        assert_eq!((wait.status(), wait.headers()[RETRY_AFTER].to_str().unwrap()), (http::StatusCode::TOO_MANY_REQUESTS, "120"));
+        assert_eq!(body(&wait), serde_json::json!({ "error": "Too many codes requested. Please try again later.", "code": "mfa_send_limit" }));
+
+        // Neither says the login is wrong: no code for the desktop app to
+        // forget its kept login on.
+        for response in [started_over(), unknown_page()] {
+            assert_eq!(response.status(), 401);
+            assert!(body(&response).get("code").is_none());
+        }
     }
 }

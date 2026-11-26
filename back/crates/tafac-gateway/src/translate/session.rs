@@ -9,10 +9,9 @@
 //       question with the session's portal cookies (its profile: uPortal's
 //       /api/v5-1/userinfo, where Node reads the layout): answered here.
 //   the same, once the portal has been signed in to again with the CAS
-//       ticket (the portal's own session lapsed, tonAPI's `session_expired`,
-//       and the CAS says the session lives): Node. Its portal requests
-//       (/__ent_proxy) go with its own copy of the cookies, so the session
-//       it opens is the one it lists the applications with.
+//       ticket (the portal's own session lapsed): answered here too, with
+//       a portal session tonAPI opens and the gateway holds
+//       (gateway/portal.rs). The session's cookie isn't written.
 //   200 { authenticated: false, expired: true, … }, the cookie cleared: the
 //       CAS no longer knows the ticket. Answered here (translate/expired.rs),
 //       and Node is told.
@@ -20,8 +19,9 @@
 //       which university the address is for.
 //   200 for the demo account, and 200 { degraded: true } without a CAS
 //       ticket: Node.
-//   500 { error }: the portal down, slow, or answering something else.
-//       Node, which asks it itself and words the error.
+//   500 { error }: the portal down, slow, or answering something else
+//       (the CAS still knowing the ticket). Node, which asks it itself and
+//       words the error.
 
 use tonapi_core::Profile;
 

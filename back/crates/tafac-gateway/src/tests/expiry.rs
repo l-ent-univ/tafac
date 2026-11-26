@@ -120,17 +120,19 @@ fn only_the_cas_ends_a_session() {
     let node = Node::default();
     let cookie = campus.lapsed();
 
-    // The portal's session lapsed and the CAS knows the ticket: Node's to
-    // sign in to the portal again. The session lives.
-    assert!(get(&gateway, &node, SESSION, &cookie).is_none());
+    // The portal's session lapsed and the CAS knows the ticket: the portal
+    // is signed in to again, here. The session lives.
+    assert_eq!(body_of(&get(&gateway, &node, SESSION, &cookie).unwrap())["authenticated"], true);
     assert!(gateway.signed_in(Some(&cookie)).is_some());
 
-    // The CAS doesn't say (down): nothing ends either.
-    gateway.signed_in(Some(&cookie)).unwrap().memory.age_cas_word();
+    // The portal forgot again and the CAS doesn't say (down): nothing ends
+    // either, and the check is Node's to answer.
+    campus.portal_forgets();
     campus.cas_is_down(true);
     assert!(get(&gateway, &node, SESSION, &cookie).is_none());
-    assert!(get(&gateway, &node, ACCOUNT, &cookie).is_none());
     assert!(gateway.signed_in(Some(&cookie)).is_some());
+    // The account asked within the half minute is the profile just read.
+    assert!(get(&gateway, &node, ACCOUNT, &cookie).is_some());
     assert!(!node.got().contains(&"POST /__ent_auth/logout".to_string()));
 }
 

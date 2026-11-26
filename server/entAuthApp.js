@@ -111,7 +111,7 @@ import {
 import { CUSTOM_SIGNATURE_MAX_LENGTH, normalizeCustomSignatureText } from '../src/mailSignatureChoice.js'
 import { createPlanningPortalApiClient } from '../planningPortalApi.js'
 import {
-  buildDrupalLayout,
+  buildPortalApps,
   isPortalSignedInPage,
   parseDrupalProfileName,
   parseDrupalToolCatalogue,
@@ -127,22 +127,17 @@ import {
   DEMO_SIGNATURE_LOGIN,
   DEMO_GRADES_DEPARTMENT_MESSAGE,
   DEMO_SESSION_MODE,
-  applyDemoLayoutMutation,
   buildDemoAdeDirectoryPayload,
   buildDemoAdeTreePayload,
   buildDemoAlertsPayload,
   buildDemoCalendarPayload,
   buildDemoEvaluationDistribution,
+  buildDemoApps,
   buildDemoGradesPayload,
-  buildDemoLayoutData,
-  buildDemoLayoutDocData,
   buildDemoMailPayload,
-  buildDemoMarketplaceEntries,
   buildDemoMoodleDeadlinesPayload,
   buildDemoPlanningPayload,
-  buildDemoPortletFragment,
   buildDemoSemesterGradesPayload,
-  buildDemoPortletMetadata,
   buildDemoTimetablePayload,
   buildDemoUpcomingPayload,
   createInitialDemoState,
@@ -194,10 +189,10 @@ const appIconStore = createAppIconStore({
   universityId: universityConfig.id,
   dataDir: options.appIcons?.dataDir ?? resolveDataDir(),
 })
-// Demo services, by the id the client sends (fname): their titles come from
-// here, not from the request.
+// Demo services, by the id the client sends (the application's): their
+// titles come from here, not from the request.
 const DEMO_APP_ICON_SERVICES = new Map(
-  buildDemoLayoutDocData().map((application) => [application.fname, {
+  buildDemoApps().map((application) => [application.id, {
     title: application.title,
     description: application.description ?? '',
     category: '',
@@ -595,105 +590,6 @@ function createDemoSession(overrides = {}) {
     createdAt: overrides.createdAt ?? Date.now(),
     lastSeenAt: Date.now(),
     sessionSource: overrides.sessionSource ?? null,
-  }
-}
-
-function buildDemoRequestPayload(requestPath, session) {
-  const normalizedPath = String(requestPath ?? '').trim()
-
-  if (!normalizedPath.startsWith('/')) {
-    return {
-      ok: false,
-      status: 400,
-      contentType: 'application/json; charset=utf-8',
-      body: JSON.stringify({ error: 'Invalid demo request path.' }),
-    }
-  }
-
-  const requestUrl = new URL(normalizedPath, 'https://demo.l-ent.local')
-
-  if (requestUrl.pathname === '/api/v4-3/dlm/layout.json') {
-    return {
-      ok: true,
-      status: 200,
-      contentType: 'application/json; charset=utf-8',
-      body: JSON.stringify(buildDemoLayoutData(session.demoState)),
-    }
-  }
-
-  if (requestUrl.pathname === '/api/layoutDoc') {
-    return {
-      ok: true,
-      status: 200,
-      contentType: 'application/json; charset=utf-8',
-      body: JSON.stringify(buildDemoLayoutDocData()),
-    }
-  }
-
-  if (requestUrl.pathname === '/api/marketplace/entries.json') {
-    return {
-      ok: true,
-      status: 200,
-      contentType: 'application/json; charset=utf-8',
-      body: JSON.stringify(buildDemoMarketplaceEntries()),
-    }
-  }
-
-  const portletFragmentMatch = requestUrl.pathname.match(/^\/api\/v4-3\/portlet\/([^/]+)\.html$/)
-  if (portletFragmentMatch) {
-    const fragment = buildDemoPortletFragment(decodeURIComponent(portletFragmentMatch[1]))
-    return fragment == null
-      ? {
-          ok: false,
-          status: 404,
-          contentType: 'text/plain; charset=utf-8',
-          body: 'Demo portlet not found.',
-        }
-      : {
-          ok: true,
-          status: 200,
-          contentType: 'text/html; charset=utf-8',
-          body: fragment,
-        }
-  }
-
-  const portletMetadataMatch = requestUrl.pathname.match(/^\/api\/portlet\/([^/]+)\.json$/)
-  if (portletMetadataMatch) {
-    const metadata = buildDemoPortletMetadata(decodeURIComponent(portletMetadataMatch[1]))
-    return metadata == null
-      ? {
-          ok: false,
-          status: 404,
-          contentType: 'application/json; charset=utf-8',
-          body: JSON.stringify({ error: 'Demo portlet metadata not found.' }),
-        }
-      : {
-          ok: true,
-          status: 200,
-          contentType: 'application/json; charset=utf-8',
-          body: JSON.stringify(metadata),
-        }
-  }
-
-  if (requestUrl.pathname === '/api/layout') {
-    const mutation = applyDemoLayoutMutation(normalizedPath, session.demoState)
-
-    if (mutation.handled) {
-      session.demoState = mutation.demoState
-      return {
-        ok: true,
-        status: 200,
-        contentType: 'application/json; charset=utf-8',
-        body: JSON.stringify(mutation.payload ?? { ok: true }),
-      }
-    }
-  }
-
-  return {
-    ok: false,
-    status: 404,
-    contentType: 'application/json; charset=utf-8',
-    body: JSON.stringify({ error: `Demo path not implemented: ${normalizedPath}` }),
   }
 }
 
@@ -6846,29 +6742,13 @@ app.post('/__ent_auth/logout', async (req, res) => {
   })
 })
 
-app.all('/__ent_auth/demo/request', express.text({ type: '*/*' }), (req, res) => {
-  const session = getSessionFromRequest(req)
-
-  if (!isDemoSession(session)) {
-    return res.status(403).json({
-      error: 'Demo session required.',
-    })
-  }
-
-  const requestPath = String(req.query.path ?? '').trim()
-  const payload = buildDemoRequestPayload(requestPath, session)
-
-  setSessionCookie(res, session)
-  res.status(payload.status)
-  res.setHeader('Cache-Control', 'no-store')
-  res.setHeader('Content-Type', payload.contentType)
-  return res.send(payload.body)
-})
-
-// Drupal or iSorbonne portal: no uPortal APIs. The applications grid asks the
-// proxy for the layout, layoutDoc and marketplace: the layout is built from
-// the catalogue page (catalog.path), the other two are empty.
-async function fetchDrupalCatalogPage(session) {
+// The applications the portal lists for the student, as one list whatever
+// the portal: { id, title, description, url, iconUrl, category, favorite },
+// tonAPI's own model (back/crates/tafac-gateway/src/translate/apps.rs). The
+// gateway answers it for the portals tonAPI reads (uPortal: Rennes). Here:
+// the demo account's, and the portals this server reads itself, from their
+// catalogue page (catalog.path).
+async function fetchPortalCatalogPage(session) {
   const page = await followRedirectChain(PORTAL_CATALOG_URL, session.jar, {
     headers: { Accept: HTML_ACCEPT_HEADER },
   })
@@ -6878,45 +6758,58 @@ async function fetchDrupalCatalogPage(session) {
 }
 
 const parsePortalCatalogue = PORTAL_KIND === 'isorbonne' ? parseIsorbonneCatalogue : parseDrupalToolCatalogue
+// Shown by the page as it is (AvailableApplications.jsx: getErrorMessage).
+const APPS_UNAVAILABLE_MESSAGE = 'Portail indisponible pour le moment'
 
-if (PORTAL_KIND !== 'uportal') {
-  app.get('/__ent_proxy/api/v4-3/dlm/layout.json', async (req, res) => {
-    res.setHeader('Cache-Control', 'no-store')
-    try {
-      const session = getSessionFromRequest(req)
-      if (!session || isDemoSession(session)) {
-        return res.status(401).json({ error: 'Not signed in.' })
-      }
-
-      let html = PORTAL_CATALOG_URL ? await fetchDrupalCatalogPage(session) : ''
-      // Portal session lapsed: sign in again silently with the CAS TGC.
-      if (html === null && await reestablishEntSessionOnce(session)) {
-        html = await fetchDrupalCatalogPage(session)
-      }
-      if (html === null) {
-        if (await answerIfSessionExpired(req, res)) return undefined
-        return res.status(502).json({ error: routeError(req, new Error('The portal session could not be established again.')) })
-      }
-
-      setSessionCookie(res, session)
-      res.json(buildDrupalLayout(parsePortalCatalogue(html, ENT_ORIGIN), session.user ?? null))
-    } catch (error) {
-      if (await answerIfSessionExpired(req, res, error)) return
-      res.status(502).json({ error: routeError(req, error) })
+app.get('/__ent_auth/apps', async (req, res) => {
+  res.setHeader('Cache-Control', 'no-store')
+  try {
+    const session = getSessionFromRequest(req)
+    if (!session) {
+      return res.status(200).json({ authenticated: false, apps: null })
     }
-  })
 
-  app.get(['/__ent_proxy/api/layoutDoc', '/__ent_proxy/api/marketplace/entries.json'], (req, res) => {
-    res.setHeader('Cache-Control', 'no-store')
-    res.json([])
-  })
-}
+    if (isDemoSession(session)) {
+      setSessionCookie(res, session)
+      return res.status(200).json({ authenticated: true, sessionMode: DEMO_SESSION_MODE, apps: buildDemoApps() })
+    }
+
+    // uPortal's applications are the gateway's to list (tonAPI reads the
+    // layout and each tile's own link). A request that gets here is one the
+    // gateway couldn't answer, or a server without it: no list.
+    if (PORTAL_KIND === 'uportal') {
+      if (await answerIfSessionExpired(req, res)) return undefined
+      return res.status(502).json({ error: APPS_UNAVAILABLE_MESSAGE })
+    }
+
+    let html = PORTAL_CATALOG_URL ? await fetchPortalCatalogPage(session) : ''
+    // Portal session lapsed: sign in again silently with the CAS TGC.
+    if (html === null && await reestablishEntSessionOnce(session)) {
+      html = await fetchPortalCatalogPage(session)
+    }
+    if (html === null) {
+      if (await answerIfSessionExpired(req, res)) return undefined
+      return res.status(502).json({ error: routeError(req, new Error('The portal session could not be established again.')) })
+    }
+
+    setSessionCookie(res, session)
+    return res.status(200).json({
+      authenticated: true,
+      sessionMode: session.mode ?? null,
+      apps: buildPortalApps(parsePortalCatalogue(html, ENT_ORIGIN)),
+    })
+  } catch (error) {
+    if (await answerIfSessionExpired(req, res, error)) return undefined
+    return res.status(502).json({ error: routeError(req, error) })
+  }
+})
 
 // ============================================================================
 // PORTAL PROXY
 // ============================================================================
-// The page's requests to the portal (applications grid, favourites, account
-// photo): server/entProxy/. Signed-in sessions only, the demo account never
+// The page's requests to the portal (the account's photo, and an old link to
+// a page of the portal's, sent on to the launch relay): server/entProxy/.
+// The applications are /__ent_auth/apps. Signed-in sessions only, the demo account never
 // reaches the university.
 app.use('/__ent_proxy', createEntProxy({
   entOrigin: ENT_ORIGIN,

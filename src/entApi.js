@@ -37,14 +37,7 @@ export const GRADES_LAUNCH_HREF = GRADES_SERVICE_URL
   ? `${ENT_AUTH_PREFIX}/launch?url=${encodeURIComponent(GRADES_SERVICE_URL)}`
   : null
 const DEFAULT_ACCEPT = 'application/json, text/html;q=0.9, text/plain;q=0.8, */*;q=0.5'
-const DEMO_SESSION_MODE = 'demo'
 const RECENT_LOGIN_SESSION_KEY = 'l-ent:recent-login-at'
-let currentSessionMode = null
-
-function setCurrentSessionMode(nextMode) {
-  currentSessionMode = nextMode === DEMO_SESSION_MODE ? DEMO_SESSION_MODE : null
-}
-
 // Whether the session is still valid, as the server's answers say
 // (src/sessionSignal.js).
 const sessionSignal = createSessionSignal()
@@ -256,20 +249,6 @@ export async function requestEnt(path, options = {}) {
   const upperMethod = method.toUpperCase()
   const hasBody = body !== '' && body !== undefined && body !== null && !['GET', 'HEAD'].includes(upperMethod)
 
-  if (currentSessionMode === DEMO_SESSION_MODE) {
-    const response = await serverFetch(
-      `${ENT_AUTH_PREFIX}/demo/request?path=${encodeURIComponent(normalizedPath)}`,
-      {
-        method: upperMethod,
-        credentials: 'same-origin',
-        headers: hasBody ? headers : undefined,
-        body: hasBody ? body : undefined,
-      },
-    )
-
-    return parseResponse(response)
-  }
-
   const response = await serverFetch(`${ENT_PROXY_PREFIX}${normalizedPath}`, {
     method: upperMethod,
     credentials: 'same-origin',
@@ -287,7 +266,6 @@ export async function getAuthSession() {
   })
 
   const payload = await parseJsonPayload(response)
-  setCurrentSessionMode(payload?.authenticated ? payload?.sessionMode : null)
   sessionSignal.mark(Boolean(payload?.authenticated))
 
   if (!payload?.authenticated) {
@@ -318,7 +296,6 @@ export async function loginToEnt({ username, password, otp, sendCode }) {
   })
 
   const payload = await parseJsonPayload(response)
-  setCurrentSessionMode(payload?.authenticated ? payload?.sessionMode : null)
   sessionSignal.restart(Boolean(payload?.authenticated))
 
   if (payload?.authenticated) {
@@ -348,36 +325,18 @@ export async function logoutFromEnt({ expired = false } = {}) {
   })
 
   const payload = await parseJsonPayload(response)
-  setCurrentSessionMode(null)
   return payload
 }
 
-export function getPortalBootstrap(auth) {
-  return Promise.allSettled([
-    getLayout(auth),
-    getLayoutDoc(auth),
-    getMarketplaceEntries(auth),
-  ]).then(([layout, layoutDoc, marketplace]) => ({
-    layout: unwrapSettledResult(layout),
-    layoutDoc: unwrapSettledResult(layoutDoc),
-    marketplace: unwrapSettledResult(marketplace),
-  }))
-}
+// The applications the portal lists for the student, one list whatever the
+// portal: { authenticated, sessionMode, apps: [{ id, title, description,
+// url, iconUrl, category, favorite }] } (src/portalApps.js makes the tiles).
+export async function getApps() {
+  const response = await serverFetch(`${ENT_AUTH_PREFIX}/apps`, {
+    credentials: 'same-origin',
+  })
 
-function unwrapSettledResult(result) {
-  if (result.status === 'fulfilled') {
-    return result.value
-  }
-
-  return {
-    ok: false,
-    status: 0,
-    statusText: 'client-error',
-    contentType: 'text/plain',
-    text: result.reason instanceof Error ? result.reason.message : String(result.reason),
-    data: null,
-    error: result.reason instanceof Error ? result.reason.message : String(result.reason),
-  }
+  return parseJsonPayload(response)
 }
 
 export async function getPlanning() {
@@ -1845,273 +1804,10 @@ export async function getAdeAlerts(etabsVets = '') {
 // ENT Portal API
 // ============================================================================
 
-export function getLayout(auth) {
-  return requestEnt('/api/v4-3/dlm/layout.json', { auth })
-}
-
 export async function getAccountInfo() {
   const response = await serverFetch(`${ENT_AUTH_PREFIX}/account`, {
     credentials: 'same-origin',
   })
 
   return parseJsonPayload(response)
-}
-
-export function getLayoutDoc(auth, tab) {
-  const suffix = tab ? `?tab=${encodeURIComponent(tab)}` : ''
-  return requestEnt(`/api/layoutDoc${suffix}`, { auth })
-}
-
-export function getMarketplaceEntries(auth) {
-  return requestEnt('/api/marketplace/entries.json', { auth })
-}
-
-export function getPortletMetadata(auth, fname) {
-  return requestEnt(`/api/portlet/${encodeURIComponent(fname)}.json`, { auth })
-}
-
-export function getPortletFragment(auth, fname) {
-  return requestEnt(`/api/v4-3/portlet/${encodeURIComponent(fname)}.html`, {
-    auth,
-    headers: {
-      Accept: 'text/html, application/xhtml+xml;q=0.9, */*;q=0.8',
-    },
-  })
-}
-
-export function collectTabs(layoutResponse) {
-  return layoutResponse?.layout?.navigation?.tabs ?? []
-}
-
-function walkLayoutPortlets(node, collector) {
-  if (!node) {
-    return
-  }
-
-  if (Array.isArray(node)) {
-    for (const item of node) {
-      walkLayoutPortlets(item, collector)
-    }
-    return
-  }
-
-  if (typeof node !== 'object') {
-    return
-  }
-
-  if (node._objectType === 'portlet' || node.fname || node.title || node.url) {
-    collector.push(node)
-  }
-
-  for (const key of ['content', 'folders', 'tabs', 'regions', 'favorites', 'favoriteGroups']) {
-    if (key in node) {
-      walkLayoutPortlets(node[key], collector)
-    }
-  }
-}
-
-export function collectPortletsFromLayout(layoutResponse) {
-  const collector = []
-
-  if (layoutResponse?.layout?.navigation) {
-    walkLayoutPortlets(layoutResponse.layout.navigation.tabs, collector)
-  }
-
-  if (layoutResponse?.layout?.regions) {
-    walkLayoutPortlets(layoutResponse.layout.regions, collector)
-  }
-
-  return collector
-}
-
-function isFavoritePortletCandidate(node) {
-  return Boolean(
-    node?._objectType === 'portlet'
-    || node?.fname
-    || node?.url
-    || node?.widgetURL
-    || node?.chanID
-    || node?.portletName
-    || node?.parameters?.launchUrl
-  )
-}
-
-function walkFavoritePortlets(node, collector, visited = new Set()) {
-  if (!node) {
-    return
-  }
-
-  if (Array.isArray(node)) {
-    for (const item of node) {
-      walkFavoritePortlets(item, collector, visited)
-    }
-    return
-  }
-
-  if (typeof node !== 'object') {
-    return
-  }
-
-  if (visited.has(node)) {
-    return
-  }
-
-  visited.add(node)
-
-  if (isFavoritePortletCandidate(node)) {
-    collector.push(node)
-  }
-
-  for (const nestedValue of Object.values(node)) {
-    if (nestedValue && (typeof nestedValue === 'object' || Array.isArray(nestedValue))) {
-      walkFavoritePortlets(nestedValue, collector, visited)
-    }
-  }
-}
-
-export function collectFavoritePortlets(layoutResponse) {
-  const collector = []
-  const layout = layoutResponse?.layout
-
-  walkFavoritePortlets(layout?.favorites, collector)
-  walkFavoritePortlets(layout?.favoriteGroups, collector)
-  walkFavoritePortlets(layout?.navigation?.favorites, collector)
-  walkFavoritePortlets(layout?.navigation?.favoriteGroups, collector)
-
-  return collector
-}
-
-export function mergePortlets(...sources) {
-  const merged = new Map()
-
-  for (const source of sources) {
-    for (const item of source ?? []) {
-      if (!item) {
-        continue
-      }
-
-      const key = item.fname || item.nodeId || item.ID || `${item.title ?? 'unknown'}-${item.url ?? ''}`
-      const current = merged.get(key) ?? {}
-      merged.set(key, { ...current, ...item })
-    }
-  }
-
-  return Array.from(merged.values()).sort((left, right) => {
-    const leftTitle = left.title ?? left.name ?? left.fname ?? ''
-    const rightTitle = right.title ?? right.name ?? right.fname ?? ''
-    return leftTitle.localeCompare(rightTitle, 'fr')
-  })
-}
-
-export function extractFragmentSignals(fragment = '') {
-  const links = new Set()
-  const scripts = new Set()
-  const formActions = new Set()
-  const apiHints = new Set()
-
-  for (const match of fragment.matchAll(/href=["']([^"']+)["']/gi)) {
-    links.add(match[1])
-  }
-
-  for (const match of fragment.matchAll(/src=["']([^"']+)["']/gi)) {
-    scripts.add(match[1])
-  }
-
-  for (const match of fragment.matchAll(/action=["']([^"']+)["']/gi)) {
-    formActions.add(match[1])
-  }
-
-  for (const match of fragment.matchAll(/(\/(?:api|f|p|Login)[^"'\\\s<>]*)/g)) {
-    apiHints.add(match[1])
-  }
-
-  return {
-    links: Array.from(links),
-    scripts: Array.from(scripts),
-    formActions: Array.from(formActions),
-    apiHints: Array.from(apiHints),
-  }
-}
-
-function collectPortletsInNode(node, collector) {
-  if (!node) {
-    return
-  }
-
-  if (Array.isArray(node)) {
-    for (const item of node) {
-      collectPortletsInNode(item, collector)
-    }
-    return
-  }
-
-  if (typeof node !== 'object') {
-    return
-  }
-
-  if (node._objectType === 'portlet') {
-    collector.push(node)
-  }
-
-  if (Array.isArray(node.content)) {
-    collectPortletsInNode(node.content, collector)
-  }
-}
-
-function isLauncherPortlet(portlet) {
-  return portlet?.portletName === 'app-launcher'
-    || String(portlet?.typeID) === '2'
-    || portlet?.parameters?.target === '_blank'
-    || portlet?.parameters?.stopImmediately === 'true'
-}
-
-export function collectServiceSections(layoutData) {
-  const tabs = collectTabs(layoutData)
-
-  return tabs
-    .map((tab) => {
-      const folders = Array.isArray(tab.content) ? tab.content.filter((item) => item?._objectType === 'folder') : []
-      const sections = folders
-        .map((folder) => {
-          const services = []
-          collectPortletsInNode(folder.content ?? [], services)
-
-          return {
-            id: folder.ID,
-            title: folder.name,
-            services: services.filter(isLauncherPortlet),
-          }
-        })
-        .filter((section) => section.services.length > 0)
-
-      return {
-        id: tab.ID,
-        title: tab.name,
-        externalId: tab.externalId,
-        sections,
-      }
-    })
-    .filter((tab) => tab.sections.length > 0)
-}
-
-export function extractLaunchLink(fragment = '') {
-  if (typeof DOMParser !== 'undefined') {
-    const document = new DOMParser().parseFromString(fragment, 'text/html')
-    const link = document.querySelector('a[href]')
-
-    if (link) {
-      return {
-        href: link.getAttribute('href') ?? '',
-        text: link.textContent?.replace(/\s+/g, ' ').trim() ?? '',
-        target: link.getAttribute('target') ?? '',
-      }
-    }
-  }
-
-  const hrefMatch = fragment.match(/href=["']([^"']+)["']/i)
-  return {
-    href: hrefMatch?.[1] ?? '',
-    text: '',
-    target: '',
-  }
 }

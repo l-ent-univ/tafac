@@ -3,26 +3,15 @@
 //
 // Node answers every route that hasn't moved (routes.rs), with the
 // session's cookie, which it reads as the gateway does. For the routes that
-// have moved, the gateway goes to it for four things, each a request to one
+// have moved, the gateway goes to it for two things, each a request to one
 // of Node's own routes:
 //
 //   what it is set up for   a session check repeats it (`analyticsEnabled`):
 //                           read from Node's own answer to a check without
 //                           a session, now and then
-//   its own sign-in         for what tonAPI's can't finish: the CAS's second
-//                           factor (Node reads Rennes' code page and has a
-//                           code sent), a page tonAPI doesn't know. The
-//                           session Node makes is one like any other: the
-//                           same cookie, the same User-Agent
 //   a session ended         signed out here, or found expired: Node drops
 //                           what it kept of it (its copy of the cookies,
 //                           the webmail's session)
-//   the portal signed in to again
-//                           when the portal's own session lapsed: Node's
-//                           portal requests (/__ent_proxy) go with Node's
-//                           copy of the cookies, so Node is the one to get
-//                           the new ones. No request is made here for it:
-//                           the session check goes to Node as it came
 //
 // The other way, Node says a session is gone on its own answers (its
 // header: expired; the cookie cleared): it is gone here too.
@@ -32,10 +21,9 @@ use std::future::Future;
 use std::sync::Mutex;
 use std::time::{Duration, Instant};
 
-use http::header::{CONTENT_LENGTH, COOKIE, TRANSFER_ENCODING};
-use http::{HeaderMap, HeaderValue, Method};
+use http::header::{CONTENT_LENGTH, COOKIE};
+use http::{HeaderMap, Method};
 
-use crate::gateway::Asked;
 use crate::session::cookie;
 use crate::session::memory::Ended;
 
@@ -97,28 +85,6 @@ impl Node {
         self.facts.lock().unwrap().insert(university.to_string(), (facts, Instant::now()));
         Some(facts)
     }
-}
-
-// The page's request, for Node to answer as it came: its method, path,
-// headers and body (a sign-in's, the one body read here). Where the caller
-// keeps the session's cookie itself (the apps: the window never sees it),
-// the cookie is put on it.
-pub(crate) fn as_it_came(asked: &Asked<'_>, cookie_name: &str, cookie: Option<&str>) -> Option<NodeRequest> {
-    let target = match asked.query {
-        Some(query) => format!("{}?{query}", asked.path),
-        None => asked.path.to_string(),
-    };
-    let mut request = http::Request::builder().method(asked.method.clone()).uri(target).body(asked.body.to_vec()).ok()?;
-    *request.headers_mut() = asked.headers.clone();
-    // The body's length is the one of the body that goes: said again by
-    // whoever sends it, never copied from a request whose body wasn't read.
-    request.headers_mut().remove(TRANSFER_ENCODING);
-    request.headers_mut().insert(CONTENT_LENGTH, asked.body.len().into());
-    let carried = asked.headers.get_all(COOKIE).iter().filter_map(|value| value.to_str().ok()).any(|header| cookie::cookie_in_header(header, cookie_name).is_some());
-    if let Some(value) = cookie.filter(|_| !carried) {
-        request.headers_mut().append(COOKIE, HeaderValue::from_str(&format!("{cookie_name}={value}")).ok()?);
-    }
-    Some(request)
 }
 
 // What tells Node a session ended here (signed out, or found expired): its

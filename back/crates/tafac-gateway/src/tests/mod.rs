@@ -4,11 +4,14 @@
 //   signin.rs             the session made and ended: a sign-in, its
 //                         refusals and limits, what is Node's, a sign-out
 //   portal.rs             the session check and the account
+//   apps.rs               the portal's applications: tonAPI's own list, a
+//                         portal session of the gateway's own
 //   expiry.rs             a session the CAS no longer knows
 //   moodle_deadlines.rs   a route another service answers: the CAS ticket,
 //                         the session held, the answer kept
 //   grades.rs             the grades' routes: ScoDoc's shape written back
 
+mod apps;
 mod expiry;
 mod grades;
 mod moodle_deadlines;

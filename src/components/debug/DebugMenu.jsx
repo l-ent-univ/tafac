@@ -18,11 +18,10 @@ import {
   getAdeTimetable,
   getAdeTree,
   getAdeUpcoming,
+  getApps,
   getAverageGrade,
   getGrades,
   getLatestGrade,
-  getLayout,
-  getMarketplaceEntries,
   getPlanning,
   getStudentProfilePictureMeta,
   logoutFromEnt,
@@ -45,9 +44,8 @@ const IS_SERVICE_NOTICE_HIDDEN = isServiceNoticeHiddenByDebug()
 const THEME_OPTIONS = [['auto', 'Auto'], ['light', 'Clair'], ['dark', 'Sombre']]
 const ENT_CALLS = [
   ['Account', getAccountInfo],
-  ['Layout', getLayout],
+  ['Apps', getApps],
   ['Planning', getPlanning],
-  ['Marketplace', getMarketplaceEntries],
   ['Grades', getGrades],
   ['Latest Grade', getLatestGrade],
   ['Average Grade', getAverageGrade],

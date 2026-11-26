@@ -1,15 +1,14 @@
 // POST /__ent_auth/login and /logout on the made-up campus: the session
 // made by tonAPI's sign-in and written here, what the CAS refuses, what
-// waits, what is Node's, and the session ended.
+// waits, the one-time code the CAS asks some students for, what is Node's,
+// and the session ended.
 
 use http::header::{CONTENT_TYPE, RETRY_AFTER};
 use http::HeaderMap;
 
-use super::{ask, asked, body_of, cookie_set, never, Node, ACCOUNT, LOGIN, LOGOUT, NODES_SESSION, POST, SESSION};
+use super::{ask, asked, body_of, cookie_set, never, Node, ACCOUNT, LOGIN, LOGOUT, POST, SESSION};
 use crate::testing::*;
 use crate::{Gateway, ANSWERED_BY, UNIVERSITY_HEADER};
-
-const MFA_REQUIRED: &str = r#"{"error":"MFA required.","code":"mfa_required","mfa":{"methods":{"app":true,"sms":null,"mail":null},"sent":null}}"#;
 
 fn json_headers() -> HeaderMap {
     let mut headers = HeaderMap::new();
@@ -20,6 +19,22 @@ fn json_headers() -> HeaderMap {
 // The page's sign-in, as src/entApi.js sends it.
 fn login(username: &str, password: &str) -> String {
     serde_json::json!({ "username": username, "password": password, "university": UNIVERSITY }).to_string()
+}
+
+// The same with the second factor's own fields: `otp`, `sendCode`, `quiet`.
+fn login_with(username: &str, more: serde_json::Value) -> String {
+    let mut body = serde_json::json!({ "username": username, "password": PASSWORD, "university": UNIVERSITY });
+    for (name, value) in more.as_object().unwrap() {
+        body[name] = value.clone();
+    }
+    body.to_string()
+}
+
+// What a second factor's answer says: its status, its code, its `mfa`.
+fn second_factor(response: &http::Response<Vec<u8>>) -> (u16, String, serde_json::Value) {
+    let body = body_of(response);
+    assert_eq!(response.headers()[ANSWERED_BY], "tonapi");
+    (response.status().as_u16(), body["code"].as_str().unwrap_or_default().to_string(), body["mfa"].clone())
 }
 
 fn sign_in(gateway: &Gateway, node: &Node, body: &str) -> Option<http::Response<Vec<u8>>> {
@@ -121,13 +136,10 @@ fn too_many_failures_wait_and_a_good_sign_in_clears_them() {
 fn a_cas_that_doesnt_answer_is_no_refusal() {
     let campus = campus();
     let gateway = campus.gateway();
-    let node = Node::default();
     campus.cas_is_down(true);
-    // The CAS answers an error to the request for its form: tonAPI calls
-    // it a page it doesn't know, and Node's own login tries (and fails the
-    // same way).
-    *node.login.lock().unwrap() = Some((401, r#"{"error":"Could not extract the CAS login form."}"#));
-    let response = sign_in(&gateway, &node, &login(STUDENT, PASSWORD)).unwrap();
+    // The CAS answers an error to the request for its form: a page tonAPI
+    // doesn't know, which says nothing of the login.
+    let response = block_on(gateway.answer(&asked(&POST, LOGIN, &json_headers(), login(STUDENT, PASSWORD).as_bytes()), || None, never)).unwrap();
     assert_eq!(response.status(), 401);
     // No code: the desktop app keeps the login it has.
     assert!(body_of(&response).get("code").is_none());
@@ -135,73 +147,168 @@ fn a_cas_that_doesnt_answer_is_no_refusal() {
 }
 
 #[test]
-fn a_second_factor_is_nodes_own_login() {
+fn a_second_factor_sends_the_only_way_to_a_code_and_takes_the_code() {
     let campus = campus();
     let gateway = campus.gateway();
-    let node = Node::default();
-    *node.login.lock().unwrap() = Some((401, MFA_REQUIRED));
+    let ways = serde_json::json!({ "app": false, "sms": null, "mail": MAIL_OF_STUDENT_WITH_CODE });
 
-    // The CAS answers the password with its code page: the page's request
-    // goes to Node as it came, and Node's answer to the page as it is.
-    let request = login(STUDENT_WITH_CODE, PASSWORD);
-    let headers = {
-        let mut headers = json_headers();
-        // A length said by the page for a body it sent another way: the
-        // request Node gets says the length of the body Node gets.
-        headers.insert("content-length", "7".parse().unwrap());
-        headers.insert("transfer-encoding", "chunked".parse().unwrap());
-        headers
-    };
-    let seen = std::sync::Mutex::new(None);
-    let recorded = block_on(gateway.answer(&asked(&POST, LOGIN, &headers, request.as_bytes()), || None, |to_node| {
-        *seen.lock().unwrap() = Some((to_node.headers().get("content-length").cloned(), to_node.headers().contains_key("transfer-encoding")));
-        node.ask(to_node)
-    }));
-    assert_eq!(recorded.unwrap().status(), 401);
-    assert_eq!(*seen.lock().unwrap(), Some((Some(http::HeaderValue::from(request.len())), false)));
-    node.got.lock().unwrap().clear();
-    let response = sign_in(&gateway, &node, &request).unwrap();
-    assert_eq!(response.status(), 401);
-    assert_eq!(response.body(), MFA_REQUIRED.as_bytes());
-    assert!(response.headers().get(ANSWERED_BY).is_none());
-    assert_eq!(node.got(), ["POST /__ent_auth/login"]);
-    assert_eq!(node.got.lock().unwrap()[0].2, request.as_bytes());
+    // The CAS answers the password with its code page: a code is wanted,
+    // and the student's only way to one left unasked, as the university's
+    // own page sends it. Node is asked nothing.
+    let response = block_on(gateway.answer(&asked(&POST, LOGIN, &json_headers(), login(STUDENT_WITH_CODE, PASSWORD).as_bytes()), || None, never)).unwrap();
+    assert_eq!(body_of(&response)["error"], "MFA required.");
+    assert_eq!(second_factor(&response), (401, "mfa_required".to_string(), serde_json::json!({ "methods": ways, "sent": "mail" })));
+    assert!(cookie_set(&response).is_none());
+    assert_eq!(campus.codes_sent(), ["otp-user random_code_mail mail auto"]);
+    assert_eq!(campus.posted_to("/cas/login"), 1);
 
-    // The code, or a code to send: Node's at once, the CAS isn't asked here.
-    let asked_before = campus.paths().len();
-    *node.login.lock().unwrap() = None;
-    let with_code = serde_json::json!({ "username": STUDENT_WITH_CODE, "password": PASSWORD, "otp": "123456", "university": UNIVERSITY }).to_string();
-    let response = sign_in(&gateway, &node, &with_code).unwrap();
+    // The code, with the login and the password again: the password posted
+    // once more, then the code, and the session is one like any other.
+    let with_code = login_with(STUDENT_WITH_CODE, serde_json::json!({ "otp": "246 810" }));
+    let response = block_on(gateway.answer(&asked(&POST, LOGIN, &json_headers(), with_code.as_bytes()), || None, never)).unwrap();
     assert_eq!(response.status(), 200);
-    // The session Node made: its cookie goes to the page as Node set it.
-    assert_eq!(cookie_set(&response).as_deref(), Some(NODES_SESSION));
-    let send = serde_json::json!({ "username": STUDENT_WITH_CODE, "password": PASSWORD, "sendCode": "sms", "university": UNIVERSITY }).to_string();
-    *node.login.lock().unwrap() = Some((401, MFA_REQUIRED));
-    assert_eq!(sign_in(&gateway, &node, &send).unwrap().body(), MFA_REQUIRED.as_bytes());
-    assert_eq!(campus.paths().len(), asked_before);
-    assert_eq!(node.got().len(), 3);
+    assert_eq!(body_of(&response), serde_json::json!({ "authenticated": true, "user": "jdoe", "sessionMode": null, "university": UNIVERSITY }));
+    assert_eq!(campus.posted_to("/cas/login"), 3);
+    // No other code left for it.
+    assert_eq!(campus.codes_sent().len(), 1);
+    let cookie = cookie_set(&response).unwrap();
+    let held = gateway.signed_in(Some(&cookie)).unwrap();
+    assert_eq!(format!("{:?}", held.session.cookies), "[TGC@localhost/cas, JSESSIONID@127.0.0.1/]");
+    assert_eq!(ask(&gateway, SESSION, &cookie).unwrap()["user"], "jdoe");
 }
 
 #[test]
-fn what_node_says_of_its_own_sign_ins_counts_here_too() {
+fn a_sign_in_the_student_doesnt_see_sends_no_code() {
     let campus = campus();
     let gateway = campus.gateway();
     let node = Node::default();
-    let with_code = serde_json::json!({ "username": STUDENT_WITH_CODE, "password": PASSWORD, "otp": "000000", "university": UNIVERSITY }).to_string();
+    // The desktop app signing in again by itself (`quiet`).
+    let response = sign_in(&gateway, &node, &login_with(STUDENT_WITH_CODE, serde_json::json!({ "quiet": true }))).unwrap();
+    let (status, code, mfa) = second_factor(&response);
+    assert_eq!((status, code.as_str(), &mfa["sent"]), (401, "mfa_required", &serde_json::Value::Null));
+    assert_eq!(mfa["methods"]["mail"], MAIL_OF_STUDENT_WITH_CODE);
+    assert!(campus.codes_sent().is_empty());
+    assert!(node.got().is_empty());
+}
+
+#[test]
+fn a_code_is_sent_by_the_way_the_student_asks_for() {
+    let campus = campus();
+    let gateway = campus.gateway();
+    let node = Node::default();
+    let ways = serde_json::json!({ "app": true, "sms": SMS_OF_STUDENT_WITH_APP, "mail": MAIL_OF_STUDENT_WITH_APP });
+
+    // An application, SMS and mail: nothing leaves unasked.
+    let response = sign_in(&gateway, &node, &login(STUDENT_WITH_APP, PASSWORD)).unwrap();
+    assert_eq!(second_factor(&response), (401, "mfa_required".to_string(), serde_json::json!({ "methods": ways, "sent": null })));
+    assert!(campus.codes_sent().is_empty());
+
+    // Asked for by SMS, then by mail: the API isn't told « unasked ».
+    for (transport, sent) in [("sms", "totp-user random_code sms"), ("mail", "totp-user random_code mail")] {
+        let response = sign_in(&gateway, &node, &login_with(STUDENT_WITH_APP, serde_json::json!({ "sendCode": transport }))).unwrap();
+        assert_eq!(second_factor(&response), (401, "mfa_required".to_string(), serde_json::json!({ "methods": ways, "sent": transport })));
+        assert_eq!(campus.codes_sent().last().unwrap(), sent);
+    }
+
+    // A way the student doesn't have: the code didn't leave, and that is
+    // said, with the ways there are.
+    let response = sign_in(&gateway, &node, &login_with(STUDENT_WITH_CODE, serde_json::json!({ "sendCode": "sms" }))).unwrap();
+    assert_eq!(body_of(&response)["error"], "Could not send the code.");
+    let only_mail = serde_json::json!({ "app": false, "sms": null, "mail": MAIL_OF_STUDENT_WITH_CODE });
+    assert_eq!(second_factor(&response), (401, "mfa_send_failed".to_string(), serde_json::json!({ "methods": only_mail, "sent": null })));
+    assert_eq!(campus.codes_sent().len(), 2);
+
+    // The code typed from the application.
+    let response = sign_in(&gateway, &node, &login_with(STUDENT_WITH_APP, serde_json::json!({ "otp": CODE }))).unwrap();
+    assert_eq!(response.status(), 200);
+    assert!(node.got().is_empty());
+}
+
+#[test]
+fn an_api_that_doesnt_answer_leaves_the_code_to_type() {
+    let campus = campus();
+    let gateway = campus.gateway();
+    let node = Node::default();
+    campus.code_api_is_down(true);
+    // The ways aren't known: the form still takes a code.
+    let response = sign_in(&gateway, &node, &login(STUDENT_WITH_CODE, PASSWORD)).unwrap();
+    assert_eq!(second_factor(&response), (401, "mfa_required".to_string(), serde_json::json!({ "methods": null, "sent": null })));
+    // A code asked for can't leave.
+    let response = sign_in(&gateway, &node, &login_with(STUDENT_WITH_CODE, serde_json::json!({ "sendCode": "mail" }))).unwrap();
+    assert_eq!(second_factor(&response), (401, "mfa_send_failed".to_string(), serde_json::json!({ "methods": null, "sent": null })));
+    assert!(campus.codes_sent().is_empty());
+    // The CAS takes the code all the same.
+    assert_eq!(sign_in(&gateway, &node, &login_with(STUDENT_WITH_CODE, serde_json::json!({ "otp": CODE }))).unwrap().status(), 200);
+    assert!(node.got().is_empty());
+}
+
+#[test]
+fn a_code_the_cas_refuses_is_a_failed_attempt_and_a_code_waited_for_is_not() {
+    let campus = campus();
+    let gateway = campus.gateway();
+    let node = Node::default();
     // A right password waiting for its code is no failure, however often.
-    *node.login.lock().unwrap() = Some((401, MFA_REQUIRED));
     for _ in 0..10 {
-        assert_eq!(sign_in(&gateway, &node, &with_code).unwrap().status(), 401);
+        let response = sign_in(&gateway, &node, &login_with(STUDENT_WITH_APP, serde_json::json!({})));
+        assert_eq!(second_factor(&response.unwrap()).1, "mfa_required");
     }
-    // A code the CAS refuses is one: the eighth waits, here as at Node's.
-    *node.login.lock().unwrap() = Some((401, r#"{"error":"Invalid OTP.","code":"mfa_invalid"}"#));
-    for _ in 0..7 {
-        assert_eq!(sign_in(&gateway, &node, &with_code).unwrap().status(), 401);
+
+    // A code the CAS refuses is one, said as Node says it.
+    let wrong = login_with(STUDENT_WITH_APP, serde_json::json!({ "otp": "000000" }));
+    let response = sign_in(&gateway, &node, &wrong).unwrap();
+    assert_eq!((response.status(), body_of(&response)), (http::StatusCode::UNAUTHORIZED, serde_json::json!({ "error": "Invalid OTP.", "code": "mfa_invalid" })));
+    assert!(cookie_set(&response).is_none());
+
+    // What is no code isn't posted to the CAS, and counts the same.
+    let posted = campus.posted_to("/cas/login");
+    let not_a_code = login_with(STUDENT_WITH_APP, serde_json::json!({ "otp": "12a456" }));
+    let response = sign_in(&gateway, &node, &not_a_code).unwrap();
+    assert_eq!(second_factor(&response).1, "mfa_invalid");
+    assert_eq!(campus.posted_to("/cas/login"), posted);
+
+    // The eighth failure brings the wait, and nothing goes to the CAS then.
+    for _ in 0..5 {
+        assert_eq!(sign_in(&gateway, &node, &wrong).unwrap().status(), 401);
     }
-    assert_eq!(sign_in(&gateway, &node, &with_code).unwrap().status(), 429);
-    let asked_of_node = node.got().len();
-    assert_eq!(sign_in(&gateway, &node, &with_code).unwrap().status(), 429);
-    assert_eq!(node.got().len(), asked_of_node);
+    let eighth = sign_in(&gateway, &node, &wrong).unwrap();
+    assert_eq!((eighth.status(), eighth.headers()[RETRY_AFTER].to_str().unwrap()), (http::StatusCode::TOO_MANY_REQUESTS, "300"));
+    let posted = campus.posted_to("/cas/login");
+    assert_eq!(sign_in(&gateway, &node, &login_with(STUDENT_WITH_APP, serde_json::json!({ "otp": CODE }))).unwrap().status(), 429);
+    assert_eq!(campus.posted_to("/cas/login"), posted);
+    assert!(node.got().is_empty());
+}
+
+#[test]
+fn the_codes_sent_to_one_student_are_counted() {
+    let campus = campus();
+    let gateway = campus.gateway();
+    let node = Node::default();
+    let ask_by_mail = login_with(STUDENT_WITH_APP, serde_json::json!({ "sendCode": "mail" }));
+    // Five codes within the window, the one sent unasked among them.
+    assert_eq!(second_factor(&sign_in(&gateway, &node, &login(STUDENT_WITH_CODE, PASSWORD)).unwrap()).2["sent"], "mail");
+    for _ in 0..4 {
+        let asked_for = login_with(STUDENT_WITH_CODE, serde_json::json!({ "sendCode": "mail" }));
+        assert_eq!(second_factor(&sign_in(&gateway, &node, &asked_for).unwrap()).2["sent"], "mail");
+    }
+    assert_eq!(campus.codes_sent().len(), 5);
+
+    // Asking for one more waits, without the CAS being asked.
+    let posted = campus.posted_to("/cas/login");
+    let sixth = sign_in(&gateway, &node, &login_with(STUDENT_WITH_CODE, serde_json::json!({ "sendCode": "mail" }))).unwrap();
+    assert_eq!(sixth.status(), 429);
+    assert_eq!(sixth.headers()[RETRY_AFTER], "300");
+    assert_eq!(body_of(&sixth), serde_json::json!({ "error": "Too many codes requested. Please try again later.", "code": "mfa_send_limit" }));
+    assert_eq!(campus.posted_to("/cas/login"), posted);
+    // None leaves unasked either; the sign-in itself goes on, and the code
+    // already sent is taken.
+    let (status, code, mfa) = second_factor(&sign_in(&gateway, &node, &login(STUDENT_WITH_CODE, PASSWORD)).unwrap());
+    assert_eq!((status, code.as_str(), &mfa["sent"]), (401, "mfa_required", &serde_json::Value::Null));
+    assert_eq!(campus.codes_sent().len(), 5);
+    assert_eq!(sign_in(&gateway, &node, &login_with(STUDENT_WITH_CODE, serde_json::json!({ "otp": CODE }))).unwrap().status(), 200);
+
+    // Another student's codes are their own.
+    assert_eq!(second_factor(&sign_in(&gateway, &node, &ask_by_mail).unwrap()).2["sent"], "mail");
+    assert!(node.got().is_empty());
 }
 
 #[test]

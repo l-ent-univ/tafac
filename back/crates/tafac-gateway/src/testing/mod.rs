@@ -20,11 +20,20 @@ pub const UNIVERSITY: &str = "univ-rennes";
 pub const COOKIE_NAME: &str = cookie::PRODUCTION_COOKIE;
 // The User-Agent Tafac goes under, to which the campus's CAS binds its ticket.
 const NODE_AGENT: &str = "node";
-// The campus's students: one signs in with a password, the other is asked
-// for a one-time code after it. Anyone else is refused.
+// The campus's students: one signs in with a password; two are asked for a
+// one-time code after it, the first with a code by mail as their only way
+// to one, the second with an authenticator application, SMS and mail.
+// Anyone else is refused.
 pub const STUDENT: &str = "jdoe";
 pub const STUDENT_WITH_CODE: &str = "otp-user";
+pub const STUDENT_WITH_APP: &str = "totp-user";
 pub const PASSWORD: &str = "the-password";
+// The one code the CAS takes.
+pub const CODE: &str = "246810";
+// Where the university's API sends each student's codes, as it masks them.
+pub const MAIL_OF_STUDENT_WITH_CODE: &str = "o***@exemple.test";
+pub const SMS_OF_STUDENT_WITH_APP: &str = "06******12";
+pub const MAIL_OF_STUDENT_WITH_APP: &str = "t***@exemple.test";
 // Node's answer to a session check without a session.
 pub const NODE_SAYS: &[u8] = br#"{"authenticated":false,"user":null,"analyticsEnabled":true,"university":"univ-rennes"}"#;
 
@@ -45,9 +54,15 @@ where
 }
 
 // The portal (127.0.0.1) knows one session, `JSESSIONID=alive`, which it
-// opens for a ticket of the CAS's; the CAS is the same listener under
+// opens for a ticket of the CAS's, until it is told to forget the sessions
+// it gave (the next one it opens is another); it lists the student's
+// applications (uPortal's layout, and each tile's own fragment). The CAS is
+// the same listener under
 // another name (localhost): it signs STUDENT in with PASSWORD, and knows one
-// ticket, `TGC=the-ticket`, until it is told to forget it. Moodle is under
+// ticket, `TGC=the-ticket`, until it is told to forget it. After the
+// password of a student with a second factor it shows its code page (Esup
+// OTP, as a step of its own flow), and takes CODE; the university's Esup
+// OTP API is under /mfa-api/ on the CAS's host. Moodle is under
 // /moodle/ on the portal's host: it signs in through the CAS and answers its
 // calendar's two lists. The ScoDoc gateway is under /scodoc/: it signs in
 // through the CAS too and answers one student's reports, a department's
@@ -68,6 +83,13 @@ struct State {
     ticket_gone: AtomicBool,
     // The CAS answers nothing but an error.
     cas_down: AtomicBool,
+    // Esup OTP's API answers nothing but an error.
+    code_api_down: AtomicBool,
+    // The portal's sessions: it forgets the ones before when this goes up.
+    portal_sessions: AtomicU32,
+    // Each code the API was asked to send: « student method transport », and
+    // « auto » when it was told the student didn't ask.
+    codes_sent: Mutex<Vec<String>>,
 }
 
 // Moodle's state: the session it knows (a number: it forgets the one before
@@ -115,11 +137,53 @@ const LOGIN_REFUSED: &str = r#"<html><body><div id="loginErrorsPanel" class="ban
     <input name="username"><input type="password" name="password">
     <input type="hidden" name="execution" value="e1s2"></form></body></html>"#;
 // Esup OTP's code page as Rennes' CAS shows it after a right password: one
-// more step of the same flow, which takes the code as `token`. tonAPI
-// doesn't read this variant.
-const CODE_PAGE: &str = r#"<html><body><script>const apiUrl = "https://mfa-api.exemple.test"; const uid = "otp-user"; const userHash = "made-up";</script>
-    <form id="fm1" method="post" action="login"><input name="token">
-    <input type="hidden" name="execution" value="e1s3"></form></body></html>"#;
+// more step of the same flow, whose script names the university's API and
+// the student there, and adds the field the code is typed in (`token`).
+// `refused`: shown again after a code the CAS didn't take.
+fn code_page(port: &str, student: &str, refused: bool) -> String {
+    let (execution, errors) = match refused {
+        true => ("e1s4", r#"<div id="errors" class="notification" data-status="error" role="alert"><p>Verification failed!</p><p>Please try again...</p></div>"#),
+        false => ("e1s3", ""),
+    };
+    format!(
+        r#"<html><head><title>Verification</title></head><body>
+    <form method="post" id="fm1">{errors}<input type="hidden" name="_eventId_submit" value="Login" /><input type="hidden" name="execution" value="{execution}" /></form>
+    <script type="module">
+      const apiUrl = "http:\/\/localhost:{port}\/mfa-api";
+      const uid = "{student}";
+      const userHash = "made-up";
+      (async () => {{ const url = new URL(apiUrl); }})();
+    </script></body></html>"#
+    )
+}
+
+// Esup OTP's API: who a student is (the ways to a code they turned on, and
+// where a code goes, masked), and a code sent.
+fn code_api_answer(method: &str, path: &str, state: &State) -> Answer {
+    let json = |body: serde_json::Value| Answer::of("200 OK", "application/json", body.to_string());
+    if state.code_api_down.load(Ordering::SeqCst) {
+        return Answer::of("503 Service Unavailable", "text/plain", String::new());
+    }
+    let (path, query) = path.split_once('?').unwrap_or((path, ""));
+    let parts: Vec<&str> = path.trim_start_matches("/mfa-api/users/").split('/').collect();
+    let way = |active: bool, transports: &[&str]| serde_json::json!({ "active": active, "transports": transports });
+    match (method, parts.as_slice()) {
+        ("GET", [STUDENT_WITH_CODE, "made-up"]) => json(serde_json::json!({ "code": "Ok", "user": {
+            "methods": { "codeRequired": true, "totp": way(false, &[]), "random_code": way(false, &["sms"]), "random_code_mail": way(true, &["mail"]), "push": way(false, &["push"]) },
+            "transports": { "mail": MAIL_OF_STUDENT_WITH_CODE },
+        } })),
+        ("GET", [STUDENT_WITH_APP, "made-up"]) => json(serde_json::json!({ "code": "Ok", "user": {
+            "methods": { "codeRequired": true, "totp": way(true, &[]), "random_code": way(true, &["sms", "mail"]), "push": way(false, &["push"]) },
+            "transports": { "sms": SMS_OF_STUDENT_WITH_APP, "mail": MAIL_OF_STUDENT_WITH_APP },
+        } })),
+        ("POST", [student, "methods", way, "transports", transport, "made-up"]) => {
+            state.codes_sent.lock().unwrap().push(format!("{student} {way} {transport} {query}").trim_end().to_string());
+            json(serde_json::json!({ "code": "Ok" }))
+        }
+        _ => Answer::of("404 Not Found", "application/json", r#"{"code":"Error"}"#.to_string()),
+    }
+}
+
 const SIGNED_IN_PAGE: &str = "<html><body><h2>Log In Successful</h2></body></html>";
 
 fn query_of(path: &str, name: &str) -> Option<String> {
@@ -354,7 +418,7 @@ fn form_field(body: &str, name: &str) -> Option<String> {
 
 // The CAS: its login page, the login and password posted to it, the ticket
 // it gives and knows after, and its sign-out.
-fn cas_answer(received: &Received<'_>, state: &State) -> Answer {
+fn cas_answer(received: &Received<'_>, port: &str, state: &State) -> Answer {
     let Received { method, path, cookies, agent, body } = *received;
     let html = |page: &str| Answer::of("200 OK", "text/html; charset=utf-8", page.to_string());
     if state.cas_down.load(Ordering::SeqCst) {
@@ -376,12 +440,22 @@ fn cas_answer(received: &Received<'_>, state: &State) -> Answer {
     };
     if method == "POST" {
         let posted = |name: &str| form_field(body, name).unwrap_or_default();
+        // The code page's form: the step of the flow it carries, and the code.
+        if form_field(body, "token").is_some() {
+            let in_the_flow = posted("_eventId_submit") == "Login" && ["e1s3", "e1s4"].contains(&posted("execution").as_str());
+            if in_the_flow && posted("token") == CODE {
+                state.ticket_gone.store(false, Ordering::SeqCst);
+                return signed_in("the-ticket");
+            }
+            // The page again, as Rennes' CAS refuses a code.
+            return Answer::of("401 Unauthorized", "text/html; charset=utf-8", code_page(port, STUDENT_WITH_CODE, true));
+        }
         return match (posted("username").as_str(), posted("password") == PASSWORD) {
             (STUDENT, true) => {
                 state.ticket_gone.store(false, Ordering::SeqCst);
                 signed_in("the-ticket")
             }
-            (STUDENT_WITH_CODE, true) => html(CODE_PAGE),
+            (student @ (STUDENT_WITH_CODE | STUDENT_WITH_APP), true) => html(&code_page(port, student, false)),
             _ => Answer::of("401 Unauthorized", "text/html; charset=utf-8", LOGIN_REFUSED.to_string()),
         };
     }
@@ -398,10 +472,55 @@ fn cas_answer(received: &Received<'_>, state: &State) -> Answer {
     html(LOGIN_FORM)
 }
 
+// The portal's session of the moment: `alive`, then `alive-1`… once it forgot.
+fn portal_session(state: &State) -> String {
+    match state.portal_sessions.load(Ordering::SeqCst) {
+        0 => "JSESSIONID=alive".to_string(),
+        forgotten => format!("JSESSIONID=alive-{forgotten}"),
+    }
+}
+
+// uPortal's layout for the student: a tab of two folders, the favourites
+// first as uPortal lists them. The mail's tile says its address in its
+// fragment only; the planning's in a parameter; the help's nowhere.
+fn portal_layout() -> String {
+    let portlet = |fname: &str, title: &str, more: serde_json::Value| {
+        let mut portlet = serde_json::json!({ "_objectType": "portlet", "fname": fname, "title": title, "portletName": "app-launcher", "typeID": "2" });
+        for (name, value) in more.as_object().unwrap() {
+            portlet[name] = value.clone();
+        }
+        portlet
+    };
+    let mail = portlet("webapp-mail", "Messagerie", serde_json::json!({ "description": "Le webmail" }));
+    serde_json::json!({ "authenticated": "true", "user": "jdoe", "layout": { "navigation": { "tabs": [{ "ID": "u1l1s1", "name": "Services", "content": [
+        { "_objectType": "folder", "ID": "u1l1s2", "name": "Favoris", "content": [mail.clone()] },
+        { "_objectType": "folder", "ID": "u1l1s3", "name": "Scolarité", "content": [
+            portlet("webapp-planning", "Mon emploi du temps", serde_json::json!({ "parameters": { "url": "https://planning.exemple.test/portal/" } })),
+            mail,
+            portlet("webapp-aide", "Assistance", serde_json::json!({})),
+        ] },
+    ] }] } } })
+    .to_string()
+}
+
 fn campus_answer(received: &Received<'_>, port: &str, state: &State) -> Answer {
-    let Received { path, cookies, .. } = *received;
+    let Received { method, path, cookies, .. } = *received;
+    if path.starts_with("/api/v4-3/dlm/layout.json") {
+        let layout = match cookies.split("; ").any(|cookie| cookie == portal_session(state)) {
+            true => portal_layout(),
+            // As uPortal answers nobody: a guest's layout, no error.
+            false => r#"{"authenticated":"false","user":"guest","layout":{"navigation":{"tabs":[]}}}"#.to_string(),
+        };
+        return Answer::of("200 OK", "application/json", layout);
+    }
+    if let Some(fragment) = path.strip_prefix("/api/v4-3/portlet/") {
+        return match fragment {
+            "webapp-mail.html" => Answer::of("200 OK", "text/html; charset=utf-8", "<a\n    id=\"Pluto_1_app\"\n    class=\"portlet-link\"\n    href=\"https://mail.exemple.test/\"\n    target=\"_blank\">Messagerie</a>".to_string()),
+            _ => Answer::of("200 OK", "text/html; charset=utf-8", "<div>Aucun lien</div>".to_string()),
+        };
+    }
     if path.starts_with("/api/v5-1/userinfo") {
-        let claims = if cookies.contains("JSESSIONID=alive") {
+        let claims = if cookies.split("; ").any(|cookie| cookie == portal_session(state)) {
             serde_json::json!({
                 "sub": "jdoe", "name": "Jeanne Doe", "given_name": "Jeanne", "family_name": "Doe",
                 "email": "jeanne.doe@exemple.test", "iat": 1, "exp": 2,
@@ -416,7 +535,7 @@ fn campus_answer(received: &Received<'_>, port: &str, state: &State) -> Answer {
     // The portal's own sign-in: a ticket of the CAS's opens its session.
     if path.split('?').next() == Some("/Login") {
         return match query_of(path, "ticket").as_deref() {
-            Some("ST-campus") => Answer::redirect(&format!("http://127.0.0.1:{port}/")).with("set-cookie: JSESSIONID=alive; Path=/".to_string()),
+            Some("ST-campus") => Answer::redirect(&format!("http://127.0.0.1:{port}/")).with(format!("set-cookie: {}; Path=/", portal_session(state))),
             _ => Answer::redirect(&format!("http://localhost:{port}/cas/login?service={}", percent_encoded(&format!("http://127.0.0.1:{port}/Login")))),
         };
     }
@@ -424,7 +543,10 @@ fn campus_answer(received: &Received<'_>, port: &str, state: &State) -> Answer {
         return Answer::of("200 OK", "text/html; charset=utf-8", "<html><body>Portail</body></html>".to_string());
     }
     if path.starts_with("/cas/") {
-        return cas_answer(received, state);
+        return cas_answer(received, port, state);
+    }
+    if path.starts_with("/mfa-api/") {
+        return code_api_answer(method, path, state);
     }
     if path.starts_with("/moodle/") {
         return moodle_answer(path, cookies, port, &state.moodle);
@@ -509,6 +631,11 @@ pub fn campus() -> Campus {
 }
 
 impl Campus {
+    // The port the campus listens on, for the addresses it gives.
+    pub fn port(&self) -> &str {
+        &self.port
+    }
+
     // tonAPI's settings for it, as a university.toml says them.
     pub fn settings(&self) -> ResolvedUniversity {
         let file = format!(
@@ -522,6 +649,8 @@ impl Campus {
             kind = "uportal5"
             base-url = "http://127.0.0.1:{port}/"
             [services.profile]
+            provider = "portal"
+            [services.apps]
             provider = "portal"
             [services.homework]
             provider = "moodle-ajax"
@@ -593,6 +722,23 @@ impl Campus {
     // The CAS stops (or starts again) answering anything but an error.
     pub fn cas_is_down(&self, down: bool) {
         self.state.cas_down.store(down, Ordering::SeqCst);
+    }
+
+    // The portal forgets the sessions it gave: the next one it opens, for a
+    // ticket of the CAS's, is another.
+    pub fn portal_forgets(&self) {
+        self.state.portal_sessions.fetch_add(1, Ordering::SeqCst);
+    }
+
+    // Esup OTP's API stops (or starts again) answering anything but an error.
+    pub fn code_api_is_down(&self, down: bool) {
+        self.state.code_api_down.store(down, Ordering::SeqCst);
+    }
+
+    // Each code the API was asked to send, in order: « student method
+    // transport », and « auto » when the student didn't ask.
+    pub fn codes_sent(&self) -> Vec<String> {
+        self.state.codes_sent.lock().unwrap().clone()
     }
 
     // How many times something was posted to a path of the campus's.

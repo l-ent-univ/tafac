@@ -26,24 +26,25 @@ access to it.
 the page ──▶ the gateway (Rust) ──▶ tonAPI ──▶ the university
                    │                            (CAS, portal, Moodle, ScoDoc)
                    └──▶ Node ──────────────────▶ the university
-                        the routes that haven't moved,    (portal, planning,
-                        with the session made above        mail, documents)
+                        the routes that haven't moved,    (planning, mail,
+                        with the session made above        documents)
 ```
 
 - **The gateway** answers `POST /login`, `POST /logout`, `GET /session`,
-  `GET /account`, the Moodle deadlines and the five grades routes, for the
-  universities of `routes.rs` (today: Rennes). It makes the session at the
+  `GET /account`, the portal's applications (`GET /apps`), the Moodle
+  deadlines and the five grades routes, for the universities of `routes.rs`
+  (today: Rennes). It makes the session at the
   sign-in and says when it is over.
-- **Node** answers everything else: the portal's proxy, the launch relay,
-  the planning and ADE, the mail, the documents, the icons, the statistics,
-  the demo account, and every route of the other universities, sign-in
-  included. `routes.rs` lists them with what keeps each there.
-- **Node is also asked** for a few cases of the moved routes, listed in
-  `node.rs`: the CAS's second factor (Node's own login reads Rennes' code
-  page; tonAPI doesn't), the portal signed in to again when its own session
-  lapsed (Node's portal proxy goes with Node's copy of the cookies), and the
-  wording of a service's error (a moved route that fails goes to Node's own
-  route).
+- **Node** answers everything else: the launch relay, the planning and
+  ADE, the mail, the documents, the icons, the statistics, the account's
+  photo (the portal's proxy), the demo account, and every route of the
+  other universities, sign-in and applications included. `routes.rs` lists
+  them with what keeps each there.
+- **Node is also asked** for the wording of a service's error (a moved
+  route that fails goes to Node's own route), and for what it is set up for
+  (`node.rs`). A sign-in at Rennes asks Node nothing, the CAS's second
+  factor included; nor does a portal session that lapsed, which tonAPI
+  opens again with the CAS ticket.
 
 ## Where things are
 
@@ -59,10 +60,10 @@ crates/tafac-gateway/
    │
    ├─ gateway/            a request in, its answer out, or None (Node answers)
    │  ├─ mod.rs           the Gateway: which route, whose session, and a session the university no longer knows
-   │  ├─ signin.rs        POST /login and /logout: the session made (tonAPI signs in), and ended
-   │  ├─ attempts.rs      the sign-in's limits, and the address a request came from
+   │  ├─ signin.rs        POST /login and /logout: the session made (tonAPI signs in, one-time code included), and ended
+   │  ├─ attempts.rs      the sign-in's limits, the codes sent, and the address a request came from
    │  ├─ portal.rs        routes the portal answers: the session check, the account
-   │  └─ services.rs      routes another service answers: Moodle's deadlines, ScoDoc's grades
+   │  └─ services.rs      routes a service answers: the portal's applications, Moodle's deadlines, ScoDoc's grades
    │
    ├─ session/            the student's session
    │  ├─ cookie.rs        its cookie, read and written, in the format Node reads
@@ -71,8 +72,9 @@ crates/tafac-gateway/
    │
    ├─ tonapi/             the questions to tonAPI, one file per thing asked
    │  ├─ mod.rs           what they share: patience, a panic caught, why there is no answer
-   │  ├─ signin.rs        the CAS: signed in, signed out, asked whether it still knows a session
+   │  ├─ signin.rs        the CAS: signed in, a code sent and given, signed out, asked whether it still knows a session
    │  ├─ profile.rs       the portal: who the student is
+   │  ├─ apps.rs          the portal: the applications it lists
    │  ├─ homework.rs      Moodle: what is due
    │  └─ grades.rs        ScoDoc: the report, a department's notice, a distribution, the PDF
    │
@@ -82,6 +84,7 @@ crates/tafac-gateway/
    │  ├─ expired.rs       any route, once the CAS says the session is over
    │  ├─ session.rs       GET /__ent_auth/session
    │  ├─ account.rs       GET /__ent_auth/account
+   │  ├─ apps.rs          GET /__ent_auth/apps: tonAPI's own list, as the page reads it
    │  ├─ moodle_deadlines.rs   GET /__ent_auth/moodle/deadlines
    │  └─ grades/          the grades' routes: ScoDoc's shape written back from tonAPI's report
    │     ├─ report.rs        GET /__ent_auth/grades and /grades/semester/<id>
@@ -109,22 +112,24 @@ crates/tafac-gateway/
   (signed out, or found expired: only the CAS says a session is over). It
   lives in one encrypted cookie the browser holds, and nowhere else: no
   server keeps sessions. What tonAPI gets from the services while it answers
-  (Moodle's session, ScoDoc's, the student's component) is held in this
-  process with the session's id (`session/memory.rs`), not in the cookie:
+  (Moodle's session, ScoDoc's, a portal session of its own, the student's
+  component) is held in this process with the session's id (`session/memory.rs`), not in the cookie:
   two requests at once would each write it, and it has 4 kB.
 - **Node reads the same cookie.** Its format is the one Node reads, with
   the same `SESSION_SECRET`; two fixtures hold both sides to it. Node writes
   it again as it answers its own routes (the portal's cookies it got since):
   the gateway reads it at each request, as it is then. So a session Node
-  made (a second factor, a session from before the gateway was there) is
-  one like any other.
+  made (one from before the gateway was there) is one like any other.
 - **One User-Agent.** The CAS binds its ticket to the User-Agent that signed
   in. The gateway and Node present themselves under the same one
   (`node.rs`, `server/upstreamAgent`; `tests/upstreamAgent.test.js`).
-- **The page doesn't change.** A moved route is answered here in the JSON
-  and the status the page reads today, which are Node's (`translate/`).
-  Where the answer is one only Node gives, the request goes to Node as it
-  came: each translator lists the cases.
+- **The page changes one screen at a time.** A moved route is answered
+  here in the JSON and the status the page reads today, which are Node's
+  (`translate/`), until its screen reads tonAPI's own model: the
+  applications do (`translate/apps.rs`, `src/portalApps.js`), and Node
+  gives the same list for the demo account and the portals it reads
+  itself. Where the answer is one only Node gives, the request goes to
+  Node as it came: each translator lists the cases.
 - **Nothing of tonAPI is copied here.** Its code and its settings come from
   the commit named in `Cargo.toml`.
 

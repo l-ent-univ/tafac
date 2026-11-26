@@ -17,29 +17,43 @@
 //                  the portal's cookies; what tonAPI got besides is held in
 //                  this process (session/memory.rs)
 //
-// A second factor is the one sign-in tonAPI can't finish at Rennes: its
-// esup-otp is another university's variant, and it has no code sent by SMS
-// or mail. When the CAS asks for one (or answers a page tonAPI doesn't
-// know), and when the page sends a code or asks for one, the page's request
-// goes to Node's own login, which posts the password itself. The session
-// Node makes is one like any other here: the same cookie, the same
-// User-Agent.
+// A second factor (Esup OTP: the CAS answers a right password with its code
+// page) is one more step of the same sign-in, in three requests of the
+// page's, each with the login and the password, as Node's own login reads
+// them:
+//
+//   no code      the password is posted; the answer is « a code is wanted »,
+//                with what the student can type one from. Their only way to
+//                a code (no application, one of SMS and mail) is sent
+//                unasked, as the university's own page sends it, unless the
+//                sign-in is one the student doesn't see (`quiet`: the
+//                desktop app signing in again by itself)
+//   `sendCode`   the same, and a code sent by SMS or by mail
+//   `otp`        the password is posted again, then the code: signed in, or
+//                the code refused
+//
+// Nothing of the first request is kept for the next: the code the
+// university sent stays good for the sign-in that follows. The codes sent
+// to one login are counted (attempts.rs): past the limit none leaves
+// unasked, and asking waits.
+//
+// Node is asked nothing of a sign-in at a university of routes.rs'.
 
 use std::future::Future;
 
 use http::header::CONTENT_TYPE;
-use tonapi_providers::Context;
+use tonapi_providers::{Context, OtpTransport};
 use tonapi_session::SessionData;
 
 use super::attempts::{requester, Who};
 use super::{now_ms, Asked, Gateway};
-use crate::node::{self, NodeAnswer, NodeRequest, UNIVERSITY_HEADER};
+use crate::node::{NodeAnswer, NodeRequest, UNIVERSITY_HEADER};
 use crate::session::cookie::NewSession;
 use crate::session::memory::{Ended, Snapshot};
 use crate::session::{handed, Held};
-use crate::tonapi::signin::SignIn;
+use crate::tonapi::signin::{Code, SignIn, Waiting, Ways};
 use crate::tonapi::{self, bounded, PORTAL_PATIENCE};
-use crate::translate::signin::{self as said, NodeSaid};
+use crate::translate::signin as said;
 use crate::universities::University;
 
 // The demo account's login, which is public (src/demoAccount.js:
@@ -56,8 +70,40 @@ struct Login {
     password: String,
     // The university the page chose, in the body.
     university: Option<String>,
-    // A one-time code, or the request to have one sent.
-    second_factor: bool,
+    // The one-time code, without its spaces: what Node makes of `otp`.
+    code: Option<String>,
+    // The transport a code is asked by (`sendCode`), when no code came.
+    send: Option<OtpTransport>,
+    // A sign-in the student doesn't see: no code leaves unasked.
+    quiet: bool,
+}
+
+// A one-time code is four to ten digits (Node's own check).
+fn is_a_code(code: &str) -> bool {
+    (4..=10).contains(&code.len()) && code.bytes().all(|byte| byte.is_ascii_digit())
+}
+
+// `otp` as Node reads it (String(otp ?? '') without its spaces): a number is
+// its digits, and what is neither text nor a number is no code a CAS takes.
+fn read_code(otp: Option<&serde_json::Value>) -> Option<String> {
+    let code: String = match otp? {
+        serde_json::Value::Null => return None,
+        serde_json::Value::String(text) => text.chars().filter(|character| !character.is_whitespace()).collect(),
+        serde_json::Value::Number(number) => number.to_string(),
+        _ => "not a code".to_string(),
+    };
+    Some(code).filter(|code| !code.is_empty())
+}
+
+// The student's only way to a code, which leaves unasked: no application,
+// and one of SMS and mail (Node's pickEsupOtpAutoTransport).
+fn only_way(ways: Option<&Ways>) -> Option<OtpTransport> {
+    let ways = ways.filter(|ways| !ways.app)?;
+    match (&ways.sms, &ways.mail) {
+        (Some(_), None) => Some(OtpTransport::Sms),
+        (None, Some(_)) => Some(OtpTransport::Mail),
+        _ => None,
+    }
 }
 
 // None: a body Node would refuse or read its own way (not JSON, no login,
@@ -79,10 +125,15 @@ fn read_login(asked: &Asked<'_>) -> Option<Login> {
     if username.is_empty() || password.is_empty() || username.len() > MAX_USERNAME_BYTES || password.len() > MAX_PASSWORD_BYTES {
         return None;
     }
-    let code = body.get("otp").is_some_and(|code| code.as_str().map_or(!code.is_null(), |code| !code.trim().is_empty()));
-    let send_code = body.get("sendCode").is_some_and(|transport| !transport.is_null());
+    let code = read_code(body.get("otp"));
+    let send = match body.get("sendCode").and_then(|transport| transport.as_str()).filter(|_| code.is_none()) {
+        Some("sms") => Some(OtpTransport::Sms),
+        Some("mail") => Some(OtpTransport::Mail),
+        _ => None,
+    };
+    let quiet = body.get("quiet").and_then(|quiet| quiet.as_bool()) == Some(true);
     let university = text("university")?.trim().to_lowercase();
-    Some(Login { username, password, university: Some(university).filter(|id| !id.is_empty()), second_factor: code || send_code })
+    Some(Login { username, password, university: Some(university).filter(|id| !id.is_empty()), code, send, quiet })
 }
 
 fn is_demo(login: &Login) -> bool {
@@ -102,13 +153,9 @@ impl Gateway {
         self.universities.get(&named)
     }
 
-    // POST /__ent_auth/login. `cookie`: the session cookie the request came
-    // with, if any (it goes to Node with the request when Node answers).
-    pub(super) async fn sign_in<N, Fut>(&self, asked: &Asked<'_>, cookie: Option<&str>, node: &N) -> Option<http::Response<Vec<u8>>>
-    where
-        N: Fn(NodeRequest) -> Fut,
-        Fut: Future<Output = NodeAnswer>,
-    {
+    // POST /__ent_auth/login. None: a sign-in that is Node's (another
+    // university, the demo account, a body Node reads its own way).
+    pub(super) async fn sign_in(&self, asked: &Asked<'_>) -> Option<http::Response<Vec<u8>>> {
         let login = read_login(asked)?;
         let university = self.chosen(&login, asked)?;
         if is_demo(&login) {
@@ -118,16 +165,69 @@ impl Gateway {
         if let Some(seconds) = self.attempts.blocked(&who) {
             return Some(said::too_many(seconds));
         }
-        if login.second_factor {
-            return self.nodes_sign_in(asked, cookie, node, &who, "a one-time code").await;
+        // What is no code isn't posted to the CAS: a failed attempt.
+        if login.code.as_deref().is_some_and(|code| !is_a_code(code)) {
+            return Some(self.failed(&who, said::code_refused()));
         }
-        match tonapi::signin::sign_in(university, &login.username, &login.password, self.net).await {
-            SignIn::Done(session) => Some(self.session_made(university, *session, &who).await),
-            SignIn::Refused(words) => Some(self.failed(&who, said::refused(words.as_deref()))),
-            SignIn::Unsure(why) => self.nodes_sign_in(asked, cookie, node, &who, why).await,
+        // Too many codes sent to this login lately: asking for one waits.
+        let codes_wait = self.attempts.codes_wait(&who);
+        if let (Some(_), Some(seconds)) = (login.send, codes_wait) {
+            return Some(said::too_many_codes(seconds));
+        }
+        Some(match tonapi::signin::sign_in(university, &login.username, &login.password, self.net).await {
+            // No code asked for this time, whatever the page sent.
+            SignIn::Done(session) => self.session_made(university, *session, &who).await,
+            SignIn::Refused(words) => self.failed(&who, said::refused(words.as_deref())),
+            SignIn::SecondFactor(waiting) => match &login.code {
+                Some(code) => self.code_given(university, *waiting, code, &who).await,
+                // None leaves unasked past the limit, nor for a sign-in the
+                // student doesn't see.
+                None => self.code_wanted(university, &waiting, login.send, codes_wait.is_none() && !login.quiet, &who).await,
+            },
+            SignIn::Unsure(why) => {
+                eprintln!("[tafac] sign-in: not tried through ({why})");
+                self.failed(&who, said::unknown_page())
+            }
             SignIn::Unreachable(why) => {
                 eprintln!("[tafac] sign-in: not tried through ({why})");
-                Some(self.failed(&who, said::unreachable()))
+                self.failed(&who, said::unreachable())
+            }
+        })
+    }
+
+    // The CAS took the password and waits for a code: the answer says what
+    // the student can type one from, after a code was sent when one is asked
+    // for (`asked`) or is the student's only way (`unasked_allowed`). A
+    // right password waiting for its code is no failed attempt.
+    async fn code_wanted(&self, university: &University, waiting: &Waiting, asked: Option<OtpTransport>, unasked_allowed: bool, who: &Who) -> http::Response<Vec<u8>> {
+        let ways = waiting.ways.as_ref();
+        let Some(transport) = asked.or_else(|| only_way(ways).filter(|_| unasked_allowed)) else {
+            return said::code_wanted(ways, None);
+        };
+        let has_it = ways.is_some_and(|ways| match transport {
+            OtpTransport::Sms => ways.sms.is_some(),
+            OtpTransport::Mail => ways.mail.is_some(),
+        });
+        if has_it && tonapi::signin::send_code(university, waiting, transport, asked.is_none(), self.net).await {
+            self.attempts.code_sent(who);
+            return said::code_wanted(ways, Some(transport));
+        }
+        // Unasked, a code that didn't leave is no error: the form offers it.
+        match asked {
+            Some(_) => said::code_not_sent(ways),
+            None => said::code_wanted(ways, None),
+        }
+    }
+
+    // The student's code, posted to the CAS after the password.
+    async fn code_given(&self, university: &University, waiting: Waiting, code: &str, who: &Who) -> http::Response<Vec<u8>> {
+        match tonapi::signin::give_code(university, waiting, code, self.net).await {
+            Code::Done(session) => self.session_made(university, *session, who).await,
+            Code::Refused => self.failed(who, said::code_refused()),
+            Code::StartedOver => self.failed(who, said::started_over()),
+            Code::Unreachable(why) => {
+                eprintln!("[tafac] sign-in: the code not tried through ({why})");
+                self.failed(who, said::unreachable())
             }
         }
     }
@@ -176,29 +276,6 @@ impl Gateway {
         }
     }
 
-    // Node's own login, with the page's request as it came, and its answer
-    // as it comes (with the cookie of the session it made). What it says of
-    // the attempt counts here too. None: Node can't be reached, and the
-    // caller finds that out the same way.
-    async fn nodes_sign_in<N, Fut>(&self, asked: &Asked<'_>, cookie: Option<&str>, node: &N, who: &Who, why: &str) -> Option<http::Response<Vec<u8>>>
-    where
-        N: Fn(NodeRequest) -> Fut,
-        Fut: Future<Output = NodeAnswer>,
-    {
-        eprintln!("[tafac] sign-in: left to Node ({why})");
-        let answer = node(node::as_it_came(asked, &self.cookie_name, cookie)?).await?;
-        match said::node_said(answer.status().as_u16(), answer.body()) {
-            NodeSaid::SignedIn => self.attempts.signed_in(who),
-            NodeSaid::Failed => {
-                if let Some(seconds) = self.attempts.failed(who) {
-                    return Some(said::too_many(seconds));
-                }
-            }
-            NodeSaid::Neither => {}
-        }
-        Some(answer)
-    }
-
     // POST /__ent_auth/logout, for a session held here. It ends here first:
     // no request still on its way is answered for it. Then the CAS is told
     // (tonAPI, with the ticket), and Node (its own sign-out, with the
@@ -235,14 +312,49 @@ mod tests {
     #[test]
     fn a_login_is_read_as_node_reads_it() {
         let login = read("application/json; charset=utf-8", r#"{"username":" JDoe ","password":" pass word ","university":" Univ-Rennes "}"#).unwrap();
-        assert_eq!((login.username.as_str(), login.password.as_str(), login.university.as_deref(), login.second_factor), ("JDoe", " pass word ", Some("univ-rennes"), false));
-        assert!(read(JSON, r#"{"username":"jdoe","password":"p","quiet":true}"#).unwrap().university.is_none());
+        assert_eq!((login.username.as_str(), login.password.as_str(), login.university.as_deref()), ("JDoe", " pass word ", Some("univ-rennes")));
+        assert_eq!((login.code, login.send, login.quiet), (None, None, false));
+        let quiet = read(JSON, r#"{"username":"jdoe","password":"p","quiet":true}"#).unwrap();
+        assert!(quiet.university.is_none() && quiet.quiet);
+        assert!(!read(JSON, r#"{"username":"jdoe","password":"p","quiet":"true"}"#).unwrap().quiet);
+    }
 
-        // A one-time code, or one asked for: the second factor's leg.
-        assert!(read(JSON, r#"{"username":"jdoe","password":"p","otp":"123 456"}"#).unwrap().second_factor);
-        assert!(read(JSON, r#"{"username":"jdoe","password":"p","sendCode":"sms"}"#).unwrap().second_factor);
-        assert!(read(JSON, r#"{"username":"jdoe","password":"p","otp":123456}"#).unwrap().second_factor);
-        assert!(!read(JSON, r#"{"username":"jdoe","password":"p","otp":"","sendCode":null}"#).unwrap().second_factor);
+    #[test]
+    fn a_code_and_a_code_asked_for_are_read_as_node_reads_them() {
+        let second_factor = |more: &str| {
+            let login = read(JSON, &format!(r#"{{"username":"jdoe","password":"p",{more}}}"#)).unwrap();
+            (login.code, login.send)
+        };
+        // The code without its spaces; a number is its digits.
+        assert_eq!(second_factor(r#""otp":" 123 456 ""#), (Some("123456".to_string()), None));
+        assert_eq!(second_factor(r#""otp":123456"#), (Some("123456".to_string()), None));
+        assert_eq!(second_factor(r#""otp":"","sendCode":null"#), (None, None));
+        assert_eq!(second_factor(r#""otp":"   ","sendCode":"mail""#), (None, Some(OtpTransport::Mail)));
+        assert_eq!(second_factor(r#""sendCode":"sms""#), (None, Some(OtpTransport::Sms)));
+        // Another transport is none; a code comes before a code asked for.
+        assert_eq!(second_factor(r#""sendCode":"push""#), (None, None));
+        assert_eq!(second_factor(r#""sendCode":7"#), (None, None));
+        assert_eq!(second_factor(r#""otp":"123456","sendCode":"sms""#), (Some("123456".to_string()), None));
+
+        // What is no code: said without the CAS being asked.
+        for (otp, is_one) in [("1234", true), ("1234567890", true), ("123", false), ("12345678901", false), ("12a456", false), ("１２３４５６", false)] {
+            assert_eq!(is_a_code(otp), is_one, "{otp}");
+        }
+        let (code, _) = second_factor(r#""otp":true"#);
+        assert!(!is_a_code(&code.unwrap()));
+        let (code, _) = second_factor(r#""otp":["123456"]"#);
+        assert!(!is_a_code(&code.unwrap()));
+    }
+
+    #[test]
+    fn a_code_leaves_unasked_only_when_it_is_the_only_way() {
+        let ways = |app: bool, sms: Option<&str>, mail: Option<&str>| Ways { app, sms: sms.map(str::to_string), mail: mail.map(str::to_string) };
+        assert_eq!(only_way(Some(&ways(false, None, Some("j***@exemple.test")))), Some(OtpTransport::Mail));
+        assert_eq!(only_way(Some(&ways(false, Some("06******12"), None))), Some(OtpTransport::Sms));
+        assert_eq!(only_way(Some(&ways(false, Some("06******12"), Some("j***@exemple.test")))), None);
+        assert_eq!(only_way(Some(&ways(true, None, Some("j***@exemple.test")))), None);
+        assert_eq!(only_way(Some(&ways(false, None, None))), None);
+        assert_eq!(only_way(None), None);
     }
 
     #[test]

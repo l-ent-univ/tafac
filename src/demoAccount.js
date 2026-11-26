@@ -255,7 +255,6 @@ const DEMO_APPLICATIONS = Object.freeze([
 ])
 
 const DEMO_APPLICATIONS_BY_ID = new Map(DEMO_APPLICATIONS.map((application) => [application.id, application]))
-const DEMO_APPLICATIONS_BY_FNAME = new Map(DEMO_APPLICATIONS.map((application) => [application.fname, application]))
 
 const DEMO_TREE_ROOT = Object.freeze({
   id: '-100',
@@ -455,193 +454,19 @@ export function normalizeDemoState(value) {
   }
 }
 
-function getDemoApplicationPortlets(ids = []) {
-  return ids
-    .map((id) => DEMO_APPLICATIONS_BY_ID.get(id))
-    .filter(Boolean)
-    .map((application) => ({
-      _objectType: 'portlet',
-      ID: application.id,
-      nodeId: application.id,
-      chanID: application.id,
-      fname: application.fname,
-      title: application.title,
-      name: application.title,
-      description: application.description,
-      portletName: 'app-launcher',
-      typeID: '2',
-      parameters: {
-        launchUrl: application.href,
-        description: application.description,
-        target: application.target,
-        stopImmediately: application.target === '_blank' ? 'true' : 'false',
-      },
-      widgetURL: application.href,
-      url: application.href,
-      target: application.target,
-    }))
-}
-
-export function buildDemoLayoutData(demoStateInput) {
-  const demoState = normalizeDemoState(demoStateInput)
-  const favoritePortlets = getDemoApplicationPortlets(demoState.favoritePortletIds)
-  const allPortlets = getDemoApplicationPortlets(DEMO_APPLICATIONS.map((application) => application.id))
-
-  return {
-    authenticated: 'true',
-    user: DEMO_ACCOUNT.preferred_username,
-    layout: {
-      globals: {
-        hasFavorites: 'true',
-      },
-      navigation: {
-        tabs: [
-          {
-            ID: 'demo-tab-services',
-            name: 'Services',
-            content: [
-              {
-                _objectType: 'folder',
-                ID: 'demo-folder-favorites',
-                name: 'Favoris',
-                content: favoritePortlets,
-              },
-              {
-                _objectType: 'folder',
-                ID: 'demo-folder-services',
-                name: 'Toutes les applications',
-                content: allPortlets,
-              },
-            ],
-          },
-        ],
-        favorites: favoritePortlets,
-      },
-      favorites: favoritePortlets,
-    },
-  }
-}
-
-export function buildDemoLayoutDocData() {
+// The demo's applications as the page reads them (GET /__ent_auth/apps:
+// tonAPI's model). `id` is the key a favourite is kept by; the ones starred
+// from the start say so, as a portal does for a real account.
+export function buildDemoApps() {
   return DEMO_APPLICATIONS.map((application) => ({
-    ID: application.id,
-    nodeId: application.id,
-    fname: application.fname,
+    id: application.fname,
     title: application.title,
-    name: application.title,
     description: application.description,
-    portletName: 'app-launcher',
-    typeID: '2',
-    parameters: {
-      launchUrl: application.href,
-      description: application.description,
-      target: application.target,
-      stopImmediately: application.target === '_blank' ? 'true' : 'false',
-    },
-    widgetURL: application.href,
     url: application.href,
-    target: application.target,
+    iconUrl: null,
+    category: null,
+    favorite: DEMO_DEFAULT_FAVORITE_IDS.includes(application.id),
   }))
-}
-
-export function buildDemoMarketplaceEntries() {
-  return []
-}
-
-export function buildDemoPortletFragment(fname) {
-  const application = DEMO_APPLICATIONS_BY_FNAME.get(String(fname ?? '').trim())
-  if (!application) {
-    return null
-  }
-
-  return `<div class="demo-portlet-fragment"><a href="${escapeHtml(application.href)}" target="${escapeHtml(application.target)}" rel="noreferrer">${escapeHtml(application.title)}</a></div>`
-}
-
-export function buildDemoPortletMetadata(fname) {
-  const application = DEMO_APPLICATIONS_BY_FNAME.get(String(fname ?? '').trim())
-  if (!application) {
-    return null
-  }
-
-  return {
-    ID: application.id,
-    nodeId: application.id,
-    fname: application.fname,
-    title: application.title,
-    name: application.title,
-    description: application.description,
-    portletName: 'app-launcher',
-    typeID: '2',
-    parameters: {
-      launchUrl: application.href,
-      description: application.description,
-      target: application.target,
-      stopImmediately: application.target === '_blank' ? 'true' : 'false',
-    },
-    widgetURL: application.href,
-    url: application.href,
-    target: application.target,
-  }
-}
-
-function insertAfter(list, targetValue, nextValue) {
-  const nextList = [...list]
-  const targetIndex = nextList.indexOf(targetValue)
-
-  if (targetIndex !== -1) {
-    return nextList
-  }
-
-  if (nextValue && nextList.includes(nextValue)) {
-    nextList.splice(nextList.indexOf(nextValue), 0, targetValue)
-    return nextList
-  }
-
-  nextList.push(targetValue)
-  return nextList
-}
-
-export function applyDemoLayoutMutation(requestPath, demoStateInput) {
-  const demoState = normalizeDemoState(demoStateInput)
-  const requestUrl = new URL(String(requestPath ?? '/api/layout'), 'https://demo.l-ent.local')
-
-  if (requestUrl.pathname !== '/api/layout') {
-    return {
-      handled: false,
-      demoState,
-    }
-  }
-
-  const sourceId = String(
-    requestUrl.searchParams.get('sourceId')
-      || requestUrl.searchParams.get('sourceID')
-      || '',
-  ).trim()
-
-  if (!DEMO_APPLICATIONS_BY_ID.has(sourceId)) {
-    return {
-      handled: true,
-      demoState,
-    }
-  }
-
-  const favoritePortletIds = demoState.favoritePortletIds.includes(sourceId)
-    ? demoState.favoritePortletIds.filter((id) => id !== sourceId)
-    : insertAfter(
-      demoState.favoritePortletIds,
-      sourceId,
-      String(requestUrl.searchParams.get('nextNodeId') || '').trim(),
-    )
-
-  return {
-    handled: true,
-    demoState: normalizeDemoState({ favoritePortletIds }),
-    payload: {
-      ok: true,
-      action: requestUrl.searchParams.get('action') || 'toggleFavorite',
-      favoritePortletIds,
-    },
-  }
 }
 
 function findDemoTreeNodeById(node, targetId) {
