@@ -16,7 +16,8 @@
 //       cookie cleared: the CAS no longer knows the ticket. Answered here
 //       (translate/expired.rs), and Node is told.
 //   502 { error }: the portal is down or slow, or answered what tonAPI
-//       doesn't read. Node, which words it for the page.
+//       doesn't read. Answered here (translate/failed.rs), in the sentence
+//       the page shows as it is.
 //   401 for nobody signed in; the demo account's list; another
 //       university's: Node.
 
@@ -33,6 +34,7 @@ pub fn translate(asked: Result<&[App], Unanswered>) -> Translated {
 
 #[cfg(test)]
 mod tests {
+    use super::super::Failure;
     use super::*;
 
     fn body(translated: Translated) -> serde_json::Value {
@@ -67,10 +69,11 @@ mod tests {
     }
 
     #[test]
-    fn what_tonapi_cant_answer_is_the_cas_to_ask_or_nodes_to_word() {
+    fn what_tonapi_cant_answer_is_the_cas_to_ask_or_the_portals_error() {
         assert!(matches!(translate(Err(Unanswered::Problem(tonapi_core::ErrorCode::SessionExpired))), Translated::Lost));
         for why in [Unanswered::Slow, Unanswered::NoTicket, Unanswered::Failed, Unanswered::Problem(tonapi_core::ErrorCode::UpstreamChanged), Unanswered::Problem(tonapi_core::ErrorCode::ServiceUnavailable)] {
-            assert!(matches!(translate(Err(why)), Translated::Node(_)));
+            let Translated::Failed(failure) = translate(Err(why)) else { panic!("{why}") };
+            assert_eq!(failure, Failure::Unavailable(why.to_string()));
         }
     }
 }

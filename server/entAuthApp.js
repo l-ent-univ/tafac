@@ -2498,11 +2498,10 @@ app.use('/__ent_auth/mail', (req, res, next) => {
 // their sessions and answers this route, the login, the account and the
 // logout itself (back/crates/tafac-gateway, routes.rs and translate/). This
 // server is behind it: it reads the session's cookie as before, and still
-// gets these four for what the gateway leaves it (node.rs there): another
-// university, the demo account, nobody signed in, the CAS's second factor,
-// and the session check when the portal's own session lapsed, which signs
-// in to the portal again for /__ent_proxy below. A field added, renamed or
-// removed here changes there too.
+// gets these four for the sessions the gateway doesn't hold: another
+// university, the demo account, nobody signed in. A field added, renamed or
+// removed here changes there too, and so does an error's status or its
+// wording (translate/failed.rs there, for every route that moved).
 app.get('/__ent_auth/session', async (req, res) => {
   try {
     res.setHeader('Cache-Control', 'no-store')
@@ -3093,10 +3092,11 @@ app.get('/__ent_auth/launch', async (req, res) => {
 // evaluation's distribution, the PDF) have moved to tonAPI where the gateway
 // runs before this server: it answers while the session lives, with
 // ScoDoc's shape written back from tonAPI's report, ends a session the CAS
-// no longer knows, and leaves the rest here (nobody signed in, the demo
-// account, a refused parameter, an error). It writes only the fields the
-// page reads: one the page starts to read goes in
-// back/crates/tafac-gateway, translate/grades/report.rs, too.
+// no longer knows, refuses a parameter and words an error as these routes
+// do (translate/failed.rs there), and leaves the rest here (nobody signed
+// in, the demo account). It writes only the fields the page reads: one the
+// page starts to read goes in back/crates/tafac-gateway,
+// translate/grades/report.rs, too.
 app.get('/__ent_auth/grades', async (req, res) => {
   try {
     res.setHeader('Cache-Control', 'no-store')
@@ -5792,9 +5792,9 @@ app.get('/__ent_auth/moodle/view', (req, res) => {
 
 // 6d. Moodle deadlines endpoint
 // Moved to tonAPI where the gateway runs before this server: it answers
-// while the session lives, ends a session the CAS no longer knows, and
-// leaves the rest to this route (nobody signed in, the demo account, an
-// error). What it does as this route does is in back/crates/tafac-gateway,
+// while the session lives, its errors too, ends a session the CAS no longer
+// knows, and leaves the rest to this route (nobody signed in, the demo
+// account). What it does as this route does is in back/crates/tafac-gateway,
 // translate/moodle_deadlines.rs: a change to an item's fields or to
 // selectMoodleDeadlines goes there too.
 app.get('/__ent_auth/moodle/deadlines', async (req, res) => {
@@ -6775,8 +6775,9 @@ app.get('/__ent_auth/apps', async (req, res) => {
     }
 
     // uPortal's applications are the gateway's to list (tonAPI reads the
-    // layout and each tile's own link). A request that gets here is one the
-    // gateway couldn't answer, or a server without it: no list.
+    // layout and each tile's own link). A request that gets here is one for
+    // a university the gateway doesn't answer for, or a server without it:
+    // no list. The gateway says the same of a portal it can't read.
     if (PORTAL_KIND === 'uportal') {
       if (await answerIfSessionExpired(req, res)) return undefined
       return res.status(502).json({ error: APPS_UNAVAILABLE_MESSAGE })

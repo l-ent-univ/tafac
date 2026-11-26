@@ -7,19 +7,21 @@
 //
 //   signin.rs    POST /__ent_auth/login and /logout: the session made, ended
 //   expired.rs   any route, once the CAS says the session is over
+//   failed.rs    any route, when it has no answer of its own: the service
+//                is down, the request is one to refuse
 //   session.rs, account.rs, moodle_deadlines.rs, grades/   the routes' own
 //   apps.rs      GET /__ent_auth/apps: tonAPI's own list, which the page
 //                reads as it is
 //
-// A translator says one of three things: the page's answer; « Node
-// answers », where the answer is one only Node gives today (it signs in to
-// the portal again, it words the error of a service that is down); or « the
-// session is lost », when tonAPI says the university no longer knows it, for
-// the gateway to ask the CAS whether it is over (gateway/mod.rs).
+// A translator says one of three things: the page's answer; why there is
+// none (failed.rs words it, as Node words its own errors); or « the session
+// is lost », when tonAPI says the university no longer knows it, for the
+// gateway to ask the CAS whether it is over (gateway/mod.rs).
 
 pub mod account;
 pub mod apps;
 pub mod expired;
+pub mod failed;
 pub mod grades;
 pub mod moodle_deadlines;
 pub mod session;
@@ -27,6 +29,7 @@ pub mod signin;
 
 use tonapi_core::{ErrorCode, Profile};
 
+pub use self::failed::Failure;
 use crate::session::cookie::Session;
 pub use crate::tonapi::Unanswered;
 
@@ -37,9 +40,8 @@ pub(crate) const ANSWERED_BY_TONAPI: &str = "tonapi";
 pub enum Translated {
     // The page's answer, as Node gives it.
     Answer(http::Response<Vec<u8>>),
-    // Node answers. Why, for the log: tonAPI's code or words of this crate,
-    // never anything of the account.
-    Node(String),
+    // No answer to give: why, for failed.rs to word as Node does.
+    Failed(Failure),
     // tonAPI says the university no longer knows the session: over, if the
     // CAS says so too.
     Lost,
@@ -49,7 +51,7 @@ pub enum Translated {
 pub(crate) fn unanswered(why: Unanswered) -> Translated {
     match why {
         Unanswered::Problem(ErrorCode::SessionExpired) => Translated::Lost,
-        why => Translated::Node(why.to_string()),
+        why => Translated::Failed(Failure::Unavailable(why.to_string())),
     }
 }
 
@@ -59,8 +61,9 @@ pub(crate) fn same_student(profile: &Profile, session: &Session) -> bool {
     profile.username.trim().eq_ignore_ascii_case(session.user.trim())
 }
 
+// Nobody's answer: the route's error, and nothing of what the portal said.
 pub(crate) fn another_student() -> Translated {
-    Translated::Node("the portal answers for another name than the session's".to_string())
+    Translated::Failed(Failure::Unavailable("the portal answers for another name than the session's".to_string()))
 }
 
 // A JSON answer with the headers Node's API answers carry that matter to a

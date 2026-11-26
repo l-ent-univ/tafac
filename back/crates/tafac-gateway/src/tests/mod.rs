@@ -1,15 +1,17 @@
-// The gateway on a made-up campus (testing/): what it answers, and what it
-// leaves to Node or asks of it.
+// The gateway on a made-up campus (testing/): what it answers, its errors
+// too, and what it leaves to Node or tells it.
 //
 //   signin.rs             the session made and ended: a sign-in, its
 //                         refusals and limits, what is Node's, a sign-out
 //   portal.rs             the session check and the account
 //   apps.rs               the portal's applications: tonAPI's own list, a
 //                         portal session of the gateway's own
-//   expiry.rs             a session the CAS no longer knows
+//   expiry.rs             a session the CAS no longer knows, and a service
+//                         that fails while the CAS still does
 //   moodle_deadlines.rs   a route another service answers: the CAS ticket,
 //                         the session held, the answer kept
-//   grades.rs             the grades' routes: ScoDoc's shape written back
+//   grades.rs             the grades' routes: ScoDoc's shape written back,
+//                         and what the routes refuse
 
 mod apps;
 mod expiry;
@@ -26,7 +28,7 @@ use http::{HeaderMap, Method};
 
 use crate::session::cookie::clear_cookie;
 use crate::testing::*;
-use crate::{Asked, Gateway, NodeAnswer, NodeRequest, ANSWERED_BY, UNIVERSITY_HEADER};
+use crate::{Asked, Gateway, NodeAnswer, NodeRequest, ANSWERED_BY};
 
 const SESSION: &str = "/__ent_auth/session";
 const ACCOUNT: &str = "/__ent_auth/account";
@@ -50,25 +52,14 @@ fn json(status: u16, body: &str) -> http::Response<Vec<u8>> {
     http::Response::builder().status(status).header(CONTENT_TYPE, "application/json; charset=utf-8").body(body.as_bytes().to_vec()).unwrap()
 }
 
-// Node, as much of it as most tests ask: what it says of itself, and
-// « fine » to whatever it is told.
-async fn node_says(request: NodeRequest) -> NodeAnswer {
-    if request.method() == Method::GET && request.uri().path() == SESSION {
-        assert_eq!(request.headers()[UNIVERSITY_HEADER], UNIVERSITY);
-        assert!(request.headers().get(COOKIE).is_none());
-        return Some(json(200, std::str::from_utf8(NODE_SAYS).unwrap()));
-    }
-    Some(json(200, "{}"))
-}
-
-// Node is not asked.
+// Node is not asked: most tests, where no session ends.
 async fn never(request: NodeRequest) -> NodeAnswer {
     panic!("Node is not asked ({} {})", request.method(), request.uri().path())
 }
 
-// Node, for the tests that look at what it was asked: each request it got
-// (its method and path, its session cookie, its body), and its own answer
-// to a sign-in.
+// Node, for the tests that look at what it was told or asked: each request
+// it got (its method and path, its session cookie, its body), and its own
+// answer to a sign-in.
 #[derive(Default)]
 struct Node {
     got: Mutex<Vec<(String, String, Vec<u8>)>>,
@@ -89,7 +80,6 @@ impl Node {
             return None;
         }
         match asked.as_str() {
-            "GET /__ent_auth/session" => node_says(request).await,
             "POST /__ent_auth/login" => match *self.login.lock().unwrap() {
                 Some((status, body)) => Some(json(status, body)),
                 None => {
@@ -113,14 +103,30 @@ impl Node {
 }
 
 // A route's answer made here, checked for what every one carries; None when
-// it was left to Node.
+// it was left to Node. Node itself is asked nothing.
 fn ask(gateway: &Gateway, target: &str, cookie: &str) -> Option<serde_json::Value> {
-    let response = block_on(gateway.answer(&asked(&GET, target, &NO_HEADERS, &[]), || Some(cookie.to_string()), node_says))?;
+    let response = block_on(gateway.answer(&asked(&GET, target, &NO_HEADERS, &[]), || Some(cookie.to_string()), never))?;
     assert_eq!(response.status(), 200);
     assert_eq!(response.headers()[ANSWERED_BY], "tonapi");
     assert_eq!(response.headers()["cache-control"], "no-store");
     assert_eq!(response.headers()["content-type"], "application/json; charset=utf-8");
     Some(serde_json::from_slice(response.body()).unwrap())
+}
+
+// A route's error made here: its status and what it says. Node is asked
+// nothing, and nothing in the answer says the session is over.
+fn error_of(gateway: &Gateway, target: &str, cookie: &str) -> (u16, serde_json::Value) {
+    let response = block_on(gateway.answer(&asked(&GET, target, &NO_HEADERS, &[]), || Some(cookie.to_string()), never)).expect("an answer made here");
+    assert_eq!(response.headers()[ANSWERED_BY], "tonapi");
+    assert_eq!(response.headers()["content-type"], "application/json; charset=utf-8");
+    assert!(response.headers().get("x-tafac-session").is_none() && response.headers().get(SET_COOKIE).is_none());
+    (response.status().as_u16(), body_of(&response))
+}
+
+// What a route says of an error of the university's, as Node's production
+// server words it.
+fn unavailable() -> (u16, serde_json::Value) {
+    (500, serde_json::json!({ "error": "Service indisponible pour le moment" }))
 }
 
 fn body_of(response: &http::Response<Vec<u8>>) -> serde_json::Value {

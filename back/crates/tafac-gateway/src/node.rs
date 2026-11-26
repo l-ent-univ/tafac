@@ -1,25 +1,20 @@
-// Node, behind the gateway: what it is asked, what it is told, and what
-// the two share.
+// Node, behind the gateway: what it is told, and what the two share.
 //
 // Node answers every route that hasn't moved (routes.rs), with the
 // session's cookie, which it reads as the gateway does. For the routes that
-// have moved, the gateway goes to it for two things, each a request to one
-// of Node's own routes:
+// have moved, the gateway goes to it for one thing, a request to one of
+// Node's own routes:
 //
-//   what it is set up for   a session check repeats it (`analyticsEnabled`):
-//                           read from Node's own answer to a check without
-//                           a session, now and then
 //   a session ended         signed out here, or found expired: Node drops
 //                           what it kept of it (its copy of the cookies,
 //                           the webmail's session)
 //
 // The other way, Node says a session is gone on its own answers (its
 // header: expired; the cookie cleared): it is gone here too.
-
-use std::collections::HashMap;
-use std::future::Future;
-use std::sync::Mutex;
-use std::time::{Duration, Instant};
+//
+// What the two share is read here from where Node reads it, and never asked
+// of Node: the name they go to the university under, and whether the
+// statistics are on.
 
 use http::header::{CONTENT_LENGTH, COOKIE};
 use http::{HeaderMap, Method};
@@ -35,56 +30,27 @@ use crate::session::memory::Ended;
 // both go under the one name. tests/upstreamAgent.test.js holds Node to it.
 pub(crate) const USER_AGENT: &str = "node";
 
-// How a request without a session names its university to Node
-// (server/universitiesApp.js).
+// How a request without a session names its university
+// (server/universitiesApp.js): a sign-in's is read here too
+// (gateway/signin.rs).
 pub const UNIVERSITY_HEADER: &str = "x-tafac-university";
-// The session check, which Node also answers without a session.
-pub const SESSION_PATH: &str = "/__ent_auth/session";
 pub(crate) const LOGOUT_PATH: &str = "/__ent_auth/logout";
 // The word, on any answer, for a session that is gone (server/sessionExpiry).
 pub(crate) const SESSION_HEADER: &str = "x-tafac-session";
 pub(crate) const SESSION_EXPIRED: &str = "expired";
 
-// How long what Node says of itself is taken as said: it changes only when
-// Node starts again, which on a server the gateway doesn't see.
-pub(crate) const FACTS_KEPT: Duration = Duration::from_secs(5 * 60);
-
 // A request to Node, and its answer: None when Node can't be reached.
 pub type NodeRequest = http::Request<Vec<u8>>;
 pub type NodeAnswer = Option<http::Response<Vec<u8>>>;
 
-// What only Node knows of itself, read from its own answer.
-#[derive(Clone, Copy, Debug, PartialEq)]
-pub(crate) struct NodeFacts {
-    pub analytics_enabled: bool,
-}
-
-#[derive(Default)]
-pub(crate) struct Node {
-    // By university, and when it was said.
-    pub(crate) facts: Mutex<HashMap<String, (NodeFacts, Instant)>>,
-}
-
-impl Node {
-    // What Node is set up for at a university: asked of it, then kept a
-    // while.
-    pub(crate) async fn facts<N, Fut>(&self, university: &str, node: &N) -> Option<NodeFacts>
-    where
-        N: Fn(NodeRequest) -> Fut,
-        Fut: Future<Output = NodeAnswer>,
-    {
-        if let Some((facts, said)) = self.facts.lock().unwrap().get(university) {
-            if said.elapsed() < FACTS_KEPT {
-                return Some(*facts);
-            }
-        }
-        // A session check without a session: no cookie goes, none comes back.
-        let request = http::Request::builder().method(Method::GET).uri(SESSION_PATH).header(UNIVERSITY_HEADER, university).body(Vec::new()).ok()?;
-        let answer = node(request).await.filter(|answer| answer.status() == http::StatusCode::OK)?;
-        let facts = read_facts(university, answer.body())?;
-        self.facts.lock().unwrap().insert(university.to_string(), (facts, Instant::now()));
-        Some(facts)
-    }
+// Whether Tafac's anonymous statistics are on, which the session check
+// repeats to the page (`analyticsEnabled`: the page then shows its
+// « Statistiques anonymes » switch, and sends its events to Node's own
+// route). Node's are on when it has PostHog's project key
+// (server/analytics.js: readAnalyticsConfig, createAnalytics). `key`:
+// POSTHOG_PROJECT_KEY, as Node is given it.
+pub(crate) fn statistics_on(key: Option<&str>) -> bool {
+    key.is_some_and(|key| !key.trim().is_empty())
 }
 
 // What tells Node a session ended here (signed out, or found expired): its
@@ -118,12 +84,21 @@ pub(crate) fn says_ended(headers: &HeaderMap, cookie_name: &str) -> Option<Ended
     cleared.then_some(Ended::SignedOut)
 }
 
-// From Node's answer to a session check without a session:
-// { authenticated: false, …, analyticsEnabled, university }.
-pub(crate) fn read_facts(university: &str, body: &[u8]) -> Option<NodeFacts> {
-    let answer: serde_json::Value = serde_json::from_slice(body).ok()?;
-    if answer.get("university")?.as_str()? != university {
-        return None;
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn the_statistics_are_on_when_node_has_a_key() {
+        assert!(statistics_on(Some("phc_made_up")));
+        assert!(statistics_on(Some(" phc_made_up\n")));
+        for none in [None, Some(""), Some("  \n")] {
+            assert!(!statistics_on(none), "{none:?}");
+        }
+        // Node's own reading, from its source: the key without the spaces
+        // around it, and nothing sent without one.
+        let node = include_str!("../../../../server/analytics.js");
+        assert!(node.contains("const projectKey = String(env.POSTHOG_PROJECT_KEY ?? '').trim()"));
+        assert!(node.contains("if (!projectKey) {\n    return DISABLED_ANALYTICS"));
     }
-    Some(NodeFacts { analytics_enabled: answer.get("analyticsEnabled")?.as_bool()? })
 }

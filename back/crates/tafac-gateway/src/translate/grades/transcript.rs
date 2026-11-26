@@ -7,24 +7,30 @@
 //       tonAPI asks the IUT's gateway for the same file, for the student of
 //       the session: answered here. The type (BUT, DUT) is the one of the
 //       student's report, whatever the request says.
-//   502 { error }: the gateway gave no PDF (tonAPI's `not_found`). Node.
+//   502 { error }: the gateway gave no PDF (tonAPI's `not_found`, or a file
+//       that isn't one). Answered here, in Node's words
+//       (translate/failed.rs).
 //   401 { error }: nobody signed in. Node.
 //   404 for the demo account: Node.
-//   400 { error }: a semester id that isn't one. Node.
-//   500 { error }: ScoDoc down or answering something else. Node.
+//   400 { error }: a semester id that isn't one. Answered here, in Node's
+//       words.
+//   500 { error }: ScoDoc down or answering something else. Answered here
+//       (translate/failed.rs).
 
+use tonapi_core::ErrorCode;
 use tonapi_providers::Download;
 
-use super::super::{answer, unanswered, Translated, Unanswered};
+use super::super::{answer, failed, unanswered, Translated, Unanswered};
 
 // `semester`: the id asked for, already checked to be one.
 pub fn translate(asked: Result<Download, Unanswered>, semester: &str) -> Translated {
     let file = match asked {
         Ok(file) => file,
+        Err(Unanswered::Problem(ErrorCode::NotFound)) => return Translated::Failed(failed::NO_PDF),
         Err(why) => return unanswered(why),
     };
     if !file.bytes.starts_with(b"%PDF") {
-        return Translated::Node("the report is not a PDF".to_string());
+        return Translated::Failed(failed::NO_PDF);
     }
     Translated::Answer(
         answer(200)
@@ -57,8 +63,10 @@ mod tests {
     }
 
     #[test]
-    fn anything_but_a_pdf_is_nodes() {
-        assert!(matches!(translate(Ok(file(b"<html>Connexion</html>")), "901"), Translated::Node(_)));
-        assert!(matches!(translate(Err(Unanswered::Problem(tonapi_core::ErrorCode::NotFound)), "901"), Translated::Node(_)));
+    fn anything_but_a_pdf_is_said_as_node_says_it() {
+        assert!(matches!(translate(Ok(file(b"<html>Connexion</html>")), "901"), Translated::Failed(failed::NO_PDF)));
+        assert!(matches!(translate(Err(Unanswered::Problem(ErrorCode::NotFound)), "901"), Translated::Failed(failed::NO_PDF)));
+        // ScoDoc down is another error than no PDF.
+        assert!(matches!(translate(Err(Unanswered::Problem(ErrorCode::ServiceUnavailable)), "901"), Translated::Failed(failed::Failure::Unavailable(_))));
     }
 }

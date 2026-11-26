@@ -19,9 +19,9 @@
 //                    process
 //   tonapi/          the questions to tonAPI, one file per thing asked
 //   translate/       one translator per moved route: tonAPI's answer as the
-//                    page reads it today, JSON and status
-//   node.rs          Node behind: what it is asked and told, and the
-//                    User-Agent the two share
+//                    page reads it today, JSON and status, its errors too
+//   node.rs          Node behind: what it is told, and what the two share
+//                    (the User-Agent, whether the statistics are on)
 //   universities.rs  tonAPI's settings, from the tonAPI the crate is built
 //                    with (build.rs): nothing of tonAPI is copied here
 //
@@ -53,7 +53,7 @@ pub mod proxy;
 pub mod testing;
 
 pub use crate::gateway::{Asked, Gateway, TrustedProxies};
-pub use crate::node::{NodeAnswer, NodeRequest, SESSION_PATH, UNIVERSITY_HEADER};
+pub use crate::node::{NodeAnswer, NodeRequest, UNIVERSITY_HEADER};
 pub use crate::session::cookie::{DEVELOPMENT_COOKIE, PRODUCTION_COOKIE};
 pub use crate::translate::ANSWERED_BY;
 pub use crate::universities::TONAPI_COMMIT;

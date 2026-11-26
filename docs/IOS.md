@@ -93,8 +93,8 @@ it answers.
   signs out.
 - **Node**, behind it: every other route, as before (the portal's
   applications, the planning, the mail, the documents, Rennes 2, Sorbonne
-  Nouvelle, the demo account), and what the gateway asks it for (a second
-  factor, the portal signed in to again, a moved route's error).
+  Nouvelle, the demo account), and what the gateway tells it (a session
+  that ended).
 - **One session**, in one cookie, read by both: the bridge's jar holds it
   whoever set it.
 - **Asked as the app starts**: the session check is the page's first

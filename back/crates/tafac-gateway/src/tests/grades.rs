@@ -1,8 +1,8 @@
 // The grades' routes on the made-up campus: tonAPI signs in to the IUT's
 // ScoDoc gateway with the CAS ticket, and its report goes to the page in
-// ScoDoc's own shape.
+// ScoDoc's own shape. What the routes refuse is refused in Node's words.
 
-use super::{ask, asked, node_says, GET, NO_HEADERS};
+use super::{ask, asked, error_of, never, unavailable, GET, NO_HEADERS};
 use crate::testing::*;
 use crate::ANSWERED_BY;
 
@@ -101,26 +101,45 @@ fn the_report_is_kept_and_scodocs_session_with_it() {
 }
 
 #[test]
-fn what_node_would_refuse_or_scodoc_doesnt_have_is_nodes() {
+fn what_node_refuses_is_refused_here_in_its_words() {
     let campus = campus();
     let gateway = campus.gateway();
     let cookie = campus.alive();
-    // Ids that aren't ids: Node's own 400, nothing asked.
-    for path in [
-        "/__ent_auth/grades/semester/abc",
-        "/__ent_auth/grades/semester/12/34x",
-        "/__ent_auth/grades/department-message",
-        "/__ent_auth/grades/department-message?dep=a%20b",
-        "/__ent_auth/grades/evaluation-distribution?semestre=901",
-        "/__ent_auth/grades/evaluation-distribution?semestre=x&eval=7301",
-        "/__ent_auth/grades/report.pdf",
-        "/__ent_auth/grades/report.pdf?semestre=current",
+    // Ids that aren't ids: Node's own 400, on any server, nothing asked.
+    for (path, said) in [
+        ("/__ent_auth/grades/semester/abc", "Invalid semester id."),
+        ("/__ent_auth/grades/semester/12345678901", "Invalid semester id."),
+        ("/__ent_auth/grades/department-message", "Invalid department."),
+        ("/__ent_auth/grades/department-message?dep=a%20b", "Invalid department."),
+        ("/__ent_auth/grades/evaluation-distribution?semestre=901", "Invalid semester or evaluation id."),
+        ("/__ent_auth/grades/evaluation-distribution?semestre=x&eval=7301", "Invalid semester or evaluation id."),
+        ("/__ent_auth/grades/evaluation-distribution?semestre=current&eval=abc", "Invalid semester or evaluation id."),
+        ("/__ent_auth/grades/report.pdf", "Invalid semester id."),
+        ("/__ent_auth/grades/report.pdf?semestre=current", "Invalid semester id."),
     ] {
-        assert_eq!(ask(&gateway, path, &cookie), None, "{path}");
+        assert_eq!(error_of(&gateway, path, &cookie), (400, serde_json::json!({ "error": said })), "{path}");
+    }
+    // A path Node's own route doesn't read an id from is no route of the
+    // page's: Node's, as any other.
+    for path in ["/__ent_auth/grades/semester/12/34x", "/__ent_auth/grades/semester/12/34", "/__ent_auth/grades/semester/"] {
+        assert!(block_on(gateway.answer(&asked(&GET, path, &NO_HEADERS, &[]), || Some(cookie.clone()), never)).is_none(), "{path}");
     }
     assert!(campus.seen.lock().unwrap().is_empty());
-    // A semester ScoDoc has no report for.
-    assert_eq!(ask(&gateway, "/__ent_auth/grades/semester/123", &cookie), None);
+}
+
+#[test]
+fn what_scodoc_doesnt_have_is_said_as_node_says_it() {
+    let campus = campus();
+    let gateway = campus.gateway();
+    let cookie = campus.alive();
+    // A semester ScoDoc has no report for: the route's error.
+    assert_eq!(error_of(&gateway, "/__ent_auth/grades/semester/123", &cookie), unavailable());
+    // An error isn't kept: ScoDoc is asked again the next time.
+    let asked_before = campus.asked(DATA);
+    assert_eq!(error_of(&gateway, "/__ent_auth/grades/semester/123", &cookie), unavailable());
+    assert!(campus.asked(DATA) > asked_before);
+    // The session lives, and the report it does have is given.
+    assert!(ask(&gateway, GRADES, &cookie).is_some());
 }
 
 #[test]
@@ -157,8 +176,10 @@ fn a_distribution_is_for_an_evaluation_of_the_students_own_report() {
     ask(&gateway, GRADES, &cookie).unwrap();
     assert_eq!(campus.asked(DATA), 5);
 
-    // An evaluation that isn't in the student's report: Node's 404.
-    assert_eq!(ask(&gateway, "/__ent_auth/grades/evaluation-distribution?semestre=901&eval=9999", &cookie), None);
+    // An evaluation that isn't in the student's report: Node's 404, which
+    // the page reads as « no such evaluation ».
+    let unknown = error_of(&gateway, "/__ent_auth/grades/evaluation-distribution?semestre=901&eval=9999", &cookie);
+    assert_eq!(unknown, (404, serde_json::json!({ "error": "Unknown evaluation." })));
 }
 
 #[test]
@@ -167,7 +188,7 @@ fn the_pdf_is_the_gateways_file() {
     let gateway = campus.gateway();
     let cookie = campus.alive();
     let request = asked(&GET, "/__ent_auth/grades/report.pdf?semestre=901&type=BUT", &NO_HEADERS, &[]);
-    let response = block_on(gateway.answer(&request, || Some(cookie.clone()), node_says)).unwrap();
+    let response = block_on(gateway.answer(&request, || Some(cookie.clone()), never)).unwrap();
     assert_eq!(response.status(), 200);
     assert_eq!(response.headers()["content-type"], "application/pdf");
     assert_eq!(response.headers()["content-disposition"], "inline; filename=\"releve-901.pdf\"");
@@ -186,7 +207,7 @@ fn every_grades_question_of_a_session_signs_in_once() {
     let cookie = campus.alive();
     let one = |target: &'static str| async {
         let request = asked(&GET, target, &NO_HEADERS, &[]);
-        gateway.answer(&request, || Some(cookie.clone()), node_says).await
+        gateway.answer(&request, || Some(cookie.clone()), never).await
     };
     let (report, notice, other) = block_on(async { tokio::join!(one(GRADES), one("/__ent_auth/grades/department-message?dep=DEMO"), one("/__ent_auth/grades/semester/890")) });
     assert!(report.is_some() && notice.is_some() && other.is_some());

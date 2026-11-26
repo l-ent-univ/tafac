@@ -9,8 +9,10 @@
 //       same and gives the text, a line per paragraph: answered here.
 //   200 { authenticated: false, message: null }: nobody signed in. Node.
 //   200 for the demo account: Node.
-//   400 { error }: a `dep` that isn't a department's name. Node.
-//   500 { error }: ScoDoc down or answering something else. Node.
+//   400 { error }: a `dep` that isn't a department's name. Answered here,
+//       in Node's words (translate/failed.rs).
+//   500 { error }: ScoDoc down or answering something else. Answered here
+//       (translate/failed.rs).
 
 use tonapi_core::GradeNotice;
 
@@ -32,12 +34,13 @@ pub fn translate(asked: Result<&GradeNotice, Unanswered>) -> Translated {
 
 #[cfg(test)]
 mod tests {
+    use super::super::super::Failure;
     use super::*;
 
     fn answer(asked: Result<&GradeNotice, Unanswered>) -> Option<serde_json::Value> {
         match translate(asked) {
             Translated::Answer(response) => Some(serde_json::from_slice(response.body()).unwrap()),
-            Translated::Node(_) | Translated::Lost => None,
+            Translated::Failed(_) | Translated::Lost => None,
         }
     }
 
@@ -46,7 +49,8 @@ mod tests {
         let written = GradeNotice { message: Some("Jury le 12 février.\n• Salle A".to_string()) };
         assert_eq!(answer(Ok(&written)).unwrap(), serde_json::json!({ "authenticated": true, "message": "Jury le 12 février.\n• Salle A" }));
         assert_eq!(answer(Ok(&GradeNotice { message: None })).unwrap(), serde_json::json!({ "authenticated": true, "message": null }));
-        assert!(answer(Err(Unanswered::Slow)).is_none());
+        // No notice read: the route's error.
+        assert!(matches!(translate(Err(Unanswered::Slow)), Translated::Failed(Failure::Unavailable(_))));
     }
 
     #[test]

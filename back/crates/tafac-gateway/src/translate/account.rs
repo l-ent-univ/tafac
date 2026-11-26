@@ -18,7 +18,9 @@
 //       (translate/expired.rs), and Node is told.
 //   200 { authenticated: false, account: null }: nobody signed in. Node.
 //   200 for the demo account: Node.
-//   500 { error }: Node, which asks the portal itself and words the error.
+//   500 { error }: the portal down, slow, or answering something else, or
+//       for another name than the session's. Answered here
+//       (translate/failed.rs).
 
 use tonapi_core::Profile;
 

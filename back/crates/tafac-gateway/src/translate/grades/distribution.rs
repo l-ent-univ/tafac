@@ -11,19 +11,22 @@
 //       isn't published), 'too-few' (fewer than six grades). tonAPI says
 //       which: answered here.
 //   404 { error }: an evaluation that isn't in the student's own report
-//       (tonAPI's `not_found`: it checks the same). Node, which words it.
+//       (tonAPI's `not_found`: it checks the same). Answered here, in
+//       Node's words (translate/failed.rs).
 //   200 { authenticated: false, … 'signed-out' }: nobody signed in. Node.
 //   200 or 404 for the demo account: Node.
-//   400 { error }: ids that aren't ids. Node.
-//   500 { error }: ScoDoc down or answering something else. Node.
+//   400 { error }: ids that aren't ids. Answered here, in Node's words.
+//   500 { error }: ScoDoc down or answering something else. Answered here
+//       (translate/failed.rs).
 
-use tonapi_core::{DistributionUnavailable, GradeDistribution};
+use tonapi_core::{DistributionUnavailable, ErrorCode, GradeDistribution};
 
-use super::super::{json_answer, unanswered, Translated, Unanswered};
+use super::super::{failed, json_answer, unanswered, Translated, Unanswered};
 
 pub fn translate(asked: Result<&GradeDistribution, Unanswered>) -> Translated {
     let distribution = match asked {
         Ok(distribution) => distribution,
+        Err(Unanswered::Problem(ErrorCode::NotFound)) => return Translated::Failed(failed::UNKNOWN_EVALUATION),
         Err(why) => return unanswered(why),
     };
     let reason = match distribution.unavailable {
@@ -46,7 +49,7 @@ mod tests {
     fn answer(asked: Result<&GradeDistribution, Unanswered>) -> Option<serde_json::Value> {
         match translate(asked) {
             Translated::Answer(response) => Some(serde_json::from_slice(response.body()).unwrap()),
-            Translated::Node(_) | Translated::Lost => None,
+            Translated::Failed(_) | Translated::Lost => None,
         }
     }
 
@@ -68,7 +71,9 @@ mod tests {
         for (reason, said) in [(DistributionUnavailable::Disabled, "disabled"), (DistributionUnavailable::Hidden, "hidden"), (DistributionUnavailable::TooFew, "too-few")] {
             assert_eq!(answer(Ok(&unavailable(reason))).unwrap(), serde_json::json!({ "authenticated": true, "status": "unavailable", "reason": said }));
         }
-        // An evaluation that isn't the student's: Node's 404.
-        assert!(answer(Err(Unanswered::Problem(tonapi_core::ErrorCode::NotFound))).is_none());
+        // An evaluation that isn't the student's: Node's 404, and no other
+        // error is that one.
+        assert!(matches!(translate(Err(Unanswered::Problem(ErrorCode::NotFound))), Translated::Failed(failed::UNKNOWN_EVALUATION)));
+        assert!(matches!(translate(Err(Unanswered::Problem(ErrorCode::UpstreamChanged))), Translated::Failed(failed::Failure::Unavailable(_))));
     }
 }

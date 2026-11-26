@@ -76,8 +76,9 @@ the gateway (Rust)                           back/crates/tafac-gateway
    │  session/       the session's cookie read and written, what tonAPI is
    │                 handed, what the session holds in this process
    │  tonapi/        the questions to tonAPI, one file per thing asked
-   │  translate/     tonAPI's answer as the page reads it today
-   │  node.rs        what Node is asked and told
+   │  translate/     tonAPI's answer as the page reads it today, its
+   │                 errors too
+   │  node.rs        what Node is told, and what the two share
    ├─ login, logout, session, account, deadlines, grades ──▶ tonAPI ──▶ the university
    ▼  everything else, as it came, with the session's cookie
 Node (server.js)                             ──▶ the university
@@ -156,6 +157,23 @@ What the gateway does, for Rennes:
 - **Signs out**: `POST /__ent_auth/logout` ends the session here, tells the
   CAS (tonAPI), and tells Node, for what Node kept of it (the webmail's
   session).
+- **Words a moved route's errors** (`translate/failed.rs`). When tonAPI
+  can't give the page's answer for a session that lives, the gateway
+  answers what Node's own route does: `500 { error }` for a service down,
+  slow or saying something tonAPI doesn't read (`502` for the
+  applications), with the one sentence Node's production server says (the
+  reason goes to the log, as tonAPI's error code; a development server
+  says it to the page); `400` in Node's words for a semester's id, an
+  evaluation's or a department's name that isn't one; `404` for an
+  evaluation that isn't in the student's report; `502` when the IUT's
+  gateway gives no PDF. A service that refuses the student while the CAS
+  still knows the ticket is such an error, not a session over. The error
+  is never kept: the service is asked again the next time.
+- **Says whether the statistics are on** (`analyticsEnabled`, in the
+  session check's answer) from the setting Node reads, without asking
+  Node: `POSTHOG_PROJECT_KEY`. On tafac.fr it is in the environment of
+  both (`src/main.rs`); in the apps it is the key the app starts its
+  server with (`bridge.rs`, « Statistics » below).
 - **One User-Agent** for the whole of Tafac. The CAS binds its ticket to
   the User-Agent that signed in and deletes it when another shows it. The
   gateway and Node present themselves under the same name, the one Node
@@ -170,12 +188,13 @@ What is still Node's, and why:
   the icons, the statistics, the demo account, and the portal's proxy for
   what is left of it (the account's photo, an old link to a page of the
   portal's).
-- **A moved route's errors.** When tonAPI can't give the page's answer (a
-  service down or slow, a parameter to refuse, the demo account, nobody
-  signed in), the request goes to Node's own route, which words it. Each
-  translator lists the cases.
-- **What Node is set up for** (`analyticsEnabled`, in the session check's
-  answer): read from Node now and then.
+- **The moved routes, for a session the gateway doesn't hold**: nobody
+  signed in, the demo account, another university, a cookie it can't read.
+  The request goes to Node's own route as it came. Each translator lists
+  the cases.
+- **A session that ended**: Node is told (its own sign-out, with the
+  session's cookie), for what it kept of the session. It is the one thing
+  the gateway goes to Node for.
 
 - **To move a route**: its line in `routes.rs`, its question in `tonapi/`,
   a translator in `translate/`, three lines in `gateway/`, and the answer
@@ -216,7 +235,9 @@ portal session lost while the CAS still knew the ticket was not; and the
 gateway's sign-out ended the CAS's session. Not run on a real account: the
 sign-in's refusals and limits (a wrong password is not tried on a real
 account), and the page itself in a browser or in the apps (the requests
-were a script's).
+were a script's). The errors the gateway words itself (a service down, a
+parameter refused, a service refusing while the CAS knows the session)
+were run on the made-up campus of the tests only.
 
 The second factor was run on a real account of Rennes on 26 November 2026,
 one whose only way to a code is the mail: the code left unasked, then asked
@@ -605,7 +626,9 @@ through tafac.fr, and only while « Statistiques anonymes » is on. Its
 events carry `client: desktop` and `app_version` (a browser tab says `web`,
 the installed PWA `pwa`). The key is built in by CI
 (`TAFAC_POSTHOG_PROJECT_KEY`, read by `src-tauri/src/sidecar.rs`): a local
-build sends nothing.
+build sends nothing. The gateway in the app reads the same key
+(`src-tauri/src/bridge.rs`) to tell the page whether the statistics are
+on: the server isn't asked.
 
 ## The disk image
 

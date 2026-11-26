@@ -1,16 +1,18 @@
 // A session the CAS no longer knows, on the made-up campus: found on any
 // moved route, ended here, said to the page as Node says it, and told to
-// Node.
+// Node. And a service that fails while the CAS still knows the session:
+// the route's error, and the session lives.
 
 use http::header::SET_COOKIE;
 use http::HeaderMap;
 
-use super::{ask, asked, body_of, cookie_set, node_says, Node, ACCOUNT, GET, NO_HEADERS, SESSION};
+use super::{ask, asked, body_of, cookie_set, error_of, never, unavailable, Node, ACCOUNT, GET, NO_HEADERS, SESSION};
 use crate::testing::*;
 use crate::Gateway;
 
 const DEADLINES: &str = "/__ent_auth/moodle/deadlines";
 const GRADES: &str = "/__ent_auth/grades";
+const CALENDAR: &str = "/moodle/lib/ajax/service.php";
 
 fn get(gateway: &Gateway, node: &Node, target: &str, cookie: &str) -> Option<http::Response<Vec<u8>>> {
     block_on(gateway.answer(&asked(&GET, target, &NO_HEADERS, &[]), || Some(cookie.to_string()), |request| node.ask(request)))
@@ -72,8 +74,8 @@ fn whoever_still_shows_the_cookie_is_told_and_the_cookie_isnt_touched_again() {
     assert_eq!((check.status(), &body_of(&check)["authenticated"], &body_of(&check)["expired"]), (http::StatusCode::OK, &false.into(), &true.into()));
     assert!(check.headers().get(SET_COOKIE).is_none());
     assert_eq!(campus.paths().len(), asked_of_campus);
-    // Node: asked once what it is set up for, for the session check.
-    assert_eq!(node.got()[asked_of_node..], ["GET /__ent_auth/session"]);
+    // Node: told once that the session ended, and asked nothing since.
+    assert_eq!(node.got().len(), asked_of_node);
 
     // Another student's session is another's.
     let other = campus.cookie(serde_json::json!({ "id": "another-session" }), &[("JSESSIONID", "alive")]);
@@ -83,7 +85,7 @@ fn whoever_still_shows_the_cookie_is_told_and_the_cookie_isnt_touched_again() {
 #[test]
 fn the_session_check_finds_it_over_and_says_so_as_node_does() {
     let campus = campus();
-    let gateway = campus.gateway();
+    let gateway = campus.gateway().with_statistics(Some("phc_made_up"));
     let node = Node::default();
     // The portal's session lapsed, and the CAS's with it.
     let cookie = campus.lapsed();
@@ -99,7 +101,8 @@ fn the_session_check_finds_it_over_and_says_so_as_node_does() {
     );
     assert!(says_expired(&response));
     assert_eq!(cookie_set(&response).as_deref(), Some("cleared"));
-    assert!(node.got().contains(&"POST /__ent_auth/logout".to_string()));
+    // Node: told that the session ended, and nothing else.
+    assert_eq!(node.got(), ["POST /__ent_auth/logout"]);
 }
 
 #[test]
@@ -126,14 +129,47 @@ fn only_the_cas_ends_a_session() {
     assert!(gateway.signed_in(Some(&cookie)).is_some());
 
     // The portal forgot again and the CAS doesn't say (down): nothing ends
-    // either, and the check is Node's to answer.
+    // either, and the check is the route's own error.
     campus.portal_forgets();
     campus.cas_is_down(true);
-    assert!(get(&gateway, &node, SESSION, &cookie).is_none());
+    let response = get(&gateway, &node, SESSION, &cookie).unwrap();
+    assert_eq!((response.status().as_u16(), body_of(&response)), unavailable());
+    assert!(!says_expired(&response) && cookie_set(&response).is_none());
     assert!(gateway.signed_in(Some(&cookie)).is_some());
     // The account asked within the half minute is the profile just read.
-    assert!(get(&gateway, &node, ACCOUNT, &cookie).is_some());
-    assert!(!node.got().contains(&"POST /__ent_auth/logout".to_string()));
+    assert_eq!(get(&gateway, &node, ACCOUNT, &cookie).unwrap().status(), 200);
+    // Node is told nothing: no session ended.
+    assert!(node.got().is_empty());
+}
+
+#[test]
+fn a_service_that_refuses_while_the_cas_knows_the_session_is_the_routes_error() {
+    let campus = campus();
+    let gateway = campus.gateway();
+    let cookie = campus.alive();
+    // Moodle refuses the session it has just given: tonAPI says the
+    // university no longer knows the student (`session_expired`). The CAS,
+    // asked with the ticket, still does: Moodle's own trouble, said as Node
+    // says a service's error, and the session lives. Node is asked nothing
+    // (`error_of`).
+    campus.moodle_refuses(true);
+    assert_eq!(error_of(&gateway, DEADLINES, &cookie), unavailable());
+    assert!(gateway.signed_in(Some(&cookie)).is_some());
+    assert!(campus.cas_knows_the_ticket());
+    // The other services answer as before, with the same session.
+    assert!(ask(&gateway, GRADES, &cookie).is_some());
+
+    // The error isn't kept: Moodle is asked again the next time, and
+    // answers once it takes its sessions again.
+    let at_moodle = campus.asked(CALENDAR);
+    assert_eq!(error_of(&gateway, DEADLINES, &cookie), unavailable());
+    assert!(campus.asked(CALENDAR) > at_moodle);
+    // A development server says why, in words that aren't a session over.
+    let development = Gateway::for_tests(vec![campus.settings()], SECRET, crate::DEVELOPMENT_COOKIE);
+    let (status, said) = error_of(&development, DEADLINES, &cookie);
+    assert_eq!((status, said["error"].as_str()), (500, Some("session_expired, and the CAS doesn't say the session is over")));
+    campus.moodle_refuses(false);
+    assert!(ask(&gateway, DEADLINES, &cookie).is_some());
 }
 
 #[test]
@@ -164,7 +200,7 @@ fn a_session_signed_in_here_expires_the_same_way() {
     let mut headers = HeaderMap::new();
     headers.insert("content-type", "application/json".parse().unwrap());
     let login = serde_json::json!({ "username": STUDENT, "password": PASSWORD, "university": UNIVERSITY }).to_string();
-    let signed_in = block_on(gateway.answer(&asked(&super::POST, super::LOGIN, &headers, login.as_bytes()), || None, node_says)).unwrap();
+    let signed_in = block_on(gateway.answer(&asked(&super::POST, super::LOGIN, &headers, login.as_bytes()), || None, never)).unwrap();
     let cookie = cookie_set(&signed_in).unwrap();
     assert!(ask(&gateway, GRADES, &cookie).is_some());
 
