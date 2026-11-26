@@ -24,6 +24,7 @@
 //                    User-Agent the two share
 //   universities.rs  tonAPI's settings, from the tonAPI the crate is built
 //                    with (build.rs): nothing of tonAPI is copied here
+//   portals.rs       what differs from one portal software to another
 //
 // And two ways in:
 //
@@ -44,6 +45,7 @@ pub mod translate;
 
 mod gateway;
 mod node;
+mod portals;
 mod tonapi;
 mod universities;
 

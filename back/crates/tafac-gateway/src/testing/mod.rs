@@ -15,6 +15,10 @@ use tonapi_config::ResolvedUniversity;
 use crate::session::cookie;
 use crate::Gateway;
 
+mod other_portals;
+
+pub use other_portals::{drupal_campus, isorbonne_campus, OtherCampus};
+
 pub const SECRET: &str = "a secret of the tests, long enough to be one";
 pub const UNIVERSITY: &str = "univ-rennes";
 pub const COOKIE_NAME: &str = cookie::PRODUCTION_COOKIE;
@@ -587,6 +591,11 @@ pub fn header_of(head: &str, name: &str) -> String {
 }
 
 pub fn campus() -> Campus {
+    listening(campus_answer)
+}
+
+// A campus that answers each request with `answer`.
+fn listening(answer: fn(&Received<'_>, &str, &State) -> Answer) -> Campus {
     let seen = Arc::new(Mutex::new(Vec::new()));
     let posted = Arc::new(Mutex::new(Vec::new()));
     let listener = block_on(tokio::net::TcpListener::bind("127.0.0.1:0")).unwrap();
@@ -612,7 +621,7 @@ pub fn campus() -> Campus {
                 let cookies = header_of(&head, "cookie");
                 let received =
                     Received { method: &method, path: &path, cookies: &cookies, agent: &header_of(&head, "user-agent"), body: &String::from_utf8_lossy(&body) };
-                let Answer { status, content_type, body, headers } = campus_answer(&received, &port, &state);
+                let Answer { status, content_type, body, headers } = answer(&received, &port, &state);
                 if method == "POST" {
                     record_posted.lock().unwrap().push(path.split('?').next().unwrap_or_default().to_string());
                 }

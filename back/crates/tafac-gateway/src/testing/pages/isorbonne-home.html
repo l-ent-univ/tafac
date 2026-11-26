@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="fr">
+<head><title>iSorbonne</title></head>
+<body>
+<form id="navBarForm" name="navBarForm" method="post" action="/ENT/secure/index.xhtml">
+  <a title="Déconnexion" class="ui-commandlink nav-link" href="logout.xhtml">Doe Jeanne <i class="fa fa-power-off"></i></a>
+</form>
+<form id="portalForm" name="portalForm" method="post" action="/ENT/secure/index.xhtml">
+  <div class="col-12 text-center" id="buttonList">
+    <input type="button" class="toglem btn btn-info m-1 ombrer" value="Accueil" id="t1">
+    <input type="button" class="toglem btn btn-warning m-1" value="Etudiant" id="t2">
+    <input type="button" class="toglem btn m-1" value="Vide" id="t3">
+    <input type="button" class="btn btn-outline-dark m-1" value="Tous les services" id="temall">
+  </div>
+  <div class="tuile default col-sm-6 t2" style="display: none;"><a href="#" class="favik"></a>
+    <a class="links" href="https://apps.exemple.test/dossier/" target="_54"><div class="bloc">
+      <label id="portalForm:p54" class="ui-outputlabel h4">Mon dossier de scolarité</label></div></a>
+    <i class="infos fa fa-question-circle" onclick="showDialog(54)"></i>
+    <div id="infos54" style="display:none"><label id="portalForm:j_idt212" class="ui-outputlabel"><ul><li>Notes et <strong>certificat</strong> de scolarité, à télécharger depuis le menu des inscriptions. Encore du texte d'aide, long, que la grille ne montre pas en entier : seulement son début, coupé sur un mot. Et encore une phrase pour dépasser la limite.</li></ul></label>
+    </div>
+  </div>
+  <div class="tuile default col-sm-6 t1" style=""><a href="#" class="ui-commandlink favik"><i class="fa fa-star"></i></a>
+    <a class="links" href="https://apps.exemple.test/Fichiers" target="_35"><div class="bloc">
+      <label id="portalForm:p35" class="ui-outputlabel h4">Mes documents U&nbsp;:</label></div></a>
+  </div>
+  <div class="tuile default col-sm-6 t2"><a class="links" href="/ENT/secure/aide.xhtml"><label id="portalForm:p61" class="h4">Aide</label></a>
+    <div id="infos61" style="display:none"><label class="ui-outputlabel">Une question&nbsp;?</label></div>
+  </div>
+  <div class="tuile default col-sm-6 t2"><a class="links" href="javascript:void(0)"><label id="portalForm:p9" class="h4">Lien cassé</label></a></div>
+</form>
+</body>
+</html>

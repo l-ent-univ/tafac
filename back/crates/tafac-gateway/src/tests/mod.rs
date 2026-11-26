@@ -10,11 +10,14 @@
 //   moodle_deadlines.rs   a route another service answers: the CAS ticket,
 //                         the session held, the answer kept
 //   grades.rs             the grades' routes: ScoDoc's shape written back
+//   other_portals.rs      the same routes at a university whose portal is
+//                         not uPortal (Drupal, iSorbonne): not switched on
 
 mod apps;
 mod expiry;
 mod grades;
 mod moodle_deadlines;
+mod other_portals;
 mod portal;
 mod signin;
 

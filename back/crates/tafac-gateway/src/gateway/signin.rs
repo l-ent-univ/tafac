@@ -140,6 +140,16 @@ fn is_demo(login: &Login) -> bool {
     login.username.to_lowercase() == DEMO_USERNAME && login.password == DEMO_PASSWORD
 }
 
+// The session's `user`: the portal's own name for the student, when it has
+// one (uPortal). A portal without one (Drupal, iSorbonne) leaves the login
+// typed, trimmed and in lower case, as Node keeps it for those portals.
+fn session_user<'a>(university: &University, named_by_the_portal: &'a str, who: &'a Who) -> &'a str {
+    match named_by_the_portal.trim() {
+        named if university.portal.names_the_student() && !named.is_empty() => named,
+        _ => who.login.as_str(),
+    }
+}
+
 impl Gateway {
     // The university a login is for, when it is one answered here: the one
     // the body names, else the one the header names (Node's resolveUniversity,
@@ -245,10 +255,7 @@ impl Gateway {
         let Ok(Ok(profile)) = profile.map(|asked| asked.map(|fetched| fetched.data)) else {
             return self.failed(who, said::no_portal_session());
         };
-        let user = match profile.username.trim() {
-            "" => who.login.as_str(),
-            named => named,
-        };
+        let user = session_user(university, &profile.username, who);
 
         let (ticket, others) = handed::for_the_cookie(university, &signed_in.cookies);
         let new = NewSession { university: &university.settings.university.id, user, ticket: &ticket, others: &others, secure: university.asked_over_https() };
@@ -376,6 +383,20 @@ mod tests {
         }
         let long = format!(r#"{{"username":"{}","password":"p"}}"#, "x".repeat(MAX_USERNAME_BYTES + 1));
         assert!(read(JSON, &long).is_none());
+    }
+
+    #[test]
+    fn the_sessions_user_is_the_portals_name_or_the_login_typed() {
+        let who = Who::new("203.0.113.7".to_string(), " JDoe ");
+        let uportal = University::of(crate::testing::campus().settings()).unwrap();
+        assert_eq!(session_user(&uportal, " e21901234 ", &who), "e21901234");
+        assert_eq!(session_user(&uportal, "  ", &who), "jdoe");
+        // No name of the portal's own: tonAPI's profile says the login as
+        // typed, and the session keeps it as Node does.
+        for campus in [crate::testing::drupal_campus(), crate::testing::isorbonne_campus()] {
+            let university = University::of(campus.settings()).unwrap();
+            assert_eq!(session_user(&university, "JDoe", &who), "jdoe");
+        }
     }
 
     // The demo account's login is Node's own: held to what Node has.
