@@ -13,6 +13,9 @@
 //   services.rs   the routes another service answers (Moodle, ScoDoc): its
 //                 turn, the answer kept, the question, what the session
 //                 holds of the service
+//   behind.rs     the home page's three answers: an old one given while
+//                 the university is asked again, and all three asked at
+//                 the sign-in
 //   settled.rs    the routes answered to their end here, failures included:
 //                 launch.rs (the launch relay, its preview) and student.rs
 //                 (the photo, the school certificate)
@@ -26,6 +29,7 @@
 // university, nobody signed in, a cookie that isn't read.
 
 mod attempts;
+mod behind;
 mod launch;
 pub(crate) mod portal;
 mod services;
@@ -36,18 +40,20 @@ mod student;
 use std::collections::BTreeMap;
 use std::future::Future;
 use std::net::IpAddr;
+use std::sync::Arc;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use http::{HeaderMap, Method};
 use tonapi_providers::NetSettings;
 
 pub use attempts::TrustedProxies;
+use behind::Lasting;
 
 use crate::node::{self, NodeAnswer, NodeRequest};
 use crate::routes::{self, Moved};
 use crate::session::cookie;
 use crate::session::handed::CAS_TICKET;
-use crate::session::memory::{Ended, Memory, Turn};
+use crate::session::memory::{self, Ended, Memory, Turn};
 use crate::session::Held;
 use crate::tonapi;
 use crate::translate::{self, Failure, Translated};
@@ -75,7 +81,8 @@ pub struct Asked<'a> {
 }
 
 pub struct Gateway {
-    universities: BTreeMap<String, University>,
+    // Shared with what is asked behind an answer (behind.rs).
+    universities: BTreeMap<String, Arc<University>>,
     cookie_name: String,
     codec: cookie::Codec,
     net: NetSettings,
@@ -88,6 +95,9 @@ pub struct Gateway {
     pub(crate) memory: Memory,
     pub(crate) attempts: attempts::Attempts,
     pub(crate) early: portal::Early,
+    // A sign-in has the home page's answers asked at once (behind.rs).
+    // Always, but in the tests, which count what a sign-in asks.
+    asks_ahead: bool,
 }
 
 pub(crate) fn now_ms() -> i64 {
@@ -104,7 +114,7 @@ impl Gateway {
 
     fn with(universities: BTreeMap<String, University>, session_secret: &str, cookie_name: &str, net: NetSettings) -> Self {
         Self {
-            universities,
+            universities: universities.into_iter().map(|(id, university)| (id, Arc::new(university))).collect(),
             cookie_name: cookie_name.to_string(),
             codec: cookie::Codec::new(session_secret),
             net,
@@ -114,6 +124,7 @@ impl Gateway {
             memory: Memory::default(),
             attempts: attempts::Attempts::default(),
             early: portal::Early::default(),
+            asks_ahead: true,
         }
     }
 
@@ -147,7 +158,16 @@ impl Gateway {
     pub fn for_tests(universities: Vec<tonapi_config::ResolvedUniversity>, session_secret: &str, cookie_name: &str) -> Self {
         let universities =
             universities.into_iter().filter_map(|settings| Some((settings.university.id.clone(), University::of(settings)?))).collect();
-        Self::with(universities, session_secret, cookie_name, NetSettings { https_only: false, user_agent: Some(node::USER_AGENT) })
+        let mut gateway = Self::with(universities, session_secret, cookie_name, NetSettings { https_only: false, user_agent: Some(node::USER_AGENT) });
+        gateway.asks_ahead = false;
+        gateway
+    }
+
+    // For the tests of what a sign-in asks ahead: as the gateway that runs.
+    #[cfg(any(test, feature = "testing"))]
+    pub fn asking_ahead(mut self) -> Self {
+        self.asks_ahead = true;
+        self
     }
 
     pub fn cookie_name(&self) -> &str {
@@ -207,12 +227,12 @@ impl Gateway {
             Moved::Logout => return Some(self.sign_out(&held, &value, &node).await),
             Moved::Session => self.session_check(&held).await,
             Moved::Account => self.account(&held).await,
-            Moved::Apps => self.apps(&held).await,
-            Moved::MoodleDeadlines => self.moodle_deadlines(&held).await,
-            Moved::Grades => self.grades(&held, None).await,
+            Moved::Apps => self.lasting(&held, Lasting::Apps, query).await,
+            Moved::MoodleDeadlines => self.lasting(&held, Lasting::Deadlines, query).await,
+            Moved::Grades => self.lasting(&held, Lasting::Grades, query).await,
             // Node's route reads one part of the path after the folder: a
             // path with none, or more, is no route of the page's.
-            Moved::GradesSemester => self.grades(&held, Some(routes::under(route, asked.path).filter(|id| !id.is_empty() && !id.contains('/'))?)).await,
+            Moved::GradesSemester => self.grades(&held, routes::under(route, asked.path).filter(|id| !id.is_empty() && !id.contains('/'))?).await,
             Moved::GradesMessage => self.grades_message(&held, query).await,
             Moved::GradesDistribution => self.grades_distribution(&held, query).await,
             Moved::GradesTranscript => self.grades_transcript(&held, query).await,
@@ -359,7 +379,7 @@ impl Gateway {
         if !session.has_cookie(&university.cas_host, CAS_TICKET) || self.memory.ended(&session.id).is_some() {
             return None;
         }
-        let memory = self.memory.of(&session.id);
+        let memory = self.memory.of(&session.id, memory::student(&session.university, &session.user).as_deref());
         Some(Held { session, university, memory })
     }
 }

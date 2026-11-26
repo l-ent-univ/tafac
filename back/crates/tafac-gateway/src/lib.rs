@@ -60,7 +60,7 @@ pub mod testing;
 pub use crate::gateway::{Asked, Gateway, TrustedProxies};
 pub use crate::node::{NodeAnswer, NodeRequest, UNIVERSITY_HEADER};
 pub use crate::session::cookie::{DEVELOPMENT_COOKIE, PRODUCTION_COOKIE};
-pub use crate::translate::ANSWERED_BY;
+pub use crate::translate::{ANSWERED_BY, REFRESHING};
 pub use crate::universities::TONAPI_COMMIT;
 
 #[cfg(test)]

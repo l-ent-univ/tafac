@@ -95,7 +95,7 @@ impl UpstreamCookie {
 }
 
 // A session, as its cookie says it.
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct Session {
     // The session's own id: a new one at each sign-in.
     pub id: String,

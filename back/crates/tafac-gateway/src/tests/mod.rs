@@ -10,6 +10,9 @@
 //                         that fails while the CAS still does
 //   moodle_deadlines.rs   a route another service answers: the CAS ticket,
 //                         the session held, the answer kept
+//   behind.rs             the home page's answers past their freshness: the
+//                         old one given while the university is asked again,
+//                         whose they are, and what a sign-in asks ahead
 //   grades.rs             the grades' routes: ScoDoc's shape written back,
 //                         and what the routes refuse
 //   launch.rs             the launch relay, its preview, and what Moodle's
@@ -20,6 +23,7 @@
 //                         not uPortal (Drupal, iSorbonne)
 
 mod apps;
+mod behind;
 mod expiry;
 mod grades;
 mod launch;

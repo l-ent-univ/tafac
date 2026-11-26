@@ -58,7 +58,8 @@ base64 = "0.23"
 http = "1"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
-tokio = { version = "1", features = ["sync", "time", "macros"] }
+# rt: what is asked of the university behind an answer (gateway/behind.rs).
+tokio = { version = "1", features = ["sync", "time", "macros", "rt"] }
 # A panic inside a provider is one route's error, not a request lost.
 futures-util = { version = "0.3", default-features = false, features = ["std"] }
 hyper = { version = "1", features = ["client", "server", "http1"], optional = true }

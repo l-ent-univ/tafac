@@ -697,6 +697,49 @@ function AvailableApplications({
   useEffect(() => {
     let isCancelled = false
 
+    // The list as the server gave it, shown.
+    function showApplications(answer) {
+      const services = orderApplications(toApplications(answer.apps, APPLICATION_OPTIONS), loadAppsOrder())
+      saveAppsOrder(services)
+
+      // The favourites: the browser's, started once from the portal's.
+      const favoritesKey = answer.sessionMode === DEMO_SESSION_MODE ? DEMO_FAVORITES_KEY : LOCAL_FAVORITES_KEY
+      favoritesKeyRef.current = favoritesKey
+      const favorites = resolveFavoriteKeys(loadLocalFavorites(favoritesKey), services)
+      if (favorites.seeded) {
+        saveLocalFavorites(favoritesKey, favorites.keys)
+      }
+      const sections = buildLocalFavoriteSections(services, favorites.keys)
+
+      // Establishment shortcuts go first. When the portal already lists one
+      // (same host), promote the portal entry instead of duplicating it.
+      const extraServices = universityConfig.establishments?.byId?.[establishment]?.extraServices ?? []
+      const pinnedServices = extraServices.map((extraService) => {
+        const extraHost = getUrlHostname(extraService.href)
+        const portalIndex = extraHost ? services.findIndex((service) => getUrlHostname(service.href) === extraHost) : -1
+        return portalIndex !== -1 ? services.splice(portalIndex, 1)[0] : extraService
+      })
+      services.unshift(...pinnedServices)
+
+      // Tile icons come in the background: the grid never waits for them.
+      void fetchAppIcons(services).then((assignments) => {
+        // Shared by the whole university, so still right after a refresh.
+        if (assignments) {
+          setAppIcons(assignments)
+        }
+      })
+
+      setAllServices(services)
+      setFavoriteActionState((current) => ({ ...current, error: '' }))
+      setViewState({
+        status: sections.sections.length > 0 ? 'ready' : 'empty',
+        source: sections.source,
+        rawCount: sections.rawCount,
+        sections: sections.sections,
+        error: '',
+      })
+    }
+
     async function hydrateApplications() {
       try {
         const answer = await getApps()
@@ -706,46 +749,16 @@ function AvailableApplications({
         if (!Array.isArray(answer?.apps)) {
           throw new Error(DEFAULT_ERROR_MESSAGE)
         }
+        showApplications(answer)
 
-        const services = orderApplications(toApplications(answer.apps, APPLICATION_OPTIONS), loadAppsOrder())
-        saveAppsOrder(services)
-
-        // The favourites: the browser's, started once from the portal's.
-        const favoritesKey = answer.sessionMode === DEMO_SESSION_MODE ? DEMO_FAVORITES_KEY : LOCAL_FAVORITES_KEY
-        favoritesKeyRef.current = favoritesKey
-        const favorites = resolveFavoriteKeys(loadLocalFavorites(favoritesKey), services)
-        if (favorites.seeded) {
-          saveLocalFavorites(favoritesKey, favorites.keys)
-        }
-        const sections = buildLocalFavoriteSections(services, favorites.keys)
-
-        // Establishment shortcuts go first. When the portal already lists one
-        // (same host), promote the portal entry instead of duplicating it.
-        const extraServices = universityConfig.establishments?.byId?.[establishment]?.extraServices ?? []
-        const pinnedServices = extraServices.map((extraService) => {
-          const extraHost = getUrlHostname(extraService.href)
-          const portalIndex = extraHost ? services.findIndex((service) => getUrlHostname(service.href) === extraHost) : -1
-          return portalIndex !== -1 ? services.splice(portalIndex, 1)[0] : extraService
-        })
-        services.unshift(...pinnedServices)
-
-        // Tile icons come in the background: the grid never waits for them.
-        void fetchAppIcons(services).then((assignments) => {
-          // Shared by the whole university, so still right after a refresh.
-          if (assignments) {
-            setAppIcons(assignments)
+        // An old list the server gave while it asks the portal again: the
+        // one that comes replaces it; without one, the old list stays.
+        if (answer.refreshing) {
+          const fresh = await getApps({ fresh: true }).catch(() => null)
+          if (!isCancelled && Array.isArray(fresh?.apps)) {
+            showApplications(fresh)
           }
-        })
-
-        setAllServices(services)
-        setFavoriteActionState((current) => ({ ...current, error: '' }))
-        setViewState({
-          status: sections.sections.length > 0 ? 'ready' : 'empty',
-          source: sections.source,
-          rawCount: sections.rawCount,
-          sections: sections.sections,
-          error: '',
-        })
+        }
       } catch (error) {
         if (isCancelled) {
           return

@@ -86,6 +86,17 @@ pub(crate) fn kept_answer(body: Vec<u8>) -> Translated {
     Translated::Answer(json_response(200, body))
 }
 
+// On an answer kept past its freshness and given all the same: the
+// university is being asked again behind it (gateway/behind.rs). The page
+// shows the answer and asks once more, `?fresh=1`, for the one that comes.
+pub const REFRESHING: &str = "x-tafac-refreshing";
+
+pub(crate) fn old_answer(body: Vec<u8>) -> Translated {
+    let mut response = json_response(200, body);
+    response.headers_mut().insert(REFRESHING, http::HeaderValue::from_static("1"));
+    Translated::Answer(response)
+}
+
 // The headers every answer of Node's production server carries
 // (server/securityHeaders/baseline.ts: BASELINE_HEADERS), which an answer
 // made here carries too: no sniffing, no framing by another site, HTTPS

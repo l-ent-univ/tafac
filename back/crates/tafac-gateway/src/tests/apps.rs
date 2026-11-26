@@ -2,7 +2,6 @@
 // applications, asked with the CAS ticket and a portal session of the
 // gateway's own.
 
-use std::time::Duration;
 
 use super::{ask, asked, body_of, cookie_set, error_of, never, Node, GET, NO_HEADERS};
 use crate::testing::*;
@@ -15,9 +14,10 @@ fn get(gateway: &Gateway, node: &Node, cookie: &str) -> Option<http::Response<Ve
     block_on(gateway.answer(&asked(&GET, APPS, &NO_HEADERS, &[]), || Some(cookie.to_string()), |request| node.ask(request)))
 }
 
-// The answer kept is past its hour.
-fn an_hour_later(gateway: &Gateway, cookie: &str) {
-    gateway.signed_in(Some(cookie)).unwrap().memory.age_answers(Duration::from_secs(3601));
+// No list is kept any longer: the day after (tests/behind.rs has the hours
+// between, when the old list is given while the portal is asked again).
+fn the_day_after(gateway: &Gateway, cookie: &str) {
+    gateway.signed_in(Some(cookie)).unwrap().memory.forget_answers();
 }
 
 #[test]
@@ -62,7 +62,7 @@ fn the_portal_session_is_the_gateways_own_and_the_list_is_kept() {
 
     // Then asked again, with the portal session held from the first time:
     // no CAS, and each tile's address isn't asked for twice.
-    an_hour_later(&gateway, &cookie);
+    the_day_after(&gateway, &cookie);
     assert!(ask(&gateway, APPS, &cookie).is_some());
     let since: Vec<String> = campus.paths()[asked_before..].to_vec();
     assert_eq!(since, [LAYOUT]);
@@ -75,7 +75,7 @@ fn a_portal_that_forgot_its_session_is_signed_in_to_again_here() {
     let node = Node::default();
     let cookie = campus.alive();
     assert!(get(&gateway, &node, &cookie).is_some());
-    an_hour_later(&gateway, &cookie);
+    the_day_after(&gateway, &cookie);
 
     campus.portal_forgets();
     let response = get(&gateway, &node, &cookie).unwrap();

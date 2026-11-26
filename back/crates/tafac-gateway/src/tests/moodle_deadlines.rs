@@ -13,6 +13,9 @@ use crate::testing::*;
 use crate::Gateway;
 
 const DEADLINES: &str = "/__ent_auth/moodle/deadlines";
+// As the page asks once it holds an old answer: for the one the university
+// gives now (tests/behind.rs has the old answer itself).
+const DEADLINES_NOW: &str = "/__ent_auth/moodle/deadlines?fresh=1";
 const SIGN_IN: &str = "/moodle/login/index.php";
 const CALENDAR: &str = "/moodle/lib/ajax/service.php";
 
@@ -81,7 +84,7 @@ fn the_answer_is_kept_five_minutes_and_moodles_session_longer() {
     // Five minutes later Moodle is asked again, with the session it gave:
     // no sign-in.
     five_minutes_later(&gateway, &cookie);
-    assert!(ask(&gateway, DEADLINES, &cookie).is_some());
+    assert!(ask(&gateway, DEADLINES_NOW, &cookie).is_some());
     assert_eq!((campus.asked(SIGN_IN), campus.asked(CALENDAR)), (2, 2));
     let calendar = campus.seen.lock().unwrap().iter().rev().find(|(path, _)| path.starts_with(CALENDAR)).cloned().unwrap();
     assert!(calendar.0.contains("sesskey=CAMPUSKEY0") && calendar.1.contains("MoodleSession=open0"));
@@ -96,7 +99,7 @@ fn a_session_moodle_forgot_is_opened_again_once() {
 
     campus.moodle_forgets();
     five_minutes_later(&gateway, &cookie);
-    assert!(ask(&gateway, DEADLINES, &cookie).is_some());
+    assert!(ask(&gateway, DEADLINES_NOW, &cookie).is_some());
     // The old session refused, one sign-in, the new one answered.
     assert_eq!((campus.asked(SIGN_IN), campus.asked(CALENDAR)), (4, 3));
     // The CAS wrote its ticket anew at the first sign-in: the second was
@@ -108,7 +111,7 @@ fn a_session_moodle_forgot_is_opened_again_once() {
 
     // And the new session is the one remembered.
     five_minutes_later(&gateway, &cookie);
-    assert!(ask(&gateway, DEADLINES, &cookie).is_some());
+    assert!(ask(&gateway, DEADLINES_NOW, &cookie).is_some());
     assert_eq!((campus.asked(SIGN_IN), campus.asked(CALENDAR)), (4, 4));
 }
 
@@ -130,7 +133,7 @@ fn the_ticket_written_anew_in_the_cookie_changes_nothing() {
     assert_eq!(ask(&gateway, DEADLINES, &rewritten).unwrap(), first);
     assert_eq!(campus.paths().len(), asked);
     five_minutes_later(&gateway, &rewritten);
-    assert!(ask(&gateway, DEADLINES, &rewritten).is_some());
+    assert!(ask(&gateway, DEADLINES_NOW, &rewritten).is_some());
     assert_eq!((campus.asked(SIGN_IN), campus.asked(CALENDAR)), (2, 2));
 }
 
@@ -168,10 +171,16 @@ fn two_questions_at_once_sign_in_once() {
 fn each_students_moodle_is_their_own() {
     let campus = campus();
     let gateway = campus.gateway();
-    let other = campus.cookie(serde_json::json!({ "id": "another-session" }), &[("JSESSIONID", "alive")]);
+    let other = campus.cookie(serde_json::json!({ "id": "another-session", "user": "asmith" }), &[("JSESSIONID", "alive")]);
     ask(&gateway, DEADLINES, &campus.alive()).unwrap();
     ask(&gateway, DEADLINES, &other).unwrap();
     // Neither the answer nor Moodle's session of one serves the other.
+    assert_eq!((campus.asked(SIGN_IN), campus.asked(CALENDAR)), (4, 2));
+
+    // The same student's other session (another browser) has the answer,
+    // which is the student's, and its own session at Moodle when it asks.
+    let elsewhere = campus.cookie(serde_json::json!({ "id": "a-third-session" }), &[("JSESSIONID", "alive")]);
+    ask(&gateway, DEADLINES, &elsewhere).unwrap();
     assert_eq!((campus.asked(SIGN_IN), campus.asked(CALENDAR)), (4, 2));
 }
 

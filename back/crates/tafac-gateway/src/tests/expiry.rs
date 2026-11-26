@@ -29,7 +29,8 @@ fn a_service_route_finds_the_session_over_and_ends_it() {
     let node = Node::default();
     let cookie = campus.alive();
     assert!(ask(&gateway, DEADLINES, &cookie).is_some());
-    gateway.signed_in(Some(&cookie)).unwrap().memory.age_answers(std::time::Duration::from_secs(301));
+    // Nothing kept to give meanwhile (tests/behind.rs has an old answer's case).
+    gateway.signed_in(Some(&cookie)).unwrap().memory.forget_answers();
 
     // The CAS ended its session (Rennes' does, half an hour in), and Moodle
     // its own: tonAPI can't sign in again, and the CAS, asked with the

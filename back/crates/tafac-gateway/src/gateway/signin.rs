@@ -48,7 +48,7 @@ use super::attempts::{requester, Who};
 use super::{now_ms, Asked, Gateway};
 use crate::node::{NodeAnswer, NodeRequest, UNIVERSITY_HEADER};
 use crate::session::cookie::NewSession;
-use crate::session::memory::{Ended, Snapshot};
+use crate::session::memory::{self, Ended, Snapshot};
 use crate::session::{handed, Held};
 use crate::tonapi::signin::{Code, SignIn, Waiting, Ways};
 use crate::tonapi::{self, bounded, PORTAL_PATIENCE};
@@ -151,7 +151,7 @@ impl Gateway {
             Some(id) => id.clone(),
             None => asked.headers.get(UNIVERSITY_HEADER)?.to_str().ok()?.trim().to_lowercase(),
         };
-        self.universities.get(&named)
+        self.universities.get(&named).map(|university| &**university)
     }
 
     // POST /__ent_auth/login. None: a sign-in that is Node's (another
@@ -257,12 +257,15 @@ impl Gateway {
         // What the session holds from its first moment: the sessions tonAPI
         // opened besides the portal's, the component it found, the profile.
         let in_the_cookie: Vec<_> = ticket.iter().chain(&others).map(handed::stored_cookie).collect();
-        let memory = self.memory.of(&session.id);
+        let memory = self.memory.of(&session.id, memory::student(&session.university, &session.user).as_deref());
         memory.keep(&Snapshot::default(), &signed_in, &in_the_cookie);
         memory.detected(signed_in.establishment.clone());
         memory.keep_profile(&profile);
         self.attempts.signed_in(who);
-        said::signed_in(&session.user, &session.university, (&self.cookie_name, &cookie))
+        let answer = said::signed_in(&session.user, &session.university, (&self.cookie_name, &cookie));
+        // The home page's answers are asked from now, before the page asks.
+        self.ask_ahead(&Held { session, university, memory });
+        answer
     }
 
     // A sign-in that failed, counted: past the limit the answer is the wait.

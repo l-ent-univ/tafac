@@ -9,7 +9,7 @@ import mailIcon from '../assets/home-icons/mail.png'
 import menuIcon from '../assets/home-icons/menu.png'
 import { trackDashboardReturn, trackDashboardView } from '../analytics'
 import { isWidgetAvailable } from '../dashboardWidgets'
-import { getGrades, peekGrades } from '../entApi'
+import { getGrades, onGradesRefreshed, peekGrades } from '../entApi'
 import { listGradesSemesters } from '../gradesReport'
 import { buildGreeting } from '../greeting'
 import { layoutHomeCards } from '../homeCardsLayout'
@@ -91,6 +91,8 @@ function useNewestGrades(enabled) {
       active = false
     }
   }, [attempt, enabled, visit])
+  // The grades that came after an old answer was shown (src/entApi.js).
+  useEffect(() => (enabled ? onGradesRefreshed((data) => setGrades(readNewestGrades(data.grades))) : undefined), [enabled])
   const retry = useCallback(() => {
     setGrades(readNewestGrades(null, 'loading'))
     setAttempt((current) => current + 1)

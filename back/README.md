@@ -85,6 +85,7 @@ crates/tafac-gateway/
    │  ├─ attempts.rs      the sign-in's limits, the codes sent, and the address a request came from
    │  ├─ portal.rs        routes the portal answers: the session check, the account
    │  ├─ services.rs      routes a service answers: the portal's applications, Moodle's deadlines, ScoDoc's grades
+   │  ├─ behind.rs        the home page's three answers: an old one given while the university is asked again, all three asked at the sign-in
    │  ├─ settled.rs       routes answered to their end here, failures included: the two files below
    │  ├─ launch.rs        GET /launch and /launch-preview: the target, who asks, the walk
    │  └─ student.rs       the student's own files: ScoDoc's photo, the school certificate
@@ -92,7 +93,7 @@ crates/tafac-gateway/
    ├─ session/            the student's session
    │  ├─ cookie.rs        its cookie, read and written, in the format Node reads
    │  ├─ handed.rs        what of it tonAPI is handed, and what a new session's cookie is written with
-   │  └─ memory.rs        what it holds in this process: services' sessions, component, answers kept, sessions ended
+   │  └─ memory.rs        what it holds in this process: services' sessions, component, sessions ended, and the student's answers kept
    │
    ├─ tonapi/             the questions to tonAPI, one file per thing asked
    │  ├─ mod.rs           what they share: patience, a panic caught, why there is no answer
@@ -175,6 +176,19 @@ crates/tafac-gateway/
   session cookie's name tells apart). Each translator lists Node's answers,
   and the ones that are still Node's to give: those of a session the
   gateway doesn't hold.
+- **The home page doesn't wait for the university twice.** The
+  applications, Moodle's deadlines and the grades' report take the
+  university seconds each, and a student asked for them at every sign-in.
+  Their answers are kept for the student, not the session
+  (`session/memory.rs`): fresh as long as tonAPI says, then old, up to a
+  day after they were read. An old one is given at once, marked
+  `X-Tafac-Refreshing: 1`, while the university is asked again behind it;
+  the page shows it and asks once more with `?fresh=1`, a request that
+  waits for the answer that comes (`gateway/behind.rs`, `src/entApi.js`).
+  A sign-in asks the three at once, before the page does. They are held
+  in this process only, never written, and go when the student signs out.
+  What is asked behind an answer ends no session: one the university no
+  longer knows takes the old answer away, and the next request finds it.
 - **Nothing of tonAPI is copied here.** Its code and its settings come from
   the commit named in `Cargo.toml`.
 - **The relay opens the university's services only.** The launch relay

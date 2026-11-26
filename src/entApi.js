@@ -408,15 +408,31 @@ export async function logoutFromEnt({ expired = false } = {}) {
   return payload
 }
 
+// The home page's answers (the applications, Moodle's deadlines, the
+// grades) take the university several seconds each. The server keeps the
+// last one it got for the student and, past its freshness, gives it at
+// once, marked with this header, while it asks the university again
+// (back/crates/tafac-gateway, gateway/behind.rs). The page shows that old
+// answer and asks once more with `?fresh=1`: that request waits for the
+// answer that comes. Nothing of it rests in the browser.
+const REFRESHING_HEADER = 'X-Tafac-Refreshing'
+const FRESH_QUERY = '?fresh=1'
+
+function isOldAnswer(response) {
+  return response.headers.get(REFRESHING_HEADER) === '1'
+}
+
 // The applications the portal lists for the student, one list whatever the
 // portal: { authenticated, sessionMode, apps: [{ id, title, description,
 // url, iconUrl, category, favorite }] } (src/portalApps.js makes the tiles).
-export async function getApps() {
-  const response = await serverFetch(`${ENT_AUTH_PREFIX}/apps`, {
+// `refreshing` on an old list: ask again with `fresh` for the one that comes.
+export async function getApps({ fresh = false } = {}) {
+  const response = await serverFetch(`${ENT_AUTH_PREFIX}/apps${fresh ? FRESH_QUERY : ''}`, {
     credentials: 'same-origin',
   })
 
-  return parseJsonPayload(response)
+  const payload = await parseJsonPayload(response)
+  return isOldAnswer(response) && payload && typeof payload === 'object' ? { ...payload, refreshing: true } : payload
 }
 
 export async function getPlanning() {
@@ -974,7 +990,9 @@ const GRADES_CACHE_KEY = 'l-ent:grades-cache'
 //   404 { ok: false, disabled: true, feature: 'moodleDeadlines' }
 //   500 { error }
 // Normalized here to { status: 'ok' | 'disabled' | 'unauthenticated' | 'error', ... }.
-export async function getMoodleDeadlines() {
+// `refreshing` on an old list (above): ask again with `fresh` for the one
+// that comes.
+export async function getMoodleDeadlines({ fresh = false } = {}) {
   const empty = { moodleHref: null, items: [] }
 
   if (!universityConfig.features?.moodleDeadlines) {
@@ -982,7 +1000,7 @@ export async function getMoodleDeadlines() {
   }
 
   try {
-    const response = await serverFetch(`${ENT_AUTH_PREFIX}/moodle/deadlines`, {
+    const response = await serverFetch(`${ENT_AUTH_PREFIX}/moodle/deadlines${fresh ? FRESH_QUERY : ''}`, {
       credentials: 'same-origin',
     })
     const payload = await response.json().catch(() => null)
@@ -1003,6 +1021,7 @@ export async function getMoodleDeadlines() {
       status: 'ok',
       moodleHref: payload.deadlines.moodleHref ?? null,
       items: Array.isArray(payload.deadlines.items) ? payload.deadlines.items : [],
+      ...(isOldAnswer(response) ? { refreshing: true } : {}),
     }
   } catch (error) {
     return {
@@ -1049,9 +1068,11 @@ export function getGrades({ force = false } = {}) {
     return gradesInflight
   }
 
-  gradesInflight = requestGrades()
-    .then((data) => {
+  // Asked again past the cache: past the server's old answer too.
+  gradesInflight = requestGrades({ fresh: force })
+    .then(({ data, old }) => {
       gradesMemory = isUsableGradesAnswer(data) ? { at: Date.now(), data } : null
+      if (old) void refreshGrades()
       return data
     })
     .finally(() => {
@@ -1060,29 +1081,49 @@ export function getGrades({ force = false } = {}) {
   return gradesInflight
 }
 
-async function requestGrades() {
+// The answer, and whether it is an old one the server gave while it asks
+// ScoDoc again (`old`, above).
+async function requestGrades({ fresh = false } = {}) {
   if (!universityConfig.features?.grades) {
-    return {
-      authenticated: false,
-      grades: null,
-      disabled: true,
-    }
+    return { data: { authenticated: false, grades: null, disabled: true }, old: false }
   }
 
   try {
-    const response = await serverFetch(`${ENT_AUTH_PREFIX}/grades`, {
+    const response = await serverFetch(`${ENT_AUTH_PREFIX}/grades${fresh ? FRESH_QUERY : ''}`, {
       credentials: 'same-origin',
     })
 
-    return await parseJsonPayload(response)
+    return { data: await parseJsonPayload(response), old: isOldAnswer(response) }
   } catch (error) {
     return {
-      authenticated: false,
-      grades: null,
-      error: error instanceof Error ? error.message : String(error),
-      errorKind: getRequestErrorKind(error),
+      data: {
+        authenticated: false,
+        grades: null,
+        error: error instanceof Error ? error.message : String(error),
+        errorKind: getRequestErrorKind(error),
+      },
+      old: false,
     }
   }
+}
+
+const gradesRefreshListeners = new Set()
+
+// `listener(data)`: the grades that came after an old answer was shown.
+// Returns what stops it.
+export function onGradesRefreshed(listener) {
+  gradesRefreshListeners.add(listener)
+  return () => gradesRefreshListeners.delete(listener)
+}
+
+// The server gave the report it kept and asks ScoDoc meanwhile: the report
+// that comes replaces it, for whoever shows grades. Without one (ScoDoc
+// down, signed out since), what is shown stays.
+async function refreshGrades() {
+  const { data } = await requestGrades({ fresh: true })
+  if (!isUsableGradesAnswer(data)) return
+  gradesMemory = { at: Date.now(), data }
+  for (const listener of gradesRefreshListeners) listener(data)
 }
 
 export async function getStudentProfilePictureMeta() {
