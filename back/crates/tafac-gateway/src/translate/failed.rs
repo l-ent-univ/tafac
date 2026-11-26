@@ -30,7 +30,7 @@ use crate::routes::Moved;
 
 // What a route says of an error of the university's in production
 // (server/routeErrors: UNAVAILABLE_MESSAGE).
-const UNAVAILABLE: &str = "Service indisponible pour le moment";
+pub(crate) const UNAVAILABLE: &str = "Service indisponible pour le moment";
 // The applications' own (server/entAuthApp.js: APPS_UNAVAILABLE_MESSAGE).
 const PORTAL_UNAVAILABLE: &str = "Portail indisponible pour le moment";
 

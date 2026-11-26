@@ -12,6 +12,9 @@
 //   session.rs, account.rs, moodle_deadlines.rs, grades/   the routes' own
 //   apps.rs      GET /__ent_auth/apps: tonAPI's own list, which the page
 //                reads as it is
+//   launch.rs, moodle_view.rs, student_pic.rs, school_certificate.rs
+//                the routes answered to their end here (settled.rs): the
+//                launch relay, Moodle's view, the photo, the certificate
 //
 // A translator says one of three things: the page's answer; why there is
 // none (failed.rs words it, as Node words its own errors); or « the session
@@ -23,9 +26,14 @@ pub mod apps;
 pub mod expired;
 pub mod failed;
 pub mod grades;
+pub mod launch;
 pub mod moodle_deadlines;
+pub mod moodle_view;
+pub mod school_certificate;
 pub mod session;
+pub mod settled;
 pub mod signin;
+pub mod student_pic;
 
 use tonapi_core::{ErrorCode, Profile};
 

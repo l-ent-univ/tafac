@@ -7,6 +7,8 @@
 //   homework.rs   Moodle: what is due
 //   grades.rs     ScoDoc: the report, a department's notice, a distribution,
 //                 the PDF
+//   picture.rs    ScoDoc: the student's photo
+//   documents.rs  the school records: the documents listed, the file of one
 //
 // tonAPI's providers are called in this process (no HTTP between the two),
 // with a session made for the one question: the cookies of the student's
@@ -19,8 +21,10 @@
 // lost » for the gateway to ask the CAS about.
 
 pub(crate) mod apps;
+pub(crate) mod documents;
 pub(crate) mod grades;
 pub(crate) mod homework;
+pub(crate) mod picture;
 pub(crate) mod profile;
 pub(crate) mod signin;
 
