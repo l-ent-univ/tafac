@@ -20,8 +20,12 @@
 //   200 for the demo account, and 200 { degraded: true } without a CAS
 //       ticket: Node.
 //   500 { error }: the portal down, slow, or answering something else
-//       (the CAS still knowing the ticket). Node, which asks it itself and
-//       words the error.
+//       (the CAS still knowing the ticket, or not saying). Answered here
+//       (translate/failed.rs).
+//
+// Where the two differ, on purpose: a portal answering for another name
+// than the session's (never seen) is the same 500 here, where Node takes
+// the portal's word for who is signed in.
 
 use tonapi_core::Profile;
 
@@ -35,7 +39,8 @@ fn cookie_names<'a>(session: &'a Session, host: &str) -> Vec<&'a str> {
     names
 }
 
-// `analytics_enabled`: what Node says of itself there (lib.rs asks it).
+// `analytics_enabled`: whether the statistics are on, as Node is set up
+// (node.rs).
 pub fn translate(asked: Result<&Profile, Unanswered>, session: &Session, university: &University, analytics_enabled: bool) -> Translated {
     let profile = match asked {
         Ok(profile) => profile,

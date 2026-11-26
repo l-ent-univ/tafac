@@ -1,5 +1,5 @@
 // The session check and the account, on the made-up campus: what the
-// gateway answers, and what it leaves to Node.
+// gateway answers, its errors too, and what it leaves to Node.
 
 use std::sync::atomic::{AtomicU32, Ordering};
 use std::time::{Duration, Instant};
@@ -8,13 +8,12 @@ use http::header::{HeaderValue, SET_COOKIE};
 use http::{HeaderMap, Method};
 use tonapi_core::Profile;
 
-use super::{ask, asked, json, never, node_says, ACCOUNT, GET, NO_HEADERS, POST, SESSION};
+use super::{ask, asked, error_of, never, unavailable, ACCOUNT, GET, NO_HEADERS, POST, SESSION};
 use crate::gateway::portal::EARLY_KEPT;
-use crate::node::{read_facts, NodeFacts, FACTS_KEPT};
-use crate::session::cookie::Session;
+use crate::session::cookie::{Session, DEVELOPMENT_COOKIE};
 use crate::testing::*;
-use crate::translate::{account, session, Translated, Unanswered};
-use crate::{Gateway, NodeRequest};
+use crate::translate::{account, session, Failure, Translated, Unanswered};
+use crate::Gateway;
 
 fn profile() -> Profile {
     Profile {
@@ -46,7 +45,7 @@ fn a_living_session_is_answered_as_node_answers_it() {
             "canUseServerLaunch": true,
             "degraded": false,
             "degradedReason": null,
-            "analyticsEnabled": true,
+            "analyticsEnabled": false,
             "university": UNIVERSITY,
         })
     );
@@ -123,7 +122,7 @@ fn the_check_made_at_the_start_answers_the_pages_first_one() {
     let campus = campus();
     let gateway = campus.gateway();
     let cookie = campus.alive();
-    block_on(gateway.check_early(Some(&cookie), node_says));
+    block_on(gateway.check_early(Some(&cookie)));
     assert_eq!(campus.paths(), ["/api/v5-1/userinfo"]);
     // The page's first check and its account: nothing more is asked.
     assert_eq!(ask(&gateway, SESSION, &cookie).unwrap()["user"], "jdoe");
@@ -139,7 +138,7 @@ fn a_portal_session_found_lapsed_at_the_start_is_opened_again_ahead() {
     let campus = campus();
     let gateway = campus.gateway();
     let cookie = campus.lapsed();
-    block_on(gateway.check_early(Some(&cookie), node_says));
+    block_on(gateway.check_early(Some(&cookie)));
     // The portal was signed in to again while the page started: its first
     // check waits for nothing.
     let asked = campus.paths().len();
@@ -151,21 +150,21 @@ fn a_portal_session_found_lapsed_at_the_start_is_opened_again_ahead() {
 fn the_check_made_at_the_start_is_for_that_session_as_it_was() {
     let campus = campus();
     let gateway = campus.gateway();
-    block_on(gateway.check_early(Some(&campus.lapsed()), node_says));
+    block_on(gateway.check_early(Some(&campus.lapsed())));
     let asked = campus.paths().len();
     // Node signed in to the portal again since: other cookies.
     assert!(ask(&gateway, SESSION, &campus.alive()).is_some());
     assert_eq!(campus.paths().len(), asked + 1);
 
     // Another session altogether.
-    block_on(gateway.check_early(Some(&campus.alive()), node_says));
+    block_on(gateway.check_early(Some(&campus.alive())));
     let other = campus.cookie(serde_json::json!({ "id": "another-session" }), &[("JSESSIONID", "alive"), ("lb", "node2")]);
     let asked = campus.paths().len();
     ask(&gateway, SESSION, &other).unwrap();
     assert_eq!(campus.paths().len(), asked + 1);
 
     // Too long ago.
-    block_on(gateway.check_early(Some(&campus.alive()), node_says));
+    block_on(gateway.check_early(Some(&campus.alive())));
     if let Some(long_ago) = Instant::now().checked_sub(EARLY_KEPT + Duration::from_secs(1)) {
         block_on(gateway.early.check.lock()).as_mut().unwrap().at = long_ago;
         let asked = campus.paths().len();
@@ -178,10 +177,27 @@ fn the_check_made_at_the_start_is_for_that_session_as_it_was() {
 fn nothing_is_asked_at_the_start_when_nobody_is_signed_in() {
     let campus = campus();
     let gateway = campus.gateway();
-    block_on(gateway.check_early(None, never));
+    block_on(gateway.check_early(None));
     let demo = campus.cookie(serde_json::json!({ "mode": "demo" }), &[("JSESSIONID", "alive")]);
-    block_on(gateway.check_early(Some(&demo), never));
+    block_on(gateway.check_early(Some(&demo)));
     assert!(campus.seen.lock().unwrap().is_empty());
+}
+
+#[test]
+fn a_check_that_failed_at_the_start_is_the_first_ones_error() {
+    let campus = campus();
+    let gateway = campus.gateway();
+    // No portal session left, and no CAS to open one with: the app starts
+    // without the university.
+    let cookie = campus.lapsed();
+    campus.cas_is_down(true);
+    block_on(gateway.check_early(Some(&cookie)));
+    let asked = campus.paths().len();
+    assert_eq!(error_of(&gateway, SESSION, &cookie), unavailable());
+    assert_eq!(campus.paths().len(), asked);
+    // The session lives: once the CAS is back, so is the answer.
+    campus.cas_is_down(false);
+    assert_eq!(ask(&gateway, SESSION, &cookie).unwrap()["user"], "jdoe");
 }
 
 #[test]
@@ -189,8 +205,8 @@ fn a_portal_that_no_longer_knows_the_session_is_signed_in_to_again_here() {
     let campus = campus();
     let gateway = campus.gateway();
     let cookie = campus.lapsed();
-    // Node is asked what it is set up for and nothing else (`ask`): the
-    // check is answered here, the session's cookie as it was.
+    // Node is asked nothing (`ask`): the check is answered here, the
+    // session's cookie as it was.
     assert_eq!(ask(&gateway, SESSION, &cookie).unwrap()["authenticated"], true);
     let seen = campus.seen.lock().unwrap().clone();
     // Asked first with the cookie's own portal session, which the portal no
@@ -240,7 +256,7 @@ fn what_is_not_a_plain_signed_in_session_is_nodes_without_a_request() {
         assert_eq!(ask(&gateway, SESSION, &cookie), None, "{why}");
         assert_eq!(ask(&gateway, ACCOUNT, &cookie), None, "{why}");
     }
-    assert!(block_on(gateway.answer(&asked(&GET, SESSION, &NO_HEADERS, &[]), || None, node_says)).is_none());
+    assert!(block_on(gateway.answer(&asked(&GET, SESSION, &NO_HEADERS, &[]), || None, never)).is_none());
     assert!(campus.seen.lock().unwrap().is_empty());
 }
 
@@ -253,12 +269,39 @@ fn a_cookie_sealed_with_another_secret_is_nodes() {
 }
 
 #[test]
-fn a_portal_answering_for_someone_else_is_nodes() {
+fn a_portal_answering_for_someone_else_is_nobodys_answer() {
     let campus = campus();
     let gateway = campus.gateway();
     let cookie = campus.cookie(serde_json::json!({}), &[("JSESSIONID", "someone-else")]);
-    assert_eq!(ask(&gateway, SESSION, &cookie), None);
-    assert_eq!(ask(&gateway, ACCOUNT, &cookie), None);
+    // The route's error, and nothing of what the portal said of the other.
+    assert_eq!(error_of(&gateway, SESSION, &cookie), unavailable());
+    assert_eq!(error_of(&gateway, ACCOUNT, &cookie), unavailable());
+}
+
+#[test]
+fn a_portal_that_cant_be_asked_is_the_routes_error_and_the_session_lives() {
+    let campus = campus();
+    let gateway = campus.gateway();
+    // The portal's own session lapsed, and the CAS, which would open
+    // another, is down: nothing says the student's session is over.
+    let cookie = campus.lapsed();
+    campus.cas_is_down(true);
+    // Node's own answer to a portal it can't ask, on a production server.
+    assert_eq!(error_of(&gateway, SESSION, &cookie), unavailable());
+    assert_eq!(error_of(&gateway, ACCOUNT, &cookie), unavailable());
+    assert!(gateway.signed_in(Some(&cookie)).is_some());
+
+    // A development server says why, as Node's does: tonAPI's own code, or
+    // words of this crate.
+    let development = Gateway::for_tests(vec![campus.settings()], SECRET, DEVELOPMENT_COOKIE);
+    let (status, said) = error_of(&development, SESSION, &cookie);
+    let why = said["error"].as_str().unwrap();
+    assert_eq!(status, 500);
+    assert!(why != "Service indisponible pour le moment" && !why.is_empty() && !why.contains("jdoe"), "{why}");
+
+    // The CAS is back: the same session is answered for again.
+    campus.cas_is_down(false);
+    assert_eq!(ask(&gateway, SESSION, &cookie).unwrap()["user"], "jdoe");
 }
 
 #[test]
@@ -270,8 +313,14 @@ fn a_session_gone_while_the_portal_was_asked_is_nodes() {
     // portal has answered (a sign-out went through meanwhile).
     let shown = AtomicU32::new(0);
     let jar = || (shown.fetch_add(1, Ordering::SeqCst) == 0).then(|| cookie.clone());
-    assert!(block_on(gateway.answer(&asked(&GET, SESSION, &NO_HEADERS, &[]), jar, node_says)).is_none());
+    assert!(block_on(gateway.answer(&asked(&GET, SESSION, &NO_HEADERS, &[]), jar, never)).is_none());
     assert_eq!(campus.paths().len(), 1);
+
+    // The same for an error: it is about a session that is no longer there.
+    let someone_else = campus.cookie(serde_json::json!({}), &[("JSESSIONID", "someone-else")]);
+    let shown = AtomicU32::new(0);
+    let jar = || (shown.fetch_add(1, Ordering::SeqCst) == 0).then(|| someone_else.clone());
+    assert!(block_on(gateway.answer(&asked(&GET, SESSION, &NO_HEADERS, &[]), jar, never)).is_none());
 }
 
 #[test]
@@ -311,7 +360,7 @@ fn a_session_node_says_is_gone_is_gone_here_too() {
 
         headers.append(gone.0, HeaderValue::from_static(gone.1));
         gateway.saw_response(Some(&cookie), &headers);
-        (ask(&gateway, SESSION, &cookie), block_on(gateway.answer(&asked(&GET, ACCOUNT, &NO_HEADERS, &[]), || Some(cookie.clone()), node_says)))
+        (ask(&gateway, SESSION, &cookie), block_on(gateway.answer(&asked(&GET, ACCOUNT, &NO_HEADERS, &[]), || Some(cookie.clone()), never)))
     };
 
     // Node found it expired: whoever still shows the cookie is told so
@@ -330,44 +379,19 @@ fn a_session_node_says_is_gone_is_gone_here_too() {
 }
 
 #[test]
-fn node_is_asked_now_and_then_what_it_is_set_up_for() {
+fn the_statistics_are_said_on_as_node_is_set_up_without_asking_it() {
     let campus = campus();
-    let gateway = campus.gateway();
     let cookie = campus.alive();
-    let times = AtomicU32::new(0);
-    let counted = |_request: NodeRequest| {
-        times.fetch_add(1, Ordering::SeqCst);
-        async { Some(json(200, r#"{"analyticsEnabled":false,"university":"univ-rennes"}"#)) }
-    };
-    for _ in 0..2 {
-        let response = block_on(gateway.answer(&asked(&GET, SESSION, &NO_HEADERS, &[]), || Some(cookie.clone()), counted)).unwrap();
-        let answer: serde_json::Value = serde_json::from_slice(response.body()).unwrap();
-        assert_eq!(answer["analyticsEnabled"], false);
+    // Node's own setting, read where Node reads it (POSTHOG_PROJECT_KEY):
+    // on with a key, off without one. Node is asked nothing (`ask`).
+    for (key, on) in [(Some("phc_made_up"), true), (Some("  "), false), (None, false)] {
+        let gateway = campus.gateway().with_statistics(key);
+        assert_eq!(ask(&gateway, SESSION, &cookie).unwrap()["analyticsEnabled"], on, "{key:?}");
+        // A session found expired says the same.
+        gateway.saw_response(Some(&cookie), &HeaderMap::from_iter([(http::HeaderName::from_static("x-tafac-session"), HeaderValue::from_static("expired"))]));
+        let expired = ask(&gateway, SESSION, &cookie).unwrap();
+        assert_eq!((&expired["expired"], &expired["analyticsEnabled"]), (&true.into(), &on.into()), "{key:?}");
     }
-    assert_eq!(times.load(Ordering::SeqCst), 1);
-
-    // Long after: asked again (Node may have started again since).
-    if let Some(long_ago) = Instant::now().checked_sub(FACTS_KEPT + Duration::from_secs(1)) {
-        gateway.node.facts.lock().unwrap().get_mut(UNIVERSITY).unwrap().1 = long_ago;
-        assert!(block_on(gateway.answer(&asked(&GET, SESSION, &NO_HEADERS, &[]), || Some(cookie.clone()), counted)).is_some());
-        assert_eq!(times.load(Ordering::SeqCst), 2);
-    }
-}
-
-#[test]
-fn a_node_that_doesnt_say_leaves_the_answer_to_itself() {
-    let campus = campus();
-    let gateway = campus.gateway();
-    let cookie = campus.alive();
-    for said in [None, Some(json(200, "not json")), Some(json(200, r#"{"analyticsEnabled":true,"university":"univ-rennes-2"}"#)), Some(json(500, std::str::from_utf8(NODE_SAYS).unwrap()))] {
-        let silent = move |_request: NodeRequest| {
-            let said = said.clone();
-            async move { said }
-        };
-        assert!(block_on(gateway.answer(&asked(&GET, SESSION, &NO_HEADERS, &[]), || Some(cookie.clone()), silent)).is_none());
-    }
-    assert_eq!(read_facts(UNIVERSITY, NODE_SAYS), Some(NodeFacts { analytics_enabled: true }));
-    assert_eq!(read_facts(UNIVERSITY, br#"{"university":"univ-rennes"}"#), None);
 }
 
 fn node_session(user: &str) -> Session {
@@ -382,7 +406,7 @@ fn an_account_holds_what_the_portal_said_and_no_more() {
 }
 
 #[test]
-fn whatever_tonapi_cant_answer_is_nodes_or_a_session_to_ask_the_cas_about() {
+fn whatever_tonapi_cant_answer_is_the_routes_error_or_a_session_to_ask_the_cas_about() {
     let campus = campus();
     let settings = crate::universities::University::of(campus.settings()).unwrap();
     let session_of = node_session("jdoe");
@@ -395,8 +419,10 @@ fn whatever_tonapi_cant_answer_is_nodes_or_a_session_to_ask_the_cas_about() {
         Unanswered::NoPortalSession,
         Unanswered::Failed,
     ] {
-        assert!(matches!(session::translate(Err(why), &session_of, &settings, true), Translated::Node(_)), "{why}");
-        assert!(matches!(account::translate(Err(why), &session_of), Translated::Node(_)), "{why}");
+        // Why, for the log: tonAPI's code or words of this crate.
+        let failed = Failure::Unavailable(why.to_string());
+        assert!(matches!(session::translate(Err(why), &session_of, &settings, true), Translated::Failed(failure) if failure == failed), "{why}");
+        assert!(matches!(account::translate(Err(why), &session_of), Translated::Failed(failure) if failure == failed), "{why}");
     }
     // The university no longer knows the session: the CAS says whether it
     // is over.
@@ -405,6 +431,6 @@ fn whatever_tonapi_cant_answer_is_nodes_or_a_session_to_ask_the_cas_about() {
     assert!(matches!(account::translate(Err(lost), &session_of), Translated::Lost));
     // The portal answering for another student is nobody's answer.
     let other = node_session("asmith");
-    assert!(matches!(session::translate(Ok(&profile()), &other, &settings, true), Translated::Node(_)));
-    assert!(matches!(account::translate(Ok(&profile()), &other), Translated::Node(_)));
+    assert!(matches!(session::translate(Ok(&profile()), &other, &settings, true), Translated::Failed(Failure::Unavailable(_))));
+    assert!(matches!(account::translate(Ok(&profile()), &other), Translated::Failed(Failure::Unavailable(_))));
 }

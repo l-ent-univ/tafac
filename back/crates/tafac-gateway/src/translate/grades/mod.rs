@@ -18,7 +18,8 @@ pub mod report;
 pub mod transcript;
 
 // A ScoDoc id (a semester's, an evaluation's): a whole number, as Node's
-// parseGradesSemesterId reads it. Anything else is Node's to refuse.
+// parseGradesSemesterId reads it. Anything else is refused in Node's words
+// (translate/failed.rs).
 pub(crate) fn scodoc_id(value: &str) -> Option<&str> {
     let id = value.trim();
     ((1..=10).contains(&id.len()) && id.bytes().all(|byte| byte.is_ascii_digit())).then_some(id)

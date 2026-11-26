@@ -7,7 +7,7 @@ use std::time::Duration;
 
 use http::Method;
 
-use super::{ask, asked, node_says, GET, NO_HEADERS, SESSION};
+use super::{ask, asked, error_of, never, unavailable, GET, NO_HEADERS, SESSION};
 use crate::session::memory::Remembered;
 use crate::testing::*;
 use crate::Gateway;
@@ -135,13 +135,16 @@ fn the_ticket_written_anew_in_the_cookie_changes_nothing() {
 }
 
 #[test]
-fn a_moodle_that_doesnt_answer_is_nodes_and_isnt_kept() {
+fn a_moodle_that_doesnt_answer_is_the_routes_error_and_isnt_kept() {
     let campus = campus();
     let gateway = campus.gateway();
     let cookie = campus.alive();
     campus.moodle_is_down(true);
-    assert_eq!(ask(&gateway, DEADLINES, &cookie), None);
-    assert_eq!(ask(&gateway, DEADLINES, &cookie), None);
+    // Node's own answer to a Moodle that is down, which the widget shows
+    // as an error. Asked again each time: an error isn't kept.
+    assert_eq!(error_of(&gateway, DEADLINES, &cookie), unavailable());
+    assert_eq!(error_of(&gateway, DEADLINES, &cookie), unavailable());
+    assert_eq!(campus.asked(CALENDAR), 2);
 
     // Moodle is back: asked, with the session opened the first time.
     campus.moodle_is_down(false);
@@ -155,7 +158,7 @@ fn two_questions_at_once_sign_in_once() {
     let gateway = campus.gateway();
     let cookie = campus.alive();
     let request = asked(&GET, DEADLINES, &NO_HEADERS, &[]);
-    let one = || gateway.answer(&request, || Some(cookie.clone()), node_says);
+    let one = || gateway.answer(&request, || Some(cookie.clone()), never);
     let (first, second) = block_on(async { tokio::join!(one(), one()) });
     assert_eq!(first.unwrap().body(), second.unwrap().body());
     assert_eq!((campus.asked(SIGN_IN), campus.asked(CALENDAR)), (2, 1));

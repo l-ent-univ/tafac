@@ -93,11 +93,13 @@ struct State {
 }
 
 // Moodle's state: the session it knows (a number: it forgets the one before
-// when the number changes), and whether it answers at all.
+// when the number changes), whether it answers at all, and whether it
+// refuses every session, the one it has just given too.
 #[derive(Default)]
 struct Moodle {
     sessions: AtomicU32,
     down: AtomicBool,
+    refuses: AtomicBool,
 }
 
 // What the campus answers to one request.
@@ -288,7 +290,7 @@ fn moodle_answer(path: &str, cookies: &str, port: &str, moodle: &Moodle) -> Answ
                 return Answer::of("503 Service Unavailable", "text/plain", String::new());
             }
             let key_matches = query_of(path, "sesskey").as_deref() == Some(format!("CAMPUSKEY{generation}").as_str());
-            if signed_in && key_matches {
+            if signed_in && key_matches && !moodle.refuses.load(Ordering::SeqCst) {
                 Answer::of("200 OK", "application/json", moodle_calendar(port))
             } else {
                 Answer::of("200 OK", "application/json", r#"[{"error":true,"exception":{"errorcode":"servicerequireslogin","message":"SECRET"}}]"#.to_string())
@@ -707,6 +709,13 @@ impl Campus {
     // Moodle stops (or starts again) answering its calendar.
     pub fn moodle_is_down(&self, down: bool) {
         self.state.moodle.down.store(down, Ordering::SeqCst);
+    }
+
+    // Moodle refuses (or takes again) every session at its calendar, the
+    // one it has just given too: its own trouble, the CAS knowing the
+    // student all the while.
+    pub fn moodle_refuses(&self, refuses: bool) {
+        self.state.moodle.refuses.store(refuses, Ordering::SeqCst);
     }
 
     // The CAS no longer knows its ticket: the session is over.

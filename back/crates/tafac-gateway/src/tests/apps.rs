@@ -4,7 +4,7 @@
 
 use std::time::Duration;
 
-use super::{ask, asked, body_of, cookie_set, never, Node, GET, NO_HEADERS};
+use super::{ask, asked, body_of, cookie_set, error_of, never, Node, GET, NO_HEADERS};
 use crate::testing::*;
 use crate::Gateway;
 
@@ -102,14 +102,19 @@ fn a_session_the_cas_no_longer_knows_ends_here() {
 }
 
 #[test]
-fn a_portal_that_cant_be_reached_is_nodes_to_word() {
+fn a_portal_that_cant_be_reached_is_said_in_the_sentence_the_page_shows() {
     let campus = campus();
     let gateway = campus.gateway();
     // The CAS is down: no portal session can be opened, and nothing says
-    // the student's session is over.
+    // the student's session is over. Node's own status and sentence for
+    // the applications, and Node is asked nothing (`error_of`).
     campus.cas_is_down(true);
-    let node = Node::default();
-    assert!(get(&gateway, &node, &campus.alive()).is_none());
+    let cookie = campus.alive();
+    assert_eq!(error_of(&gateway, APPS, &cookie), (502, serde_json::json!({ "error": "Portail indisponible pour le moment" })));
+    assert!(gateway.signed_in(Some(&cookie)).is_some());
+    // The error isn't kept: the list is given once the CAS is back.
+    campus.cas_is_down(false);
+    assert_eq!(ask(&gateway, APPS, &cookie).unwrap()["apps"].as_array().unwrap().len(), 3);
 
     // Nobody signed in, the demo account, another university: Node's.
     let demo = campus.cookie(serde_json::json!({ "mode": "demo" }), &[]);

@@ -188,8 +188,8 @@ impl Proxy {
         Ok(Response::from_parts(parts, body.map_err(BoxError::from).boxed_unsync()))
     }
 
-    // A request the gateway makes to Node (node.rs says which), and Node's
-    // whole answer.
+    // A request the gateway makes to Node (node.rs says which: Node told
+    // that a session ended), and Node's whole answer.
     async fn ask_node(&self, request: NodeRequest) -> NodeAnswer {
         let (mut parts, body) = request.into_parts();
         let path = parts.uri.path_and_query().map_or("/", |path| path.as_str());
@@ -228,7 +228,6 @@ mod tests {
 
     use super::*;
     use crate::testing::{block_on, campus, header_of, read_head, read_request, spawn, Campus, NODE_SAYS};
-    use crate::UNIVERSITY_HEADER;
 
     // Node's own answer to a session check, told from a translated one by
     // what only Node says (`runtime`).
@@ -419,7 +418,7 @@ mod tests {
     }
 
     #[test]
-    fn a_moved_route_is_answered_here_and_node_only_asked_what_it_says_of_itself() {
+    fn a_moved_route_is_answered_here_and_node_is_asked_nothing() {
         let (campus, node) = (campus(), node());
         let address = gateway_before(&node, Some(&campus));
         let (head, body) = get(&address, "/__ent_auth/session", &session_cookie(&campus.alive()));
@@ -434,21 +433,22 @@ mod tests {
         let answer: serde_json::Value = serde_json::from_slice(&body).unwrap();
         assert_eq!(answer["account"]["email"], "jeanne.doe@exemple.test");
 
-        // Node: asked once what it is set up for, without anybody's cookie.
-        let heads = node.heads();
-        assert_eq!(heads.len(), 1);
-        assert!(heads[0].starts_with("GET /__ent_auth/session HTTP/1.1"));
-        assert_eq!(header_of(&heads[0], "cookie"), "");
-        assert_eq!(header_of(&heads[0], UNIVERSITY_HEADER), "univ-rennes");
+        // Its error too, in Node's own words: a semester id that isn't one.
+        let (head, body) = get(&address, "/__ent_auth/grades/semester/abc", &session_cookie(&campus.alive()));
+        assert!(head.starts_with("HTTP/1.1 400"), "{head}");
+        assert_eq!(header_of(&head, crate::ANSWERED_BY), "tonapi");
+        assert_eq!(body, br#"{"error":"Invalid semester id."}"#);
+
+        assert!(node.heads().is_empty());
     }
 
     #[test]
     fn what_the_gateway_leaves_is_nodes_own_answer() {
         let (campus, node) = (campus(), node());
         let address = gateway_before(&node, Some(&campus));
-        // The portal answers for another name than the session's: Node's.
-        let someone_else = campus.cookie(serde_json::json!({}), &[("JSESSIONID", "someone-else")]);
-        let (head, body) = get(&address, "/__ent_auth/session", &session_cookie(&someone_else));
+        // A session the gateway doesn't hold (the demo account's): Node's.
+        let demo = campus.cookie(serde_json::json!({ "mode": "demo" }), &[]);
+        let (head, body) = get(&address, "/__ent_auth/session", &session_cookie(&demo));
         assert_eq!(header_of(&head, crate::ANSWERED_BY), "");
         assert_eq!(body, NODES_SESSION.as_bytes());
         // Nobody signed in, and a route that hasn't moved.

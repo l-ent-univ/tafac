@@ -15,7 +15,7 @@
 //
 // A question either has tonAPI's answer or the reason it has none
 // (Unanswered): the route's translator turns the first into the page's
-// answer, and the second into « Node answers », or into « the session is
+// answer, and the second into the route's error, or into « the session is
 // lost » for the gateway to ask the CAS about.
 
 pub(crate) mod apps;
@@ -38,11 +38,12 @@ use crate::session::memory::Snapshot;
 use crate::session::{handed, Held};
 use crate::universities::University;
 
-// How long the portal is waited for before Node is asked instead: the page
-// waits on this answer to show anything.
-pub(crate) const PORTAL_PATIENCE: Duration = Duration::from_secs(6);
+// How long the portal is waited for before the route fails. The page waits
+// on this answer to show anything, and nobody asks a second time: a slow
+// portal is waited for rather than said to be down.
+pub(crate) const PORTAL_PATIENCE: Duration = Duration::from_secs(15);
 // How long a service is: signing in to Moodle through the federation takes
-// a few seconds by itself, and Node asked next would start it all again.
+// a few seconds by itself.
 const SERVICE_PATIENCE: Duration = Duration::from_secs(20);
 // tonAPI's session wants an end; this one lives for one question.
 const SESSION_SECONDS: i64 = 5 * 60;
@@ -56,13 +57,14 @@ pub enum Unanswered {
     Slow,
     // The portal answered, and replaced one of its cookies in the session:
     // Node, whose portal requests go with those cookies, must be the one to
-    // get the new one.
+    // get the new one. The question is asked again with a portal session
+    // of the gateway's own (gateway/portal.rs).
     CookiesChanged,
     // The session holds no cookie of the portal's to ask with.
     NoPortalSession,
     // The session holds no CAS ticket to sign in to a service with.
     NoTicket,
-    // tonAPI's code gave up halfway (a panic): its request is Node's.
+    // tonAPI's code gave up halfway (a panic): its request fails.
     Failed,
 }
 
@@ -87,7 +89,7 @@ pub(crate) struct Asked<T> {
 }
 
 // One of tonAPI's calls, waited for no longer than `patience`. A panic
-// inside a provider is one request left to Node, not a request lost.
+// inside a provider is one route's error, not a request lost.
 pub(crate) async fn bounded<T>(patience: Duration, call: impl Future<Output = T>) -> Result<T, Unanswered> {
     match std::panic::AssertUnwindSafe(tokio::time::timeout(patience, call)).catch_unwind().await {
         Ok(Ok(value)) => Ok(value),

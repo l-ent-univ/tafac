@@ -2,8 +2,9 @@
 // when the answer is Node's to give.
 //
 //   mod.rs        the Gateway: which route, whose session, whether the
-//                 answer made is still the session's when it is ready, and
-//                 a session the university no longer knows
+//                 answer made is still the session's when it is ready, a
+//                 route that fails, and a session the university no longer
+//                 knows
 //   signin.rs     POST /login and /logout: the session made (tonAPI signs
 //                 in, the cookie is written) and ended
 //   attempts.rs   the sign-in's limits, and the address a request came from
@@ -14,12 +15,12 @@
 //                 holds of the service
 //
 // The session is the gateway's: it signs the student in, holds what tonAPI
-// got from the university, and says when the session is over. Node is behind
-// it for what hasn't moved (routes.rs), and for what a moved route still
-// needs of it (node.rs). None from here means the request goes to Node as it
-// came: a route of Node's, another university, the demo account, nobody
-// signed in, a portal session to sign in to again, a service that is down
-// or slow (Node words those errors).
+// got from the university, and says when the session is over. For a session
+// it holds, every moved route is answered here, its errors too
+// (translate/failed.rs). Node is behind it for what hasn't moved
+// (routes.rs), and is told when a session ends (node.rs). None from here
+// means the request goes to Node as it came: a route of Node's, another
+// university, the demo account, nobody signed in, a cookie that isn't read.
 
 mod attempts;
 pub(crate) mod portal;
@@ -36,19 +37,22 @@ use tonapi_providers::NetSettings;
 
 pub use attempts::TrustedProxies;
 
-use crate::node::{self, Node, NodeAnswer, NodeRequest};
+use crate::node::{self, NodeAnswer, NodeRequest};
 use crate::routes::{self, Moved};
 use crate::session::cookie;
 use crate::session::handed::CAS_TICKET;
 use crate::session::memory::{Ended, Memory, Turn};
 use crate::session::Held;
 use crate::tonapi;
-use crate::translate::{self, Translated};
+use crate::translate::{self, Failure, Translated};
 use crate::universities::{self, University};
 
 // How long Node is waited for when it is told a session ended: it ends the
 // webmail's session and tells the CAS too, and the page waits meanwhile.
 const NODE_TOLD_PATIENCE: Duration = Duration::from_secs(6);
+// Why a route failed when tonAPI said `session_expired` of a session the
+// CAS still knows, or doesn't say is over: the service's own refusal.
+const REFUSED_NOT_OVER: &str = "session_expired, and the CAS doesn't say the session is over";
 
 // A request of the page's.
 pub struct Asked<'a> {
@@ -70,9 +74,11 @@ pub struct Gateway {
     codec: cookie::Codec,
     net: NetSettings,
     trusted: TrustedProxies,
-    // Says every request left to Node, not only the unexpected ones.
+    // Whether the statistics are on, as Node is set up (node.rs).
+    statistics: bool,
+    // Says every request a moved route refused, not only the ones that
+    // failed.
     verbose: bool,
-    pub(crate) node: Node,
     pub(crate) memory: Memory,
     pub(crate) attempts: attempts::Attempts,
     pub(crate) early: portal::Early,
@@ -97,8 +103,8 @@ impl Gateway {
             codec: cookie::Codec::new(session_secret),
             net,
             trusted: TrustedProxies::Private,
+            statistics: false,
             verbose: std::env::var_os("TAFAC_LOG_REQUESTS").is_some(),
-            node: Node::default(),
             memory: Memory::default(),
             attempts: attempts::Attempts::default(),
             early: portal::Early::default(),
@@ -110,6 +116,24 @@ impl Gateway {
     pub fn trusting(mut self, trusted: TrustedProxies) -> Self {
         self.trusted = trusted;
         self
+    }
+
+    // Whether the statistics are on, which a session check says to the page
+    // (`analyticsEnabled`). `posthog_project_key`: POSTHOG_PROJECT_KEY as
+    // the Node behind is given it, which decides it for Node; None where
+    // Node sends nothing whatever its key (a development server without
+    // POSTHOG_IN_DEV).
+    pub fn with_statistics(mut self, posthog_project_key: Option<&str>) -> Self {
+        self.statistics = node::statistics_on(posthog_project_key);
+        self
+    }
+
+    // Whether Node runs as on tafac.fr and in the apps, which the cookie's
+    // name says (getSessionCookieName): its routes then say one sentence
+    // for an error of the university's, and the reason in development
+    // (server/routeErrors).
+    fn in_production(&self) -> bool {
+        self.cookie_name != cookie::DEVELOPMENT_COOKIE
     }
 
     // For the tests: the universities given, asked without TLS.
@@ -140,7 +164,8 @@ impl Gateway {
     //
     // `cookie`: the value of the session cookie as the caller holds it now
     // (asked again before answering: the session may have ended meanwhile).
-    // `node`: a request to Node and its answer (node.rs says which are made).
+    // `node`: a request to Node and its answer (node.rs says which is made:
+    // Node told that a session ended).
     //
     // An answer may set or clear the session's cookie (Set-Cookie): a
     // caller that keeps the cookie itself takes it from there.
@@ -157,7 +182,7 @@ impl Gateway {
         }
         let value = cookie()?;
         if route != Moved::Logout {
-            if let Some(expired) = self.found_expired_already(route, &value, &node).await {
+            if let Some(expired) = self.found_expired_already(route, &value) {
                 return Some(expired);
             }
         }
@@ -168,30 +193,48 @@ impl Gateway {
             Moved::Login => return None,
             // The session ends: nothing to check of it after.
             Moved::Logout => return Some(self.sign_out(&held, &value, &node).await),
-            Moved::Session => self.session_check(&held, &node).await,
+            Moved::Session => self.session_check(&held).await,
             Moved::Account => self.account(&held).await,
             Moved::Apps => self.apps(&held).await,
             Moved::MoodleDeadlines => self.moodle_deadlines(&held).await,
             Moved::Grades => self.grades(&held, None).await,
-            Moved::GradesSemester => self.grades(&held, Some(asked.path.rsplit('/').next().unwrap_or_default())).await,
+            // Node's route reads one part of the path after the folder: a
+            // path with none, or more, is no route of the page's.
+            Moved::GradesSemester => self.grades(&held, Some(routes::under(route, asked.path).filter(|id| !id.is_empty() && !id.contains('/'))?)).await,
             Moved::GradesMessage => self.grades_message(&held, query).await,
             Moved::GradesDistribution => self.grades_distribution(&held, query).await,
             Moved::GradesTranscript => self.grades_transcript(&held, query).await,
         };
 
-        match translated {
-            // Signed out, or in again, while the university was asked: the
-            // session this answer is about is no longer the one there is.
-            Translated::Answer(response) => {
-                let still = self.signed_in(cookie().as_deref()).is_some_and(|current| current.session.id == held.session.id);
-                still.then_some(response)
-            }
-            Translated::Node(why) => {
-                self.left_to_node(&why);
-                None
-            }
-            Translated::Lost => self.lost(route, &held, &value, &node).await,
+        let response = match translated {
+            Translated::Answer(response) => response,
+            Translated::Failed(failure) => self.route_failed(route, &failure),
+            Translated::Lost => match self.lost(route, &held, &value, &node).await {
+                Some(expired) => return Some(expired),
+                // The CAS still knows the ticket, or doesn't say: the
+                // service refused for a reason of its own.
+                None => self.route_failed(route, &Failure::Unavailable(REFUSED_NOT_OVER.to_string())),
+            },
+        };
+        // Signed out, or in again, while the university was asked: the
+        // session this answer is about is no longer the one there is.
+        let still = self.signed_in(cookie().as_deref()).is_some_and(|current| current.session.id == held.session.id);
+        still.then_some(response)
+    }
+
+    // A moved route without an answer of its own: its error, worded here as
+    // Node words its own (translate/failed.rs). An error of the
+    // university's is worth a line: the route as the table writes it, and
+    // tonAPI's error code or words of this crate, never anything of the
+    // account. A request refused is said only when asked
+    // (TAFAC_LOG_REQUESTS).
+    fn route_failed(&self, route: Moved, failure: &Failure) -> http::Response<Vec<u8>> {
+        match failure {
+            Failure::Unavailable(why) => eprintln!("[tafac] tonapi: {} failed ({why})", routes::written(route)),
+            Failure::Said(status, _) if self.verbose => eprintln!("[tafac] tonapi: {} refused ({status})", routes::written(route)),
+            Failure::Said(..) => {}
         }
+        translate::failed::answer(route, failure, self.in_production())
     }
 
     // tonAPI says the university no longer knows the session (its
@@ -200,24 +243,16 @@ impl Gateway {
     // says a session is over, when its login page, asked with the ticket,
     // wants the password again. Then the session ends here: the page is
     // told (the route's answer, `X-Tafac-Session: expired`, the cookie
-    // taken away) and Node is told. Otherwise the request is Node's, which
-    // words the service's error.
+    // taken away) and Node is told. None otherwise: the session lives, and
+    // the route has failed.
     async fn lost<N, Fut>(&self, route: Moved, held: &Held<'_>, cookie: &str, node: &N) -> Option<http::Response<Vec<u8>>>
     where
         N: Fn(NodeRequest) -> Fut,
         Fut: Future<Output = NodeAnswer>,
     {
         if self.cas_still_knows(held).await != Some(false) {
-            self.left_to_node(tonapi_core::ErrorCode::SessionExpired.as_str());
             return None;
         }
-        let university = &held.session.university;
-        // Without what Node says of itself the session check is Node's: it
-        // finds the session expired as this did.
-        let analytics = match route {
-            Moved::Session => Some(self.node.facts(university, node).await?.analytics_enabled),
-            _ => None,
-        };
         // The one request that ends the session takes its cookie away; one
         // that found it expired at the same moment says so, no more.
         let ends_it = self.memory.end(&held.session.id, Ended::Expired);
@@ -225,26 +260,25 @@ impl Gateway {
             eprintln!("[tafac] session: signed out, the CAS no longer knows it");
             self.tell_node_it_ended(cookie, node).await;
         }
-        Some(translate::expired::answer(analytics.map(|analytics| (university.as_str(), analytics)), ends_it.then_some(self.cookie_name.as_str())))
+        Some(self.expired(route, &held.session.university, ends_it))
     }
 
     // A request that still shows the cookie of a session found expired
     // here: told so again, as Node tells it (the cookie isn't touched: the
     // answer that ended the session took it).
-    async fn found_expired_already<N, Fut>(&self, route: Moved, cookie: &str, node: &N) -> Option<http::Response<Vec<u8>>>
-    where
-        N: Fn(NodeRequest) -> Fut,
-        Fut: Future<Output = NodeAnswer>,
-    {
+    fn found_expired_already(&self, route: Moved, cookie: &str) -> Option<http::Response<Vec<u8>>> {
         let session = self.codec.read(cookie, now_ms())?;
         if self.memory.ended(&session.id) != Some(Ended::Expired) || !self.universities.contains_key(&session.university) {
             return None;
         }
-        let analytics = match route {
-            Moved::Session => Some(self.node.facts(&session.university, node).await?.analytics_enabled),
-            _ => None,
-        };
-        Some(translate::expired::answer(analytics.map(|analytics| (session.university.as_str(), analytics)), None))
+        Some(self.expired(route, &session.university, false))
+    }
+
+    // What a route says of a session that is over (translate/expired.rs).
+    // `ends_it`: on the answer that ends the session.
+    fn expired(&self, route: Moved, university: &str, ends_it: bool) -> http::Response<Vec<u8>> {
+        let session_check = (route == Moved::Session).then_some((university, self.statistics));
+        translate::expired::answer(session_check, ends_it.then_some(self.cookie_name.as_str()))
     }
 
     // Whether the CAS still knows the session's ticket; None when it doesn't
@@ -316,16 +350,5 @@ impl Gateway {
         }
         let memory = self.memory.of(&session.id);
         Some(Held { session, university, memory })
-    }
-
-    // Why a request this crate could have answered went to Node: tonAPI's
-    // error code or words of this crate, never anything of the account. A
-    // portal session that lapsed is the ordinary case, said only when asked
-    // (TAFAC_LOG_REQUESTS); anything else is worth a line.
-    pub(crate) fn left_to_node(&self, why: &str) {
-        let ordinary = why == tonapi_core::ErrorCode::SessionExpired.as_str() || why == crate::tonapi::Unanswered::NoPortalSession.to_string();
-        if self.verbose || !ordinary {
-            eprintln!("[tafac] tonapi: left to Node ({why})");
-        }
     }
 }

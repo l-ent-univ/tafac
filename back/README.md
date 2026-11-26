@@ -34,17 +34,24 @@ the page ──▶ the gateway (Rust) ──▶ tonAPI ──▶ the university
   `GET /account`, the portal's applications (`GET /apps`), the Moodle
   deadlines and the five grades routes, for the universities of `routes.rs`
   (today: Rennes). It makes the session at the
-  sign-in and says when it is over.
+  sign-in and says when it is over. For a session it holds, it answers
+  these routes whatever happens: a service down or slow, a parameter to
+  refuse, are said here in the status and the words Node's own route has
+  for them (`translate/failed.rs`).
 - **Node** answers everything else: the launch relay, the planning and
   ADE, the mail, the documents, the icons, the statistics, the account's
   photo (the portal's proxy), the demo account, and every route of the
   other universities, sign-in and applications included. `routes.rs` lists
-  them with what keeps each there.
-- **Node is also asked** for the wording of a service's error (a moved
-  route that fails goes to Node's own route), and for what it is set up for
-  (`node.rs`). A sign-in at Rennes asks Node nothing, the CAS's second
-  factor included; nor does a portal session that lapsed, which tonAPI
-  opens again with the CAS ticket.
+  them with what keeps each there. The moved routes are still Node's for
+  the sessions the gateway doesn't hold: nobody signed in, the demo
+  account, another university.
+- **Node is told** when a session ends here (signed out, or found expired:
+  `node.rs`), for what it kept of it. The gateway asks it nothing else: a
+  sign-in at Rennes is made here, the CAS's second factor included; a
+  portal session that lapsed is opened again by tonAPI, with the CAS
+  ticket; an error is worded here; and whether the statistics are on
+  (`analyticsEnabled`, in the session check) is read from the setting Node
+  reads, `POSTHOG_PROJECT_KEY`.
 
 ## Where things are
 
@@ -59,7 +66,7 @@ crates/tafac-gateway/
    ├─ routes.rs           THE TABLE: each route of the page, moved or Node's, and why
    │
    ├─ gateway/            a request in, its answer out, or None (Node answers)
-   │  ├─ mod.rs           the Gateway: which route, whose session, and a session the university no longer knows
+   │  ├─ mod.rs           the Gateway: which route, whose session, a route that fails, and a session the university no longer knows
    │  ├─ signin.rs        POST /login and /logout: the session made (tonAPI signs in, one-time code included), and ended
    │  ├─ attempts.rs      the sign-in's limits, the codes sent, and the address a request came from
    │  ├─ portal.rs        routes the portal answers: the session check, the account
@@ -79,9 +86,10 @@ crates/tafac-gateway/
    │  └─ grades.rs        ScoDoc: the report, a department's notice, a distribution, the PDF
    │
    ├─ translate/          one translator per moved route: tonAPI's answer as the page reads it today
-   │  ├─ mod.rs           what they share: the answer's headers, « Node answers », « the session is lost »
+   │  ├─ mod.rs           what they share: the answer's headers, « no answer », « the session is lost »
    │  ├─ signin.rs        POST /__ent_auth/login and /logout
    │  ├─ expired.rs       any route, once the CAS says the session is over
+   │  ├─ failed.rs        any route, when it has no answer of its own: Node's errors, worded here
    │  ├─ session.rs       GET /__ent_auth/session
    │  ├─ account.rs       GET /__ent_auth/account
    │  ├─ apps.rs          GET /__ent_auth/apps: tonAPI's own list, as the page reads it
@@ -92,7 +100,7 @@ crates/tafac-gateway/
    │     ├─ distribution.rs  GET /__ent_auth/grades/evaluation-distribution
    │     └─ transcript.rs    GET /__ent_auth/grades/report.pdf
    │
-   ├─ node.rs             Node behind: what it is asked and told, and the User-Agent the two share
+   ├─ node.rs             Node behind: what it is told, and what the two share (the User-Agent, whether the statistics are on)
    ├─ universities.rs     tonAPI's settings, and where each university's services are
    │
    ├─ proxy.rs            tafac.fr: the HTTP server in front of Node
@@ -128,8 +136,11 @@ crates/tafac-gateway/
   (`translate/`), until its screen reads tonAPI's own model: the
   applications do (`translate/apps.rs`, `src/portalApps.js`), and Node
   gives the same list for the demo account and the portals it reads
-  itself. Where the answer is one only Node gives, the request goes to
-  Node as it came: each translator lists the cases.
+  itself. A route's errors are Node's words too (`translate/failed.rs`):
+  one fixed sentence where Node runs in production, the reason on a
+  development server (which the session cookie's name tells apart). Each
+  translator lists Node's answers, and the ones that are still Node's to
+  give: those of a session the gateway doesn't hold.
 - **Nothing of tonAPI is copied here.** Its code and its settings come from
   the commit named in `Cargo.toml`.
 
@@ -138,7 +149,8 @@ crates/tafac-gateway/
 1. Its line in `routes.rs` (from `node(…)` to `moved(…)`).
 2. Its question in `tonapi/`: which of tonAPI's providers is asked.
 3. Its translator in `translate/`: the page's JSON from tonAPI's answer,
-   with the cases that stay Node's written at the top.
+   with each of Node's answers written at the top, its errors and its
+   refusals too (`translate/failed.rs` words them).
 4. Three lines in `gateway/` (`portal.rs` or `services.rs`).
 5. Its tests in `tests/`, on the made-up campus (`testing/`).
 6. The answer compared with Node's on a real account.
@@ -158,4 +170,8 @@ Open http://127.0.0.1:3100 and sign in there: the gateway makes the session.
 In development the page outlines each widget and page by who answered its
 route (orange: the gateway, through tonAPI; green: Node) and lists every
 route asked, with its time (`src/dev/BackendMarks.jsx`). The gateway's own
-log says each request it left to Node, and why.
+log says each moved route that failed, and why; the page gets the reason
+too, as from the development server. The statistics are off there, as the
+development server's are, unless the gateway is started with
+`POSTHOG_IN_DEV=1` and `POSTHOG_PROJECT_KEY` as that server is (the gateway
+reads its environment only, not `.env.local`).

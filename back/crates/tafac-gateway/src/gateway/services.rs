@@ -9,7 +9,11 @@
 //                   own caches: the deadlines, five minutes)
 //   the question    asked with the CAS ticket and the service's session the
 //                   student's session holds from the last one (tonapi/)
-//   the translator  tonAPI's answer as the page reads it today
+//   the translator  tonAPI's answer as the page reads it today, or why
+//                   there is none (never kept: asked again the next time)
+//
+// A request Node's own route refuses (a parameter that isn't what it should
+// be) is refused here in Node's words, before anything is asked.
 //
 // A route added here is a few lines: its question, its translator, its key.
 
@@ -20,17 +24,11 @@ use crate::session::memory::Turn;
 use crate::session::Held;
 use crate::tonapi::{self, Service, Unanswered};
 use crate::translate::grades::{message, report, scodoc_id};
-use crate::translate::{self, Translated};
+use crate::translate::{self, failed, Translated};
 
 // One of the request's parameters (« ?name=value »), decoded.
 fn parameter(query: Option<&str>, name: &str) -> Option<String> {
     url::form_urlencoded::parse(query?.as_bytes()).find_map(|(found, value)| (found == name).then(|| value.into_owned()))
-}
-
-// Node's own answer to a request it would refuse (a parameter that isn't
-// what it should be): its words, its status.
-fn refused_by_node(what: &str) -> Translated {
-    Translated::Node(format!("{what}: Node's to refuse"))
 }
 
 impl Gateway {
@@ -79,7 +77,7 @@ impl Gateway {
     // `semester` (translate/grades/report.rs).
     pub(super) async fn grades(&self, held: &Held<'_>, semester: Option<&str>) -> Translated {
         let semester = match semester.map(scodoc_id) {
-            Some(None) => return refused_by_node("a semester id that isn't one"),
+            Some(None) => return Translated::Failed(failed::SEMESTER_REFUSED),
             Some(Some(id)) => Some(id),
             None => None,
         };
@@ -117,7 +115,7 @@ impl Gateway {
     pub(super) async fn grades_message(&self, held: &Held<'_>, query: Option<&str>) -> Translated {
         let named = parameter(query, "dep");
         let Some(department) = named.as_deref().and_then(message::department) else {
-            return refused_by_node("a department that isn't one");
+            return Translated::Failed(failed::DEPARTMENT_REFUSED);
         };
         let key = format!("grades/message/{department}");
         self.kept_or_asked(held, &key, async |service: &Service<'_>| {
@@ -132,20 +130,19 @@ impl Gateway {
     // (translate/grades/distribution.rs).
     pub(super) async fn grades_distribution(&self, held: &Held<'_>, query: Option<&str>) -> Translated {
         let (asked_semester, asked_evaluation) = (parameter(query, "semestre"), parameter(query, "eval"));
-        let Some(evaluation) = asked_evaluation.as_deref().and_then(scodoc_id) else {
-            return refused_by_node("an evaluation id that isn't one");
-        };
         // « current »: the semester of the report the page shows first.
         let current = asked_semester.as_deref() == Some("current");
-        let Some(semester) = asked_semester.as_deref().and_then(|id| if current { Some(id) } else { scodoc_id(id) }) else {
-            return refused_by_node("a semester id that isn't one");
+        let semester = asked_semester.as_deref().and_then(|id| if current { Some(id) } else { scodoc_id(id) });
+        let (Some(semester), Some(evaluation)) = (semester, asked_evaluation.as_deref().and_then(scodoc_id)) else {
+            return Translated::Failed(failed::IDS_REFUSED);
         };
         let key = format!("grades/distribution/{semester}/{evaluation}");
         self.kept_or_asked(held, &key, async |service: &Service<'_>| {
             let semester = if current {
                 match self.report(service, None).await.map(|body| report::semester_of(&body)) {
                     Ok(Some(id)) => id,
-                    Ok(None) => return (Translated::Node("no current semester in the report".to_string()), None),
+                    // A student without a semester has no evaluation.
+                    Ok(None) => return (Translated::Failed(failed::UNKNOWN_EVALUATION), None),
                     Err(other) => return (other, None),
                 }
             } else {
@@ -163,7 +160,7 @@ impl Gateway {
     pub(super) async fn grades_transcript(&self, held: &Held<'_>, query: Option<&str>) -> Translated {
         let asked_semester = parameter(query, "semestre");
         let Some(semester) = asked_semester.as_deref().and_then(scodoc_id) else {
-            return refused_by_node("a semester id that isn't one");
+            return Translated::Failed(failed::SEMESTER_REFUSED);
         };
         let _turn = held.memory.turn(Turn::Service(ServiceKind::Grades)).await;
         let service = Service { held, net: self.net };

@@ -16,8 +16,8 @@
 //   401 with X-Tafac-Session: expired: the CAS no longer knows the ticket
 //       (tonAPI's `session_expired`, and the CAS asked says so). Answered
 //       here (translate/expired.rs), and Node is told.
-//   500 { error }: Moodle down, slow, or answering something else. Node,
-//       which signs in itself and words the error.
+//   500 { error }: Moodle down, slow, or answering something else (the CAS
+//       still knowing the ticket). Answered here (translate/failed.rs).
 //   404 { disabled: true }: a university without the widget. It is not one
 //       of routes.rs' universities for this route.
 //
@@ -29,7 +29,7 @@
 use chrono::{DateTime, Duration, SecondsFormat, Utc};
 use tonapi_core::Homework;
 
-use super::{json_answer, unanswered, Translated, Unanswered};
+use super::{json_answer, unanswered, Failure, Translated, Unanswered};
 use crate::universities::University;
 
 // selectMoodleDeadlines' limits (MOODLE_DEADLINES_*).
@@ -95,8 +95,9 @@ pub fn translate(asked: Result<&[Homework], Unanswered>, university: &University
         Ok(homework) => homework,
         Err(why) => return unanswered(why),
     };
+    // Deadlines read somewhere else than a Moodle have no link to give.
     let Some(moodle) = &university.moodle else {
-        return Translated::Node("no Moodle in the university's settings".to_string());
+        return Translated::Failed(Failure::Unavailable("no Moodle in the university's settings".to_string()));
     };
     let moodle_host = moodle.host_str().unwrap_or_default().to_ascii_lowercase();
 
@@ -169,7 +170,7 @@ mod tests {
     fn answer(asked: Result<&[Homework], Unanswered>, university: &University) -> Option<serde_json::Value> {
         match translate(asked, university, Utc.timestamp_opt(NOW, 0).unwrap()) {
             Translated::Answer(response) => Some(serde_json::from_slice(response.body()).unwrap()),
-            Translated::Node(_) | Translated::Lost => None,
+            Translated::Failed(_) | Translated::Lost => None,
         }
     }
 
@@ -253,14 +254,19 @@ mod tests {
     }
 
     #[test]
-    fn nothing_due_is_an_answer_and_no_answer_is_nodes() {
+    fn nothing_due_is_an_answer_and_no_answer_is_the_routes_error() {
+        let now = Utc.timestamp_opt(NOW, 0).unwrap();
         let answer = answer(Ok(&[]), &with_moodle()).unwrap();
         assert_eq!(answer["deadlines"]["items"], serde_json::json!([]));
-        for why in [Unanswered::Problem(tonapi_core::ErrorCode::SessionExpired), Unanswered::Slow, Unanswered::NoTicket, Unanswered::CookiesChanged, Unanswered::Failed] {
-            assert!(super::tests::answer(Err(why), &with_moodle()).is_none(), "{why}");
+        for why in [Unanswered::Problem(tonapi_core::ErrorCode::ServiceUnavailable), Unanswered::Slow, Unanswered::NoTicket, Unanswered::CookiesChanged, Unanswered::Failed] {
+            let Translated::Failed(failure) = translate(Err(why), &with_moodle(), now) else { panic!("{why}") };
+            assert_eq!(failure, Failure::Unavailable(why.to_string()));
         }
+        // The university no longer knows the session: the CAS says whether
+        // it is over.
+        assert!(matches!(translate(Err(Unanswered::Problem(tonapi_core::ErrorCode::SessionExpired)), &with_moodle(), now), Translated::Lost));
         // A university whose settings name no Moodle.
-        assert!(super::tests::answer(Ok(&[]), &university("")).is_none());
+        assert!(matches!(translate(Ok(&[]), &university(""), now), Translated::Failed(Failure::Unavailable(_))));
     }
 
     #[test]

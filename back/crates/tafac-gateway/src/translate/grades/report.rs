@@ -12,11 +12,16 @@
 //       answered here, with ScoDoc's shape written back from it.
 //   200 { authenticated: false, grades: null }: nobody signed in. Node.
 //   200 for the demo account: Node.
-//   400 { error }: a semester id that isn't one. Node.
+//   the same for a student without a semester, `grades` being ScoDoc's own
+//       empty report: answered here, written back as empty.
+//   400 { error }: a semester id that isn't one. Answered here, in Node's
+//       words (translate/failed.rs).
 //   401 with X-Tafac-Session: expired: the CAS no longer knows the ticket.
 //       Answered here (translate/expired.rs), and Node is told.
 //   500 { error }: ScoDoc down, slow, or answering something else; a
-//       student ScoDoc doesn't know. Node, which asks itself and words it.
+//       student ScoDoc doesn't know, or whose component has none (tonAPI's
+//       `service_absent`); a semester ScoDoc has no report for. Answered
+//       here (translate/failed.rs).
 //   404 { disabled: true }: a university without grades. It is not one of
 //       routes.rs' universities for this route.
 //
@@ -34,7 +39,9 @@
 //     from ScoDoc's text in three evaluations of a past semester on a real
 //     account (why isn't known yet: spaces, probably);
 //   - a jury's `decision_annee.date` is the day, where ScoDoc gives the day
-//     and the hour: the page doesn't show it.
+//     and the hour: the page doesn't show it;
+//   - a semester's id written in %XX in the path, which Node's router
+//     decodes, is no id here: the page writes its digits.
 
 use std::collections::BTreeMap;
 
@@ -289,10 +296,17 @@ fn absences(report: &AbsenceReport) -> Value {
     Value::Object(by_day)
 }
 
+// ScoDoc's « relevé » for a student without a semester, as the IUT's
+// gateway gives it: nothing in it.
+fn empty_releve() -> Value {
+    json!({ "etudiant": { "dept_acronym": null }, "ressources": [], "saes": [] })
+}
+
 // What the IUT's gateway is set up for, as far as the page reads it.
-fn config(semester: &SemesterGrades, report: &AbsenceReport) -> Value {
+// `semester`: the report's, when the student has one.
+fn config(semester: Option<&SemesterGrades>, report: &AbsenceReport) -> Value {
     json!({
-        "releve_PDF": semester.transcript == Some(true),
+        "releve_PDF": semester.is_some_and(|semester| semester.transcript == Some(true)),
         "liste_dep_publi_PDF": "",
         "afficher_absences": report.visible == Some(true),
         "liste_dep_publi_absences": "",
@@ -309,10 +323,8 @@ pub fn translate(asked: Result<&(GradeReport, AbsenceReport), Unanswered>, curre
         Ok(report) => report,
         Err(why) => return unanswered(why),
     };
-    // A student without a semester: ScoDoc's own empty answer, from Node.
-    let Some(semester) = grades.semesters.first() else {
-        return Translated::Node("no semester in the report".to_string());
-    };
+    // None for a student without a semester: ScoDoc's own empty answer.
+    let semester = grades.semesters.first();
 
     let mut payload = Map::new();
     if current {
@@ -326,7 +338,7 @@ pub fn translate(asked: Result<&(GradeReport, AbsenceReport), Unanswered>, curre
                 .collect(),
         );
     }
-    payload.insert("relevé".to_string(), releve(semester, timezone));
+    payload.insert("relevé".to_string(), semester.map_or_else(empty_releve, |semester| releve(semester, timezone)));
     payload.insert("absences".to_string(), absences(absent));
     if let Some(totals) = &absent.unit_totals {
         payload.insert("totauxAbsences".to_string(), json!({ "absent": { "justifie": totals.justified, "non_justifie": totals.unjustified } }));
@@ -342,5 +354,50 @@ pub(crate) fn semester_of(answer: &[u8]) -> Option<String> {
         Value::Number(id) => Some(id.to_string()),
         Value::String(id) => Some(id.clone()),
         _ => None,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use tonapi_core::{AbsenceTotals, ErrorCode};
+
+    use super::super::super::Failure;
+    use super::*;
+
+    fn no_absences() -> AbsenceReport {
+        AbsenceReport {
+            absences: Vec::new(),
+            totals: AbsenceTotals { justified: 0, unjustified: 0 },
+            lates: Vec::new(),
+            visible: None,
+            unit: None,
+            unit_totals: None,
+            notice: None,
+        }
+    }
+
+    #[test]
+    fn a_student_without_a_semester_gets_scodocs_empty_report() {
+        let report = (GradeReport::default(), no_absences());
+        let Translated::Answer(response) = translate(Ok(&report), true, chrono_tz::Europe::Paris) else { panic!("an answer") };
+        let answer: Value = serde_json::from_slice(response.body()).unwrap();
+        assert_eq!((response.status(), &answer["authenticated"]), (http::StatusCode::OK, &true.into()));
+        let grades = &answer["grades"];
+        assert_eq!(grades["semestres"], json!([]));
+        assert_eq!(grades["relevé"], json!({ "etudiant": { "dept_acronym": null }, "ressources": [], "saes": [] }));
+        assert_eq!((&grades["config"]["releve_PDF"], &grades["absences"]), (&false.into(), &json!({})));
+        // No semester to ask a distribution of.
+        assert_eq!(semester_of(response.body()), None);
+    }
+
+    #[test]
+    fn no_report_is_the_routes_error_or_the_cas_to_ask() {
+        let failed = |why| translate(Err(why), false, chrono_tz::Europe::Paris);
+        // A semester ScoDoc has no report for, a component without ScoDoc.
+        for code in [ErrorCode::NotFound, ErrorCode::ServiceAbsent, ErrorCode::UpstreamChanged] {
+            let Translated::Failed(failure) = failed(Unanswered::Problem(code)) else { panic!("{code}") };
+            assert_eq!(failure, Failure::Unavailable(code.as_str().to_string()));
+        }
+        assert!(matches!(failed(Unanswered::Problem(ErrorCode::SessionExpired)), Translated::Lost));
     }
 }

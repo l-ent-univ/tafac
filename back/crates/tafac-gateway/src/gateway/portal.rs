@@ -12,9 +12,9 @@
 // its own with the CAS ticket, which the session holds in this process from
 // then on (session/memory.rs): Node isn't asked to sign in to the portal
 // again. Only when the CAS refuses the ticket is the session lost, and then
-// over (mod.rs).
+// over (mod.rs). A portal that is down or slow is the route's own error
+// (translate/failed.rs).
 
-use std::future::Future;
 use std::time::{Duration, Instant};
 
 use tonapi_config::ServiceKind;
@@ -22,7 +22,6 @@ use tonapi_core::{ErrorCode, Profile};
 use tonapi_session::StoredCookie;
 
 use super::Gateway;
-use crate::node::{NodeAnswer, NodeRequest};
 use crate::session::memory::Turn;
 use crate::session::{handed, Held};
 use crate::tonapi::{self, Service, Unanswered};
@@ -71,31 +70,21 @@ impl Gateway {
     }
 
     // GET /__ent_auth/session (translate/session.rs).
-    pub(super) async fn session_check<N, Fut>(&self, held: &Held<'_>, node: &N) -> Translated
-    where
-        N: Fn(NodeRequest) -> Fut,
-        Fut: Future<Output = NodeAnswer>,
-    {
+    pub(super) async fn session_check(&self, held: &Held<'_>) -> Translated {
         let Held { session, university, memory } = held;
         let sent = handed::portal_cookies(university, session);
         // The check made as the app started, if it was about this very
         // session a moment ago; taken once.
         let early = self.early.check.lock().await.take();
         let early = early.filter(|check| check.session == session.id && check.sent == sent && check.at.elapsed() < EARLY_KEPT);
-        let profile = async {
-            match early {
-                Some(check) => check.profile,
-                None => self.profile(held, &sent).await,
-            }
-        };
-        let (profile, facts) = tokio::join!(profile, self.node.facts(&session.university, node));
-        let Some(facts) = facts else {
-            return Translated::Node("Node didn't say what it is set up for".to_string());
+        let profile = match early {
+            Some(check) => check.profile,
+            None => self.profile(held, &sent).await,
         };
         if let Ok(profile) = &profile {
             memory.keep_profile(profile);
         }
-        translate::session::translate(profile.as_ref().map_err(|why| *why), session, university, facts.analytics_enabled)
+        translate::session::translate(profile.as_ref().map_err(|why| *why), session, university, self.statistics)
     }
 
     // GET /__ent_auth/account (translate/account.rs).
@@ -109,31 +98,19 @@ impl Gateway {
     }
 
     // As an app starts: the session check its page is about to ask for,
-    // made while Node and the page start, and what Node says of itself
-    // (`node`, as answer's: it waits for Node to be up). Nothing when
-    // nobody is signed in. Not for a server: it has no start a student
-    // waits for.
-    pub async fn check_early<N, Fut>(&self, cookie: Option<&str>, node: N)
-    where
-        N: Fn(NodeRequest) -> Fut,
-        Fut: Future<Output = NodeAnswer>,
-    {
+    // made while Node and the page start. Nothing when nobody is signed in.
+    // Not for a server: it has no start a student waits for.
+    pub async fn check_early(&self, cookie: Option<&str>) {
         let Some(held) = self.signed_in(cookie) else { return };
         let Held { session, university, .. } = &held;
-        {
-            let mut early = self.early.check.lock().await;
-            let sent = handed::portal_cookies(university, session);
-            let profile = self.profile(&held, &sent).await;
-            if let Err(why) = &profile {
-                self.left_to_node(&why.to_string());
-            }
-            // The CAS refused its ticket for the portal: it is asked ahead
-            // too whether the session is over, and its « no » kept.
-            if profile == Err(Unanswered::Problem(ErrorCode::SessionExpired)) {
-                let _ = self.cas_still_knows(&held).await;
-            }
-            *early = Some(EarlyCheck { session: session.id.clone(), sent, at: Instant::now(), profile });
+        let mut early = self.early.check.lock().await;
+        let sent = handed::portal_cookies(university, session);
+        let profile = self.profile(&held, &sent).await;
+        // The CAS refused its ticket for the portal: it is asked ahead too
+        // whether the session is over, and its « no » kept.
+        if profile == Err(Unanswered::Problem(ErrorCode::SessionExpired)) {
+            let _ = self.cas_still_knows(&held).await;
         }
-        let _ = self.node.facts(&session.university, &node).await;
+        *early = Some(EarlyCheck { session: session.id.clone(), sent, at: Instant::now(), profile });
     }
 }

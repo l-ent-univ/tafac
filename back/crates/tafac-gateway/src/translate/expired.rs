@@ -27,7 +27,7 @@ use crate::session::cookie::clear_cookie;
 const SESSION_EXPIRED_CODE: &str = "session_expired";
 
 // `session_check`: for GET /__ent_auth/session, the session's university
-// and what Node says of itself there (`analyticsEnabled`); None for any
+// and whether the statistics are on (`analyticsEnabled`); None for any
 // other route. `ends_it`: the session cookie's name, on the answer that
 // ends the session.
 pub fn answer(session_check: Option<(&str, bool)>, ends_it: Option<&str>) -> http::Response<Vec<u8>> {

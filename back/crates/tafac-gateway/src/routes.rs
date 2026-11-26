@@ -8,8 +8,9 @@
 // Node's.
 //
 // A moved route is written once more in translate/ (tonAPI's answer as the
-// page reads it today). For some of its cases the answer is still Node's:
-// the route's translator says which, and node.rs what Node is asked for.
+// page reads it today, its errors too). It is still Node's for the sessions
+// the gateway doesn't hold: nobody signed in, the demo account, another
+// university.
 
 use http::Method;
 
@@ -115,6 +116,22 @@ pub fn moved_route(method: &Method, path: &str) -> Option<Moved> {
     }
 }
 
+fn line_of(moved: Moved) -> Option<&'static Route> {
+    ROUTES.iter().find(|route| route.backend == Backend::TonApi(moved))
+}
+
+// A moved route as the table writes it (« GET /__ent_auth/grades/semester/* »):
+// what the log says of a request, never what the page put in its path.
+pub fn written(moved: Moved) -> String {
+    line_of(moved).map_or_else(String::new, |route| format!("{} {}", route.method, route.path))
+}
+
+// What a path holds under a moved route's folder (« /…/* »): the semester's
+// id of /__ent_auth/grades/semester/<id>. None for a route that is one path.
+pub fn under(moved: Moved, path: &str) -> Option<&str> {
+    path.strip_prefix(line_of(moved)?.path.strip_suffix('*')?)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -162,6 +179,16 @@ mod tests {
             assert_eq!(backend(&method, path), Backend::Node, "{method} {path}");
             assert_eq!(moved_route(&method, path), None);
         }
+    }
+
+    #[test]
+    fn a_moved_route_is_written_and_read_as_the_table_has_it() {
+        assert_eq!(written(Moved::Grades), "GET /__ent_auth/grades");
+        assert_eq!(written(Moved::GradesSemester), "GET /__ent_auth/grades/semester/*");
+        assert_eq!(under(Moved::GradesSemester, "/__ent_auth/grades/semester/1234"), Some("1234"));
+        assert_eq!(under(Moved::GradesSemester, "/__ent_auth/grades/semester/12/34"), Some("12/34"));
+        assert_eq!(under(Moved::GradesSemester, "/__ent_auth/grades/semester/"), Some(""));
+        assert_eq!(under(Moved::Grades, "/__ent_auth/grades"), None);
     }
 
     #[test]

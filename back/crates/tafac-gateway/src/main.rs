@@ -3,8 +3,8 @@
 // routes that moved to tonAPI (routes.rs); it passes everything else on to
 // Node as it came.
 //
-// Its settings, from the environment (SESSION_SECRET and TRUST_PROXY are
-// Node's own, read from the same place):
+// Its settings, from the environment (SESSION_SECRET, TRUST_PROXY and
+// POSTHOG_PROJECT_KEY are Node's own, read from the same place):
 //
 //   TAFAC_GATEWAY_LISTEN  where it listens (default 127.0.0.1:3100)
 //   TAFAC_GATEWAY_NODE    where Node listens (default 127.0.0.1:3000, Node's PORT)
@@ -14,10 +14,16 @@
 //   TRUST_PROXY           whose word is taken for a student's address (the
 //                         sign-in's limits): unset, the server in front on
 //                         this machine or a private network, as Node
+//   POSTHOG_PROJECT_KEY   whether the statistics are on, which a session
+//                         check says to the page: on when Node has the key
+//                         (server/analytics.js). Node sends them, not this
 //   TAFAC_GATEWAY_DEV     set in front of the development server (`npm run
 //                         dev`), whose session cookie is lent_session;
-//                         server.js names it __Host-lent_session, always
-//   TAFAC_LOG_REQUESTS    says every request a moved route left to Node
+//                         server.js names it __Host-lent_session, always.
+//                         That server words its errors for its debug menu,
+//                         and sends no statistics without POSTHOG_IN_DEV=1
+//   TAFAC_LOG_REQUESTS    says every request a moved route refused, not
+//                         only the ones that failed
 
 use std::sync::Arc;
 
@@ -54,8 +60,13 @@ async fn main() -> std::io::Result<()> {
         eprintln!("Tafac gateway: TRUST_PROXY is a list of addresses, which isn't read here: private networks are trusted, as when it is unset");
         TrustedProxies::Private
     });
+    // Node's own key, when Node sends statistics at all: the development
+    // server doesn't unless told to (vite.config.js). It may read its key
+    // from .env or .env.local too, which aren't read here: in front of it
+    // the key is the environment's.
+    let statistics = std::env::var("POSTHOG_PROJECT_KEY").ok().filter(|_| !development || std::env::var("POSTHOG_IN_DEV").as_deref() == Ok("1"));
     let secret = setting("SESSION_SECRET", "");
-    let gateway = (!secret.is_empty()).then(|| Gateway::new(&secret, cookie).trusting(trusted));
+    let gateway = (!secret.is_empty()).then(|| Gateway::new(&secret, cookie).trusting(trusted).with_statistics(statistics.as_deref()));
     let listener = tokio::net::TcpListener::bind(&listen).await?;
     match &gateway {
         Some(gateway) => println!(
