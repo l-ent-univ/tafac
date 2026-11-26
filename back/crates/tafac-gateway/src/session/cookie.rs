@@ -1,24 +1,26 @@
-// Node's session cookie, read for tonAPI.
+// The session's cookie: read, and written.
 //
-// The Node server keeps a student's session in one encrypted cookie
-// (server/sessionCookie.js): who it is, at which university, and the
-// university's own cookies (the CAS ticket, the portal's session…). This
-// reads it, so tonAPI asks the university with those very cookies: one
-// sign-in, one set of university cookies. Read only: Node alone writes that
-// cookie, and nothing of tonAPI's side is kept beside it.
+// A student's session is one encrypted cookie the browser holds: who it
+// is, at which university, and the university's own cookies (the CAS
+// ticket, the portal's session…). No server keeps a session: this cookie
+// is all there is to start again from. The gateway writes it when it signs
+// a student in (gateway/signin.rs) and reads it at every request.
 //
-// The format is Node's: `v1.<iv>.<ciphertext>.<tag>`, each part in
-// base64url, AES-256-GCM under a key derived from SESSION_SECRET
-// (HKDF-SHA256, no salt). A cookie Node made is read by both sides' tests
-// (tests/fixtures/session-cookie-v1.json): a change of format there fails
-// here.
+// Node reads the same cookie for the routes that are still its own, and
+// writes it again as it answers them (the portal's cookies it got since).
+// So the format is the one Node reads (server/sessionCookie.js):
+// `v1.<iv>.<ciphertext>.<tag>`, each part in base64url, AES-256-GCM under a
+// key derived from SESSION_SECRET (HKDF-SHA256, no salt), the payload
+// { id, uni, user, mode, demoState, createdAt, jar }. Two fixtures hold both
+// sides to it: a cookie Node made is read here, and one made here is read by
+// Node (tests/fixtures/session-cookie-v1.json, session-cookie-gateway-v1.json).
 //
-// When in doubt the cookie is not read (None), and Node answers: a part
-// that doesn't decode, a session past its lifetime, an entry of the jar in a
+// When in doubt a cookie is not read (None), and Node answers: a part that
+// doesn't decode, a session past its lifetime, an entry of the jar in a
 // shape this file doesn't know, a secret Node has since replaced
 // (SESSION_SECRET_PREVIOUS: Node reads those cookies and issues them again).
 
-use aes_gcm::aead::{Aead, KeyInit, Payload};
+use aes_gcm::aead::{Aead, Generate, KeyInit, Payload};
 use aes_gcm::{Aes256Gcm, Nonce};
 use base64::engine::general_purpose::URL_SAFE_NO_PAD;
 use base64::Engine as _;
@@ -40,6 +42,14 @@ const TAG_BYTES: usize = 16;
 // A session older than this is gone, whatever its cookie's own expiry says
 // (SESSION_ABSOLUTE_TTL_MS).
 const ABSOLUTE_TTL_MS: f64 = 30.0 * 24.0 * 60.0 * 60.0 * 1000.0;
+// How long the browser keeps the cookie (SESSION_COOKIE_MAX_AGE_MS).
+const MAX_AGE_SECONDS: u64 = 30 * 24 * 60 * 60;
+// A browser drops a cookie past 4096 bytes, name and attributes included
+// (MAX_SESSION_COOKIE_VALUE_BYTES).
+const MAX_VALUE_BYTES: usize = 3800;
+// A cookie of the university's longer than this isn't written
+// (MAX_PERSISTED_COOKIE_VALUE_LENGTH).
+const MAX_UPSTREAM_VALUE_BYTES: usize = 1024;
 const DEMO_MODE: &str = "demo";
 
 // One of the university's cookies, as Node's jar holds it
@@ -81,8 +91,9 @@ impl UpstreamCookie {
     }
 }
 
+// A session, as its cookie says it.
 #[derive(Debug)]
-pub struct NodeSession {
+pub struct Session {
     // The session's own id: a new one at each sign-in.
     pub id: String,
     // The university's id (universities/<id>).
@@ -94,7 +105,7 @@ pub struct NodeSession {
     pub cookies: Vec<UpstreamCookie>,
 }
 
-impl NodeSession {
+impl Session {
     pub fn has_cookie(&self, host: &str, name: &str) -> bool {
         self.cookies.iter().any(|cookie| cookie.name == name && cookie.is_for(host))
     }
@@ -128,11 +139,44 @@ fn is_set(flag: &serde_json::Value) -> bool {
     }
 }
 
-pub struct Reader {
+// A session to write: what a sign-in made.
+pub struct NewSession<'a> {
+    pub university: &'a str,
+    pub user: &'a str,
+    // The CAS ticket: always written, whatever its size. Without it nothing
+    // signs in again.
+    pub ticket: &'a [UpstreamCookie],
+    // The university's other cookies, the most useful first: each is
+    // written while the cookie still has room for it.
+    pub others: &'a [UpstreamCookie],
+    // Whether the university is asked over https: its cookies then go to
+    // nothing else (Node's jar holds each one's Secure flag).
+    pub secure: bool,
+}
+
+pub struct Codec {
     cipher: Aes256Gcm,
 }
 
-impl Reader {
+fn base64url_length(bytes: usize) -> usize {
+    (bytes * 4).div_ceil(3)
+}
+
+// packJarCookies' tuple, for one cookie.
+fn packed(cookie: &UpstreamCookie, secure: bool) -> serde_json::Value {
+    serde_json::json!([cookie.name, cookie.value, cookie.domain, cookie.path, u8::from(cookie.host_only), u8::from(secure), cookie.expires_at_ms])
+}
+
+// A session id as Node makes them (randomUUID): a version 4 UUID.
+fn new_id() -> Option<String> {
+    let mut bytes = <[u8; 16]>::try_generate().ok()?;
+    bytes[6] = (bytes[6] & 0x0f) | 0x40;
+    bytes[8] = (bytes[8] & 0x3f) | 0x80;
+    let hex: String = bytes.iter().map(|byte| format!("{byte:02x}")).collect();
+    Some(format!("{}-{}-{}-{}-{}", &hex[0..8], &hex[8..12], &hex[12..16], &hex[16..20], &hex[20..32]))
+}
+
+impl Codec {
     // `secret`: SESSION_SECRET, as Node is given it.
     pub fn new(secret: &str) -> Self {
         let mut key = [0_u8; KEY_BYTES];
@@ -145,7 +189,7 @@ impl Reader {
     // The session a cookie's value holds, at `now_ms` (milliseconds since
     // the epoch). None: not one of this server's, tampered with, past its
     // lifetime, or not understood.
-    pub fn read(&self, value: &str, now_ms: i64) -> Option<NodeSession> {
+    pub fn read(&self, value: &str, now_ms: i64) -> Option<Session> {
         let stored: Stored = serde_json::from_slice(&self.open(value)?).ok()?;
         let created_at = stored.created_at.filter(|created_at| created_at.is_finite())?;
         if now_ms as f64 - created_at > ABSOLUTE_TTL_MS || stored.id.is_empty() {
@@ -164,13 +208,58 @@ impl Reader {
                 expires_at_ms: expires_at.filter(|expiry| expiry.is_finite()).map(|expiry| expiry as i64),
             })
             .collect();
-        Some(NodeSession {
+        Some(Session {
             id: stored.id,
             university: stored.uni.filter(|id| !id.is_empty())?,
             user: stored.user.filter(|user| !user.is_empty())?,
             demo: stored.mode.as_deref() == Some(DEMO_MODE),
             cookies,
         })
+    }
+
+    // A new session's cookie (its value) and the session it holds, signed in
+    // at `now_ms`. None when the system gives no random bytes: no session is
+    // made with an id or a nonce that could be guessed.
+    pub fn write(&self, new: &NewSession<'_>, now_ms: i64) -> Option<(String, Session)> {
+        let id = new_id()?;
+        let (payload, kept) = Self::payload(&id, new, now_ms);
+        let value = self.seal(&payload, <[u8; IV_BYTES]>::try_generate().ok()?)?;
+        let session = Session { id, university: new.university.to_string(), user: new.user.to_string(), demo: false, cookies: kept };
+        Some((value, session))
+    }
+
+    // The payload Node reads, with as many of the university's cookies as
+    // the cookie's size allows, in the order given (fitSessionPayload).
+    fn payload(id: &str, new: &NewSession<'_>, now_ms: i64) -> (serde_json::Value, Vec<UpstreamCookie>) {
+        let mut payload = serde_json::json!({
+            "id": id, "uni": new.university, "user": new.user, "mode": null, "demoState": null, "createdAt": now_ms, "jar": [],
+        });
+        let mut kept = new.ticket.to_vec();
+        payload["jar"] = new.ticket.iter().map(|cookie| packed(cookie, new.secure)).collect();
+        for cookie in new.others.iter().filter(|cookie| cookie.value.len() <= MAX_UPSTREAM_VALUE_BYTES) {
+            let Some(jar) = payload["jar"].as_array_mut() else { break };
+            jar.push(packed(cookie, new.secure));
+            if Self::sealed_length(&payload) <= MAX_VALUE_BYTES {
+                kept.push(cookie.clone());
+            } else if let Some(jar) = payload["jar"].as_array_mut() {
+                jar.pop();
+            }
+        }
+        (payload, kept)
+    }
+
+    // How long a payload's cookie is, without sealing it (encodedLength).
+    fn sealed_length(payload: &serde_json::Value) -> usize {
+        let plaintext = serde_json::to_vec(payload).map_or(usize::MAX / 4, |bytes| bytes.len());
+        FORMAT.len() + 3 + base64url_length(IV_BYTES) + base64url_length(plaintext) + base64url_length(TAG_BYTES)
+    }
+
+    fn seal(&self, payload: &serde_json::Value, iv: [u8; IV_BYTES]) -> Option<String> {
+        let nonce = Nonce::try_from(iv.as_slice()).ok()?;
+        let plaintext = serde_json::to_vec(payload).ok()?;
+        let sealed = self.cipher.encrypt(&nonce, Payload { msg: &plaintext, aad: ASSOCIATED_DATA }).ok()?;
+        let (ciphertext, tag) = sealed.split_at(sealed.len().checked_sub(TAG_BYTES)?);
+        Some([FORMAT.to_string(), URL_SAFE_NO_PAD.encode(iv), URL_SAFE_NO_PAD.encode(ciphertext), URL_SAFE_NO_PAD.encode(tag)].join("."))
     }
 
     fn open(&self, value: &str) -> Option<Vec<u8>> {
@@ -187,6 +276,27 @@ impl Reader {
         sealed.extend_from_slice(&tag);
         let nonce = Nonce::try_from(iv.as_slice()).ok()?;
         self.cipher.decrypt(&nonce, Payload { msg: &sealed, aad: ASSOCIATED_DATA }).ok()
+    }
+}
+
+// The Set-Cookie that gives the browser a session's cookie, as Node sets it
+// (buildSessionCookieOptions): for this site only, out of the page's reach,
+// thirty days. `name` says how the server runs: the production cookie only
+// travels over https.
+pub fn set_cookie(name: &str, value: &str) -> String {
+    format!("{name}={value}; Max-Age={MAX_AGE_SECONDS}; Path=/; HttpOnly{}; SameSite=Lax", secure_attribute(name))
+}
+
+// The Set-Cookie that takes it away (Express's clearCookie).
+pub fn clear_cookie(name: &str) -> String {
+    format!("{name}=; Max-Age=0; Path=/; Expires=Thu, 01 Jan 1970 00:00:00 GMT; HttpOnly{}; SameSite=Lax", secure_attribute(name))
+}
+
+fn secure_attribute(name: &str) -> &'static str {
+    if name == PRODUCTION_COOKIE {
+        "; Secure"
+    } else {
+        ""
     }
 }
 
@@ -213,17 +323,11 @@ pub fn clears_cookie(set_cookie: &str, name: &str) -> bool {
         })
 }
 
-// A cookie as Node would write it, for the tests here and of what uses the
-// crate: nothing else ever writes one.
+// A cookie holding any payload, for the tests here and of what uses the
+// crate: one Node made, or one no server would make.
 #[cfg(any(test, feature = "testing"))]
 pub fn seal(secret: &str, payload: &serde_json::Value) -> String {
-    let reader = Reader::new(secret);
-    let iv = [7_u8; IV_BYTES];
-    let nonce = Nonce::try_from(iv.as_slice()).unwrap();
-    let plaintext = serde_json::to_vec(payload).unwrap();
-    let sealed = reader.cipher.encrypt(&nonce, Payload { msg: &plaintext, aad: ASSOCIATED_DATA }).unwrap();
-    let (ciphertext, tag) = sealed.split_at(sealed.len() - TAG_BYTES);
-    [FORMAT.to_string(), URL_SAFE_NO_PAD.encode(iv), URL_SAFE_NO_PAD.encode(ciphertext), URL_SAFE_NO_PAD.encode(tag)].join(".")
+    Codec::new(secret).seal(payload, [7_u8; IV_BYTES]).unwrap()
 }
 
 #[cfg(test)]
@@ -271,7 +375,7 @@ mod tests {
     #[test]
     fn nodes_cookie_is_read() {
         let fixture = fixture();
-        let session = Reader::new(&fixture.secret).read(&fixture.cookie, fixture.created_at + DAY_MS).unwrap();
+        let session = Codec::new(&fixture.secret).read(&fixture.cookie, fixture.created_at + DAY_MS).unwrap();
         assert_eq!(session.id, "3f2a9c1e-7b64-4d0f-9a51-2c8e6d7f0b13");
         assert_eq!(session.university, "univ-exemple");
         assert_eq!(session.user, "jdoe");
@@ -287,16 +391,16 @@ mod tests {
     fn a_secret_with_spaces_around_it_is_nodes_trimmed_one() {
         let fixture = fixture();
         let padded = format!("  {}\n", fixture.secret);
-        assert!(Reader::new(&padded).read(&fixture.cookie, fixture.created_at).is_some());
+        assert!(Codec::new(&padded).read(&fixture.cookie, fixture.created_at).is_some());
     }
 
     #[test]
     fn another_secret_or_a_changed_cookie_reads_nothing() {
         let fixture = fixture();
         let now = fixture.created_at;
-        assert!(Reader::new("another secret, as long as the first one is").read(&fixture.cookie, now).is_none());
+        assert!(Codec::new("another secret, as long as the first one is").read(&fixture.cookie, now).is_none());
 
-        let reader = Reader::new(&fixture.secret);
+        let reader = Codec::new(&fixture.secret);
         let parts: Vec<&str> = fixture.cookie.split('.').collect();
         let flipped = |part: &str| {
             let first = if part.starts_with('A') { "B" } else { "A" };
@@ -316,14 +420,14 @@ mod tests {
     #[test]
     fn a_session_past_thirty_days_is_gone() {
         let fixture = fixture();
-        let reader = Reader::new(&fixture.secret);
+        let reader = Codec::new(&fixture.secret);
         assert!(reader.read(&fixture.cookie, fixture.created_at + 30 * DAY_MS).is_some());
         assert!(reader.read(&fixture.cookie, fixture.created_at + 30 * DAY_MS + 1).is_none());
     }
 
     #[test]
     fn what_the_test_seals_reads_back() {
-        let session = Reader::new(SECRET).read(&seal(SECRET, &payload(serde_json::json!({}))), NOW).unwrap();
+        let session = Codec::new(SECRET).read(&seal(SECRET, &payload(serde_json::json!({}))), NOW).unwrap();
         assert_eq!((session.id.as_str(), session.user.as_str(), session.demo), ("one-session", "jdoe", false));
         assert!(session.has_cookie("cas.exemple.test", "TGC"));
     }
@@ -331,12 +435,12 @@ mod tests {
     #[test]
     fn the_demo_account_is_told_apart() {
         let demo = payload(serde_json::json!({ "mode": "demo", "user": "demo", "jar": [] }));
-        assert!(Reader::new(SECRET).read(&seal(SECRET, &demo), NOW).unwrap().demo);
+        assert!(Codec::new(SECRET).read(&seal(SECRET, &demo), NOW).unwrap().demo);
     }
 
     #[test]
     fn a_payload_without_what_a_session_needs_reads_nothing() {
-        let reader = Reader::new(SECRET);
+        let reader = Codec::new(SECRET);
         for missing in [
             serde_json::json!({ "uni": null }),
             serde_json::json!({ "user": null }),
@@ -357,7 +461,7 @@ mod tests {
             ["old", "1", "ent.exemple.test", "/", 1, 1, NOW - 1],
             ["kept", "1", "ent.exemple.test", "", 1, 1, NOW + 1],
         ] });
-        let session = Reader::new(SECRET).read(&seal(SECRET, &payload(jar)), NOW).unwrap();
+        let session = Codec::new(SECRET).read(&seal(SECRET, &payload(jar)), NOW).unwrap();
         // An empty path is the root, as Node reads it.
         assert_eq!(format!("{:?}", session.cookies), "[kept@ent.exemple.test/]");
     }
@@ -394,6 +498,81 @@ mod tests {
         assert_eq!(cookie_in_header(header, DEVELOPMENT_COOKIE), None);
         assert_eq!(cookie_in_header("lent_session=", DEVELOPMENT_COOKIE), None);
         assert_eq!(cookie_in_header("", DEVELOPMENT_COOKIE), None);
+    }
+
+    fn upstream(name: &str, value: &str, domain: &str, path: &str) -> UpstreamCookie {
+        UpstreamCookie { name: name.into(), value: value.into(), domain: domain.into(), path: path.into(), host_only: true, expires_at_ms: None }
+    }
+
+    #[test]
+    fn a_session_written_reads_back_with_an_id_of_its_own() {
+        let codec = Codec::new(SECRET);
+        let cookies = [upstream("TGC", "ticket", "cas.exemple.test", "/cas"), upstream("JSESSIONID", "portal", "ent.exemple.test", "/")];
+        let new = NewSession { university: "univ-exemple", user: "jdoe", ticket: &cookies[..1], others: &cookies[1..], secure: true };
+        let (value, made) = codec.write(&new, NOW).unwrap();
+        let read = codec.read(&value, NOW).unwrap();
+        assert_eq!((read.id.as_str(), read.university.as_str(), read.user.as_str(), read.demo), (made.id.as_str(), "univ-exemple", "jdoe", false));
+        assert_eq!(read.cookies, cookies);
+        assert_eq!(made.cookies, cookies);
+
+        // A version 4 UUID, as Node's, and never the same twice.
+        let id: Vec<&str> = made.id.split('-').collect();
+        assert_eq!(id.iter().map(|part| part.len()).collect::<Vec<_>>(), [8, 4, 4, 4, 12]);
+        assert!(id[2].starts_with('4') && made.id.bytes().all(|byte| byte == b'-' || byte.is_ascii_hexdigit()));
+        let (other_value, other) = codec.write(&new, NOW).unwrap();
+        assert_ne!(other.id, made.id);
+        assert_ne!(other_value, value);
+    }
+
+    #[test]
+    fn what_doesnt_fit_the_cookie_is_left_out_from_the_end() {
+        let codec = Codec::new(SECRET);
+        let long = "x".repeat(1000);
+        // A ticket longer than any other cookie may be is written all the same.
+        let ticket = [upstream("TGC", &"t".repeat(MAX_UPSTREAM_VALUE_BYTES + 100), "cas.exemple.test", "/cas")];
+        let others = [
+            // Longer than a cookie of the university's may be: never written.
+            upstream("huge", &"x".repeat(MAX_UPSTREAM_VALUE_BYTES + 1), "ent.exemple.test", "/"),
+            upstream("one", &long, "ent.exemple.test", "/"),
+            upstream("two", &long, "ent.exemple.test", "/"),
+            // The last still fits where the one before it didn't.
+            upstream("small", "1", "ent.exemple.test", "/"),
+        ];
+        let (value, made) = codec.write(&NewSession { university: "univ-exemple", user: "jdoe", ticket: &ticket, others: &others, secure: true }, NOW).unwrap();
+        assert!(value.len() <= MAX_VALUE_BYTES, "{}", value.len());
+        assert_eq!(format!("{:?}", made.cookies), "[TGC@cas.exemple.test/cas, one@ent.exemple.test/, small@ent.exemple.test/]");
+        assert_eq!(codec.read(&value, NOW).unwrap().cookies, made.cookies);
+    }
+
+    // Read by Node's own codec too (tests/sessionCookie.test.js): what is
+    // written here is a session there.
+    #[test]
+    fn what_is_written_is_what_node_reads() {
+        let fixture: serde_json::Value = serde_json::from_str(include_str!("../../../../../tests/fixtures/session-cookie-gateway-v1.json")).unwrap();
+        let cookies = [
+            upstream("TGC", "TGT-made-up-ticket", "cas.exemple.test", "/cas"),
+            upstream("JSESSIONID", "made-up-portal-session", "ent.exemple.test", "/"),
+            UpstreamCookie { host_only: false, expires_at_ms: Some(1_795_000_000_000), ..upstream("lang", "fr", "exemple.test", "/") },
+        ];
+        let new = NewSession { university: "univ-exemple", user: "jdoe", ticket: &cookies[..1], others: &cookies[1..], secure: true };
+        let (payload, kept) = Codec::payload("5d0c8a52-1e3b-4f6a-8c97-0b2d4e6f8a1c", &new, 1_790_000_000_000);
+        assert_eq!(kept, cookies);
+        assert_eq!(payload, fixture["payload"]);
+        assert_eq!(seal(fixture["secret"].as_str().unwrap(), &payload), fixture["cookie"].as_str().unwrap());
+    }
+
+    #[test]
+    fn the_cookie_is_set_as_node_sets_it_and_cleared_as_node_clears_it() {
+        let set = set_cookie(PRODUCTION_COOKIE, "v1.a.b.c");
+        assert_eq!(set, "__Host-lent_session=v1.a.b.c; Max-Age=2592000; Path=/; HttpOnly; Secure; SameSite=Lax");
+        assert!(!clears_cookie(&set, PRODUCTION_COOKIE));
+        // The development server's is plain http.
+        assert_eq!(set_cookie(DEVELOPMENT_COOKIE, "v1.a.b.c"), "lent_session=v1.a.b.c; Max-Age=2592000; Path=/; HttpOnly; SameSite=Lax");
+
+        let cleared = clear_cookie(PRODUCTION_COOKIE);
+        assert!(cleared.starts_with("__Host-lent_session=;") && cleared.contains("; Secure"));
+        assert!(clears_cookie(&cleared, PRODUCTION_COOKIE));
+        assert!(clears_cookie(&clear_cookie(DEVELOPMENT_COOKIE), DEVELOPMENT_COOKIE));
     }
 
     #[test]

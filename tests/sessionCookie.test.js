@@ -12,6 +12,7 @@ import {
   createSessionCookieCodec,
   fitSessionPayload,
   getSessionCookieName,
+  getSessionUniversityId,
   isSessionDataExpired,
   packJarCookies,
   resolveSessionSecrets,
@@ -102,11 +103,11 @@ test('encodedLength predicts the real cookie size exactly', () => {
   }
 })
 
-// The gateway reads this cookie too, in Rust, for the routes tonAPI answers
-// (back/crates/tafac-gateway/src/session/cookie.rs, whose tests read the
-// same file). A change of format that makes this test fail makes theirs
-// fail: the reader there changes with the codec here, and the file is made
-// again (createSessionCookieCodec({ secret }).encode(payload)).
+// The gateway reads this cookie too, in Rust (back/crates/tafac-gateway/src/
+// session/cookie.rs, whose tests read the same file). A change of format
+// that makes this test fail makes theirs fail: the reader there changes
+// with the codec here, and the file is made again
+// (createSessionCookieCodec({ secret }).encode(payload)).
 test('the cookie the gateway\'s reader is tested on is still one of the codec\'s', () => {
   const fixture = JSON.parse(readFileSync(new URL('./fixtures/session-cookie-v1.json', import.meta.url), 'utf8'))
   const decoded = createSessionCookieCodec({ secret: fixture.secret }).decode(fixture.cookie)
@@ -115,6 +116,29 @@ test('the cookie the gateway\'s reader is tested on is still one of the codec\'s
   assert.equal(getSessionCookieName(true), '__Host-lent_session')
   assert.equal(isSessionDataExpired(fixture.payload, fixture.payload.createdAt + SESSION_ABSOLUTE_TTL_MS), false)
   assert.equal(isSessionDataExpired(fixture.payload, fixture.payload.createdAt + SESSION_ABSOLUTE_TTL_MS + 1), true)
+})
+
+// And the gateway writes it: it signs the students in and makes their
+// sessions, which this server then reads for its own routes. The file is a
+// cookie the gateway made (its own test makes it again from the payload):
+// what is read here is the session the server restores from it.
+test('a cookie the gateway wrote is a session here', () => {
+  const fixture = JSON.parse(readFileSync(new URL('./fixtures/session-cookie-gateway-v1.json', import.meta.url), 'utf8'))
+  const decoded = createSessionCookieCodec({ secret: fixture.secret }).decode(fixture.cookie)
+
+  assert.deepEqual(decoded, { data: fixture.payload, format: 'v1', needsReissue: false })
+  assert.equal(isSessionDataExpired(decoded.data, decoded.data.createdAt + 1000), false)
+  assert.equal(getSessionUniversityId(decoded.data), 'univ-exemple')
+
+  // The university's cookies, as the server's jar takes them back.
+  const jar = new Map(unpackJarCookies(decoded.data.jar))
+  assert.deepEqual([...jar.keys()], ['cas.exemple.test|/cas|TGC', 'ent.exemple.test|/|JSESSIONID', 'exemple.test|/|lang'])
+  assert.deepEqual(jar.get('cas.exemple.test|/cas|TGC'), {
+    name: 'TGC', value: 'TGT-made-up-ticket', domain: 'cas.exemple.test', path: '/cas', hostOnly: true, secure: true, expiresAt: null,
+  })
+  assert.deepEqual(jar.get('exemple.test|/|lang'), {
+    name: 'lang', value: 'fr', domain: 'exemple.test', path: '/', hostOnly: false, secure: true, expiresAt: 1795000000000,
+  })
 })
 
 test('any single-character change is rejected', () => {

@@ -1,29 +1,36 @@
 // The one table: which side answers each of the page's routes.
 //
 // The page asks /__ent_auth/* and /__ent_proxy/* and nothing else, on
-// tafac.fr and in the apps alike. A route is Node's until it is moved here:
-// one line changes in ROUTES, and one translator is written (translate/)
-// that turns tonAPI's answer into the answer the page gets from Node. Node's
-// routes are listed too, with what keeps each there, so this file says where
-// the move stands. A route not listed is Node's.
+// tafac.fr and in the apps alike. The gateway is in front: it signs the
+// student in, holds the session, and answers the routes that have moved to
+// tonAPI. Node is behind it for the rest, each listed here with what keeps
+// it there, so this file says where the move stands. A route not listed is
+// Node's.
 //
-// A moved route is still Node's whenever tonAPI can't give Node's own
-// answer for it (its translator says when): a route moves, the session
-// stays (session/).
+// A moved route is written once more in translate/ (tonAPI's answer as the
+// page reads it today). For some of its cases the answer is still Node's:
+// the route's translator says which, and node.rs what Node is asked for.
 
 use http::Method;
 
-// The universities whose moved routes tonAPI answers: named alike in
+// The universities the gateway signs in at and answers for: named alike in
 // tonAPI's settings and in Tafac's (universities/<id>), and checked there on
-// a real account. Any other university's are Node's.
+// a real account. Any other university is Node's, sign-in included.
 pub const UNIVERSITIES: &[&str] = &["univ-rennes"];
 
 // A route tonAPI answers, by its translator (translate/<name>.rs).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Moved {
+    Login,
+    Logout,
     Session,
     Account,
     MoodleDeadlines,
+    Grades,
+    GradesSemester,
+    GradesMessage,
+    GradesDistribution,
+    GradesTranscript,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -51,13 +58,19 @@ const fn node(method: &'static str, path: &'static str, why: &'static str) -> Ro
 }
 
 pub const ROUTES: &[Route] = &[
-    // Moved.
+    // The session: made, checked, ended.
+    moved("POST", "/__ent_auth/login", Moved::Login),
+    moved("POST", "/__ent_auth/logout", Moved::Logout),
     moved("GET", "/__ent_auth/session", Moved::Session),
     moved("GET", "/__ent_auth/account", Moved::Account),
+    // What the university's services say.
     moved("GET", "/__ent_auth/moodle/deadlines", Moved::MoodleDeadlines),
-    // The session itself.
-    node("POST", "/__ent_auth/login", "the session is Node's cookie: Node signs in, tonAPI is handed its cookies"),
-    node("POST", "/__ent_auth/logout", "ends Node's session and its cookie"),
+    moved("GET", "/__ent_auth/grades", Moved::Grades),
+    moved("GET", "/__ent_auth/grades/semester/*", Moved::GradesSemester),
+    moved("GET", "/__ent_auth/grades/department-message", Moved::GradesMessage),
+    moved("GET", "/__ent_auth/grades/evaluation-distribution", Moved::GradesDistribution),
+    moved("GET", "/__ent_auth/grades/report.pdf", Moved::GradesTranscript),
+    // Tafac's own.
     node("GET", "/__ent_auth/universities", "Tafac's own list of universities"),
     node("GET", "/__ent_auth/universities/*", "Tafac's own logos"),
     node("POST", "/__ent_auth/analytics", "Tafac's own statistics"),
@@ -71,8 +84,6 @@ pub const ROUTES: &[Route] = &[
     node("GET", "/__ent_auth/planning", "tonAPI's timetable is the student's own groups only, without ADE's colours and ids"),
     node("*", "/__ent_auth/ade/*", "tonAPI's timetable takes no resource to ask for, and has no tree, search, rooms or teachers"),
     // Grades.
-    node("GET", "/__ent_auth/grades", "the page reads ScoDoc's own report; tonAPI gives a summary of it"),
-    node("GET", "/__ent_auth/grades/*", "other semesters, distributions and the PDF aren't in tonAPI"),
     node("GET", "/__ent_auth/student-pic", "no photo in tonAPI's profile"),
     // Mail, Moodle, documents.
     node("*", "/__ent_auth/mail/*", "tonAPI reads an inbox only, and Rennes' stops at the SAML step: no message, folder, draft or send"),
@@ -109,9 +120,20 @@ mod tests {
 
     #[test]
     fn the_moved_routes_and_only_them() {
+        assert_eq!(backend(&Method::POST, "/__ent_auth/login"), Backend::TonApi(Moved::Login));
+        assert_eq!(backend(&Method::POST, "/__ent_auth/logout"), Backend::TonApi(Moved::Logout));
         assert_eq!(backend(&Method::GET, "/__ent_auth/session"), Backend::TonApi(Moved::Session));
         assert_eq!(backend(&Method::GET, "/__ent_auth/account"), Backend::TonApi(Moved::Account));
         assert_eq!(backend(&Method::GET, "/__ent_auth/moodle/deadlines"), Backend::TonApi(Moved::MoodleDeadlines));
+        for (path, route) in [
+            ("/__ent_auth/grades", Moved::Grades),
+            ("/__ent_auth/grades/semester/1234", Moved::GradesSemester),
+            ("/__ent_auth/grades/department-message", Moved::GradesMessage),
+            ("/__ent_auth/grades/evaluation-distribution", Moved::GradesDistribution),
+            ("/__ent_auth/grades/report.pdf", Moved::GradesTranscript),
+        ] {
+            assert_eq!(backend(&Method::GET, path), Backend::TonApi(route), "{path}");
+        }
         for (method, path) in [
             (Method::POST, "/__ent_auth/session"),
             (Method::POST, "/__ent_auth/moodle/deadlines"),
@@ -119,10 +141,13 @@ mod tests {
             (Method::GET, "/__ent_auth/moodle/deadlines/"),
             (Method::GET, "/__ent_auth/session/"),
             (Method::GET, "/__ent_auth/sessions"),
-            (Method::POST, "/__ent_auth/login"),
-            (Method::POST, "/__ent_auth/logout"),
-            (Method::GET, "/__ent_auth/grades"),
-            (Method::GET, "/__ent_auth/grades/semester/12"),
+            (Method::GET, "/__ent_auth/login"),
+            (Method::GET, "/__ent_auth/logout"),
+            (Method::POST, "/__ent_auth/login/"),
+            (Method::POST, "/__ent_auth/grades"),
+            (Method::GET, "/__ent_auth/grades/semester"),
+            (Method::GET, "/__ent_auth/grades/something-new"),
+            (Method::GET, "/__ent_auth/student-pic"),
             (Method::POST, "/__ent_auth/ade/upcoming"),
             (Method::POST, "/__ent_auth/mail/send"),
             (Method::GET, "/__ent_proxy/api/v4-3/dlm/layout.json"),

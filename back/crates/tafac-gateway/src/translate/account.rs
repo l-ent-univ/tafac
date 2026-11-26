@@ -11,24 +11,25 @@
 //       exp, iat, iss), which Node passes on and the page never reads, are
 //       not in tonAPI's profile and so not here.
 //   200 { authenticated: true, account: <the portal's guest> }: the portal's
-//       session lapsed (tonAPI's `session_expired`) and the portal says so
-//       with a guest's token, which Node passes on. Node, as before.
+//       own session lapsed (tonAPI's `session_expired`) while the CAS still
+//       knows the ticket; the portal says so with a guest's token, which
+//       Node passes on. Node, as before.
 //   401 { error: 'session_expired' } with X-Tafac-Session: expired, the
-//       cookie cleared: the portal answers something else than a token and
-//       the CAS no longer knows the ticket. Node, which ends the session.
+//       cookie cleared: the CAS no longer knows the ticket. Answered here
+//       (translate/expired.rs), and Node is told.
 //   200 { authenticated: false, account: null }: nobody signed in. Node.
 //   200 for the demo account: Node.
 //   500 { error }: Node, which asks the portal itself and words the error.
 
 use tonapi_core::Profile;
 
-use super::{another_student, json_answer, same_student, Translated, Unanswered};
-use crate::session::cookie::NodeSession;
+use super::{another_student, json_answer, same_student, unanswered, Translated, Unanswered};
+use crate::session::cookie::Session;
 
-pub fn translate(asked: Result<&Profile, Unanswered>, session: &NodeSession) -> Translated {
+pub fn translate(asked: Result<&Profile, Unanswered>, session: &Session) -> Translated {
     let profile = match asked {
         Ok(profile) => profile,
-        Err(why) => return Translated::Node(why.to_string()),
+        Err(why) => return unanswered(why),
     };
     if !same_student(profile, session) {
         return another_student();

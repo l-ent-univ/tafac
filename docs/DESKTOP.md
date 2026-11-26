@@ -17,6 +17,8 @@ window (tafac://localhost/)          src-tauri/src/main.rs
 bridge (Rust)                        src-tauri/src/bridge.rs
    │  holds the session cookie (jar.rs): WebKit doesn't keep cookies
    │  from a custom scheme, and the page never sees it
+   ├─ the gateway, in the app itself     back/crates/tafac-gateway
+   │    signs in, holds the session, answers what moved to tonAPI
    ▼  Unix socket (named pipe on Windows), no TCP port
 server.js, unchanged                 desktop/sidecar.mjs
    │  PORT = the socket path, SESSION_SECRET made once per install
@@ -57,65 +59,145 @@ the university (CAS, ADE, webmail…)
 
 The server is moving from Node to
 [tonAPI](https://github.com/l-ent-univ/tonAPI) (Rust: one provider per
-software, one settings file per university), a route at a time. A route
-moves once, in one crate, for every place Tafac runs:
-`back/crates/tafac-gateway`. `back/` is the Rust backend's root (a Cargo
-workspace, `back/README.md`); the apps use its crates by path.
+software, one settings file per university). The Rust side is in charge:
+it signs the student in, holds the session and answers the routes that
+have moved; Node is behind it for the ones that haven't. One crate does it
+for every place Tafac runs: `back/crates/tafac-gateway`. `back/` is the
+Rust backend's root (a Cargo workspace, `back/README.md`); the apps use
+its crates by path.
 
 ```
 the page: /__ent_auth/*, /__ent_proxy/*      unchanged, the only contract
    ▼
 the gateway (Rust)                           back/crates/tafac-gateway
-   │  routes.rs      the one table: each route, tonAPI's or Node's
-   │  gateway/       who is signed in, the route's question, the answer
-   │  session/       Node's cookie read, what tonAPI is handed, what is
-   │                 remembered of a session between two questions
+   │  routes.rs      the one table: each route, moved or Node's
+   │  gateway/       the sign-in and the sign-out, whose session a request
+   │                 is, the route's question, a session that is over
+   │  session/       the session's cookie read and written, what tonAPI is
+   │                 handed, what the session holds in this process
    │  tonapi/        the questions to tonAPI, one file per thing asked
-   │  translate/     tonAPI's answer as the page gets it from Node
-   ├─ a moved route, when tonAPI has Node's own answer ──▶ the university
-   ▼  everything else, as it came
-Node (server.js)
+   │  translate/     tonAPI's answer as the page reads it today
+   │  node.rs        what Node is asked and told
+   ├─ login, logout, session, account, deadlines, grades ──▶ tonAPI ──▶ the university
+   ▼  everything else, as it came, with the session's cookie
+Node (server.js)                             ──▶ the university
 ```
 
 - **In the apps** the bridge calls the gateway in the app's own process
   before it asks Node (`bridge.rs`), on the desktop and on iOS alike.
 - **On tafac.fr** the same crate is a small server in front of Node
-  (`cargo build --release -p tafac-gateway` in `back/`, `src/main.rs`): it answers the
-  moved routes and passes every other request on as it came (headers,
-  cookies, bodies as they stream, redirects, WebSocket). Not deployed.
-- **One session**: Node's. The gateway reads Node's session cookie
-  (`session/cookie.rs`; the cookie's format is checked on both sides by
-  `tests/fixtures/session-cookie-v1.json`) and never writes it. No second
-  sign-in at the university.
-- **What tonAPI is handed** (`session/handed.rs`): for the portal, the
-  portal's cookies and never the CAS ticket (the portal's session is shared
-  with Node, which alone opens a new one). For another service (Moodle), the
-  CAS ticket and nothing of the portal's: tonAPI opens that service's
-  session itself, as Node does on a copy of its jar. The CAS binds its
-  ticket to the User-Agent that signed in, so tonAPI presents itself as
-  Node does (`node.rs`; `tests/gatewayUserAgent.test.js` holds Node to it).
-- **What is remembered** (`session/memory.rs`), in the gateway's own memory
-  and nowhere else: each service's session (an hour unused), the student's
-  component, and each answer for as long as tonAPI says it may be given
-  again (the deadlines: five minutes, as Node caches them). It goes with the
-  session (signed out, expired) and starts over when Node signs in again.
-- **Node still answers** a moved route whenever tonAPI can't give Node's
-  own answer (each translator lists the cases): so a refusal, an expired
-  session and a sign-out are Node's, as before.
+  (`cargo build --release -p tafac-gateway` in `back/`, `src/main.rs`): it
+  answers what the gateway answers and passes every other request on as it
+  came (headers, cookies, bodies as they stream, redirects, WebSocket). Not
+  deployed.
+- **For the Université de Rennes only** (`routes.rs`: `UNIVERSITIES`).
+  Every other university is Node's as before, sign-in included.
+
+What the gateway does, for Rennes:
+
+- **Signs in** (`gateway/signin.rs`). `POST /__ent_auth/login` is answered
+  by tonAPI's own sign-in: the CAS's form, the password posted once, the
+  way back to the portal, the student's component. The answers are the
+  ones the page and `signin.rs` know: `200`, `401` with `code:
+  'login_refused'` when the CAS refuses, `429` with `Retry-After` past the
+  limits (Node's numbers: 8 failures per login, 30 per address, in 15
+  minutes).
+- **Makes the session** (`session/cookie.rs`): one encrypted cookie, the
+  same as before, in the format Node reads, with the same
+  `SESSION_SECRET`. It holds the CAS ticket and the portal's cookies:
+  nothing else is kept anywhere, and no server stores sessions. Node reads
+  it for its own routes and writes it again as it answers them. Two
+  fixtures hold both sides to the format
+  (`tests/fixtures/session-cookie-v1.json`,
+  `session-cookie-gateway-v1.json`).
+- **Holds, in its own memory** (`session/memory.rs`), what tonAPI gets from
+  the services while it answers: each service's session (an hour unused),
+  the student's component, the profile (half a minute), and each answer for
+  as long as tonAPI says it may be given again (the deadlines: five
+  minutes, as Node caches them). It goes with the session and is found
+  again after a restart, with the ticket.
+- **Answers** `GET /__ent_auth/session`, `GET /__ent_auth/account`, `GET
+  /__ent_auth/moodle/deadlines` and the five grades routes
+  (`/__ent_auth/grades`, `/grades/semester/<id>`,
+  `/grades/department-message`, `/grades/evaluation-distribution`,
+  `/grades/report.pdf`), in the JSON the page reads today (`translate/`).
+- **Says when the session is over** (`gateway/mod.rs`). When tonAPI says
+  the university no longer knows the session, the gateway asks the CAS with
+  the ticket: if the CAS wants the password again, the session ends here,
+  with the answers the page and the apps act on (`401 { error:
+  'session_expired' }`, `X-Tafac-Session: expired`, the cookie taken away;
+  `expired: true` on the session check), and Node is told.
+- **Signs out**: `POST /__ent_auth/logout` ends the session here, tells the
+  CAS (tonAPI), and tells Node, for what Node kept of it (the webmail's
+  session).
+- **One User-Agent** for the whole of Tafac. The CAS binds its ticket to
+  the User-Agent that signed in and deletes it when another shows it. The
+  gateway and Node present themselves under the same name, the one Node
+  always had (`node`): the gateway's `node.rs`, Node's
+  `server/upstreamAgent`, held together by `tests/upstreamAgent.test.js`.
+  So a session one of them made is used by the other.
+
+What is still Node's, and why:
+
+- **Every route that hasn't moved** (`routes.rs` says what tonAPI lacks for
+  each): the portal's proxy, the launch relay, the planning and ADE, the
+  mail, the documents, the icons, the statistics, the demo account.
+- **The second factor.** tonAPI's esup-otp is another university's variant:
+  it doesn't read Rennes' code page, and has no code sent by SMS or mail.
+  When the CAS answers the password with that page, or when the page sends
+  a code, the request goes to Node's own login, which posts the password
+  itself. The session Node makes is one like any other.
+- **The portal signed in to again.** Node's portal proxy goes with Node's
+  own copy of the session's cookies. So when the portal's session lapses
+  (the CAS still knowing the ticket), the session check goes to Node, which
+  opens the portal's new session, as before.
+- **A moved route's errors.** When tonAPI can't give the page's answer (a
+  service down or slow, a parameter to refuse, the demo account, nobody
+  signed in), the request goes to Node's own route, which words it. Each
+  translator lists the cases.
+- **What Node is set up for** (`analyticsEnabled`, in the session check's
+  answer): read from Node now and then.
+
 - **To move a route**: its line in `routes.rs`, its question in `tonapi/`,
   a translator in `translate/`, three lines in `gateway/`, and the answer
   compared with Node's on a real account.
 - `TAFAC_LOG_REQUESTS=1` logs the page's requests in a debug build of the
-  app, with `tonapi` after the ones tonAPI answered; `TAFAC_NO_TONAPI=1`
-  leaves every route to Node.
+  app, with `tonapi` after the ones the gateway answered; `TAFAC_NO_TONAPI=1`
+  leaves every route to Node, sign-in included.
 
-Moved so far, for the Université de Rennes: `GET /__ent_auth/session`,
-`GET /__ent_auth/account` and `GET /__ent_auth/moodle/deadlines`. On a
-real account, a debug build on a Mac: the session check 80 ms from Node,
-answered before the page asks with tonAPI (the app asks the portal as it
-starts); the account 10 ms, then 0; the deadlines 4.7 s the first time
-(Moodle's sign-in through the federation: 4.3 s from Node), then 3 ms for
-five minutes, as from Node, and the same six items field for field.
+The grades come from tonAPI's own report, written back in ScoDoc's shape
+for the page: on a real account every field the page reads is Node's, value
+for value, but five: the list of departments allowed to see absences (one
+switch says the same), the description of three evaluations of a past
+semester (why isn't known yet) and the date of a jury's decision (the day
+without the hour). `translate/grades/report.rs` lists them. In development
+the page shows who answered each route
+(`back/README.md`, « To see it work »).
+
+On a real Rennes account, the gateway's server (a debug build, on a Mac) in
+front of the development server, each asked a few times:
+
+| | the gateway | Node |
+|---|---|---|
+| sign-in | 2.5 to 3.3 s | 1.8 to 1.9 s |
+| session check | 40 to 100 ms | 320 to 760 ms |
+| account | 1 to 4 ms | 40 ms |
+| deadlines, the first time | 4.3 to 5 s | 3.7 to 4.5 s |
+| grades, the first time | 1 s | 0.5 s |
+| sign-out | 0.1 s | 0.15 s |
+
+The sign-in takes a second more than Node's: tonAPI looks for the student's
+component there, which the first grades used to wait for (3 s, and still do
+for a session Node made). With the session the gateway made, Node's own
+routes answered as with its own (the portal's applications, the planning,
+ADE, the mail, the photo, the school certificate), and the answers of the
+moved routes were the ones of a session Node made, field for field, where
+they were before. A session over at the CAS was said so by the gateway; a
+portal session lost while the CAS still knew the ticket was not; and the
+gateway's sign-out ended the CAS's session. Not run on a real account: a
+second factor (no such account), the sign-in's refusals and limits (a wrong
+password is not tried on a real account), and the page itself in a browser
+or in the apps (the requests were a script's).
 
 ## Staying signed in
 
@@ -136,14 +218,19 @@ after « Se déconnecter » (`src-tauri/src/signin.rs`, used by `bridge.rs`).
   keychain: an unsigned build would have macOS ask for it at each rebuild):
   after a restart, `npm run desktop:dev` asks for the password again. A store
   that refuses it leaves it in memory for the run.
-- **Signed in again**: an answer with `X-Tafac-Session: expired`
-  (`server/sessionExpiry/`), on any request of the window or of Moodle's view,
+- **Signed in again**: an answer with `X-Tafac-Session: expired` (the
+  gateway's, when it finds the session over; the server's,
+  `server/sessionExpiry/`), on any request of the window or of Moodle's view,
   makes the bridge sign in with the kept login (`quiet: true`: the server
   sends no one-time code unasked), then ask the request again: the page and
-  Moodle's view get the second answer and never see the expiry. One sign-in
-  at a time: the requests that come back expired meanwhile wait for it and
-  are asked again after. Moodle's view stays open; the launch relay it asks
-  signs in to Moodle with the new session.
+  Moodle's view get the second answer and never see the expiry. The sign-in
+  goes the way the page's own does: the gateway makes it (tonAPI), in the
+  app. One sign-in at a time: the requests that come back expired meanwhile
+  wait for it and are asked again after. Moodle's view stays open; the
+  launch relay it asks signs in to Moodle with the new session. An answer
+  that takes the session's cookie away is about the session its request
+  left with: when the app has signed in again by then, the new cookie stays
+  (`bridge.rs`: `keep_cookies`).
 - **At launch**: the page's first questions answer signed out
   (`/__ent_auth/universities` without a session, `/__ent_auth/session`
   `authenticated: false`): the bridge signs in first, so the page boots on
@@ -162,10 +249,13 @@ after « Se déconnecter » (`src-tauri/src/signin.rs`, used by `bridge.rs`).
   (`X-Tafac-Logout: expired`, `logoutFromEnt({ expired: true })` in
   `src/entApi.js`) and keeps it. The bridge waits for a sign-in under way
   before the sign-out goes, so none signs the student in again behind it.
-- **The password** goes only to the local server's login route, and from
-  there to the university's CAS, as when the student types it. It is never
-  logged (the app's log says `[tafac] sign-in: kept`, `signed in again`,
-  `refused by the university, forgotten`…).
+- **The password** goes from the bridge to the gateway in the app's own
+  process, and from there to the university's CAS (tonAPI), as when the
+  student types it; for an account with a second factor, and for a
+  university the gateway doesn't sign in at, to the local server's login
+  route, and from there to the CAS. It is never logged (the app's log says
+  `[tafac] sign-in: kept`, `signed in again`, `refused by the university,
+  forgotten`…).
 - **The login page** keeps the site's wording (« Ne transite pas sur le
   serveur de Tafac », the university's `loginPasswordNote`): nothing on it
   mentions the Keychain.

@@ -8,14 +8,16 @@
 //       The portal knows the session. tonAPI asks the portal the same
 //       question with the session's portal cookies (its profile: uPortal's
 //       /api/v5-1/userinfo, where Node reads the layout): answered here.
-//   the same, once Node has signed in to the portal again with the CAS
-//       ticket (the portal's session lapsed, tonAPI's `session_expired`):
-//       Node. The session it opens is the one it lists the applications
-//       with; tonAPI has no CAS ticket to open another.
+//   the same, once the portal has been signed in to again with the CAS
+//       ticket (the portal's own session lapsed, tonAPI's `session_expired`,
+//       and the CAS says the session lives): Node. Its portal requests
+//       (/__ent_proxy) go with its own copy of the cookies, so the session
+//       it opens is the one it lists the applications with.
 //   200 { authenticated: false, expired: true, … }, the cookie cleared: the
-//       CAS no longer knows the ticket either. Node, which ends the session.
-//   200 { authenticated: false, … }: nobody signed in. Node (nothing is
-//       asked of tonAPI without a session).
+//       CAS no longer knows the ticket. Answered here (translate/expired.rs),
+//       and Node is told.
+//   200 { authenticated: false, … }: nobody signed in. Node, which knows
+//       which university the address is for.
 //   200 for the demo account, and 200 { degraded: true } without a CAS
 //       ticket: Node.
 //   500 { error }: the portal down, slow, or answering something else.
@@ -23,27 +25,27 @@
 
 use tonapi_core::Profile;
 
-use super::{another_student, json_answer, same_student, Translated, Unanswered};
-use crate::session::cookie::NodeSession;
+use super::{another_student, json_answer, same_student, unanswered, Translated, Unanswered};
+use crate::session::cookie::Session;
 use crate::universities::University;
 
-fn cookie_names<'a>(session: &'a NodeSession, host: &str) -> Vec<&'a str> {
+fn cookie_names<'a>(session: &'a Session, host: &str) -> Vec<&'a str> {
     let mut names: Vec<&str> = session.cookies.iter().filter(|cookie| cookie.is_for(host)).map(|cookie| cookie.name.as_str()).collect();
     names.sort_by_key(|name| (name.to_lowercase(), *name));
     names
 }
 
 // `analytics_enabled`: what Node says of itself there (lib.rs asks it).
-pub fn translate(asked: Result<&Profile, Unanswered>, session: &NodeSession, university: &University, analytics_enabled: bool) -> Translated {
+pub fn translate(asked: Result<&Profile, Unanswered>, session: &Session, university: &University, analytics_enabled: bool) -> Translated {
     let profile = match asked {
         Ok(profile) => profile,
-        Err(why) => return Translated::Node(why.to_string()),
+        Err(why) => return unanswered(why),
     };
     if !same_student(profile, session) {
         return another_student();
     }
     // The session is read from its cookie at each request: `cookie`, as
-    // Node's own first answer after it starts (it says `runtime` after).
+    // Node's own first answer for a session (it says `runtime` after).
     json_answer(&serde_json::json!({
         "authenticated": true,
         "user": session.user,

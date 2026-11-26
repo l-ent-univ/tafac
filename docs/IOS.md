@@ -16,7 +16,8 @@ web view (tafac://localhost/)        src-tauri/src/ios.rs
    ▼
 bridge (Rust), as on the desktop     src-tauri/src/bridge.rs
    │  session cookie (jar.rs), kept login (signin.rs)
-   │  a few routes: tonAPI, in the app    back/crates/tafac-gateway
+   │  the gateway, in the app: signs in, holds the session, answers what
+   │  moved to tonAPI                     back/crates/tafac-gateway
    ▼  Unix socket in the app's own folder, no TCP port
 server.js, unchanged                 desktop/ios.mjs
    │  inside the app's process, on Node 18  src-tauri/src/node.rs
@@ -79,24 +80,23 @@ process, means the same folder.
 ## tonAPI
 
 The server is moving from Node to
-[tonAPI](https://github.com/l-ent-univ/tonAPI) (Rust), a route at a time.
-A route moves once, for tafac.fr and both apps, in one crate:
-`back/crates/tafac-gateway` (its `lib.rs` says how; `docs/DESKTOP.md`,
-« tonAPI »). On the phone the bridge asks it before Node, in the app's own
-process: no JavaScript runs for a route that moved.
+[tonAPI](https://github.com/l-ent-univ/tonAPI) (Rust). One crate does it for
+tafac.fr and both apps: `back/crates/tafac-gateway` (its `lib.rs` says how;
+`docs/DESKTOP.md`, « tonAPI », says who does what). On the phone the bridge
+asks it before Node, in the app's own process: no JavaScript runs for what
+it answers.
 
-- **Moved**: `GET /__ent_auth/session` and `GET /__ent_auth/account`, for
-  the Université de Rennes (`routes.rs`, the one table). Everything else is
-  Node's, as before: the login and the sign-out, the portal's applications,
-  grades, the planning, the mail, Moodle, Rennes 2, Sorbonne Nouvelle, the
-  demo account.
-- **One session**: Node's. tonAPI asks the portal with the cookies of
-  Node's session cookie, read at each request; it keeps none of its own, and
-  is never given the CAS ticket.
-- **Node still answers** a moved route whenever tonAPI can't give Node's own
-  answer: the portal no longer knows the session (Node signs in to it again,
-  or ends the session), an error, a slow answer. So an expired session
-  reaches the page as before.
+- **The gateway**, for the Université de Rennes (`routes.rs`, the one
+  table): it signs the student in (tonAPI's own sign-in at the CAS), makes
+  the session and its cookie, answers the session check, the account,
+  Moodle's deadlines and the grades, says when the session is over, and
+  signs out.
+- **Node**, behind it: every other route, as before (the portal's
+  applications, the planning, the mail, the documents, Rennes 2, Sorbonne
+  Nouvelle, the demo account), and what the gateway asks it for (a second
+  factor, the portal signed in to again, a moved route's error).
+- **One session**, in one cookie, read by both: the bridge's jar holds it
+  whoever set it.
 - **Asked as the app starts**: the session check is the page's first
   question, and it can only ask once Node and the page have started. The app
   asks the portal as it starts instead (`bridge::start_ahead`), so the
@@ -107,8 +107,10 @@ process: no JavaScript runs for a route that moved.
   with git (`.cargo/config.toml`) and a build needs read access
   to it.
 
-Measured on a real Rennes account, iPhone 17 simulator, debug build
-(`TAFAC_NO_TONAPI=1` is the same build with every route left to Node):
+Measured on a real Rennes account, iPhone 17 simulator, debug build, when
+the gateway answered the session check and the account only, on sessions
+Node made (`TAFAC_NO_TONAPI=1` is the same build with every route left to
+Node). Not measured again since the gateway signs in:
 
 | Cold launch | `/__ent_auth/session` | `/__ent_auth/account` |
 |---|---|---|
@@ -609,10 +611,12 @@ shows, signing in, the Keychain keeping the login.
 - **A real account**: one was signed in over the app's socket, in the
   simulator (« tonAPI », above): the dashboard's requests all answer. Not
   seen: the screens themselves, the login typed in the app, a phone.
-- **tonAPI**: two routes moved. On a phone nothing was measured (Node
-  without a JIT is slower there than in the simulator). A release build's
-  size with tonAPI in it wasn't measured either (the gateway's own server,
-  built for release, is 3.4 MB on this Mac).
+- **tonAPI**: the sign-in made in the app, the session it makes and the
+  sign-out were not run on a phone or in the simulator (the bridge's tests
+  run them on a made-up campus, on a Mac). On a phone nothing was measured
+  (Node without a JIT is slower there than in the simulator). A release
+  build's size with tonAPI in it wasn't measured either (the gateway's own
+  server, built for release, is 3.4 MB on this Mac).
 - **Taps**: a UI test taps the simulator as a finger does (it was written
   for the glass, « Checked », and isn't in the repository: a test target
   with `XCUIApplication(bundleIdentifier: "fr.tafac.ios")`, run with

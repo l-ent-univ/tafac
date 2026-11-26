@@ -51,6 +51,7 @@ import { buildMoodleViewPolicy } from './moodleView/policy.ts'
 import { createRouteErrorReporter, dropDebugFields } from './routeErrors/index.ts'
 import { SESSION_EXPIRED_CODE, createCasSessionProbe, createEndedSessions, markSessionExpired } from './sessionExpiry/index.ts'
 import { createFailureWindow, createLoginRateLimiter } from './loginRateLimit/index.ts'
+import { withUpstreamAgent } from './upstreamAgent/index.ts'
 import { fetchEsupOtpChannels, pickEsupOtpAutoTransport, readEsupOtpPage, sendEsupOtpCode } from './esupOtp.js'
 import {
   buildMailMessage,
@@ -916,10 +917,11 @@ function isRedirectStatus(statusCode) {
   return [301, 302, 303, 307, 308].includes(statusCode)
 }
 
-// Keep one User-Agent for every CAS request of a session: the Rennes 2 CAS
-// binds the TGC to it and deletes the TGC when another one shows it.
+// One User-Agent for every request made with a session's cookies, the same
+// as the gateway's in front of this server: a CAS binds the TGC to it and
+// deletes the TGC when another one shows it (server/upstreamAgent).
 async function fetchWithJar(url, jar, options = {}) {
-  const headers = new Headers(options.headers ?? {})
+  const headers = withUpstreamAgent(new Headers(options.headers ?? {}))
   const cookieHeader = jar.getCookieHeader(url)
 
   if (cookieHeader && !headers.has('cookie')) {
@@ -2595,10 +2597,15 @@ app.use('/__ent_auth/mail', (req, res, next) => {
 })
 
 // 1. Auth Status Endpoint
-// This route and the account's below have moved to tonAPI: where the
-// gateway runs before this server (the apps; tafac.fr once it is deployed
-// there), it answers them while the portal's session lives
-// (back/crates/tafac-gateway, translate/). A field added, renamed or
+// Where the gateway runs before this server (the apps; tafac.fr once it is
+// deployed there), it signs the students of its universities in, holds
+// their sessions and answers this route, the login, the account and the
+// logout itself (back/crates/tafac-gateway, routes.rs and translate/). This
+// server is behind it: it reads the session's cookie as before, and still
+// gets these four for what the gateway leaves it (node.rs there): another
+// university, the demo account, nobody signed in, the CAS's second factor,
+// and the session check when the portal's own session lapsed, which signs
+// in to the portal again for /__ent_proxy below. A field added, renamed or
 // removed here changes there too.
 app.get('/__ent_auth/session', async (req, res) => {
   try {
@@ -3186,6 +3193,14 @@ app.get('/__ent_auth/launch', async (req, res) => {
 })
 
 // 6. Grades Endpoint (ScoDoc / Notes9)
+// This route and the four below (a semester, the department's message, an
+// evaluation's distribution, the PDF) have moved to tonAPI where the gateway
+// runs before this server: it answers while the session lives, with
+// ScoDoc's shape written back from tonAPI's report, ends a session the CAS
+// no longer knows, and leaves the rest here (nobody signed in, the demo
+// account, a refused parameter, an error). It writes only the fields the
+// page reads: one the page starts to read goes in
+// back/crates/tafac-gateway, translate/grades/report.rs, too.
 app.get('/__ent_auth/grades', async (req, res) => {
   try {
     res.setHeader('Cache-Control', 'no-store')
@@ -5881,10 +5896,11 @@ app.get('/__ent_auth/moodle/view', (req, res) => {
 
 // 6d. Moodle deadlines endpoint
 // Moved to tonAPI where the gateway runs before this server: it answers
-// while the session lives, and leaves the rest to this route (nobody signed
-// in, the demo account, an expired session, an error). What it does as this
-// route does is in back/crates/tafac-gateway, translate/moodle_deadlines.rs:
-// a change to an item's fields or to selectMoodleDeadlines goes there too.
+// while the session lives, ends a session the CAS no longer knows, and
+// leaves the rest to this route (nobody signed in, the demo account, an
+// error). What it does as this route does is in back/crates/tafac-gateway,
+// translate/moodle_deadlines.rs: a change to an item's fields or to
+// selectMoodleDeadlines goes there too.
 app.get('/__ent_auth/moodle/deadlines', async (req, res) => {
   try {
     res.setHeader('Cache-Control', 'no-store')

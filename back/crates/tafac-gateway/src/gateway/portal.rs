@@ -1,49 +1,40 @@
 // The routes the portal answers: the session check and the account.
 //
 // Both are one question to tonAPI (the student's profile, tonapi/profile.rs),
-// which the page asks for twice in a row: the session check keeps its
-// profile half a minute for the account that follows. An app asks it a
-// third time before either, as it starts (check_early), so the page's first
-// check waits for nothing.
+// which the page asks for twice in a row: the session keeps the profile half
+// a minute for the account that follows (a sign-in reads it too). An app
+// asks it a third time before either, as it starts (check_early), so the
+// page's first check waits for nothing.
+//
+// The portal's own session is the one thing of a session Node keeps up: its
+// portal requests (/__ent_proxy, the applications) go with its own copy of
+// the cookies. So the question is asked with the portal's cookies and never
+// the CAS ticket (session/handed.rs), and a portal that no longer knows the
+// session is Node's to sign in to again, unless the CAS says the whole
+// session is over (mod.rs).
 
-use std::collections::HashMap;
 use std::future::Future;
-use std::sync::Mutex;
 use std::time::{Duration, Instant};
 
 use tonapi_core::Profile;
 use tonapi_session::StoredCookie;
 
 use super::Gateway;
-use crate::session::cookie::NodeSession;
-use crate::session::handed;
+use crate::node::{NodeAnswer, NodeRequest};
+use crate::session::{handed, Held};
 use crate::tonapi::{self, Unanswered};
 use crate::translate::{self, Translated};
-use crate::universities::University;
 
-// How long the profile a session check read stands for the account asked
-// after it: the page asks one, then the other.
-const PROFILE_KEPT: Duration = Duration::from_secs(30);
 // How long the check an app makes as it starts stands for its page's first
 // one: the time Node and the page take to start, with room.
 pub(crate) const EARLY_KEPT: Duration = Duration::from_secs(20);
-// Students whose profile is remembered at once (tafac.fr serves many; an
-// app, one).
-const REMEMBERED: usize = 10_000;
 
+// The check an app makes as it starts, until its page's first one takes
+// it. Locked while it is made: the page's question, if it comes before the
+// portal's answer, waits for it rather than ask a second time.
 #[derive(Default)]
-pub(crate) struct Portal {
-    // By session: the last session check's profile.
-    profiles: Mutex<HashMap<String, KeptProfile>>,
-    // The check an app makes as it starts, until its page's first one takes
-    // it. Locked while it is made: the page's question, if it comes before
-    // the portal's answer, waits for it rather than ask a second time.
-    pub(crate) early: tokio::sync::Mutex<Option<EarlyCheck>>,
-}
-
-struct KeptProfile {
-    at: Instant,
-    profile: Profile,
+pub(crate) struct Early {
+    pub(crate) check: tokio::sync::Mutex<Option<EarlyCheck>>,
 }
 
 // The session check an app made as it started.
@@ -55,38 +46,18 @@ pub(crate) struct EarlyCheck {
     profile: Result<Profile, Unanswered>,
 }
 
-impl Portal {
-    fn keep(&self, session: &str, profile: &Profile) {
-        let mut profiles = self.profiles.lock().unwrap();
-        profiles.retain(|_, kept| kept.at.elapsed() < PROFILE_KEPT);
-        if profiles.len() >= REMEMBERED {
-            profiles.clear();
-        }
-        profiles.insert(session.to_string(), KeptProfile { at: Instant::now(), profile: profile.clone() });
-    }
-
-    fn kept(&self, session: &str) -> Option<Profile> {
-        let profiles = self.profiles.lock().unwrap();
-        let kept = profiles.get(session).filter(|kept| kept.at.elapsed() < PROFILE_KEPT)?;
-        Some(kept.profile.clone())
-    }
-
-    pub(crate) fn forget(&self, session: &str) {
-        self.profiles.lock().unwrap().remove(session);
-    }
-}
-
 impl Gateway {
     // GET /__ent_auth/session (translate/session.rs).
-    pub(super) async fn session_check<F, Fut>(&self, university: &University, session: &NodeSession, ask_node: F) -> Translated
+    pub(super) async fn session_check<N, Fut>(&self, held: &Held<'_>, node: &N) -> Translated
     where
-        F: FnOnce(String) -> Fut,
-        Fut: Future<Output = Option<Vec<u8>>>,
+        N: Fn(NodeRequest) -> Fut,
+        Fut: Future<Output = NodeAnswer>,
     {
+        let Held { session, university, memory } = held;
         let sent = handed::portal_cookies(university, session);
         // The check made as the app started, if it was about this very
         // session a moment ago; taken once.
-        let early = self.portal.early.lock().await.take();
+        let early = self.early.check.lock().await.take();
         let early = early.filter(|check| check.session == session.id && check.sent == sent && check.at.elapsed() < EARLY_KEPT);
         let profile = async {
             match early {
@@ -94,19 +65,20 @@ impl Gateway {
                 None => tonapi::profile::read(university, session, &sent, self.net).await,
             }
         };
-        let (profile, facts) = tokio::join!(profile, self.node.facts(&session.university, ask_node));
+        let (profile, facts) = tokio::join!(profile, self.node.facts(&session.university, node));
         let Some(facts) = facts else {
             return Translated::Node("Node didn't say what it is set up for".to_string());
         };
         if let Ok(profile) = &profile {
-            self.portal.keep(&session.id, profile);
+            memory.keep_profile(profile);
         }
         translate::session::translate(profile.as_ref().map_err(|why| *why), session, university, facts.analytics_enabled)
     }
 
     // GET /__ent_auth/account (translate/account.rs).
-    pub(super) async fn account(&self, university: &University, session: &NodeSession) -> Translated {
-        let profile = match self.portal.kept(&session.id) {
+    pub(super) async fn account(&self, held: &Held<'_>) -> Translated {
+        let Held { session, university, memory } = held;
+        let profile = match memory.profile() {
             Some(profile) => Ok(profile),
             None => tonapi::profile::read(university, session, &handed::portal_cookies(university, session), self.net).await,
         };
@@ -115,24 +87,30 @@ impl Gateway {
 
     // As an app starts: the session check its page is about to ask for,
     // made while Node and the page start, and what Node says of itself
-    // (`ask_node`, as answer's: it waits for Node to be up). Nothing when
+    // (`node`, as answer's: it waits for Node to be up). Nothing when
     // nobody is signed in. Not for a server: it has no start a student
     // waits for.
-    pub async fn check_early<F, Fut>(&self, cookie: Option<&str>, ask_node: F)
+    pub async fn check_early<N, Fut>(&self, cookie: Option<&str>, node: N)
     where
-        F: FnOnce(String) -> Fut,
-        Fut: Future<Output = Option<Vec<u8>>>,
+        N: Fn(NodeRequest) -> Fut,
+        Fut: Future<Output = NodeAnswer>,
     {
-        let Some((session, university)) = self.signed_in(cookie) else { return };
+        let Some(held) = self.signed_in(cookie) else { return };
+        let Held { session, university, .. } = &held;
         {
-            let mut early = self.portal.early.lock().await;
-            let sent = handed::portal_cookies(university, &session);
-            let profile = tonapi::profile::read(university, &session, &sent, self.net).await;
+            let mut early = self.early.check.lock().await;
+            let sent = handed::portal_cookies(university, session);
+            let profile = tonapi::profile::read(university, session, &sent, self.net).await;
             if let Err(why) = &profile {
                 self.left_to_node(&why.to_string());
             }
+            // A portal that no longer knows the session: the CAS is asked
+            // ahead too whether the session is over, and its « no » kept.
+            if profile == Err(Unanswered::Problem(tonapi_core::ErrorCode::SessionExpired)) {
+                let _ = self.cas_still_knows(&held).await;
+            }
             *early = Some(EarlyCheck { session: session.id.clone(), sent, at: Instant::now(), profile });
         }
-        let _ = self.node.facts(&session.university, ask_node).await;
+        let _ = self.node.facts(&session.university, &node).await;
     }
 }

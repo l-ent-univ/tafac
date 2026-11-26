@@ -14,7 +14,8 @@
 //   200 { authenticated: false, deadlines: null }: nobody signed in. Node.
 //   200 for the demo account: Node.
 //   401 with X-Tafac-Session: expired: the CAS no longer knows the ticket
-//       (tonAPI's `session_expired`). Node, which ends the session.
+//       (tonAPI's `session_expired`, and the CAS asked says so). Answered
+//       here (translate/expired.rs), and Node is told.
 //   500 { error }: Moodle down, slow, or answering something else. Node,
 //       which signs in itself and words the error.
 //   404 { disabled: true }: a university without the widget. It is not one
@@ -28,7 +29,7 @@
 use chrono::{DateTime, Duration, SecondsFormat, Utc};
 use tonapi_core::Homework;
 
-use super::{json_answer, Translated, Unanswered};
+use super::{json_answer, unanswered, Translated, Unanswered};
 use crate::universities::University;
 
 // selectMoodleDeadlines' limits (MOODLE_DEADLINES_*).
@@ -92,7 +93,7 @@ fn item(homework: &Homework, moodle_host: &str, now: DateTime<Utc>) -> serde_jso
 pub fn translate(asked: Result<&[Homework], Unanswered>, university: &University, now: DateTime<Utc>) -> Translated {
     let homework = match asked {
         Ok(homework) => homework,
-        Err(why) => return Translated::Node(why.to_string()),
+        Err(why) => return unanswered(why),
     };
     let Some(moodle) = &university.moodle else {
         return Translated::Node("no Moodle in the university's settings".to_string());
@@ -168,7 +169,7 @@ mod tests {
     fn answer(asked: Result<&[Homework], Unanswered>, university: &University) -> Option<serde_json::Value> {
         match translate(asked, university, Utc.timestamp_opt(NOW, 0).unwrap()) {
             Translated::Answer(response) => Some(serde_json::from_slice(response.body()).unwrap()),
-            Translated::Node(_) => None,
+            Translated::Node(_) | Translated::Lost => None,
         }
     }
 

@@ -1,19 +1,26 @@
 // Asking tonAPI: one file per thing asked, and here what they share.
 //
+//   signin.rs     the CAS: a student signed in, signed out, and whether it
+//                 still knows a session
 //   profile.rs    the portal: who the student is (session check, account)
 //   homework.rs   Moodle: what is due
+//   grades.rs     ScoDoc: the report, a department's notice, a distribution,
+//                 the PDF
 //
 // tonAPI's providers are called in this process (no HTTP between the two),
-// with a session made for the one question: the cookies of Node's session
-// the question is handed (session/handed.rs) and, for a service, what the
-// gateway remembers of it (session/memory.rs).
+// with a session made for the one question: the cookies of the student's
+// session the question is handed (session/handed.rs) and, for a service,
+// what the session holds of it in this process (session/memory.rs).
 //
 // A question either has tonAPI's answer or the reason it has none
-// (Unanswered): the route's translator turns the first into Node's answer,
-// and the second into « Node answers ».
+// (Unanswered): the route's translator turns the first into the page's
+// answer, and the second into « Node answers », or into « the session is
+// lost » for the gateway to ask the CAS about.
 
+pub(crate) mod grades;
 pub(crate) mod homework;
 pub(crate) mod profile;
+pub(crate) mod signin;
 
 use std::future::Future;
 use std::time::Duration;
@@ -24,9 +31,9 @@ use tonapi_core::{ErrorCode, Problem};
 use tonapi_providers::{Context, Fetched, NetSettings};
 use tonapi_session::SessionData;
 
-use crate::session::cookie::NodeSession;
-use crate::session::handed;
-use crate::session::memory::{Remembered, Snapshot};
+use crate::session::cookie::Session;
+use crate::session::memory::Snapshot;
+use crate::session::{handed, Held};
 use crate::universities::University;
 
 // How long the portal is waited for before Node is asked instead: the page
@@ -45,8 +52,9 @@ pub enum Unanswered {
     Problem(ErrorCode),
     // The university didn't answer in time.
     Slow,
-    // The portal answered, and replaced one of its cookies in Node's
-    // session: Node, which holds the session, must be the one to get it.
+    // The portal answered, and replaced one of its cookies in the session:
+    // Node, whose portal requests go with those cookies, must be the one to
+    // get the new one.
     CookiesChanged,
     // The session holds no cookie of the portal's to ask with.
     NoPortalSession,
@@ -94,7 +102,7 @@ fn answered<T>(asked: Result<Result<Fetched<T>, Problem>, Unanswered>) -> Result
 }
 
 // tonAPI's session for one question, with these cookies.
-pub(crate) fn session_data(university: &University, session: &NodeSession, cookies: Vec<tonapi_session::StoredCookie>) -> Result<SessionData, Unanswered> {
+pub(crate) fn session_data(university: &University, session: &Session, cookies: Vec<tonapi_session::StoredCookie>) -> Result<SessionData, Unanswered> {
     let now = chrono::Utc::now();
     Ok(SessionData {
         university: session.university.clone(),
@@ -109,12 +117,10 @@ pub(crate) fn session_data(university: &University, session: &NodeSession, cooki
 }
 
 // A question to one of the university's services (Moodle, ScoDoc, ADE), for
-// one session: asked with the CAS ticket and what is remembered of the
-// session, which then remembers what the question left.
+// one session: asked with the CAS ticket and what the session holds of the
+// service, which then holds what the question left.
 pub(crate) struct Service<'a> {
-    pub university: &'a University,
-    pub session: &'a NodeSession,
-    pub remembered: &'a Remembered,
+    pub held: &'a Held<'a>,
     pub net: NetSettings,
 }
 
@@ -123,38 +129,42 @@ impl Service<'_> {
     where
         F: AsyncFnOnce(&mut Context<'_>) -> Result<Fetched<T>, Problem>,
     {
-        let ticket = handed::cas_cookies(self.university, self.session);
+        let Held { session, university, memory } = self.held;
+        let ticket = handed::cas_cookies(university, session);
         if ticket.is_empty() {
             return Err(Unanswered::NoTicket);
         }
-        let before = self.remembered.snapshot();
-        let mut data = session_data(self.university, self.session, ticket.iter().chain(&before.cookies).cloned().collect())?;
+        let before = memory.snapshot();
+        let mut data = session_data(university, session, ticket.iter().chain(&before.cookies).cloned().collect())?;
         data.tokens = before.tokens.clone();
         if before.detected {
             if let Some(component) = &before.component {
                 data.establishment = Some(component.clone());
             }
-        } else if self.university.differs_by_component(kind) {
+        } else if university.differs_by_component(kind) {
             data = self.detect(data, &before, &ticket).await?;
         }
 
-        let settings = &self.university.settings;
+        let settings = &university.settings;
         let services = settings.services_for(data.establishment.as_ref().map(|component| component.id.as_str()));
         let mut context = Context { university: settings, session: &mut data, now: chrono::Utc::now(), net: self.net };
         let asked = bounded(SERVICE_PATIENCE, call(&mut context)).await;
         // What the question left is kept even when it has no answer: a
         // session the service refused is no longer handed back.
-        self.remembered.keep(&before, &data, &ticket);
+        memory.keep(&before, &data, &ticket);
         Ok(Asked { value: answered(asked)?, keep_secs: tonapi_providers::keep_secs(&services, kind) })
     }
 
     // The student's component (an IUT, a faculty), which decides where some
-    // services are: tonAPI asks the university for it, once per session.
+    // services are. A sign-in made here found it already; for a session made
+    // elsewhere (Node's own sign-in, a process started again) tonAPI asks
+    // the university for it, once.
     async fn detect(&self, data: SessionData, before: &Snapshot, ticket: &[tonapi_session::StoredCookie]) -> Result<SessionData, Unanswered> {
-        let detecting = tonapi_providers::with_detected_establishment(&self.university.settings, data, chrono::Utc::now(), self.net);
+        let Held { university, memory, .. } = self.held;
+        let detecting = tonapi_providers::with_detected_establishment(&university.settings, data, chrono::Utc::now(), self.net);
         let data = bounded(SERVICE_PATIENCE, detecting).await?;
-        self.remembered.keep(before, &data, ticket);
-        self.remembered.detected(data.establishment.clone());
+        memory.keep(before, &data, ticket);
+        memory.detected(data.establishment.clone());
         Ok(data)
     }
 }

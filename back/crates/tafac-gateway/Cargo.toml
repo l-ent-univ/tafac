@@ -1,14 +1,14 @@
 [package]
 name = "tafac-gateway"
 version = "0.0.0"
-description = "Tafac: the routes tonAPI answers in front of the Node server, on tafac.fr and in the apps"
+description = "Tafac's backend in Rust: it signs in, holds the session and answers what moved to tonAPI, in front of the Node server, on tafac.fr and in the apps"
 license = "AGPL-3.0-only"
 edition = "2021"
 publish = false
 
-# One code for the three places a route moves in: the apps call the library
-# from their bridge (src-tauri/src/bridge.rs); tafac.fr runs the binary in
-# front of Node. No Tauri here.
+# One code for the three places Tafac runs: the apps call the library from
+# their bridge (src-tauri/src/bridge.rs); tafac.fr runs the binary in front
+# of Node. No Tauri here.
 [features]
 default = ["server"]
 # The HTTP server in front of Node, and the binary that runs it.
@@ -30,21 +30,24 @@ name = "tafac-gateway"
 required-features = ["server"]
 
 [dependencies]
-# tonAPI's own code, at one commit of its repository, never a copy of it: its
-# providers ask the university, its settings say where (build.rs puts them
-# in the crate), its session holds the cookies.
-tonapi-providers = { git = "https://github.com/l-ent-univ/tonAPI", rev = "a28cb46ff73d5dc329967a99aae0530f48c20288" }
-tonapi-config = { git = "https://github.com/l-ent-univ/tonAPI", rev = "a28cb46ff73d5dc329967a99aae0530f48c20288" }
-tonapi-session = { git = "https://github.com/l-ent-univ/tonAPI", rev = "a28cb46ff73d5dc329967a99aae0530f48c20288" }
-tonapi-core = { git = "https://github.com/l-ent-univ/tonAPI", rev = "a28cb46ff73d5dc329967a99aae0530f48c20288" }
+# tonAPI's own code, at one commit of its repository, never a copy of it: it
+# signs in at the university, its providers ask the services, its settings
+# say where (build.rs puts them in the crate), its session holds the cookies.
+tonapi-providers = { git = "https://github.com/l-ent-univ/tonAPI", rev = "29b378900afa03e98e253a5d2f81dc62ce085412" }
+tonapi-config = { git = "https://github.com/l-ent-univ/tonAPI", rev = "29b378900afa03e98e253a5d2f81dc62ce085412" }
+tonapi-session = { git = "https://github.com/l-ent-univ/tonAPI", rev = "29b378900afa03e98e253a5d2f81dc62ce085412" }
+tonapi-core = { git = "https://github.com/l-ent-univ/tonAPI", rev = "29b378900afa03e98e253a5d2f81dc62ce085412" }
 # The time a provider is asked at (tonAPI's Context).
 chrono = { version = "0.4", default-features = false, features = ["clock"] }
+# The university's own time: ScoDoc dates an evaluation at its midnight.
+chrono-tz = { version = "0.10", default-features = false }
 # tonAPI's settings files, read as tonAPI reads them.
 toml = "1"
 # Where a service of the university is (its address in tonAPI's settings).
 url = "2"
-# Node's session cookie (src/session/cookie.rs): HKDF-SHA256 for its key,
-# AES-256-GCM, base64url.
+# The session's cookie, in the format Node reads (src/session/cookie.rs):
+# HKDF-SHA256 for its key, AES-256-GCM (and the system's random bytes for a
+# session's id and nonce), base64url.
 aes-gcm = "0.11.1"
 hkdf = "0.12"
 sha2 = "0.10"

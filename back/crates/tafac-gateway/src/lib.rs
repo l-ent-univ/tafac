@@ -1,23 +1,27 @@
-// Tafac's gateway: the routes tonAPI answers, in front of the Node server.
+// Tafac's backend in Rust: it signs the student in, holds the session, and
+// answers what has moved to tonAPI. Node is behind it for the rest.
 //
-// The page asks /__ent_auth/* and /__ent_proxy/*. The Node server
-// (server.js) answers them all in JavaScript; tonAPI
+// The page asks /__ent_auth/* and /__ent_proxy/*. tonAPI
 // (github.com/l-ent-univ/tonAPI, in Rust: one provider per software, one
-// settings file per university) takes them over a route at a time. This
-// crate is where a route moves, once, for every place Tafac runs.
+// settings file per university) signs in at the university and reads what
+// its services say; Node (server.js) still answers the routes that haven't
+// moved, with the session made here. This crate is where a route moves,
+// once, for every place Tafac runs.
 //
 // A request goes down this file's list:
 //
-//   routes.rs        the one table: each route, tonAPI's or Node's
-//   gateway/         the Gateway: who is signed in, the route's question,
-//                    and the answer only if it is the one Node would give
-//   session/         the student's session: Node's cookie read, what of it
-//                    tonAPI is handed, what is remembered between questions
+//   routes.rs        the one table: each route, moved or Node's
+//   gateway/         the Gateway: the sign-in and the sign-out, whose
+//                    session a request is, the route's question, and a
+//                    session the university no longer knows
+//   session/         the student's session: its cookie read and written,
+//                    what of it tonAPI is handed, what it holds in this
+//                    process
 //   tonapi/          the questions to tonAPI, one file per thing asked
 //   translate/       one translator per moved route: tonAPI's answer as the
-//                    page gets it from Node, JSON and status
-//   node.rs          Node seen from here: what it says of itself, the
-//                    sessions it ended
+//                    page reads it today, JSON and status
+//   node.rs          Node behind: what it is asked and told, and the
+//                    User-Agent the two share
 //   universities.rs  tonAPI's settings, from the tonAPI the crate is built
 //                    with (build.rs): nothing of tonAPI is copied here
 //
@@ -48,8 +52,8 @@ pub mod proxy;
 #[cfg(any(test, feature = "testing"))]
 pub mod testing;
 
-pub use crate::gateway::Gateway;
-pub use crate::node::{SESSION_PATH, UNIVERSITY_HEADER};
+pub use crate::gateway::{Asked, Gateway, TrustedProxies};
+pub use crate::node::{NodeAnswer, NodeRequest, SESSION_PATH, UNIVERSITY_HEADER};
 pub use crate::session::cookie::{DEVELOPMENT_COOKIE, PRODUCTION_COOKIE};
 pub use crate::translate::ANSWERED_BY;
 pub use crate::universities::TONAPI_COMMIT;

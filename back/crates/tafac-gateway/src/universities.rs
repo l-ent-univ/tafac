@@ -28,6 +28,8 @@ pub struct University {
     pub cas_login_path: String,
     // Where Moodle is, when the university's deadlines are read there.
     pub moodle: Option<Url>,
+    // The time the university lives by.
+    pub timezone: chrono_tz::Tz,
 }
 
 impl University {
@@ -47,7 +49,17 @@ impl University {
             Some(HomeworkService::MoodleAjax { base_url, .. } | HomeworkService::MoodleWebservice { base_url, .. }) => Some(base_url.clone()),
             _ => None,
         };
-        Some(Self { settings, portal_host, cas_host, cas_login_path, moodle })
+        let timezone = settings.university.timezone.parse().ok()?;
+        Some(Self { settings, portal_host, cas_host, cas_login_path, moodle, timezone })
+    }
+}
+
+impl University {
+    // Whether the university is asked over https (any real one is): its
+    // cookies then go to nothing else.
+    pub(crate) fn asked_over_https(&self) -> bool {
+        let PortalConfig::Uportal5 { base_url: portal } = &self.settings.university.portal else { return true };
+        portal.scheme() == "https"
     }
 }
 

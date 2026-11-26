@@ -1,27 +1,36 @@
-// What the gateway remembers of a session between two questions.
+// What a session holds in this process, beside its cookie.
 //
-// Node keeps, for each session, the services' own sessions (Moodle's, an
-// hour) and their last answers (the deadlines, five minutes). The routes
-// that moved here need the same, or every question would sign in to the
-// service again and ask it again:
+// The cookie is what a session starts again from: the CAS ticket and the
+// portal's cookies (cookie.rs). What tonAPI gets from the university while
+// it answers is kept here, with the session's id, as Node keeps its own
+// (runtimeSessions):
 //
 //   the services' sessions   the cookies and tokens tonAPI got from a
 //                            service (MoodleSession, its sesskey…), handed
 //                            back with the next question
-//   the student's component  detected once (tonAPI asks the university)
+//   the student's component  found at the sign-in, or at the first question
+//                            that needs it (tonAPI asks the university)
+//   the student's profile    half a minute: the page asks who is signed in,
+//                            then for the account
 //   the answers              each kept as long as tonAPI says it may be
 //                            (its `keep_secs`: the settings' cache-ttl-secs)
+//   the CAS's word           that it still knew the ticket, a minute
 //
-// All of it lives in this process: nothing is written to Node's cookie or to
-// a disk, and it goes with the session (signed out, expired) or after an
-// hour unused. It is made for one CAS ticket: when Node signs in again the
-// ticket is another, and the memory starts over.
+// Not in the cookie: two questions asked at once would each write it, one
+// undoing the other, and a browser drops a cookie past 4 kB. A process
+// that starts again signs in to the services again, with the ticket.
+//
+// It goes with the session (signed out, expired: `ended` says so to any
+// request still on its way with the cookie) or after an hour unused. The
+// CAS ticket's own value says nothing of whose it is: the CAS writes it
+// anew each time someone signs in to a service, for the same session.
 
 use std::collections::{BTreeMap, HashMap};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
 use tonapi_config::ServiceKind;
+use tonapi_core::Profile;
 use tonapi_session::{EstablishmentPick, SessionData, StoredCookie};
 
 use crate::session::handed::same_cookie;
@@ -33,20 +42,44 @@ const UNUSED_KEPT: Duration = Duration::from_secs(60 * 60);
 const REMEMBERED: usize = 10_000;
 // Answers kept for one session: one per route and what it was asked.
 const ANSWERS_KEPT: usize = 64;
+// How long the profile read for a session check stands for the account
+// asked after it: the page asks one, then the other.
+const PROFILE_KEPT: Duration = Duration::from_secs(30);
+// How long the CAS's « I know this ticket » is taken as said: a service
+// down for a while doesn't send the CAS a question at each of its failures
+// (Node's DEFAULT_VALID_FOR_MS).
+const CAS_WORD_KEPT: Duration = Duration::from_secs(60);
+// How long a session that ended is remembered as ended (Node's
+// ENDED_KEPT_MS): past any request still on its way with its cookie.
+const ENDED_KEPT: Duration = Duration::from_secs(60 * 60);
+
+// Why a session ended.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum Ended {
+    SignedOut,
+    // The CAS no longer knows its ticket.
+    Expired,
+}
 
 #[derive(Default)]
 pub(crate) struct Memory {
     sessions: Mutex<HashMap<String, Arc<Remembered>>>,
+    ended: Mutex<HashMap<String, (Ended, Instant)>>,
+}
+
+// Whose turn it is: one question at a time to each service of a session,
+// and to the CAS about its ticket.
+#[derive(Clone, Copy, PartialEq, Eq, Hash)]
+pub(crate) enum Turn {
+    Service(ServiceKind),
+    Cas,
 }
 
 // One session's memory.
 pub(crate) struct Remembered {
-    // The CAS cookies it was made with.
-    ticket: Vec<StoredCookie>,
     state: Mutex<State>,
-    // One question at a time to each service of a session: a second one
-    // waits for the first, then finds its answer kept.
-    turns: Mutex<HashMap<ServiceKind, Arc<tokio::sync::Mutex<()>>>>,
+    // A second question waits for the first, then finds its answer kept.
+    turns: Mutex<HashMap<Turn, Arc<tokio::sync::Mutex<()>>>>,
 }
 
 struct State {
@@ -57,6 +90,9 @@ struct State {
     // The component was looked for: found or not, not twice.
     detected: bool,
     answers: HashMap<String, KeptAnswer>,
+    profile: Option<(Instant, Profile)>,
+    // When the CAS last said it knew the ticket.
+    cas_knew: Option<Instant>,
 }
 
 struct KeptAnswer {
@@ -74,12 +110,12 @@ pub(crate) struct Snapshot {
 }
 
 impl Memory {
-    // The memory of a session, for the CAS cookies it holds now: a new one
-    // when there is none, or when the ticket is no longer the same.
-    pub(crate) fn of(&self, session: &str, ticket: &[StoredCookie]) -> Arc<Remembered> {
+    // The memory of a session (by its id): a new one when there is none,
+    // or when the one there is went an hour unused.
+    pub(crate) fn of(&self, session: &str) -> Arc<Remembered> {
         let mut sessions = self.sessions.lock().unwrap();
         if let Some(remembered) = sessions.get(session) {
-            if remembered.ticket == ticket && remembered.state.lock().unwrap().used.elapsed() < UNUSED_KEPT {
+            if remembered.state.lock().unwrap().used.elapsed() < UNUSED_KEPT {
                 return remembered.clone();
             }
         }
@@ -88,7 +124,6 @@ impl Memory {
             sessions.clear();
         }
         let remembered = Arc::new(Remembered {
-            ticket: ticket.to_vec(),
             state: Mutex::new(State {
                 used: Instant::now(),
                 cookies: Vec::new(),
@@ -96,6 +131,8 @@ impl Memory {
                 component: None,
                 detected: false,
                 answers: HashMap::new(),
+                profile: None,
+                cas_knew: None,
             }),
             turns: Mutex::new(HashMap::new()),
         });
@@ -103,9 +140,27 @@ impl Memory {
         remembered
     }
 
-    // The session ended (signed out, expired): nothing of it stays.
-    pub(crate) fn forget(&self, session: &str) {
+    // The session ended: nothing of it stays, and a copy of its cookie is
+    // worth nothing from now on. Whether this ended it: false when it had
+    // ended already (two requests found it expired together: one ends it).
+    pub(crate) fn end(&self, session: &str, why: Ended) -> bool {
         self.sessions.lock().unwrap().remove(session);
+        let mut ended = self.ended.lock().unwrap();
+        ended.retain(|_, (_, at)| at.elapsed() < ENDED_KEPT);
+        if ended.contains_key(session) {
+            return false;
+        }
+        if ended.len() >= REMEMBERED {
+            ended.clear();
+        }
+        ended.insert(session.to_string(), (why, Instant::now()));
+        true
+    }
+
+    // Why a session ended, when it did, lately.
+    pub(crate) fn ended(&self, session: &str) -> Option<Ended> {
+        let ended = self.ended.lock().unwrap();
+        ended.get(session).filter(|(_, at)| at.elapsed() < ENDED_KEPT).map(|(why, _)| *why)
     }
 
     #[cfg(test)]
@@ -115,9 +170,9 @@ impl Memory {
 }
 
 impl Remembered {
-    // This question's turn at a service: held until it is answered.
-    pub(crate) async fn turn(&self, service: ServiceKind) -> tokio::sync::OwnedMutexGuard<()> {
-        let turn = self.turns.lock().unwrap().entry(service).or_default().clone();
+    // This question's turn: held until it is answered.
+    pub(crate) async fn turn(&self, turn: Turn) -> tokio::sync::OwnedMutexGuard<()> {
+        let turn = self.turns.lock().unwrap().entry(turn).or_default().clone();
         turn.lock_owned().await
     }
 
@@ -129,7 +184,8 @@ impl Remembered {
 
     // What a question left in tonAPI's session, kept for the next one: what
     // it added or changed since `before`, and no longer what it took away.
-    // The cookies handed from Node's session (`handed`) are Node's to keep.
+    // The cookies handed from the session's own cookie (`handed`: the CAS
+    // ticket, the portal's) stay where they are, in the cookie.
     // Two questions to two services may cross: each keeps its own.
     pub(crate) fn keep(&self, before: &Snapshot, after: &SessionData, handed: &[StoredCookie]) {
         let mut state = self.state.lock().unwrap();
@@ -178,6 +234,33 @@ impl Remembered {
         state.answers.insert(key.to_string(), KeptAnswer { until: now + Duration::from_secs(u64::from(seconds)), body: body.to_vec() });
     }
 
+    // The profile a session check or a sign-in just read, for the account
+    // asked next.
+    pub(crate) fn keep_profile(&self, profile: &Profile) {
+        self.state.lock().unwrap().profile = Some((Instant::now(), profile.clone()));
+    }
+
+    pub(crate) fn profile(&self) -> Option<Profile> {
+        let state = self.state.lock().unwrap();
+        state.profile.as_ref().filter(|(at, _)| at.elapsed() < PROFILE_KEPT).map(|(_, profile)| profile.clone())
+    }
+
+    // The CAS said it knows the ticket.
+    pub(crate) fn cas_knows(&self) {
+        self.state.lock().unwrap().cas_knew = Some(Instant::now());
+    }
+
+    // Whether it said so a moment ago.
+    pub(crate) fn cas_knew(&self) -> bool {
+        self.state.lock().unwrap().cas_knew.is_some_and(|at| at.elapsed() < CAS_WORD_KEPT)
+    }
+
+    #[cfg(test)]
+    pub(crate) fn age_cas_word(&self) {
+        let mut state = self.state.lock().unwrap();
+        state.cas_knew = state.cas_knew.and_then(|at| at.checked_sub(CAS_WORD_KEPT + Duration::from_secs(1)));
+    }
+
     #[cfg(test)]
     pub(crate) fn age_answers(&self, by: Duration) {
         for kept in self.state.lock().unwrap().answers.values_mut() {
@@ -220,9 +303,9 @@ mod tests {
     }
 
     #[test]
-    fn what_a_service_gave_is_kept_and_nodes_cookies_are_not() {
+    fn what_a_service_gave_is_kept_and_the_cookies_own_are_not() {
         let memory = Memory::default();
-        let remembered = memory.of("one-session", &ticket());
+        let remembered = memory.of("one-session");
         let before = remembered.snapshot();
         let mut after = ticket();
         after.push(cookie("moodle.exemple.test", "MoodleSession", "abc"));
@@ -232,12 +315,12 @@ mod tests {
         assert_eq!(kept.cookies, [cookie("moodle.exemple.test", "MoodleSession", "abc")]);
         assert_eq!(kept.tokens.get("moodle.sesskey").map(String::as_str), Some("KEY1"));
         // The same memory at the next question, for the same ticket.
-        assert_eq!(memory.of("one-session", &ticket()).snapshot().cookies.len(), 1);
+        assert_eq!(memory.of("one-session").snapshot().cookies.len(), 1);
     }
 
     #[test]
     fn what_a_question_took_away_or_changed_is() {
-        let remembered = Memory::default().of("one-session", &ticket());
+        let remembered = Memory::default().of("one-session");
         let empty = remembered.snapshot();
         remembered.keep(&empty, &session(vec![cookie("m.test", "MoodleSession", "old"), cookie("m.test", "lang", "fr")], &[("moodle.sesskey", "OLD"), ("ade", "token")]), &ticket());
 
@@ -252,7 +335,7 @@ mod tests {
 
     #[test]
     fn two_questions_that_cross_each_keep_their_own() {
-        let remembered = Memory::default().of("one-session", &ticket());
+        let remembered = Memory::default().of("one-session");
         let start = remembered.snapshot();
         // Both started from the same empty memory.
         remembered.keep(&start, &session(vec![cookie("moodle.test", "MoodleSession", "m")], &[("moodle.sesskey", "K")]), &ticket());
@@ -263,30 +346,48 @@ mod tests {
     }
 
     #[test]
-    fn another_ticket_or_an_hour_unused_starts_over() {
+    fn an_hour_unused_or_the_session_ended_starts_over() {
         let memory = Memory::default();
-        let remembered = memory.of("one-session", &ticket());
+        let remembered = memory.of("one-session");
         remembered.detected(None);
         remembered.keep_answer("deadlines", 300, b"{}");
-        assert!(memory.of("one-session", &ticket()).snapshot().detected);
+        assert!(memory.of("one-session").snapshot().detected);
+        // Another session's memory is another.
+        assert!(!memory.of("another-session").snapshot().detected);
 
-        // Node signed in again: another ticket.
-        let other = vec![cookie("cas.exemple.test", "TGC", "another-ticket")];
-        let fresh = memory.of("one-session", &other);
+        remembered.age(UNUSED_KEPT + Duration::from_secs(1));
+        let fresh = memory.of("one-session");
         assert!(!fresh.snapshot().detected);
         assert_eq!(fresh.answer("deadlines"), None);
 
-        fresh.detected(None);
-        fresh.age(UNUSED_KEPT + Duration::from_secs(1));
-        assert!(!memory.of("one-session", &other).snapshot().detected);
-
-        memory.forget("one-session");
+        assert_eq!(memory.ended("one-session"), None);
+        assert!(memory.end("one-session", Ended::Expired));
+        // Ended once: whoever comes second didn't end it.
+        assert!(!memory.end("one-session", Ended::SignedOut));
         assert!(!memory.remembers("one-session"));
+        // Ended, and said so to whoever still shows its cookie; a session
+        // under the same id would start from nothing.
+        assert_eq!(memory.ended("one-session"), Some(Ended::Expired));
+        assert_eq!(memory.ended("another-session"), None);
+        assert!(!memory.of("one-session").snapshot().detected);
+    }
+
+    #[test]
+    fn a_profile_and_the_cas_word_are_kept_a_moment() {
+        let remembered = Memory::default().of("one-session");
+        assert!(remembered.profile().is_none() && !remembered.cas_knew());
+        let profile = Profile { username: "jdoe".into(), display_name: None, first_name: None, last_name: None, email: None, student_number: None, program: None };
+        remembered.keep_profile(&profile);
+        assert_eq!(remembered.profile().map(|profile| profile.username).as_deref(), Some("jdoe"));
+        remembered.cas_knows();
+        assert!(remembered.cas_knew());
+        remembered.age_cas_word();
+        assert!(!remembered.cas_knew());
     }
 
     #[test]
     fn an_answer_is_kept_as_long_as_it_was_said_and_no_longer() {
-        let remembered = Memory::default().of("one-session", &ticket());
+        let remembered = Memory::default().of("one-session");
         assert_eq!(remembered.answer("deadlines"), None);
         remembered.keep_answer("deadlines", 300, b"{\"a\":1}");
         assert_eq!(remembered.answer("deadlines").as_deref(), Some(&b"{\"a\":1}"[..]));

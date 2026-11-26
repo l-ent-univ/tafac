@@ -1,14 +1,13 @@
 // GET /__ent_auth/moodle/deadlines on the made-up campus: a route another
 // service answers. tonAPI is handed the CAS ticket, signs in to Moodle
-// itself, and the gateway remembers that session and the answer.
+// itself, and the session holds Moodle's session and the answer.
 
 use std::sync::Arc;
 use std::time::Duration;
 
 use http::Method;
 
-use super::{ask, node_says, SESSION};
-use crate::session::handed;
+use super::{ask, asked, node_says, GET, NO_HEADERS, SESSION};
 use crate::session::memory::Remembered;
 use crate::testing::*;
 use crate::Gateway;
@@ -18,8 +17,7 @@ const SIGN_IN: &str = "/moodle/login/index.php";
 const CALENDAR: &str = "/moodle/lib/ajax/service.php";
 
 fn remembered(gateway: &Gateway, cookie: &str) -> Arc<Remembered> {
-    let (session, university) = gateway.signed_in(Some(cookie)).unwrap();
-    gateway.memory.of(&session.id, &handed::cas_cookies(university, &session))
+    gateway.signed_in(Some(cookie)).unwrap().memory
 }
 
 // The answer kept is past its five minutes.
@@ -102,7 +100,7 @@ fn a_session_moodle_forgot_is_opened_again_once() {
     // The old session refused, one sign-in, the new one answered.
     assert_eq!((campus.asked(SIGN_IN), campus.asked(CALENDAR)), (4, 3));
     // The CAS wrote its ticket anew at the first sign-in: the second was
-    // handed the ticket of Node's session all the same, which Node still has.
+    // handed the ticket of the session's cookie all the same.
     let seen = campus.seen.lock().unwrap().clone();
     let at_the_cas: Vec<_> = seen.iter().filter(|(path, _)| path.starts_with("/cas/login")).collect();
     assert_eq!(at_the_cas.len(), 2);
@@ -112,6 +110,28 @@ fn a_session_moodle_forgot_is_opened_again_once() {
     five_minutes_later(&gateway, &cookie);
     assert!(ask(&gateway, DEADLINES, &cookie).is_some());
     assert_eq!((campus.asked(SIGN_IN), campus.asked(CALENDAR)), (4, 4));
+}
+
+#[test]
+fn the_ticket_written_anew_in_the_cookie_changes_nothing() {
+    let campus = campus();
+    let gateway = campus.gateway();
+    let first = ask(&gateway, DEADLINES, &campus.alive()).unwrap();
+    let asked = campus.paths().len();
+
+    // Node signed in to another service since (the planning, the mail): the
+    // CAS wrote its ticket anew, and Node wrote it in the cookie. The same
+    // session, the same student: the answer kept is still theirs, and
+    // Moodle's session too.
+    let rewritten = campus.cookie(
+        serde_json::json!({ "jar": [["TGC", "the-ticket-written-anew", "localhost", "/cas", 1, 1, null], ["JSESSIONID", "alive", "127.0.0.1", "/", 1, 1, null]] }),
+        &[],
+    );
+    assert_eq!(ask(&gateway, DEADLINES, &rewritten).unwrap(), first);
+    assert_eq!(campus.paths().len(), asked);
+    five_minutes_later(&gateway, &rewritten);
+    assert!(ask(&gateway, DEADLINES, &rewritten).is_some());
+    assert_eq!((campus.asked(SIGN_IN), campus.asked(CALENDAR)), (2, 2));
 }
 
 #[test]
@@ -134,7 +154,8 @@ fn two_questions_at_once_sign_in_once() {
     let campus = campus();
     let gateway = campus.gateway();
     let cookie = campus.alive();
-    let one = || gateway.answer(&Method::GET, DEADLINES, || Some(cookie.clone()), node_says);
+    let request = asked(&GET, DEADLINES, &NO_HEADERS, &[]);
+    let one = || gateway.answer(&request, || Some(cookie.clone()), node_says);
     let (first, second) = block_on(async { tokio::join!(one(), one()) });
     assert_eq!(first.unwrap().body(), second.unwrap().body());
     assert_eq!((campus.asked(SIGN_IN), campus.asked(CALENDAR)), (2, 1));
@@ -179,17 +200,6 @@ fn what_is_not_a_plain_signed_in_session_is_nodes_without_a_request() {
         assert_eq!(ask(&gateway, DEADLINES, &cookie), None, "{why}");
     }
     assert!(campus.seen.lock().unwrap().is_empty());
-}
-
-#[test]
-fn a_ticket_the_cas_no_longer_knows_is_nodes() {
-    let campus = campus();
-    let gateway = campus.gateway();
-    // The CAS answers its login form: tonAPI's `session_expired`, and Node's
-    // to end the session.
-    let cookie = campus.cookie(serde_json::json!({ "jar": [["TGC", "an-old-ticket", "localhost", "/cas", 1, 1, null], ["JSESSIONID", "alive", "127.0.0.1", "/", 1, 1, null]] }), &[]);
-    assert_eq!(ask(&gateway, DEADLINES, &cookie), None);
-    assert_eq!(campus.asked(CALENDAR), 0);
 }
 
 #[test]
