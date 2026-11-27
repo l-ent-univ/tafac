@@ -514,11 +514,6 @@ impl<T: Clone, E: Clone> SendOnce<T, E> {
         Self { state: Arc::new(Mutex::new(OnceState { sessions: HashMap::new(), pruned_at: None, next_id: 0 })), ttl, per_session }
     }
 
-    // Whether `uid` was asked for already (its limits aren't counted again).
-    pub(crate) fn has(&self, session_id: &str, uid: &str) -> bool {
-        self.has_at(session_id, uid, Instant::now())
-    }
-
     // This request's send of `uid`: the first, or a repeat of one under way
     // or done.
     pub(crate) fn begin(&self, session_id: &str, uid: &str) -> Begun<T, E> {
@@ -540,6 +535,8 @@ impl<T: Clone, E: Clone> SendOnce<T, E> {
         });
     }
 
+    // Whether `uid` was asked for already (the tests': the send asks begin).
+    #[cfg(test)]
     fn has_at(&self, session_id: &str, uid: &str, now: Instant) -> bool {
         let mut state = lock(&self.state);
         self.prune(&mut state, now);

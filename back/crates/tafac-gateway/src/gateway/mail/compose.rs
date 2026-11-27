@@ -293,16 +293,9 @@ impl Gateway {
         let session = &call.held.session.id;
         let uid = prepared.payload.send_uid.clone().unwrap_or_default();
         let recipients = prepared.payload.recipients();
-        // A uid asked already: its first answer, nothing counted again.
-        let slot = if self.mail_limits.send_once.has(session, &uid) {
-            None
-        } else {
-            let keys = limit_keys(session, Some(&call.held.session.user));
-            match self.mail_limits.sends.sends.take(&keys, recipients.len() as u64) {
-                Ok(slot) => Some(slot),
-                Err(seconds) => return Ok(retry_after(error(429, "mail_send_rate_limited"), seconds)),
-            }
-        };
+        // A uid asked already: its first answer, nothing counted again. The
+        // uid is taken first, then the limit: two requests with the same uid
+        // at once count one mail, not two.
         let ticket = match self.mail_limits.send_once.begin(session, &uid) {
             Begun::Repeat(wait) => {
                 return Ok(match wait.outcome().await {
@@ -311,6 +304,16 @@ impl Gateway {
                 });
             }
             Begun::First(ticket) => ticket,
+        };
+        let keys = limit_keys(session, Some(&call.held.session.user));
+        let slot = match self.mail_limits.sends.sends.take(&keys, recipients.len() as u64) {
+            Ok(slot) => Some(slot),
+            Err(seconds) => {
+                // Not sent: the uid is forgotten (the ticket dropped), a
+                // later try with it sends.
+                drop(ticket);
+                return Ok(retry_after(error(429, "mail_send_rate_limited"), seconds));
+            }
         };
         let prepared = &prepared;
         let sent = self.with_webmail(call, |context| async move { Ok(self.send_mail(call, &context, prepared).await) }).await;
@@ -422,7 +425,17 @@ impl Gateway {
                 draft_id: draft_id.as_deref(),
                 for_draft: false,
             });
-            match context.webmail.soap("SendMsgRequest", MAIL, json!({ "suid": uid, "m": message }), SOAP_TIMEOUT).await {
+            // In a task of its own: the student gone mid-send (the request
+            // dropped), the webmail is still asked to its end, never cut off
+            // half-way. Asked again, the same uid is sent once (Zimbra's
+            // suid).
+            let sending = {
+                let context = context.clone();
+                let request = json!({ "suid": uid, "m": message });
+                tokio::spawn(async move { context.webmail.soap("SendMsgRequest", MAIL, request, SOAP_TIMEOUT).await })
+            };
+            let said = sending.await.map_err(|_| Refused::Failed(MailError::Other("the send's task stopped".to_string())))?;
+            match said {
                 Ok(_) => break None,
                 // Sent to some addresses only: sent all the same.
                 Err(fault) if is_partial_send(fault.code.as_deref()) => break Some(fault),

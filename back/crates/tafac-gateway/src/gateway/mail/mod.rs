@@ -588,8 +588,13 @@ impl Gateway {
             Ok(response) => response,
             Err(failure) => self.mail_failed(&call, &failure, node).await,
         };
-        // Signed out meanwhile: the answer is no longer this session's.
-        if self.signed_in(Some(cookie)).is_none_or(|current| current.session.id != held.session.id) && self.memory.ended(&held.session.id).is_some() {
+        // Signed out meanwhile: the answer is no longer this session's. The
+        // open link's is a way to the webmail signed out, whatever happened:
+        // kept.
+        if route != Route::Open
+            && self.signed_in(Some(cookie)).is_none_or(|current| current.session.id != held.session.id)
+            && self.memory.ended(&held.session.id).is_some()
+        {
             return self.found_expired_already(Moved::Mail, cookie).map_or_else(no_session, |expired| expired.map(MailBody::Whole));
         }
         response
@@ -615,12 +620,26 @@ impl Gateway {
         N: Fn(NodeRequest) -> Fut,
         Fut: Future<Output = NodeAnswer>,
     {
-        if call.route != Route::Part {
+        if !matches!(call.route, Route::Part | Route::Open) {
             eprintln!("[mail] {} failed: {}", call.route.name(), failure.words());
         }
         if failure.may_be_expired() {
             if let Some(expired) = self.lost(Moved::Mail, call.held, call.cookie, node).await {
                 self.mail_ended(&call.held.session.id).await;
+                // The open link is a page opened in a tab, never read by the
+                // page's code: the webmail's own link, signed out, whatever
+                // happened (Node's silent fallback), the session ended all
+                // the same. Its answer still carries the cookie cleared and
+                // `X-Tafac-Session: expired`.
+                if call.route == Route::Open {
+                    let mut fallback = self.mail_open_fallback(Some(&call.held.session.university));
+                    for (name, value) in expired.headers() {
+                        if name == http::header::SET_COOKIE || name.as_str() == SESSION_HEADER {
+                            fallback.headers_mut().append(name.clone(), value.clone());
+                        }
+                    }
+                    return fallback;
+                }
                 return expired.map(MailBody::Whole);
             }
         }

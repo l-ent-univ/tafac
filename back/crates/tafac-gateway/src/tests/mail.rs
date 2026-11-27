@@ -388,3 +388,23 @@ fn a_cookie_that_is_nobodys_is_answered_here_as_no_session() {
         assert_eq!(action.headers()["connection"], "close");
     }
 }
+
+// The open link is a page opened in a tab: the CAS saying the session is
+// over ends it, and the tab still gets the webmail's own link (Node's
+// silent fallback), never a JSON page.
+#[test]
+fn a_failed_open_link_still_opens_the_webmail() {
+    let campus = campus();
+    let gateway = campus.gateway();
+    let cookie = campus.alive();
+    campus.cas_forgets();
+    let node = Node::default();
+    let open = block_on(gateway.answer(&asked(&GET, "/__ent_auth/mail/open", &NO_HEADERS, &[]), || Some(cookie.clone()), |request| node.ask(request))).unwrap();
+    assert_eq!(open.status(), 302, "{}", String::from_utf8_lossy(open.body()));
+    assert!(open.headers()["location"].to_str().unwrap().starts_with("/__ent_auth/launch?url="));
+    assert_eq!(open.headers()["x-tafac-session"], "expired");
+    assert!(open.headers().contains_key("set-cookie"));
+    // Ended: the next request hears it expired.
+    let after = get(&gateway, RECENT, Some(&cookie));
+    assert_eq!((after.status().as_u16(), body_of(&after)), (401, json!({ "error": "session_expired" })));
+}
