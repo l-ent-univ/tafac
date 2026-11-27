@@ -237,7 +237,8 @@ crates/tafac-gateway/
 ## The rules
 
 - **One table.** `routes.rs` says what answers each route of the page's
-  API: every one is the gateway's. A path of the API not listed is a 404; a
+  API: every one is the gateway's, HEAD wherever GET is (its status and
+  headers, no body, as Express). A path of the API not listed is a 404; a
   test fails when Node gains a route the table doesn't have (but for the
   two the page no longer asks, which go with Node's code).
 - **The session is made here.** tonAPI signs in at the CAS; the gateway

@@ -752,6 +752,32 @@ mod tests {
         assert!(node.heads().is_empty());
     }
 
+    // HEAD wherever GET is answered: the same status and headers, the
+    // length said, no body; 404 where there is no GET.
+    #[test]
+    fn head_is_answered_as_get_without_its_body() {
+        let (campus, node) = (campus(), node());
+        let address = gateway_before(&node, Some(&campus));
+        let head = |path: &str, headers: &str| send(&address, format!("HEAD {path} HTTP/1.1\r\nhost: tafac.exemple.test\r\n{headers}connection: close\r\n\r\n").as_bytes());
+        let alive = session_cookie(&campus.alive());
+        for (path, cookie) in [("/__ent_auth/session", ""), ("/__ent_auth/account", alive.as_str()), ("/__ent_auth/grades/semester/abc", alive.as_str()), ("/__ent_auth/student-pic?meta=1", "")] {
+            let (got, body) = get(&address, path, cookie);
+            let (headed, nothing) = head(path, cookie);
+            assert_eq!(got.lines().next(), headed.lines().next(), "{path}");
+            assert_eq!(header_of(&headed, "content-length"), body.len().to_string(), "{path}");
+            for name in ["content-type", "cache-control", "x-tafac-session", crate::ANSWERED_BY] {
+                assert_eq!(header_of(&headed, name), header_of(&got, name), "{path}: {name}");
+            }
+            assert!(nothing.is_empty(), "{path}");
+        }
+        let catalogue = format!("http://127.0.0.1:{}/library/catalogue", campus.port());
+        let (headed, _) = head(&format!("/__ent_auth/launch?url={}", catalogue.replace(':', "%3A").replace('/', "%2F")), "");
+        assert!(headed.starts_with("HTTP/1.1 302"), "{headed}");
+        let (headed, _) = head("/__ent_auth/login", "");
+        assert!(headed.starts_with("HTTP/1.1 404"), "{headed}");
+        assert!(node.heads().is_empty());
+    }
+
     #[test]
     fn an_upgraded_connection_is_joined_end_to_end() {
         let node = node();

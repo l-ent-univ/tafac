@@ -188,8 +188,10 @@ pub(crate) fn is_api(path: &str) -> bool {
     ["/__ent_auth", "/__ent_proxy"].iter().any(|api| path.strip_prefix(api).is_some_and(|rest| rest.is_empty() || rest.starts_with('/')))
 }
 
+// HEAD is answered wherever GET is, as Express's router does (the answer's
+// status and headers, no body: Gateway::answer).
 fn matches(route: &Route, method: &Method, path: &str) -> bool {
-    let method_matches = route.method == "*" || route.method == method.as_str();
+    let method_matches = route.method == "*" || route.method == method.as_str() || (route.method == "GET" && method == Method::HEAD);
     let path_matches = match route.path.strip_suffix("/*") {
         // The whole site: every address but the page's API.
         Some("") => path.starts_with('/') && !is_api(path),
@@ -315,7 +317,6 @@ mod tests {
             (Method::GET, "/__ent_auth/timetable/"),
             (Method::GET, "/__ent_auth/timetable/groups"),
             (Method::GET, "/__ent_auth/something-new"),
-            (Method::HEAD, "/__ent_auth/session"),
             (Method::GET, "/__ent_auth"),
         ] {
             assert_eq!(backend(&method, path), Backend::TonApi(Moved::NotFound), "{method} {path}");
@@ -336,6 +337,19 @@ mod tests {
             assert_eq!(backend(&method, path), Backend::Node, "{method} {path}");
             assert_eq!(moved_route(&method, path), None);
             assert_eq!(server_route(&method, path), None);
+        }
+    }
+
+    #[test]
+    fn head_is_answered_wherever_get_is() {
+        for (path, route) in [("/__ent_auth/session", Moved::Session), ("/__ent_auth/grades/semester/12", Moved::GradesSemester), ("/__ent_auth/launch", Moved::Launch), ("/__ent_proxy/f/welcome", Moved::PortalProxy)] {
+            assert_eq!(backend(&Method::HEAD, path), Backend::TonApi(route), "{path}");
+        }
+        assert_eq!(server_route(&Method::HEAD, "/robots.txt"), Some(Servers::Robots));
+        assert_eq!(server_route(&Method::HEAD, "/assets/index.js"), Some(Servers::BuiltFile));
+        // A route with no GET has no HEAD either.
+        for path in ["/__ent_auth/login", "/__ent_auth/logout", "/__ent_auth/analytics", "/__ent_auth/app-icons"] {
+            assert_eq!(backend(&Method::HEAD, path), Backend::TonApi(Moved::NotFound), "{path}");
         }
     }
 

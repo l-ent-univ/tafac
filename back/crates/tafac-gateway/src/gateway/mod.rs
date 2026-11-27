@@ -302,6 +302,13 @@ impl Gateway {
         if let Some(Some(value)) = first.get() {
             self.reissue(value, response.headers_mut());
         }
+        // HEAD: the GET's answer, its length said, without its body
+        // (Express's res.send).
+        if asked.method == Method::HEAD {
+            let length = response.body().len();
+            response.headers_mut().entry(http::header::CONTENT_LENGTH).or_insert(length.into());
+            response.body_mut().clear();
+        }
         Some(response)
     }
 
