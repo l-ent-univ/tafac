@@ -101,6 +101,7 @@ import {
   clearGradesCache,
   detectScodocGroupSelection,
   findAdeGroupForScodoc,
+  findScodocTpInYear,
   forgetPlanningTrees,
   getAccountInfo,
   getAdeTree,
@@ -766,8 +767,8 @@ function buildStoredTpSelection(program, year, td, tp, contextLabel) {
 // asks for the TP (year and TD already picked) rather than saving a TD-only
 // selection with an empty timetable. `forceChoice` (debug panel) asks even
 // when the TP is known.
-async function resolveDefaultSelectionTp(adeDefaultSelection, { tdAliases = [], tpAliases = [], forceChoice = false } = {}) {
-  const defaultSelection = await correctDefaultSelectionWithScodoc(adeDefaultSelection, tdAliases, tpAliases)
+async function resolveDefaultSelectionTp(adeDefaultSelection, { tdAliases = [], tpAliases = [], hints = [], forceChoice = false } = {}) {
+  const defaultSelection = await correctDefaultSelectionWithScodoc(adeDefaultSelection, tdAliases, tpAliases, hints)
   const keepDefault = { selection: defaultSelection }
   if (!defaultSelection?.tdResourceId || (defaultSelection.tpResourceId && !forceChoice)) {
     return keepDefault
@@ -803,33 +804,43 @@ async function resolveDefaultSelectionTp(adeDefaultSelection, { tdAliases = [], 
 }
 
 // ADE's default can name the wrong group: Rennes ADE puts a 2A2 MMI student
-// on "2B2-StratUX MMI" while ScoDoc says TD 2A, TP 2A2. When ScoDoc names a TP
-// the default doesn't match, ScoDoc wins if its TD exists under the default's
-// year and its TP under that TD; otherwise ADE's default stays.
-async function correctDefaultSelectionWithScodoc(defaultSelection, tdAliases, tpAliases) {
+// on "2B2-StratUX MMI" while ScoDoc says TD 2A, TP 2B1. When ScoDoc names a TP
+// the default doesn't match, ScoDoc wins: its TD under the default's year
+// and its TP under that TD; else its TP anywhere under the year, the folder
+// above it as its TD (ScoDoc's TD « 2A » is no folder of 2B1's in ADE,
+// « 2B MMI »: adeGroupMatch's findTpUnderYear). Found nowhere, ADE's
+// default stays. `hints`: ScoDoc's other groups (its parcours), for a TP
+// named alike in two of them.
+async function correctDefaultSelectionWithScodoc(defaultSelection, tdAliases, tpAliases, hints = []) {
   const isDefaultTpScodocs = tpAliases.some((alias) => selectionLabelsMatch(defaultSelection?.tpLabel, alias))
-  if (!defaultSelection?.yearResourceId || !defaultSelection.tpResourceId || !tpAliases.length || !tdAliases.length || isDefaultTpScodocs) {
+  if (!defaultSelection?.yearResourceId || !defaultSelection.tpResourceId || !tpAliases.length || isDefaultTpScodocs) {
     return defaultSelection
   }
+  const program = buildStoredSelectionOption(defaultSelection.programResourceId, defaultSelection.programLabel)
+  const year = buildStoredSelectionOption(defaultSelection.yearResourceId, defaultSelection.yearLabel)
 
   try {
-    const yearTreeResponse = await getAdeTree(defaultSelection.yearResourceId)
-    const td = findTpOptionByLabel(buildNextTpStepFromTree(yearTreeResponse?.tree).options, tdAliases)
-    if (!td?.resourceId) {
-      return defaultSelection
+    if (tdAliases.length) {
+      const yearTreeResponse = await getAdeTree(defaultSelection.yearResourceId)
+      const td = findTpOptionByLabel(buildNextTpStepFromTree(yearTreeResponse?.tree).options, tdAliases)
+      if (td?.resourceId) {
+        const tdTreeResponse = await getAdeTree(td.resourceId)
+        const tp = findTpOptionByLabel(buildNextTpStepFromTree(tdTreeResponse?.tree).options, tpAliases)
+        if (tp?.resourceId) {
+          return buildStoredTpSelection(program, year, td, tp, defaultSelection.contextLabel)
+        }
+      }
     }
 
-    const tdTreeResponse = await getAdeTree(td.resourceId)
-    const tp = findTpOptionByLabel(buildNextTpStepFromTree(tdTreeResponse?.tree).options, tpAliases)
-    if (!tp?.resourceId) {
+    const found = await findScodocTpInYear(defaultSelection.yearResourceId, tpAliases, { hints, current: defaultSelection.tpResourceId })
+    if (!found || String(found.tp.id) === String(defaultSelection.tpResourceId)) {
       return defaultSelection
     }
-
     return buildStoredTpSelection(
-      buildStoredSelectionOption(defaultSelection.programResourceId, defaultSelection.programLabel),
-      buildStoredSelectionOption(defaultSelection.yearResourceId, defaultSelection.yearLabel),
-      td,
-      tp,
+      program,
+      year,
+      buildTpSelectionOption(found.td, null, defaultSelection.contextLabel),
+      buildTpSelectionOption(found.tp, found.td, defaultSelection.contextLabel),
       defaultSelection.contextLabel,
     )
   } catch {
@@ -1507,6 +1518,7 @@ function App() {
           ? await resolveDefaultSelectionTp(treePayload.defaultSelection, {
             tdAliases: scodocGroupSelection?.tdAliases ?? [],
             tpAliases: scodocGroupSelection?.tpAliases ?? [],
+            hints: scodocGroupSelection?.labels ?? [],
             forceChoice: forceTpChoice,
           })
           : null

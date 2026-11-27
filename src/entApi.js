@@ -3,8 +3,8 @@ import universityConfig from '@university'
 import { GRADES_UNAVAILABLE_MESSAGE } from './gradeFeatureState'
 import { evaluationTypeLabel, listGradesSemesters, summarizeAverage } from './gradesReport'
 import { readDistributionCounts } from './evaluationDistribution'
-import { pickAdeGroupForAlias } from './adeGroupMatch'
-import { adeTreeRoot, buildDirectory, focusAdeTree, followedGroups } from './planningTree'
+import { findTpUnderYear, pickAdeGroupForAlias } from './adeGroupMatch'
+import { adeTreeRoot, buildDirectory, findTreePath, focusAdeTree, followedGroups } from './planningTree'
 import { buildParcoursTpAliases } from './scodocParcoursGroups'
 import { getDefaultUniversityId, getLoadedUniversityId, getUniversityRequestHeaders } from './universityRuntime'
 import { buildUploadDisposition, normalizeAttachmentType, readAttachmentLimits, sanitizeAttachmentName } from './mailAttachments'
@@ -1869,6 +1869,13 @@ export async function getAdeTree(etabsVets = '', { fallback = '' } = {}) {
     ownResources: followedGroups(groups),
   })
   return { authenticated: true, tree }
+}
+
+// ScoDoc's TP group under a year of the groups' tree (`yearResourceId`),
+// with its TD: adeGroupMatch's findTpUnderYear. → { tp, td } | null.
+export async function findScodocTpInYear(yearResourceId, tpAliases, options = {}) {
+  const year = findTreePath(adeTreeRoot(await loadTree('group')), yearResourceId)?.at(-1)
+  return year ? findTpUnderYear(year, tpAliases, options) : null
 }
 
 // « Salles et personnels »: the rooms, staff and groups of the tree, those
