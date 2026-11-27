@@ -1871,12 +1871,15 @@ export async function getAdeTree(etabsVets = '', { fallback = '' } = {}) {
   return { authenticated: true, tree }
 }
 
-// « Salles et personnels »: the rooms, staff and groups of the tree
-// ({ groups, items }, src/planningTree.js's buildDirectory). `supported`:
-// false where the planning service has no tree to give.
-export async function getAdeDirectory() {
+// « Salles et personnels »: the rooms, staff and groups of the tree, those
+// of `kinds` ('room', 'person', 'group'), as { groups, items }
+// (src/planningTree.js's buildDirectory). `supported`: false where the
+// planning service has no tree to give.
+const DIRECTORY_TREE_KINDS = { room: 'room', person: 'teacher', group: 'group' }
+
+export async function getAdeDirectory(kinds = Object.keys(DIRECTORY_TREE_KINDS)) {
   try {
-    const trees = await Promise.all(['room', 'teacher', 'group'].map(loadTree))
+    const trees = await Promise.all(kinds.map((kind) => DIRECTORY_TREE_KINDS[kind]).filter(Boolean).map(loadTree))
     return { authenticated: true, supported: true, directory: buildDirectory(trees.flat()) }
   } catch (error) {
     if (['not_implemented', 'service_absent'].includes(error?.code)) {

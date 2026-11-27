@@ -94,6 +94,10 @@ export default {
       { label: 'ADE Rennes', href: 'https://ade-rennes.univ-rennes2.fr/direct/index.jsp?projectId=1' },
       { label: 'ADE Mazier', href: 'https://ade-mazier.univ-rennes2.fr/direct/index.jsp?projectId=2' },
     ],
+    // « Salles » (the planning's side panel): TEMPO's rooms, as its
+    // « Disponibilité des salles » lists them, and each one's timetable.
+    // Its tree is by type of room, not by campus: all of it is listed.
+    directory: { kinds: ['room'], bySite: false },
   },
 
   // Mail: the "Mails récents" card and the in-app mail page (Partage's

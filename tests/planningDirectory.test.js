@@ -89,6 +89,10 @@ test('folder names lose ADE sort prefixes', () => {
   assert.equal(cleanFolderName('19-Lannion IUT - Institut'), 'Lannion IUT - Institut')
   assert.equal(cleanFolderName('.Chercheurs - laboratoires'), 'Chercheurs - laboratoires')
   assert.equal(cleanFolderName('Bâtiment 05 - INFO'), 'Bâtiment 05 - INFO')
+  // TEMPO's (Rennes 2): a sort number, a count of rooms.
+  assert.equal(cleanFolderName('02 - SALLES DE COURS (226)'), 'SALLES DE COURS')
+  assert.equal(cleanFolderName('06 - LIEUX EXTERNES'), 'LIEUX EXTERNES')
+  assert.equal(cleanFolderName('BUT INFO-COM'), 'BUT INFO-COM')
 })
 
 test('a room shows its seats apart', () => {
@@ -96,6 +100,14 @@ test('a room shows its seats apart', () => {
   assert.equal(roomCapacity('B27 - 115 [46p]'), 46)
   assert.equal(roomCapacity('B05 - 107'), null)
   assert.equal(roomLabel('B09B - Amphi TA (009) [142P]'), 'B09B - Amphi TA (009)')
+  // TEMPO's (Rennes 2).
+  assert.equal(roomCapacity('A1 Amphi (M. Oussekine) - 133 pl.'), 133)
+  assert.equal(roomLabel('A1 Amphi (M. Oussekine) - 133 pl.'), 'A1 Amphi (M. Oussekine)')
+  assert.equal(roomCapacity('B009 (44 pl.+1)'), 44)
+  assert.equal(roomLabel('B009 (44 pl.+1)'), 'B009')
+  assert.equal(roomCapacity('E402 (24 PC+1)'), 24)
+  assert.equal(roomLabel('E402 (24 PC+1)'), 'E402')
+  assert.equal(roomLabel('HALL L'), 'HALL L')
 })
 
 test('the site comes from the group’s context', () => {
@@ -120,6 +132,23 @@ test('the site’s rooms are in sections by building, their type on the row', ()
   ])
   const people = sectionEntries(siteEntries(entries, 'person', 'IUT Lannion'), 'person')
   assert.deepEqual(people.map(({ title }) => title), ['Permanents · Info Com', 'Vacataires · BUT INFO-COM'])
+})
+
+test('a tree that isn\'t by site is in sections from its first folder', () => {
+  const tempo = prepareDirectory({
+    groups: [
+      { kind: 'room', path: ['01 - AMPHITHEATRES (25)'] },
+      { kind: 'room', path: ['02 - SALLES DE COURS (226)', 'SALLES MUTUALISEES (168)', '1 - SALLES DE COURS (21)'] },
+      { kind: 'room', path: ['06 - LIEUX EXTERNES', 'CAMPUS SANTE', 'AMPHITHEATRES'] },
+    ],
+    items: [['6', 'A1 Amphi (M. Oussekine) - 133 pl.', 0], ['1503', 'B019 Amphi - 92 pl.', 0], ['2204', 'B009 (44 pl.+1)', 1], ['9', 'AMPHI A Bât 2', 2]],
+  })
+  const sections = sectionEntries(tempo, 'room', { bySite: false })
+  // Every folder of TEMPO's in lower case, the room's name as it is.
+  assert.deepEqual(sections.map(({ title }) => title), ['Amphitheatres', 'Lieux externes', 'Salles de cours'])
+  assert.deepEqual(sections[1].entries.map(({ name, detail }) => `${name} | ${detail}`), ['AMPHI A Bât 2 | Campus sante · Amphitheatres'])
+  assert.deepEqual(sections[2].entries.map(({ name, detail }) => `${name} | ${detail}`), ['B009 (44 pl.+1) | Salles mutualisees · Salles de cours'])
+  assert.deepEqual(sections[0].entries.map(({ id }) => id), ['6', '1503'])
 })
 
 test('a search matches every word, names first, the site first', () => {

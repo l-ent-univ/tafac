@@ -4,7 +4,7 @@ import { trackPlanningAction, trackPlanningNavigation } from '../analytics'
 import { WEEKDAY_LETTERS, addDays, dayText, daysBetween, monthLabel, parseDayKey, sameWeekday, shortWeekRangeText, shortWeekdayText, startOfWeek, toDayKey, weekRangeText, weekdayIndex } from '../planningDates'
 import { LABEL_COLUMN } from '../planningGrid'
 import { SECONDARY_BUTTON } from '../scodocPageUtils'
-import { HAS_PLANNING_DIRECTORY } from '../usePlanningDirectory'
+import { DIRECTORY_TITLE, HAS_PLANNING_DIRECTORY } from '../usePlanningDirectory'
 import Dropdown from './Dropdown'
 import PlanningDirectoryButton from './PlanningDirectoryButton'
 import PlanningExportButton from './PlanningExportButton'
@@ -205,7 +205,7 @@ function PhoneViewMenu({ view, onChangeView, onOpenDirectory = null }) {
       options={PHONE_VIEWS}
       value={shown.value}
       onChange={onChangeView}
-      actions={HAS_PLANNING_DIRECTORY && onOpenDirectory ? [{ id: 'directory', label: 'Salles et personnels', icon: 'ph:user-list', onSelect: onOpenDirectory }] : []}
+      actions={HAS_PLANNING_DIRECTORY && onOpenDirectory ? [{ id: 'directory', label: DIRECTORY_TITLE, icon: 'ph:user-list', onSelect: onOpenDirectory }] : []}
       label="Affichage"
       align="end"
       className="shrink-0"

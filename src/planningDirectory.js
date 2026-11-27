@@ -14,21 +14,38 @@ export function foldDirectoryText(value) {
 
 const foldedWords = (value) => foldDirectoryText(value).split(' ').filter(Boolean)
 
-// A folder's name as shown: ADE's sort prefixes dropped ("19-Lannion IUT"
-// → "Lannion IUT", ".Chercheurs" → "Chercheurs").
+// A folder's name as shown: the sort prefixes dropped ("19-Lannion IUT"
+// → "Lannion IUT", ".Chercheurs" → "Chercheurs", TEMPO's "01 - Salles de
+// cours (226)" → "Salles de cours", its count of rooms too).
 export function cleanFolderName(name) {
-  return String(name ?? '').replace(/^\.+/, '').replace(/^\d{1,3}-\s*/, '').trim()
+  return String(name ?? '').replace(/^\.+/, '').replace(/^\d{1,3}\s*-\s*/, '').replace(/\s*\(\d+\)$/, '').trim()
 }
 
-// A room's seats, from ADE's "[142P]" / "[46p]" suffix; null without.
+// TEMPO's tree (Rennes 2): its top folders written « 01 - SALLES DE COURS
+// (226) », a number and a count of rooms, every folder under them in
+// capitals. ADE's capitals stay ("BUT INFO-COM", "ISTIC").
+function isTempoFolder(name) {
+  return /^\d{1,3}\s+-\s+/.test(name) || /\s\(\d+\)$/.test(name)
+}
+
+function softenCapitals(name) {
+  return name === name.toLocaleUpperCase('fr') ? name.charAt(0) + name.slice(1).toLocaleLowerCase('fr') : name
+}
+
+// A room's seats: ADE's "[142P]" / "[46p]", TEMPO's "133 pl.", "(44
+// pl.+1)" or a computer room's "(24 PC+1)"; null without.
 export function roomCapacity(name) {
-  const match = /\[(\d+)\s*p\]/i.exec(String(name ?? ''))
+  const match = /\[(\d+)\s*p\]/i.exec(String(name ?? '')) ?? /(\d+)\s*(?:pl\.|pc\b)/i.exec(String(name ?? ''))
   return match ? Number(match[1]) : null
 }
 
-// A room's name without its seats suffix.
+// A room's name without its seats: ADE's suffix, TEMPO's " - 133 pl.",
+// " (44 pl.+1)" or " (24 PC+1)".
 export function roomLabel(name) {
-  return String(name ?? '').replace(/\s*\[\d+\s*p\]\s*$/i, '').trim()
+  return String(name ?? '')
+    .replace(/\s*\[\d+\s*p\]\s*$/i, '')
+    .replace(/\s*(?:-\s*)?\(?\d+\s*(?:pl\.|pc\b)[^)]*\)?\s*$/i, '')
+    .trim()
 }
 
 // Rooms, staff, and the students' groups (« Formations »).
@@ -43,7 +60,8 @@ export function prepareDirectory(directory) {
     const [id, name, groupIndex] = Array.isArray(item) ? item : [item?.id, item?.name, item?.group]
     const group = groups[groupIndex]
     if (!id || !name || !group) return []
-    const path = Array.isArray(group.path) ? group.path : []
+    const written = Array.isArray(group.path) ? group.path : []
+    const path = isTempoFolder(String(written[0] ?? '')) ? written.map((folder) => softenCapitals(cleanFolderName(folder))) : written
     return [{
       id: String(id),
       name: String(name),
@@ -90,12 +108,13 @@ const SECTION_DEPTH = { room: 1, person: Infinity }
 // The site's rooms or staff in sections, by the folders under the site's
 // own: the sections and their entries in order. What's below the title is
 // on the entry's row (`detail`). The groups have their own layout
-// (groupCollections).
-export function sectionEntries(entries, kind) {
+// (groupCollections). `bySite: false`: a tree that isn't by site, its
+// sections from its first folder (TEMPO's "Amphithéâtres").
+export function sectionEntries(entries, kind, { bySite = true } = {}) {
   const depth = SECTION_DEPTH[kind] ?? Infinity
   const sections = new Map()
   for (const entry of entries) {
-    const below = entry.path.slice(1).map(cleanFolderName).filter(Boolean)
+    const below = entry.path.slice(bySite ? 1 : 0).map(cleanFolderName).filter(Boolean)
     const title = below.slice(0, depth).join(' · ')
     const detail = below.slice(depth).join(' · ')
     if (!sections.has(title)) sections.set(title, [])
