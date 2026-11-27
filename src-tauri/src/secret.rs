@@ -102,7 +102,11 @@ pub fn session_secret_with(path: &Path, store: Option<&dyn SecretStore>, generat
 
 pub fn session_secret(data_dir: &Path) -> std::io::Result<String> {
     let store = system_store();
-    session_secret_with(&data_dir.join("session-secret"), store.as_deref(), || crate::sidecar::random_hex(32))
+    session_secret_with(&data_dir.join("session-secret"), store.as_deref(), || random_hex(32))
+}
+
+fn random_hex(bytes: usize) -> String {
+    (0..bytes).map(|_| format!("{:02x}", rand::random::<u8>())).collect()
 }
 
 // Packaged builds, on the systems with a credential store.

@@ -1,98 +1,131 @@
 // The tafac:// scheme: every request the window makes (the page, its files,
-// /__ent_auth, /__ent_proxy) is answered here, and its answer handed back.
-// No TCP port: other programs and browser tabs on the computer can't reach
-// the app's server.
+// /__ent_auth, /__ent_proxy) is answered here, in the app itself, and its
+// answer handed back. No TCP port, and no other program: other programs and
+// browser tabs on the device can't reach any of it.
 //
 // Who answers:
 //
-//   the gateway    in the app itself (back/crates/tafac-gateway, the same
-//                  code as on tafac.fr): it signs the student in through
-//                  tonAPI, holds the session, and answers the routes that
-//                  have moved, their errors too
-//   the server     Node, over its Unix socket (named pipe on Windows): every
-//                  other route, what the gateway leaves it (a session it
-//                  doesn't hold), and what it tells it (a session ended)
+//   the gateway    the page's API (back/crates/tafac-gateway, the same code
+//                  as tafac.fr's server): it signs the student in through
+//                  tonAPI, holds the session, and answers every route, for
+//                  a session it holds and for nobody, its errors too; the
+//                  list of universities with the remote settings
+//                  (remote_settings.rs), the statistics, the icons
+//   the site       everything else: the page and its built files, from the
+//                  build the app carries (the gateway's Site, as tafac.fr's
+//                  server answers them)
 //
 // The bridge also holds the session's cookie (jar.rs: the window never sees
-// it), whoever set it, and signs in again with the kept login when an answer
-// says the session is gone (signin.rs): the request is then asked again, and
-// the page gets the second answer.
+// it), and signs in again with the kept login when an answer says the
+// session is gone (signin.rs): the request is then asked again, and the
+// page gets the second answer.
 //
-// The page's built files (/assets/…) are asked for once and answered from
+// The page's built files (/assets/…) are read once and answered from
 // memory after that (assets.rs): WebKit keeps nothing from this scheme, and
 // reads a video a few bytes at a time.
 
-use std::error::Error;
-use std::time::{Duration, Instant};
+use std::path::Path;
+#[cfg(debug_assertions)]
+use std::time::Instant;
 
 use bytes::Bytes;
+use http::header::{CONTENT_TYPE, HOST, IF_MODIFIED_SINCE, IF_NONE_MATCH, IF_RANGE, RANGE, SET_COOKIE};
 use http::{HeaderMap, HeaderValue, Method};
-use http_body_util::{BodyExt, Full};
-use hyper::header::{CONNECTION, CONTENT_TYPE, COOKIE, HOST, IF_MODIFIED_SINCE, IF_NONE_MATCH, IF_RANGE, RANGE, SET_COOKIE, TRANSFER_ENCODING};
-use hyper_util::rt::TokioIo;
-use tokio::io::{AsyncRead, AsyncWrite};
 
+use tafac_gateway::own::universities::Served;
+use tafac_gateway::own::{RemoteSettings, Site};
 use tafac_gateway::session::cookie::clears_cookie;
-use tafac_gateway::{Asked, Gateway, NodeAnswer, NodeRequest};
+use tafac_gateway::{Asked, Gateway, NodeAnswer, Statistics};
 
 use crate::assets::{self, Assets};
 use crate::jar::CookieJar;
 use crate::signin::{self, KeptLogin, Outcome, SignIn};
 
-type BoxError = Box<dyn Error + Send + Sync>;
-
 pub struct Bridge {
-    pub endpoint: String,
     pub jar: CookieJar,
     pub signin: SignIn,
     pub assets: Assets,
-    // What signs in and answers the moved routes in the app itself; None:
-    // the server does it all.
-    pub gateway: Option<Gateway>,
+    // What signs in and answers the page's API, in the app itself.
+    pub gateway: Gateway,
+    // The page and its built files.
+    pub site: Site,
 }
 
 impl Bridge {
-    pub fn new(endpoint: String, jar: CookieJar, signin: SignIn) -> Self {
-        Self { endpoint, jar, signin, assets: Assets::default(), gateway: None }
-    }
-
-    // With the gateway, for the app's own server: the secret both write and
-    // read the session's cookie with, the cookie's name (the app's server
-    // always runs in production), and the key that turns the server's
-    // statistics on, which the gateway says as the server would.
-    pub fn with_gateway(mut self, session_secret: &str) -> Self {
-        self.gateway = Some(Gateway::new(session_secret, tafac_gateway::PRODUCTION_COOKIE).with_statistics(statistics_key().as_deref()));
-        // Development: TAFAC_NO_TONAPI=1 leaves every route to the server,
-        // to compare the two on the same build.
-        #[cfg(debug_assertions)]
-        if std::env::var_os("TAFAC_NO_TONAPI").is_some() {
-            self.gateway = None;
-        }
-        self
+    pub fn new(gateway: Gateway, site: Site, jar: CookieJar, signin: SignIn) -> Self {
+        Self { jar, signin, assets: Assets::default(), gateway, site }
     }
 
     // The session's cookie, as the jar holds it now.
     fn session_cookie(&self) -> Option<String> {
-        self.jar.get(self.gateway.as_ref()?.cookie_name())
+        self.jar.get(self.gateway.cookie_name())
     }
 }
 
-// PostHog's project key as the app's server has it (POSTHOG_PROJECT_KEY):
-// the one CI builds in, which the server is started with (sidecar.rs,
-// node.rs), else the one of the environment the app runs in, which the
-// server has too. Without one the server sends no statistics.
+// The gateway as the app has it, set up as the Node the app ran before was
+// (started with NODE_ENV=production and MULTI_UNIVERSITY=1):
+//
+//   `session_secret`  what the session's cookie is sealed with (secret.rs)
+//   the cookie        production's name: the app's server always ran so
+//   the universities  every one (Served::every), Tafac's own text
+//   no Node behind    nobody to tell a session ended
+//   the statistics    on with the key CI builds in, sent from this device
+//                     to PostHog, as that Node sent them (statistics_key)
+//   the icons         in `data_dir`/server, the folder that Node kept them
+//                     in (its DATA_DIR)
+//   `remote_settings` what their patches lay over the page's settings, in
+//                     the list of universities
+pub fn gateway(session_secret: &str, data_dir: &Path, remote_settings: RemoteSettings) -> Gateway {
+    let key = statistics_key();
+    // MULTI_UNIVERSITY=1, as that Node was started: every university, for
+    // the university a visitor's events are tagged with. PostHog's own
+    // address (POSTHOG_HOST unset), nobody kept out.
+    let setting = |name: &str| (name == "MULTI_UNIVERSITY").then(|| "1".to_string());
+    Gateway::new(session_secret, tafac_gateway::PRODUCTION_COOKIE)
+        .without_node()
+        .serving(Served::every())
+        .with_statistics(key.as_deref())
+        .sending_statistics(Statistics::read(key.as_deref(), setting))
+        .with_icons_in(data_dir.join("server"))
+        .with_remote_settings(remote_settings)
+}
+
+// The page and its files: the build the app carries among its resources
+// (tauri.bundle.conf.json, tauri.ios.conf.json: dist/). A debug build of
+// the desktop app without one (`npm run desktop:dev`, tauri.conf.json
+// alone) reads the repository's own, which `tauri dev` builds first.
+pub fn site(resource_dir: &Path) -> Site {
+    let dist = resource_dir.join("dist");
+    #[cfg(all(debug_assertions, desktop))]
+    let dist = if dist.join("index.html").is_file() { dist } else { std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("..").join("dist") };
+    Site::new(dist, Served::every())
+}
+
+// PostHog's project key (POSTHOG_PROJECT_KEY): the one CI builds in, else
+// the one of the environment the app runs in. Without one the app sends no
+// statistics. Sent from this device to PostHog, not through tafac.fr, and
+// only while the student leaves « Statistiques anonymes » on.
 fn statistics_key() -> Option<String> {
     let built_in = option_env!("TAFAC_POSTHOG_PROJECT_KEY").filter(|key| !key.is_empty());
     built_in.map(str::to_string).or_else(|| std::env::var("POSTHOG_PROJECT_KEY").ok())
 }
 
-// How long a request waits for the server to be up (it is starting when the
-// window opens).
-const STARTUP_WAIT: Duration = Duration::from_secs(20);
+// The address the window opens: Tauri serves custom schemes as
+// <scheme>://localhost, except on Windows (WebView2) where it is
+// http://<scheme>.localhost. On /login, not /: the app goes on to / by
+// itself once signed in (src/desktopApp.js, App.jsx).
+pub fn app_url() -> &'static str {
+    if cfg!(windows) {
+        "http://tafac.localhost/login"
+    } else {
+        "tafac://localhost/login"
+    }
+}
 
-// A request as it goes to the server, kept whole to be sent again.
+// A request as it was made, kept whole to be asked again.
 struct Outgoing {
     method: Method,
+    // The path and its query.
     path: String,
     headers: HeaderMap,
     body: Bytes,
@@ -100,7 +133,7 @@ struct Outgoing {
 
 pub async fn forward(bridge: &Bridge, request: http::Request<Vec<u8>>) -> http::Response<Vec<u8>> {
     // Development: TAFAC_LOG_REQUESTS=1 says what the page asks, how long
-    // each answer took, and which ones tonAPI gave in the server's place.
+    // each answer took, and which ones tonAPI gave.
     #[cfg(debug_assertions)]
     let asked = std::env::var_os("TAFAC_LOG_REQUESTS").map(|_| (format!("{} {}", request.method(), request.uri().path()), Instant::now()));
     let response = answer(bridge, request).await;
@@ -143,42 +176,22 @@ async fn answer(bridge: &Bridge, request: http::Request<Vec<u8>>) -> http::Respo
 
     let round = bridge.signin.round();
     let response = ask(bridge, &outgoing, true).await;
-    let signed_out = signin::says_signed_out(
-        path,
-        response.status().as_u16(),
-        header(response.headers(), signin::SESSION_HEADER),
-        response.body(),
-    );
+    let signed_out = signin::says_signed_out(path, response.status().as_u16(), header(response.headers(), signin::SESSION_HEADER), response.body());
     if signed_out && bridge.signin.again(round, |login| sign_in_again(bridge, login)).await {
         return ask(bridge, &outgoing, true).await;
     }
     response
 }
 
-// A request answered: in the app itself when the gateway has its answer (a
-// sign-in, a route that moved asked for a session it holds: the route's
-// answer or its error), by the server otherwise.
-// `with_cookies`: whether it goes with the session's cookie.
-async fn ask(bridge: &Bridge, outgoing: &Outgoing, with_cookies: bool) -> http::Response<Vec<u8>> {
-    if let Some(response) = answered_here(bridge, outgoing, with_cookies).await {
-        return response;
-    }
-    // A sign-out the server answers ends the session for the gateway as it
-    // leaves.
-    if let Some(gateway) = bridge.gateway.as_ref().filter(|_| with_cookies) {
-        gateway.saw_request(&outgoing.method, path_of(outgoing), bridge.session_cookie().as_deref());
-    }
-    send_or_answer(bridge, outgoing, with_cookies).await
-}
-
 fn path_of(outgoing: &Outgoing) -> &str {
     outgoing.path.split('?').next().unwrap_or_default()
 }
 
-// The gateway's answer, when it has one. The session's cookie it sets or
-// takes away goes to the jar, not to the window. None: the server answers.
-async fn answered_here(bridge: &Bridge, outgoing: &Outgoing, with_cookies: bool) -> Option<http::Response<Vec<u8>>> {
-    let gateway = bridge.gateway.as_ref()?;
+// A request answered: by the gateway for the page's API, the session's
+// cookie it sets or takes away going to the jar, not to the window; by the
+// site for any other address. `with_cookies`: whether it goes with the
+// session's cookie.
+async fn ask(bridge: &Bridge, outgoing: &Outgoing, with_cookies: bool) -> http::Response<Vec<u8>> {
     let session_cookie = || bridge.session_cookie().filter(|_| with_cookies);
     let sent_with = session_cookie();
     let asked = Asked {
@@ -190,37 +203,33 @@ async fn answered_here(bridge: &Bridge, outgoing: &Outgoing, with_cookies: bool)
         // One student, one process: no address to count sign-ins by.
         peer: None,
     };
-    let response = gateway.answer(&asked, session_cookie, |request| server_asked(bridge, request)).await?;
-    let (mut parts, body) = response.into_parts();
-    keep_cookies(bridge, &parts.headers, sent_with.as_deref());
-    parts.headers.remove(SET_COOKIE);
-    Some(http::Response::from_parts(parts, body))
+    // No Node behind: the gateway never asks one.
+    let no_node = |_| std::future::ready(NodeAnswer::None);
+    if let Some(response) = bridge.gateway.answer(&asked, session_cookie, no_node).await {
+        let (mut parts, body) = response.into_parts();
+        keep_cookies(bridge, &parts.headers, sent_with.as_deref());
+        parts.headers.remove(SET_COOKIE);
+        return http::Response::from_parts(parts, body);
+    }
+    site_answer(bridge, &outgoing.method, &outgoing.path, &outgoing.headers).await
+}
+
+// The site's answer for an address outside the page's API, asked as the
+// app's Node was: under the name localhost, the address the page is filled
+// with (its links for previews, which the app never shows).
+async fn site_answer(bridge: &Bridge, method: &Method, path: &str, headers: &HeaderMap) -> http::Response<Vec<u8>> {
+    let mut headers = headers.clone();
+    headers.insert(HOST, HeaderValue::from_static("localhost"));
+    let Ok(uri) = path.parse::<http::Uri>() else {
+        return http::Response::builder().status(400).body(Vec::new()).unwrap();
+    };
+    bridge.site.answer(method, &uri, &headers).await
 }
 
 // As the app starts: the session check the page is about to ask for, made
-// while the server and the page start (the gateway's check_early).
+// while the page starts (the gateway's check_early).
 pub async fn start_ahead(bridge: &Bridge) {
-    if let Some(gateway) = bridge.gateway.as_ref() {
-        gateway.check_early(bridge.session_cookie().as_deref()).await;
-    }
-}
-
-// A request the gateway makes to the server (a session that ended), and the
-// server's whole answer. It goes as the gateway wrote it, and nothing of
-// the answer is kept here: the gateway says what goes to the page.
-async fn server_asked(bridge: &Bridge, request: NodeRequest) -> NodeAnswer {
-    let (parts, body) = request.into_parts();
-    let mut builder = hyper::Request::builder().method(parts.method).uri(parts.uri.path_and_query().map_or("/", |path| path.as_str()));
-    for (name, value) in parts.headers.iter().filter(|(name, _)| *name != HOST) {
-        builder = builder.header(name, value);
-    }
-    let upstream = builder.header(HOST, "localhost").body(Full::new(Bytes::from(body))).ok()?;
-    let (mut parts, body) = send(&bridge.endpoint, upstream).await.ok()?.into_parts();
-    for name in [TRANSFER_ENCODING, CONNECTION] {
-        parts.headers.remove(name);
-    }
-    let body = body.collect().await.ok()?.to_bytes().to_vec();
-    Some(http::Response::from_parts(parts, body))
+    bridge.gateway.check_early(bridge.session_cookie().as_deref()).await;
 }
 
 // An answer's cookies, kept in the jar. `sent_with`: the session cookie the
@@ -228,16 +237,16 @@ async fn server_asked(bridge: &Bridge, request: NodeRequest) -> NodeAnswer {
 // about that session: when the jar holds another by now (the app signed in
 // again meanwhile), that one stays.
 fn keep_cookies(bridge: &Bridge, headers: &HeaderMap, sent_with: Option<&str>) {
-    let session = bridge.gateway.as_ref().map(Gateway::cookie_name);
-    let stale = |set_cookie: &&str| session.is_some_and(|name| clears_cookie(set_cookie, name) && bridge.jar.get(name).as_deref() != sent_with);
+    let name = bridge.gateway.cookie_name();
+    let stale = |set_cookie: &&str| clears_cookie(set_cookie, name) && bridge.jar.get(name).as_deref() != sent_with;
     // Sorted out before the jar is opened: it is read to tell which.
     let kept: Vec<&str> = headers.get_all(SET_COOKIE).iter().filter_map(|value| value.to_str().ok()).filter(|set_cookie| !stale(set_cookie)).collect();
     bridge.jar.store(kept.into_iter());
 }
 
 // One of the page's built files, from memory; the first time, from the
-// server, asked for the whole file whatever part the page wanted. None when
-// the server has no such file to give whole: it answers the request itself.
+// site, read whole whatever part the page wanted. None when the site has no
+// such file to give whole: it answers the request itself.
 async fn asset(bridge: &Bridge, outgoing: &Outgoing, path: &str) -> Option<http::Response<Vec<u8>>> {
     let range = header(&outgoing.headers, RANGE.as_str());
     if let Some(file) = bridge.assets.get(path) {
@@ -251,8 +260,7 @@ async fn asset(bridge: &Bridge, outgoing: &Outgoing, path: &str) -> Option<http:
     for name in [RANGE, IF_RANGE, IF_NONE_MATCH, IF_MODIFIED_SINCE] {
         headers.remove(name);
     }
-    let whole = Outgoing { method: Method::GET, path: outgoing.path.clone(), headers, body: Bytes::new() };
-    let response = try_forward(bridge, &whole, false).await.ok()?;
+    let response = site_answer(bridge, &Method::GET, &outgoing.path, &headers).await;
     if response.status() != http::StatusCode::OK {
         return None;
     }
@@ -264,9 +272,8 @@ fn header<'a>(headers: &'a HeaderMap, name: &str) -> Option<&'a str> {
 }
 
 // The kept login, sent as the page sends one, without the old session's
-// cookie: answered by the gateway (tonAPI signs in) or by the server, as
-// the page's own. Its answer's cookie goes to the jar: the session the
-// retried requests then carry.
+// cookie: tonAPI signs in, as for the page's own. Its answer's cookie goes
+// to the jar: the session the retried requests then carry.
 async fn sign_in_again(bridge: &Bridge, login: KeptLogin) -> Outcome {
     let mut headers = HeaderMap::new();
     headers.insert(CONTENT_TYPE, HeaderValue::from_static("application/json"));
@@ -283,200 +290,62 @@ async fn sign_in_again(bridge: &Bridge, login: KeptLogin) -> Outcome {
     signin::outcome(response.status().as_u16(), response.body())
 }
 
-async fn send_or_answer(bridge: &Bridge, outgoing: &Outgoing, with_cookies: bool) -> http::Response<Vec<u8>> {
-    match try_forward(bridge, outgoing, with_cookies).await {
-        Ok(response) => response,
-        Err(error) => {
-            eprintln!("[tafac] local server unreachable: {error}");
-            http::Response::builder()
-                .status(502)
-                .header("content-type", "text/plain; charset=utf-8")
-                .body(format!("Le serveur local de Tafac ne répond pas ({error})").into_bytes())
-                .unwrap()
-        }
-    }
-}
-
-async fn try_forward(bridge: &Bridge, outgoing: &Outgoing, with_cookies: bool) -> Result<http::Response<Vec<u8>>, BoxError> {
-    let mut builder = hyper::Request::builder().method(outgoing.method.clone()).uri(outgoing.path.as_str());
-    for (name, value) in outgoing.headers.iter() {
-        if name != HOST && name != COOKIE {
-            builder = builder.header(name, value);
-        }
-    }
-    builder = builder.header(HOST, "localhost");
-    if let Some(cookies) = bridge.jar.header().filter(|_| with_cookies) {
-        builder = builder.header(COOKIE, cookies);
-    }
-    let upstream = builder.body(Full::new(outgoing.body.clone()))?;
-    let session_cookie = bridge.session_cookie().filter(|_| with_cookies);
-
-    let response = send(&bridge.endpoint, upstream).await?;
-    let (parts, body) = response.into_parts();
-    // A session the server says is gone is gone for the gateway too.
-    if let Some(gateway) = &bridge.gateway {
-        gateway.saw_response(session_cookie.as_deref(), &parts.headers);
-    }
-    keep_cookies(bridge, &parts.headers, session_cookie.as_deref());
-    let body = body.collect().await?.to_bytes().to_vec();
-
-    let mut builder = http::Response::builder().status(parts.status);
-    for (name, value) in parts.headers.iter() {
-        if name != SET_COOKIE && name != TRANSFER_ENCODING && name != CONNECTION {
-            builder = builder.header(name, value);
-        }
-    }
-    Ok(builder.body(body)?)
-}
-
-async fn send(
-    endpoint: &str,
-    request: hyper::Request<Full<Bytes>>,
-) -> Result<hyper::Response<hyper::body::Incoming>, BoxError> {
-    let deadline = Instant::now() + STARTUP_WAIT;
-    loop {
-        match open(endpoint).await {
-            Ok(stream) => return exchange(stream, request).await,
-            Err(_) if Instant::now() < deadline => tokio::time::sleep(Duration::from_millis(100)).await,
-            Err(error) => return Err(error.into()),
-        }
-    }
-}
-
-// One connection per request: local, so cheap, and no pool to manage.
-async fn exchange<S>(
-    stream: S,
-    request: hyper::Request<Full<Bytes>>,
-) -> Result<hyper::Response<hyper::body::Incoming>, BoxError>
-where
-    S: AsyncRead + AsyncWrite + Unpin + Send + 'static,
-{
-    let (mut sender, connection) = hyper::client::conn::http1::handshake(TokioIo::new(stream)).await?;
-    tauri::async_runtime::spawn(async move {
-        let _ = connection.await;
-    });
-    Ok(sender.send_request(request).await?)
-}
-
-#[cfg(unix)]
-async fn open(endpoint: &str) -> std::io::Result<tokio::net::UnixStream> {
-    tokio::net::UnixStream::connect(endpoint).await
-}
-
-#[cfg(windows)]
-async fn open(endpoint: &str) -> std::io::Result<tokio::net::windows::named_pipe::NamedPipeClient> {
-    tokio::net::windows::named_pipe::ClientOptions::new().open(endpoint)
-}
-
-// What the gateway answers and what still goes to the server, through the
-// bridge itself: the gateway's made-up campus, and a made-up server on a
-// socket.
-#[cfg(all(test, unix))]
+// What the app answers, through the bridge itself: the gateway's made-up
+// campus, and a made-up build.
+#[cfg(test)]
 mod tests {
     use std::future::Future;
+    use std::path::PathBuf;
     use std::sync::atomic::{AtomicU32, Ordering};
-    use std::sync::{Arc, Mutex};
 
-    use tafac_gateway::testing::{campus, header_of, read_head, Campus, CODE, COOKIE_NAME, PASSWORD, STUDENT, STUDENT_WITH_CODE};
+    use tafac_gateway::testing::{campus, Campus, CODE, COOKIE_NAME, PASSWORD, STUDENT, STUDENT_WITH_CODE};
     use tafac_gateway::ANSWERED_BY;
-    use tokio::io::AsyncWriteExt;
 
     use super::*;
 
-    // The server's own answer to a session check, told from a translated
-    // one by what only the server says (`runtime`).
-    const SERVERS_SESSION: &str = r#"{"authenticated":true,"user":"jdoe","sessionSource":"runtime"}"#;
-    const SERVERS_OTHER: &str = r#"{"from":"the server"}"#;
-    const SIGNED_OUT: &str = "{}";
-    // The server's own sign-in, and the cookie of the session it makes.
-    const SERVERS_LOGIN: &str = r#"{"authenticated":true,"user":"otp-user","sessionMode":null,"from":"the server"}"#;
-    const SERVERS_COOKIE: &str = "v1.made.by.the-server";
+    const PAGE: &str = "<!doctype html><html><head><title>%LENT_APP_NAME%</title></head><body><div id=\"root\"></div></body></html>";
+    const SCRIPT: &[u8] = b"console.log('the page')";
 
     fn block_on<F: Future>(future: F) -> F::Output {
         tauri::async_runtime::block_on(future)
     }
 
-    // The local server, as much of it as the bridge asks here.
-    struct Server {
-        endpoint: String,
-        // Each request received: its method and path, and whether it came
-        // with the session's cookie.
-        seen: Arc<Mutex<Vec<(String, bool)>>>,
-    }
-
-    fn server() -> Server {
+    fn scratch(name: &str) -> PathBuf {
         static NEXT: AtomicU32 = AtomicU32::new(0);
-        let name = format!("tafac-bridge-test-{}-{}.sock", std::process::id(), NEXT.fetch_add(1, Ordering::SeqCst));
-        let endpoint = std::env::temp_dir().join(name);
-        let _ = std::fs::remove_file(&endpoint);
-        let listener = block_on(async { tokio::net::UnixListener::bind(&endpoint) }).unwrap();
-        let seen = Arc::new(Mutex::new(Vec::new()));
-        let record = seen.clone();
-        tauri::async_runtime::spawn(async move {
-            while let Ok((mut stream, _)) = listener.accept().await {
-                let record = record.clone();
-                tauri::async_runtime::spawn(async move {
-                    let Some(head) = read_head(&mut stream).await else { return };
-                    let mut words = head.split_whitespace();
-                    let asked = format!("{} {}", words.next().unwrap_or_default(), words.next().unwrap_or_default());
-                    let with_cookie = !header_of(&head, "cookie").is_empty();
-                    let (body, extra) = match (asked.as_str(), with_cookie) {
-                        ("GET /__ent_auth/session", true) => (SERVERS_SESSION.to_string(), String::new()),
-                        // Its own sign-in makes a session of its own.
-                        ("POST /__ent_auth/login", _) => (SERVERS_LOGIN.to_string(), format!("set-cookie: {COOKIE_NAME}={SERVERS_COOKIE}; Path=/; HttpOnly\r\n")),
-                        // A sign-out clears the session's cookie.
-                        ("POST /__ent_auth/logout", _) => (SIGNED_OUT.to_string(), format!("set-cookie: {COOKIE_NAME}=; Path=/; Max-Age=0\r\n")),
-                        _ => (SERVERS_OTHER.to_string(), String::new()),
-                    };
-                    record.lock().unwrap().push((asked, with_cookie));
-                    let answer = format!(
-                        "HTTP/1.1 200 OK\r\ncontent-type: application/json\r\n{extra}content-length: {}\r\nconnection: close\r\n\r\n{body}",
-                        body.len()
-                    );
-                    let _ = stream.write_all(answer.as_bytes()).await;
-                    let _ = stream.shutdown().await;
-                });
-            }
-        });
-        Server { endpoint: endpoint.to_string_lossy().to_string(), seen }
+        std::env::temp_dir().join(format!("tafac-bridge-test-{}-{}-{name}", std::process::id(), NEXT.fetch_add(1, Ordering::SeqCst)))
     }
 
-    impl Server {
-        fn seen(&self) -> Vec<(String, bool)> {
-            self.seen.lock().unwrap().clone()
-        }
-    }
-
-    impl Drop for Server {
-        fn drop(&mut self) {
-            let _ = std::fs::remove_file(&self.endpoint);
-        }
+    // A build as Vite writes it.
+    fn build() -> PathBuf {
+        let dist = scratch("dist");
+        std::fs::create_dir_all(dist.join("assets")).unwrap();
+        std::fs::write(dist.join("index.html"), PAGE).unwrap();
+        std::fs::write(dist.join("assets").join("index-abc123.js"), SCRIPT).unwrap();
+        dist
     }
 
     // A jar that holds the session cookie, as after a sign-in; an empty
     // one without.
     fn jar_with(session_cookie: Option<&str>) -> CookieJar {
-        static NEXT: AtomicU32 = AtomicU32::new(0);
-        let name = format!("tafac-bridge-test-{}-{}.json", std::process::id(), NEXT.fetch_add(1, Ordering::SeqCst));
         // No expiry: nothing is saved to the file.
-        let jar = CookieJar::load(std::env::temp_dir().join(name));
+        let jar = CookieJar::load(scratch("cookies.json"));
         if let Some(session_cookie) = session_cookie {
             jar.store([format!("{COOKIE_NAME}={session_cookie}; Path=/; HttpOnly").as_str()].into_iter());
         }
         jar
     }
 
-    fn bridge(server: &Server, campus: Option<&Campus>, session_cookie: &str) -> Bridge {
-        let mut bridge = Bridge::new(server.endpoint.clone(), jar_with(Some(session_cookie)), SignIn::new(None));
-        bridge.gateway = campus.map(Campus::gateway);
-        bridge
+    fn bridge_with(campus: &Campus, session_cookie: Option<&str>) -> Bridge {
+        Bridge::new(campus.gateway(), Site::new(build(), Served::every()), jar_with(session_cookie), SignIn::new(None))
+    }
+
+    fn bridge(campus: &Campus, session_cookie: &str) -> Bridge {
+        bridge_with(campus, Some(session_cookie))
     }
 
     // The app as it first opens: nobody signed in.
-    fn signed_out_bridge(server: &Server, campus: &Campus) -> Bridge {
-        let mut bridge = Bridge::new(server.endpoint.clone(), jar_with(None), SignIn::new(None));
-        bridge.gateway = Some(campus.gateway());
-        bridge
+    fn signed_out_bridge(campus: &Campus) -> Bridge {
+        bridge_with(campus, None)
     }
 
     fn ask(bridge: &Bridge, method: &str, path: &str) -> http::Response<Vec<u8>> {
@@ -509,57 +378,56 @@ mod tests {
         response.headers().contains_key(ANSWERED_BY)
     }
 
-    fn session_request(with_cookie: bool) -> (String, bool) {
-        ("GET /__ent_auth/session".to_string(), with_cookie)
+    fn json(response: &http::Response<Vec<u8>>) -> serde_json::Value {
+        serde_json::from_slice(response.body()).unwrap()
     }
 
     #[test]
     fn a_sign_in_is_made_in_the_app_and_its_cookie_kept_from_the_window() {
-        let (campus, server) = (campus(), server());
-        let bridge = signed_out_bridge(&server, &campus);
+        let campus = campus();
+        let bridge = signed_out_bridge(&campus);
         let response = sign_in(&bridge, STUDENT, PASSWORD);
         assert_eq!(response.status(), 200);
         assert!(by_tonapi(&response));
-        let answer: serde_json::Value = serde_json::from_slice(response.body()).unwrap();
+        let answer = json(&response);
         assert_eq!((&answer["authenticated"], &answer["user"]), (&true.into(), &"jdoe".into()));
         // The cookie is the jar's: the window gets none.
         assert!(response.headers().get(SET_COOKIE).is_none());
         assert!(bridge.session_cookie().is_some_and(|cookie| cookie.starts_with("v1.")));
-        // The login is kept to sign in again, as after a sign-in the server made.
+        // The login is kept to sign in again.
         assert!(bridge.signin.has_kept());
-        // The server was asked nothing: the password went from the app to the CAS.
-        assert!(server.seen().is_empty());
+        // The password went from the app to the CAS.
         assert_eq!(campus.posted_to("/cas/login"), 1);
 
-        // The session is one like any other, here and for the server's routes.
+        // The session is one like any other, for every route.
         assert!(by_tonapi(&ask(&bridge, "GET", "/__ent_auth/account")));
-        assert_eq!(ask(&bridge, "GET", "/__ent_auth/planning").body(), SERVERS_OTHER.as_bytes());
-        assert_eq!(server.seen(), [("GET /__ent_auth/planning".to_string(), true)]);
+        // A route the page no longer asks: no route, the session kept.
+        let gone = ask(&bridge, "GET", "/__ent_auth/planning");
+        assert_eq!((gone.status().as_u16(), json(&gone)), (404, serde_json::json!({ "error": "Not found." })));
+        assert!(bridge.session_cookie().is_some());
     }
 
     #[test]
     fn a_sign_in_the_cas_refuses_keeps_nothing() {
-        let (campus, server) = (campus(), server());
-        let bridge = signed_out_bridge(&server, &campus);
+        let campus = campus();
+        let bridge = signed_out_bridge(&campus);
         let response = sign_in(&bridge, STUDENT, "not-the-password");
         assert_eq!(response.status(), 401);
-        let answer: serde_json::Value = serde_json::from_slice(response.body()).unwrap();
-        assert_eq!(answer["code"], "login_refused");
+        assert_eq!(json(&response)["code"], "login_refused");
         assert_eq!(bridge.session_cookie(), None);
         assert!(!bridge.signin.has_kept());
-        assert!(server.seen().is_empty());
     }
 
     #[test]
     fn a_second_factor_is_answered_in_the_app() {
-        let (campus, server) = (campus(), server());
-        let bridge = signed_out_bridge(&server, &campus);
+        let campus = campus();
+        let bridge = signed_out_bridge(&campus);
         // The CAS answers the password with its code page: a code is wanted,
         // and the student's only way to one left unasked. No session yet.
         let response = sign_in(&bridge, STUDENT_WITH_CODE, PASSWORD);
         assert!(by_tonapi(&response));
         assert_eq!(response.status(), 401);
-        let answer: serde_json::Value = serde_json::from_slice(response.body()).unwrap();
+        let answer = json(&response);
         assert_eq!((&answer["code"], &answer["mfa"]["sent"]), (&serde_json::json!("mfa_required"), &serde_json::json!("mail")));
         assert_eq!(bridge.session_cookie(), None);
         assert_eq!(campus.codes_sent().len(), 1);
@@ -571,15 +439,13 @@ mod tests {
         assert_eq!(response.status(), 200);
         assert!(bridge.session_cookie().is_some());
         assert!(!bridge.signin.has_kept());
-        // The server's own login was never asked.
-        assert!(server.seen().is_empty());
     }
 
     #[test]
     fn a_session_found_expired_is_signed_in_again_without_the_page_seeing_it() {
-        let (campus, server) = (campus(), server());
+        let campus = campus();
         let first = campus.alive();
-        let bridge = bridge(&server, Some(&campus), &first);
+        let bridge = bridge(&campus, &first);
         // The login the app kept at the student's sign-in.
         let kept = serde_json::json!({ "username": STUDENT, "password": PASSWORD, "university": "univ-rennes" }).to_string();
         block_on(bridge.signin.after_login(kept.as_bytes(), None, 200, br#"{"authenticated":true}"#));
@@ -597,15 +463,13 @@ mod tests {
         assert_ne!(second, first);
         // Signed in again in the app: the password went to the CAS once.
         assert_eq!(campus.posted_to("/cas/login"), 1);
-        // The server: told the first session ended, with that session's cookie.
-        assert_eq!(server.seen(), [("POST /__ent_auth/logout".to_string(), true)]);
     }
 
     #[test]
     fn an_answer_about_a_session_gone_since_leaves_the_new_ones_cookie() {
-        let (campus, server) = (campus(), server());
+        let campus = campus();
         let current = campus.alive();
-        let bridge = bridge(&server, Some(&campus), &current);
+        let bridge = bridge(&campus, &current);
         // A request left with the old session's cookie; the app signed in
         // again before its answer came, and the answer takes « the »
         // session's cookie away.
@@ -619,134 +483,141 @@ mod tests {
     }
 
     #[test]
-    fn a_session_tonapi_answers_for_asks_the_server_nothing() {
-        let (campus, server) = (campus(), server());
-        let bridge = bridge(&server, Some(&campus), &campus.alive());
+    fn a_session_is_answered_in_the_app() {
+        let campus = campus();
+        let bridge = bridge(&campus, &campus.alive());
 
         let session = ask(&bridge, "GET", "/__ent_auth/session");
         assert!(by_tonapi(&session));
-        let answer: serde_json::Value = serde_json::from_slice(session.body()).unwrap();
+        let answer = json(&session);
         assert_eq!((&answer["authenticated"], &answer["user"], &answer["sessionSource"]), (&true.into(), &"jdoe".into(), &"cookie".into()));
         // Whether the statistics are on is said here too (the campus's
-        // gateway has no key for them): the server isn't asked.
+        // gateway has no key for them).
         assert_eq!(answer["analyticsEnabled"], false);
-
         assert!(by_tonapi(&ask(&bridge, "GET", "/__ent_auth/account")));
-        assert!(by_tonapi(&ask(&bridge, "GET", "/__ent_auth/session")));
-        assert!(server.seen().is_empty());
     }
 
     #[test]
     fn a_moved_routes_error_is_answered_in_the_app_too() {
-        let (campus, server) = (campus(), server());
+        let campus = campus();
         // The portal answers for another name than the session's: nobody's
-        // answer, and the route's error, worded in the app as the server
-        // words its own.
+        // answer, and the route's error, worded in the app as Node worded
+        // its own.
         let someone_else = campus.cookie(serde_json::json!({}), &[("JSESSIONID", "someone-else")]);
-        let bridge = bridge(&server, Some(&campus), &someone_else);
+        let bridge = bridge(&campus, &someone_else);
         for path in ["/__ent_auth/session", "/__ent_auth/account"] {
             let response = ask(&bridge, "GET", path);
             assert!(by_tonapi(&response), "{path}");
             assert_eq!(response.status(), 500, "{path}");
             assert_eq!(response.body(), br#"{"error":"Service indisponible pour le moment"}"#, "{path}");
         }
-        // A parameter the server's own route refuses, in its words.
+        // A parameter Node's own route refused, in its words.
         let refused = ask(&bridge, "GET", "/__ent_auth/grades/semester/abc");
         assert!(by_tonapi(&refused));
         assert_eq!(refused.status(), 400);
         assert_eq!(refused.body(), br#"{"error":"Invalid semester id."}"#);
 
         // Nothing says the session is over: it is kept, nobody signs in
-        // again, and the server is asked nothing.
+        // again.
         assert_eq!(bridge.session_cookie().as_deref(), Some(someone_else.as_str()));
         assert_eq!(campus.posted_to("/cas/login"), 0);
-        assert!(server.seen().is_empty());
     }
 
     #[test]
-    fn what_the_gateway_doesnt_hold_is_the_servers_own_answer() {
-        let (campus, server) = (campus(), server());
-        // The demo account's session: the server's own to answer.
+    fn a_session_the_gateway_doesnt_hold_is_nobodys() {
+        let campus = campus();
+        // The demo account's session, from when Node served it: nobody's.
         let demo = campus.cookie(serde_json::json!({ "mode": "demo" }), &[]);
-        let bridge = bridge(&server, Some(&campus), &demo);
+        let bridge = bridge(&campus, &demo);
 
         let session = ask(&bridge, "GET", "/__ent_auth/session");
-        assert!(!by_tonapi(&session));
-        assert_eq!(session.body(), SERVERS_SESSION.as_bytes());
-        // The student's request, as the page sent it, with the cookie.
-        assert_eq!(server.seen(), [session_request(true)]);
-
+        assert!(by_tonapi(&session));
+        assert_eq!((&json(&session)["authenticated"], &json(&session)["university"]), (&false.into(), &"univ-rennes".into()));
         let account = ask(&bridge, "GET", "/__ent_auth/account");
-        assert_eq!(account.body(), SERVERS_OTHER.as_bytes());
-        assert_eq!(server.seen()[1], ("GET /__ent_auth/account".to_string(), true));
+        assert_eq!(json(&account), serde_json::json!({ "authenticated": false, "account": null, "sessionMode": null }));
+        assert_eq!(account.headers()[signin::SESSION_HEADER], "expired");
         assert!(campus.seen.lock().unwrap().is_empty());
     }
 
     #[test]
-    fn every_other_request_goes_to_the_server() {
-        let (campus, server) = (campus(), server());
-        let bridge = bridge(&server, Some(&campus), &campus.alive());
-        for (method, path) in [
-            ("GET", "/__ent_auth/planning"),
-            ("POST", "/__ent_auth/ade/upcoming"),
-            ("GET", "/__ent_proxy/api/v4-3/dlm/layout.json"),
-            ("GET", "/__ent_auth/universities"),
-            ("POST", "/__ent_auth/session"),
-            ("GET", "/"),
+    fn every_request_is_answered_in_the_app() {
+        let campus = campus();
+        let bridge = bridge(&campus, &campus.alive());
+        // The page's API: no route, the portal proxy's refusal, the list of
+        // universities, another method.
+        for (method, path, status) in [
+            ("POST", "/__ent_auth/ade/upcoming", 404),
+            ("GET", "/__ent_proxy/api/v4-3/dlm/layout.json", 403),
+            ("GET", "/__ent_auth/universities", 200),
+            ("POST", "/__ent_auth/session", 404),
         ] {
             let response = ask(&bridge, method, path);
-            assert!(!by_tonapi(&response), "{method} {path}");
-            assert_eq!(response.body(), SERVERS_OTHER.as_bytes(), "{method} {path}");
+            assert!(by_tonapi(&response), "{method} {path}");
+            assert_eq!(response.status().as_u16(), status, "{method} {path}");
         }
-        assert_eq!(server.seen().len(), 6);
+        let universities = json(&ask(&bridge, "GET", "/__ent_auth/universities"));
+        assert_eq!((&universities["mode"], &universities["session"], universities["universities"].as_array().unwrap().len()), (&"multi".into(), &"univ-rennes".into(), 3));
+
+        // The page itself, at the app's addresses, Tafac's own.
+        for path in ["/login", "/"] {
+            let page = ask(&bridge, "GET", path);
+            assert_eq!(page.status(), 200, "{path}");
+            assert_eq!(page.headers()["content-type"], "text/html; charset=utf-8", "{path}");
+            assert!(String::from_utf8_lossy(page.body()).contains("<title>Tafac</title>"), "{path}");
+        }
+        // Anything else: Express's 404, as the app's Node said it.
+        assert_eq!(ask(&bridge, "POST", "/").status(), 404);
         assert!(campus.seen.lock().unwrap().is_empty());
+    }
+
+    #[test]
+    fn the_pages_files_are_read_once_and_kept() {
+        let campus = campus();
+        let bridge = signed_out_bridge(&campus);
+        let whole = ask(&bridge, "GET", "/assets/index-abc123.js");
+        assert_eq!((whole.status().as_u16(), whole.body().as_slice()), (200, SCRIPT));
+        assert_eq!(whole.headers()["content-type"], "text/javascript; charset=utf-8");
+        assert!(bridge.assets.get("/assets/index-abc123.js").is_some());
+        // A part, from memory.
+        let request = http::Request::builder().uri("tafac://localhost/assets/index-abc123.js").header("range", "bytes=0-6").body(Vec::new()).unwrap();
+        let part = block_on(forward(&bridge, request));
+        assert_eq!((part.status().as_u16(), part.body().as_slice()), (206, &b"console"[..]));
+        // A file the build hasn't: the page, not kept.
+        assert_eq!(ask(&bridge, "GET", "/assets/gone-123.js").headers()["content-type"], "text/html; charset=utf-8");
+        assert!(bridge.assets.get("/assets/gone-123.js").is_none());
     }
 
     #[test]
     fn asked_ahead_as_the_app_starts_the_first_check_asks_nobody() {
-        let (campus, server) = (campus(), server());
-        let bridge = bridge(&server, Some(&campus), &campus.alive());
+        let campus = campus();
+        let bridge = bridge(&campus, &campus.alive());
         block_on(start_ahead(&bridge));
-        // The portal, once; the server isn't asked, and needn't be up.
-        let (portal, local) = (campus.paths().len(), server.seen().len());
-        assert_eq!((portal, local), (1, 0));
+        // The portal, once.
+        let portal = campus.paths().len();
+        assert_eq!(portal, 1);
 
         assert!(by_tonapi(&ask(&bridge, "GET", "/__ent_auth/session")));
         assert!(by_tonapi(&ask(&bridge, "GET", "/__ent_auth/account")));
-        assert_eq!((campus.paths().len(), server.seen().len()), (portal, local));
+        assert_eq!(campus.paths().len(), portal);
     }
 
     #[test]
-    fn a_sign_out_is_answered_in_the_app_and_the_server_is_told() {
-        let (campus, server) = (campus(), server());
+    fn a_sign_out_is_answered_in_the_app() {
+        let campus = campus();
         let cookie = campus.alive();
-        let bridge = bridge(&server, Some(&campus), &cookie);
+        let bridge = bridge(&campus, &cookie);
         assert!(by_tonapi(&ask(&bridge, "GET", "/__ent_auth/session")));
-        let asked_before = server.seen().len();
 
         let response = ask(&bridge, "POST", "/__ent_auth/logout");
         assert!(by_tonapi(&response));
         assert_eq!(response.body(), br#"{"authenticated":false}"#);
         assert!(!campus.cas_knows_the_ticket());
-        // The server was told, with the session's cookie, for what it kept.
-        assert_eq!(server.seen()[asked_before..], [("POST /__ent_auth/logout".to_string(), true)]);
         // The jar lost the cookie, and the gateway the session: even with
-        // the cookie put back (a copy kept), the server answers.
+        // the cookie put back (a copy kept), nobody is signed in.
         assert_eq!(bridge.session_cookie(), None);
         bridge.jar.store([format!("{COOKIE_NAME}={cookie}; Path=/").as_str()].into_iter());
         let session = ask(&bridge, "GET", "/__ent_auth/session");
-        assert!(!by_tonapi(&session));
-        assert_eq!(session.body(), SERVERS_SESSION.as_bytes());
-    }
-
-    #[test]
-    fn without_the_gateway_the_server_answers_everything() {
-        let (campus, server) = (campus(), server());
-        let bridge = bridge(&server, None, &campus.alive());
-        block_on(start_ahead(&bridge));
-        let session = ask(&bridge, "GET", "/__ent_auth/session");
-        assert_eq!(session.body(), SERVERS_SESSION.as_bytes());
-        assert_eq!(server.seen(), [session_request(true)]);
-        assert!(campus.seen.lock().unwrap().is_empty());
+        assert!(by_tonapi(&session));
+        assert_eq!(json(&session)["authenticated"], false);
     }
 }

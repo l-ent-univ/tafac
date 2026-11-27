@@ -51,11 +51,12 @@ outputs/marketing-booklet/
 # Server data (automatic app icons, see docs/SELF_HOSTING.md)
 data/
 
-# Desktop app (Tauri): Rust build output and what scripts/desktop-prepare.mjs
-# assembles (server copy with its production node_modules, Node binary, the
-# disk image's background joined from its two PNGs). The iOS app's Xcode
-# project (src-tauri/gen/apple) is kept: project.yml links Node into it. Its
-# assets/ is the copy of the app's resources each build makes.
+# Desktop app (Tauri): Rust build output and the disk image's background,
+# joined from its two PNGs (scripts/desktop-prepare.mjs). The iOS app's
+# Xcode project (src-tauri/gen/apple) is kept; its assets/ is the copy of
+# the app's resources each build makes. src-tauri/binaries/ and
+# desktop-build/: what the builds that shipped Node left (its binary, the
+# server's copy, nodejs-mobile), no longer made.
 src-tauri/target/
 back/target/
 src-tauri/gen/schemas/

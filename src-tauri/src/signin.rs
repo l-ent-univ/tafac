@@ -3,7 +3,7 @@
 // The university's session dies on its own (the Rennes CAS ends it 30 to 47
 // minutes after the login, whatever the student does). The app keeps the
 // login, password and university of the last sign-in made in its window, and
-// when the local server says the session is gone (bridge.rs), it signs in
+// when the gateway says the session is gone (bridge.rs), it signs in
 // again with them and asks again: the page never sees the expiry. At launch,
 // a signed-out answer to the page's first questions does the same, so the
 // login page doesn't show.
@@ -19,7 +19,7 @@
 //              (`code: 'login_refused'`, server/casLogin/refusal.ts) or asks
 //              for a code, and when another login replaces it
 //   kept as is when the sign-in couldn't be tried: no network, the CAS down,
-//              the local server down. The page then signs out as before, and
+//              too many attempts. The page then signs out as before, and
 //              the next signed-out answer tries again (not before COOL_DOWN)
 //
 // Where: a packaged app keeps it in the system's credential store (macOS
@@ -27,8 +27,8 @@
 // keeps it in memory only, for the run: an unsigned build would have macOS
 // ask for the keychain at each rebuild, and the password goes in no file.
 //
-// The password is sent nowhere but the local server's login route (and from
-// there to the university's CAS), and never logged.
+// The password is sent nowhere but the gateway's login route, in the app
+// (and from there to the university's CAS), and never logged.
 
 use std::future::Future;
 use std::sync::atomic::{AtomicU64, Ordering};
@@ -125,8 +125,8 @@ pub enum Outcome {
     Refused,
     // The account asks for a one-time code: only the student can sign in.
     SecondFactor,
-    // Not tried through: no network, the CAS or the local server down, too
-    // many attempts. Kept for later.
+    // Not tried through: no network, the CAS down, too many attempts. Kept
+    // for later.
     NotNow,
 }
 

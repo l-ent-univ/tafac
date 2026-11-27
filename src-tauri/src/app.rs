@@ -1,11 +1,11 @@
-// Tafac's desktop app: a window on the same app as tafac.fr, with the server
-// running on the student's computer (sidecar.rs) instead of on tafac.fr. The
-// login and every request to the university go from this computer straight
-// to the university.
+// Tafac's desktop app: a window on the same app as tafac.fr, with its server
+// (the gateway, bridge.rs) running in the app on the student's computer
+// instead of on tafac.fr. The login and every request to the university go
+// from this computer straight to the university.
 
 #[cfg(target_os = "macos")]
 use crate::menu;
-use crate::{bridge, desktop, jar, links, moodle, secret, sidecar, signin, updater, window};
+use crate::{bridge, desktop, jar, links, moodle, remote_settings, secret, signin, updater, window};
 
 use std::sync::Arc;
 
@@ -31,7 +31,7 @@ pub fn run() {
     #[cfg(windows)]
     let builder = builder.plugin(tauri_plugin_decorum::init());
     // macOS: the menu bar (menu.rs), and closing the main window doesn't
-    // quit: it hides, the app (and its server) keeps running, a click on its
+    // quit: it hides, the app keeps running, a click on its
     // Dock icon shows it again (RunEvent::Reopen below). ⌘Q quits.
     #[cfg(target_os = "macos")]
     let builder = builder
@@ -75,17 +75,24 @@ pub fn run() {
         .setup(|app| {
             let data_dir = app.path().app_data_dir()?;
             std::fs::create_dir_all(&data_dir)?;
+            // The student's alone: the cookie jar, the kept files.
+            #[cfg(unix)]
+            {
+                use std::os::unix::fs::PermissionsExt;
+                std::fs::set_permissions(&data_dir, std::fs::Permissions::from_mode(0o700))?;
+            }
 
-            let endpoint = sidecar::endpoint(&data_dir)?;
             let secret = secret::session_secret(&data_dir)?;
-            app.manage(sidecar::spawn(app.handle(), &endpoint, &secret, &data_dir)?);
-            let bridge = Arc::new(
-                bridge::Bridge::new(endpoint, jar::CookieJar::load(data_dir.join("cookies.json")), signin::SignIn::for_this_build())
-                    .with_gateway(&secret),
-            );
+            let remote_settings = remote_settings::for_this_app(app.handle(), "desktop", &data_dir);
+            let bridge = Arc::new(bridge::Bridge::new(
+                bridge::gateway(&secret, &data_dir, remote_settings),
+                bridge::site(&app.path().resource_dir()?),
+                jar::CookieJar::load(data_dir.join("cookies.json")),
+                signin::SignIn::for_this_build(),
+            ));
             app.manage(bridge.clone());
             // The page's first question, asked of the university now, while
-            // the server and the page start.
+            // the page starts.
             tauri::async_runtime::spawn(async move { bridge::start_ahead(&bridge).await });
             app.manage(Arc::new(moodle::Moodle::default()));
 
@@ -98,7 +105,7 @@ pub fn run() {
             #[cfg(windows)]
             window::remove_service_workers(app.handle());
 
-            let start_url: tauri::Url = sidecar::app_url().parse()?;
+            let start_url: tauri::Url = bridge::app_url().parse()?;
             // Development: TAFAC_START_PATH=/rennes opens on that page.
             #[cfg(debug_assertions)]
             let start_url = match std::env::var("TAFAC_START_PATH") {
@@ -122,13 +129,8 @@ pub fn run() {
         .expect("Tafac could not start");
 
     app.run(|handle, event| match event {
-        RunEvent::Exit => {
-            if let Some(sidecar) = handle.try_state::<sidecar::Sidecar>() {
-                sidecar.stop();
-            }
-            // A downloaded update takes the app's place now that it has quit.
-            updater::install_on_exit(handle);
-        }
+        // A downloaded update takes the app's place now that it has quit.
+        RunEvent::Exit => updater::install_on_exit(handle),
         // Moodle's view goes first: the main window is then Tauri's
         // WebviewWindow again, as what saves its state on exit expects.
         RunEvent::ExitRequested { .. } => moodle::close(handle),
