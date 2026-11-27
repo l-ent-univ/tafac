@@ -15,10 +15,19 @@
 // sides to it: a cookie Node made is read here, and one made here is read by
 // Node (tests/fixtures/session-cookie-v1.json, session-cookie-gateway-v1.json).
 //
-// When in doubt a cookie is not read (None), and Node answers: a part that
+// The secrets, as Node takes them (resolveSessionSecrets): SESSION_SECRET
+// writes and reads, trimmed, at least 32 bytes where the server runs in
+// production; SESSION_SECRET_PREVIOUS, a comma-separated list, the ones it
+// replaced, still read during a rotation (each trimmed, the empty ones and
+// the current one left out). A cookie read with an older secret is written
+// again with the current one on the answer to its request, as Node wrote
+// the session's cookie again on each of its answers (Gateway::answer).
+// Without the old secret listed, rotating SESSION_SECRET signs everyone
+// out.
+//
+// When in doubt a cookie is not read (None): it is nobody's. A part that
 // doesn't decode, a session past its lifetime, an entry of the jar in a
-// shape this file doesn't know, a secret Node has since replaced
-// (SESSION_SECRET_PREVIOUS: Node reads those cookies and issues them again).
+// shape this file doesn't know, a secret not listed.
 
 use aes_gcm::aead::{Aead, Generate, KeyInit, Payload};
 use aes_gcm::{Aes256Gcm, Nonce};
@@ -156,7 +165,42 @@ pub struct NewSession<'a> {
 }
 
 pub struct Codec {
-    cipher: Aes256Gcm,
+    // The current secret's, then the older ones', in the order given.
+    ciphers: Vec<Aes256Gcm>,
+}
+
+// SESSION_SECRET's shortest (MIN_SESSION_SECRET_BYTES): a production server
+// doesn't start with a shorter one.
+pub const MIN_SECRET_BYTES: usize = 32;
+
+// The older secrets SESSION_SECRET_PREVIOUS lists, as Node reads them
+// (parseSecretList, then resolveSessionSecrets): comma-separated, trimmed,
+// without the empty ones, the current one, or one given twice.
+pub fn previous_secrets(current: &str, listed: &str) -> Vec<String> {
+    let current = current.trim();
+    let mut previous: Vec<String> = Vec::new();
+    for secret in listed.split(',').map(str::trim).filter(|secret| !secret.is_empty() && *secret != current) {
+        if !previous.iter().any(|kept| kept == secret) {
+            previous.push(secret.to_string());
+        }
+    }
+    previous
+}
+
+// SESSION_SECRET as a production server takes it: Node's refusal of one
+// too short, in its words.
+pub fn production_secret(secret: &str) -> Result<(), String> {
+    let bytes = secret.trim().len();
+    if bytes < MIN_SECRET_BYTES {
+        return Err(format!("SESSION_SECRET is too short ({bytes} bytes, {MIN_SECRET_BYTES} required). Generate one with: openssl rand -base64 32 — to keep existing sessions alive, move the old value to SESSION_SECRET_PREVIOUS."));
+    }
+    Ok(())
+}
+
+fn cipher_of(secret: &str) -> Aes256Gcm {
+    let mut key = [0_u8; KEY_BYTES];
+    Hkdf::<Sha256>::new(None, secret.trim().as_bytes()).expand(HKDF_INFO, &mut key).expect("32 bytes are within HKDF-SHA256's output");
+    Aes256Gcm::new_from_slice(&key).expect("the key is 32 bytes")
 }
 
 fn base64url_length(bytes: usize) -> usize {
@@ -186,11 +230,27 @@ fn new_id() -> Option<String> {
 impl Codec {
     // `secret`: SESSION_SECRET, as Node is given it.
     pub fn new(secret: &str) -> Self {
-        let mut key = [0_u8; KEY_BYTES];
-        Hkdf::<Sha256>::new(None, secret.trim().as_bytes())
-            .expand(HKDF_INFO, &mut key)
-            .expect("32 bytes are within HKDF-SHA256's output");
-        Self { cipher: Aes256Gcm::new_from_slice(&key).expect("the key is 32 bytes") }
+        Self::rotating(secret, "")
+    }
+
+    // The same, with the older secrets still read: `previous`,
+    // SESSION_SECRET_PREVIOUS as Node is given it (previous_secrets).
+    pub fn rotating(secret: &str, previous: &str) -> Self {
+        let ciphers = std::iter::once(secret.to_string()).chain(previous_secrets(secret, previous)).map(|secret| cipher_of(&secret)).collect();
+        Self { ciphers }
+    }
+
+    // Whether a cookie's value is read with an older secret only: it is
+    // written again with the current one.
+    pub fn needs_reissue(&self, value: &str) -> bool {
+        self.opened(value).is_some_and(|(_, index)| index > 0)
+    }
+
+    // The same cookie sealed with the current secret: the payload as it is,
+    // a new nonce. None when it isn't read, or no random bytes come.
+    pub fn reissued(&self, value: &str) -> Option<String> {
+        let (plaintext, _) = self.opened(value)?;
+        self.sealed(&plaintext, <[u8; IV_BYTES]>::try_generate().ok()?)
     }
 
     // The session a cookie's value holds, at `now_ms` (milliseconds since
@@ -274,14 +334,22 @@ impl Codec {
     }
 
     fn seal(&self, payload: &serde_json::Value, iv: [u8; IV_BYTES]) -> Option<String> {
+        self.sealed(&serde_json::to_vec(payload).ok()?, iv)
+    }
+
+    fn sealed(&self, plaintext: &[u8], iv: [u8; IV_BYTES]) -> Option<String> {
         let nonce = Nonce::try_from(iv.as_slice()).ok()?;
-        let plaintext = serde_json::to_vec(payload).ok()?;
-        let sealed = self.cipher.encrypt(&nonce, Payload { msg: &plaintext, aad: ASSOCIATED_DATA }).ok()?;
+        let sealed = self.ciphers[0].encrypt(&nonce, Payload { msg: plaintext, aad: ASSOCIATED_DATA }).ok()?;
         let (ciphertext, tag) = sealed.split_at(sealed.len().checked_sub(TAG_BYTES)?);
         Some([FORMAT.to_string(), URL_SAFE_NO_PAD.encode(iv), URL_SAFE_NO_PAD.encode(ciphertext), URL_SAFE_NO_PAD.encode(tag)].join("."))
     }
 
     fn open(&self, value: &str) -> Option<Vec<u8>> {
+        self.opened(value).map(|(plaintext, _)| plaintext)
+    }
+
+    // The plaintext, and which secret opened it (0: the current one).
+    fn opened(&self, value: &str) -> Option<(Vec<u8>, usize)> {
         let mut parts = value.split('.');
         let (Some(FORMAT), Some(iv), Some(ciphertext), Some(tag), None) =
             (parts.next(), parts.next(), parts.next(), parts.next(), parts.next())
@@ -294,7 +362,7 @@ impl Codec {
         let mut sealed = URL_SAFE_NO_PAD.decode(ciphertext).ok()?;
         sealed.extend_from_slice(&tag);
         let nonce = Nonce::try_from(iv.as_slice()).ok()?;
-        self.cipher.decrypt(&nonce, Payload { msg: &sealed, aad: ASSOCIATED_DATA }).ok()
+        self.ciphers.iter().enumerate().find_map(|(index, cipher)| Some((cipher.decrypt(&nonce, Payload { msg: &sealed, aad: ASSOCIATED_DATA }).ok()?, index)))
     }
 }
 
@@ -597,6 +665,60 @@ mod tests {
         assert!(cleared.starts_with("__Host-lent_session=;") && cleared.contains("; Secure"));
         assert!(clears_cookie(&cleared, PRODUCTION_COOKIE));
         assert!(clears_cookie(&clear_cookie(DEVELOPMENT_COOKIE), DEVELOPMENT_COOKIE));
+    }
+
+    #[test]
+    fn the_older_secrets_are_read_as_node_lists_them() {
+        assert_eq!(previous_secrets(" now ", " old one , , now,old one,older,"), ["old one", "older"]);
+        assert!(previous_secrets("now", "").is_empty());
+        assert!(production_secret(&"x".repeat(MIN_SECRET_BYTES)).is_ok());
+        let short = production_secret(&format!(" {} ", "x".repeat(MIN_SECRET_BYTES - 1))).unwrap_err();
+        assert!(short.starts_with("SESSION_SECRET is too short (31 bytes, 32 required)."), "{short}");
+        // Node's own rule, read from its source.
+        let node = include_str!("../../../../../server/sessionCookie.js");
+        assert!(node.contains("export const MIN_SESSION_SECRET_BYTES = 32"));
+        assert!(node.contains("return String(value ?? '').split(',').map((entry) => entry.trim()).filter(Boolean)"));
+        assert!(node.contains("entry !== current && list.indexOf(entry) === index"));
+    }
+
+    #[test]
+    fn a_cookie_of_an_older_secret_is_read_and_sealed_again_with_the_current_one() {
+        const NEW: &str = "the secret of now, as long as any other one";
+        // A listed secret has no comma: the list is cut at them.
+        const OLD: &str = "the secret of before as long as any other";
+        let old = seal(OLD, &payload(serde_json::json!({})));
+        let rotating = Codec::rotating(NEW, &format!("an unrelated one, , {OLD}"));
+        let session = rotating.read(&old, NOW).unwrap();
+        assert_eq!((session.id.as_str(), session.user.as_str()), ("one-session", "jdoe"));
+        assert!(rotating.needs_reissue(&old));
+        let again = rotating.reissued(&old).unwrap();
+        assert_ne!(again, old);
+        // Sealed with the current secret alone: the payload as it was.
+        assert!(!rotating.needs_reissue(&again));
+        assert!(Codec::new(OLD).read(&again, NOW).is_none());
+        let only_new = Codec::new(NEW);
+        assert_eq!(serde_json::from_slice::<serde_json::Value>(&only_new.open(&again).unwrap()).unwrap(), payload(serde_json::json!({})));
+        // A cookie of the current secret is never sealed again.
+        assert!(!rotating.needs_reissue(&again) && !only_new.needs_reissue(&again));
+
+        // A secret not listed: nobody's.
+        assert!(Codec::rotating(NEW, "an unrelated one").read(&old, NOW).is_none());
+        assert!(!Codec::rotating(NEW, "an unrelated one").needs_reissue(&old));
+        assert!(Codec::new(NEW).reissued(&old).is_none());
+    }
+
+    #[test]
+    fn nodes_cookie_of_an_older_secret_round_trips() {
+        let fixture = fixture();
+        let rotating = Codec::rotating("the secret of now as long as any other one", &fixture.secret);
+        let now = fixture.created_at + DAY_MS;
+        assert_eq!(rotating.read(&fixture.cookie, now).unwrap().id, "3f2a9c1e-7b64-4d0f-9a51-2c8e6d7f0b13");
+        let again = rotating.reissued(&fixture.cookie).unwrap();
+        // Its very payload, the bytes Node wrote, under the current secret.
+        assert_eq!(rotating.opened(&again).unwrap(), (Codec::new(&fixture.secret).open(&fixture.cookie).unwrap(), 0));
+        assert_eq!(rotating.read(&again, now).unwrap().id, "3f2a9c1e-7b64-4d0f-9a51-2c8e6d7f0b13");
+        // With its secret still the current one, nothing to seal again.
+        assert!(!Codec::rotating(&fixture.secret, "older").needs_reissue(&fixture.cookie));
     }
 
     #[test]

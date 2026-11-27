@@ -14,7 +14,13 @@
 //   SESSION_SECRET        the session's cookie is written and read with it,
 //                         here and by Node. Without it every request goes
 //                         to Node, the sign-in too; without it and without
-//                         Node, the server doesn't start
+//                         Node, the server doesn't start; nor with one
+//                         shorter than 32 bytes, but in front of the
+//                         development server, as Node refuses it
+//   SESSION_SECRET_PREVIOUS   Node's too: the secrets SESSION_SECRET
+//                         replaced, comma-separated, still read; a cookie
+//                         of one of them goes back sealed with the current
+//                         one (session/cookie.rs)
 //   TRUST_PROXY           whose word is taken for a student's address (the
 //                         sign-in's limits): unset, the server in front on
 //                         this machine or a private network, as Node
@@ -96,6 +102,10 @@ async fn main() -> std::io::Result<()> {
     // the key is the environment's.
     let statistics = std::env::var("POSTHOG_PROJECT_KEY").ok().filter(|_| !development || std::env::var("POSTHOG_IN_DEV").as_deref() == Ok("1"));
     let secret = setting("SESSION_SECRET", "");
+    if !development && !secret.is_empty() {
+        tafac_gateway::session::cookie::production_secret(&secret).map_err(|why| std::io::Error::new(std::io::ErrorKind::InvalidInput, why))?;
+    }
+    let previous = std::env::var("SESSION_SECRET_PREVIOUS").unwrap_or_default();
     // The universities served, from the environment Node behind reads too
     // (UNIVERSITY, UNIVERSITIES, MULTI_UNIVERSITY): where Node wouldn't
     // start, neither does this.
@@ -107,7 +117,7 @@ async fn main() -> std::io::Result<()> {
     // Node's default folder, without a Node to keep it.
     let data_dir = Some(setting("DATA_DIR", "")).filter(|dir| !dir.is_empty()).or_else(|| node.is_none().then(|| "data".to_string()));
     let gateway = (!secret.is_empty()).then(|| {
-        let mut gateway = Gateway::new(&secret, cookie).trusting(trusted).with_statistics(statistics.as_deref()).sending_statistics(Statistics::read(statistics.as_deref(), environment)).serving(served.clone());
+        let mut gateway = Gateway::new(&secret, cookie).with_previous_secrets(&secret, &previous).trusting(trusted).with_statistics(statistics.as_deref()).sending_statistics(Statistics::read(statistics.as_deref(), environment)).serving(served.clone());
         if node.is_none() {
             gateway = gateway.without_node();
         }

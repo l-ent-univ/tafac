@@ -249,7 +249,9 @@ crates/tafac-gateway/
   component) is held in this process with the session's id (`session/memory.rs`), not in the cookie:
   two requests at once would each write it, and it has 4 kB.
 - **Node reads the same cookie.** Its format is the one Node reads, with
-  the same `SESSION_SECRET`; two fixtures hold both sides to it. Node writes
+  the same `SESSION_SECRET` (and `SESSION_SECRET_PREVIOUS`, the older
+  secrets still read during a rotation: a cookie of one of them goes back
+  sealed with the current one, as Node wrote it again); two fixtures hold both sides to it. Node writes
   it again as it answers its own routes (the portal's cookies it got since):
   the gateway reads it at each request, as it is then. So a session Node
   made (one from before the gateway was there) is one like any other.

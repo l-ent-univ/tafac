@@ -145,6 +145,14 @@ pub(crate) fn now_ms() -> i64 {
 }
 
 impl Gateway {
+    // The older secrets still read (SESSION_SECRET_PREVIOUS, as Node is
+    // given it), beside `session_secret`, the current one: a cookie of one
+    // of them is written again with the current one (reissue).
+    pub fn with_previous_secrets(mut self, session_secret: &str, previous: &str) -> Self {
+        self.codec = cookie::Codec::rotating(session_secret, previous);
+        self
+    }
+
     // `session_secret`: SESSION_SECRET, which Node is given too. `cookie_name`:
     // the session cookie's (PRODUCTION_COOKIE or DEVELOPMENT_COOKIE, as Node
     // runs).
@@ -283,6 +291,41 @@ impl Gateway {
         N: Fn(NodeRequest) -> Fut,
         Fut: Future<Output = NodeAnswer>,
     {
+        // The cookie the request came with: the first one asked for.
+        let first = std::sync::OnceLock::new();
+        let cookie = || {
+            let value = cookie();
+            first.get_or_init(|| value.clone());
+            value
+        };
+        let mut response = self.answered(asked, &cookie, node).await?;
+        if let Some(Some(value)) = first.get() {
+            self.reissue(value, response.headers_mut());
+        }
+        Some(response)
+    }
+
+    // A session's cookie read with an older secret (SESSION_SECRET_PREVIOUS)
+    // goes back sealed with the current one, on the answer to its request,
+    // as Node wrote it again on its answers: once the browser has it, the
+    // old secret can go. Not for a session that ended, nor on an answer
+    // that sets or clears the cookie itself.
+    pub(crate) fn reissue(&self, value: &str, headers: &mut HeaderMap) {
+        let sets_it = headers.get_all(http::header::SET_COOKIE).iter().filter_map(|set| set.to_str().ok()).any(|set| set.starts_with(&format!("{}=", self.cookie_name)));
+        if sets_it || !self.codec.needs_reissue(value) || self.signed_in(Some(value)).is_none() {
+            return;
+        }
+        if let Some(set) = self.codec.reissued(value).and_then(|again| cookie::set_cookie(&self.cookie_name, &again).parse().ok()) {
+            headers.append(http::header::SET_COOKIE, set);
+        }
+    }
+
+    async fn answered<C, N, Fut>(&self, asked: &Asked<'_>, cookie: &C, node: N) -> Option<http::Response<Vec<u8>>>
+    where
+        C: Fn() -> Option<String>,
+        N: Fn(NodeRequest) -> Fut,
+        Fut: Future<Output = NodeAnswer>,
+    {
         let route = routes::moved_route(asked.method, asked.path)?;
         // A sign-in is the one route without a session to answer for.
         if route == Moved::Login {
@@ -298,7 +341,7 @@ impl Gateway {
         // The mail's, with the body read whole (the apps' bridge): its answer
         // read whole too. tafac.fr's server streams them (proxy.rs).
         if route == Moved::Mail {
-            let answered = self.mail(asked, MailBody::Whole(asked.body.to_vec()), &cookie, node).await;
+            let answered = self.mail(asked, MailBody::Whole(asked.body.to_vec()), cookie, node).await;
             let (parts, body) = answered.into_parts();
             let body = body.read(usize::MAX).await.ok()?;
             return Some(http::Response::from_parts(parts, body));
@@ -322,7 +365,7 @@ impl Gateway {
         }
         // The routes answered to their end here, failures included.
         if Self::settles(route) {
-            return self.settled(route, asked, &value, &cookie, &node).await;
+            return self.settled(route, asked, &value, cookie, &node).await;
         }
         if route == Moved::PortalProxy {
             if self.apps_node_answers() {
@@ -374,7 +417,7 @@ impl Gateway {
                 None => self.route_failed(route, &Failure::Unavailable(REFUSED_NOT_OVER.to_string())),
             },
         };
-        self.still_the_sessions(route, asked, &value, &held, &cookie, response, &node).await
+        self.still_the_sessions(route, asked, &value, &held, cookie, response, &node).await
     }
 
     // In the apps, whose bridge doesn't tell the gateway what is served and

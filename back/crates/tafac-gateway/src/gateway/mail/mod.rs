@@ -414,6 +414,9 @@ impl Gateway {
         if value.as_deref().and_then(|cookie| self.signed_in(Some(cookie))).is_none() {
             response.headers_mut().insert(SESSION_HEADER, HeaderValue::from_static(SESSION_EXPIRED));
         }
+        if let Some(value) = value.as_deref() {
+            self.reissue(value, response.headers_mut());
+        }
         if head {
             *response.body_mut() = MailBody::empty();
         }

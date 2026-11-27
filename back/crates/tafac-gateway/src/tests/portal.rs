@@ -8,7 +8,7 @@ use http::header::{HeaderValue, SET_COOKIE};
 use http::{HeaderMap, Method};
 use tonapi_core::Profile;
 
-use super::{ask, asked, body_of, error_of, never, unavailable, ACCOUNT, GET, LOGOUT, NO_HEADERS, POST, SESSION};
+use super::{ask, asked, body_of, cookie_set, error_of, never, unavailable, ACCOUNT, GET, LOGOUT, NO_HEADERS, POST, SESSION};
 use crate::gateway::portal::EARLY_KEPT;
 use crate::session::cookie::{Session, DEVELOPMENT_COOKIE};
 use crate::testing::*;
@@ -459,4 +459,44 @@ fn whatever_tonapi_cant_answer_is_the_routes_error_or_a_session_to_ask_the_cas_a
     let other = node_session("asmith");
     assert!(matches!(session::translate(Ok(&profile()), &other, &settings, true), Translated::Failed(Failure::Unavailable(_))));
     assert!(matches!(account::translate(Ok(&profile()), &other), Translated::Failed(Failure::Unavailable(_))));
+}
+
+// A rotation of SESSION_SECRET: a cookie of the older secret, still listed
+// (SESSION_SECRET_PREVIOUS), is answered for and goes back sealed with the
+// current one, once; one of a secret no longer listed is nobody's.
+#[test]
+fn a_cookie_of_an_older_secret_is_answered_for_and_sealed_again() {
+    const NOW: &str = "the secret of now as long as any other one";
+    const OLD: &str = "the secret of before as long as any other";
+    let campus = campus();
+    let served = || crate::own::universities::Served::from_environment(|_| None, false).unwrap();
+    let gateway = Gateway::for_tests(vec![campus.settings()], NOW, COOKIE_NAME).with_previous_secrets(NOW, &format!(" {OLD} ,")).serving(served());
+    let payload = serde_json::json!({
+        "id": "one-session", "uni": UNIVERSITY, "user": "jdoe", "mode": null, "demoState": null, "createdAt": crate::gateway::now_ms(),
+        "jar": [["TGC", "the-ticket", "localhost", "/cas", 1, 1, null], ["JSESSIONID", "alive", "127.0.0.1", "/", 1, 1, null]],
+    });
+    let old = crate::session::cookie::seal(OLD, &payload);
+    let check = |cookie: &str| block_on(gateway.answer(&asked(&GET, SESSION, &NO_HEADERS, &[]), || Some(cookie.to_string()), never)).unwrap();
+
+    let first = check(&old);
+    assert_eq!(body_of(&first)["user"], "jdoe");
+    let again = cookie_set(&first).expect("the cookie sealed again");
+    assert_ne!(again, old);
+    assert!(crate::session::cookie::Codec::new(NOW).read(&again, crate::gateway::now_ms()).is_some());
+    assert!(crate::session::cookie::Codec::new(OLD).read(&again, crate::gateway::now_ms()).is_none());
+    // The browser has the new one: nothing more is written.
+    let next = check(&again);
+    assert_eq!(body_of(&next)["user"], "jdoe");
+    assert!(cookie_set(&next).is_none());
+
+    // A secret no longer listed: nobody signed in, nothing written.
+    let forgotten = Gateway::for_tests(vec![campus.settings()], NOW, COOKIE_NAME).serving(served());
+    let response = block_on(forgotten.answer(&asked(&GET, SESSION, &NO_HEADERS, &[]), || Some(old.clone()), never)).unwrap();
+    assert_eq!(body_of(&response)["authenticated"], false);
+    assert!(cookie_set(&response).is_none());
+
+    // A sign-out clears it, and seals nothing again.
+    let out = block_on(gateway.without_node().answer(&asked(&POST, LOGOUT, &NO_HEADERS, &[]), || Some(old.clone()), never)).unwrap();
+    assert_eq!(cookie_set(&out).as_deref(), Some("cleared"));
+    assert_eq!(out.headers().get_all(http::header::SET_COOKIE).iter().count(), 1);
 }
