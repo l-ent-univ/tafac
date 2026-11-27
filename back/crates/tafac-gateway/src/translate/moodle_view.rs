@@ -59,7 +59,7 @@ mod tests {
         University::of(settings).unwrap()
     }
 
-    // What Node's own tests hold its policy to (tests/moodleView.test.ts).
+    // What Node's own tests held its policy to (tests/moodleView.test.ts, gone with it).
     #[test]
     fn rennes_moodle_its_cas_and_the_federations_hosts_are_the_universitys() {
         let served = universities::served();

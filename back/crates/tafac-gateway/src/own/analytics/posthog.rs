@@ -37,7 +37,7 @@ use tokio::sync::Semaphore;
 use tonapi_http::{Browser, BrowserOptions, CookieJar, HttpError};
 use url::Url;
 
-// posthog-node's settings in server/analytics.js (a test holds them to it).
+// posthog-node's settings, as Node's server/analytics.js gave them.
 const ATTEMPT: Duration = Duration::from_millis(5000);
 const ATTEMPTS: usize = 2;
 const BETWEEN_ATTEMPTS: Duration = Duration::from_millis(3000);

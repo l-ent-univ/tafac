@@ -10,7 +10,8 @@
 // its own and inline, images from anywhere over HTTP(S), requests to the
 // page's API and the few public APIs it asks itself (CONNECT_SOURCES), its
 // own frames, never framed by another site. Nothing here is looser than
-// Node's, and a test holds each directive and each source to Node's file.
+// Node's, and the fixture of Node's answers holds the policy of a few pages
+// (tests/fixtures/static-files.json).
 //
 // For whoever serves the page here: page_headers(html) with the HTML as it
 // is sent (an inline script's hash is of the page as it goes out). The

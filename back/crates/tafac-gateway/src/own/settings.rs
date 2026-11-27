@@ -20,8 +20,9 @@
 // keep it, and lay its patches over the page's settings (remote.rs, as
 // Node's createRemoteSettings did in their own Node), after checking its
 // signature (minisign.rs), what it says (document.rs) and what a patch may
-// not do (guard.rs), as Node's (server/remoteSettings/). Their tests hold
-// them to Node's, on Node's own signed fixtures.
+// not do (guard.rs), ported from Node's (server/remoteSettings/). Their tests
+// read the signed files made when Node read them
+// (tests/fixtures/remoteSettings.js).
 
 use std::path::PathBuf;
 

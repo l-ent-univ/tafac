@@ -21,7 +21,7 @@
 //                 Vary: Accept, and a body in what the request accepts
 //                 (negotiator's choice between text and HTML), or none
 //
-// A test holds these to Node's own modules' answers.
+// Held to what Node's own modules answered, recorded as fixtures.
 
 use http::header::{ACCEPT, CACHE_CONTROL, CONTENT_LENGTH, CONTENT_TYPE, LOCATION, VARY};
 use http::{HeaderMap, Method, Response};

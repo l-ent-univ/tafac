@@ -55,8 +55,8 @@ use crate::translate::BASELINE_HEADERS;
 pub(crate) type Body = UnsyncBoxBody<Bytes, Box<dyn std::error::Error + Send + Sync>>;
 
 // send's types, by extension (mime-types, with a charset for text): the
-// ones a build has, and a few more. Another is Node's. A test holds each
-// to what Node's handler answered.
+// ones a build has, and a few more; a file of another isn't served. The fixture of what
+// Node's handler answered holds each (tests/fixtures/static-files.json).
 const CONTENT_TYPES: &[(&str, &str)] = &[
     ("js", "text/javascript; charset=utf-8"),
     ("mjs", "text/javascript; charset=utf-8"),

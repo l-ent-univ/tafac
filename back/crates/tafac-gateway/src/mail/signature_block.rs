@@ -6,8 +6,8 @@
 // resolveMailSignature and readPngSize (server/mailSend.js,
 // server/entAuthApp.js).
 //
-// The settings are Node's (universities/<id>/server.js, mail.signature),
-// written again here; a test holds them to those files. The logos are the
+// The settings are the ones Node read (universities/<id>/server.js,
+// mail.signature, gone with it): these are the settings now. The logos are the
 // same PNG files, in the binary: their size is read from the file (drawn at
 // 2×, shown at half).
 

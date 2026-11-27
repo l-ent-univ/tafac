@@ -27,10 +27,10 @@ use std::collections::BTreeSet;
 use tonapi_config::{PortalConfig, ResolvedUniversity, Sso};
 use url::Url;
 
-// Tafac's own, for one university: what its settings in Node say that
-// tonAPI's don't, because it is about what Tafac opens rather than about a
-// software (universities/<id>/server.js). A test holds each list to that
-// file.
+// Tafac's own, for one university: what tonAPI's settings don't say,
+// because it is about what Tafac opens rather than about a software. Node
+// read the same lists from universities/<id>/server.js, gone with it: these
+// are the lists now.
 pub(crate) struct Own {
     // launch.allowedDomains: the domains whose services the portal lists.
     pub launch: &'static [&'static str],
