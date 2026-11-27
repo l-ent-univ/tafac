@@ -8,7 +8,7 @@ use http::header::{HeaderValue, SET_COOKIE};
 use http::{HeaderMap, Method};
 use tonapi_core::Profile;
 
-use super::{ask, asked, error_of, never, unavailable, ACCOUNT, GET, NO_HEADERS, POST, SESSION};
+use super::{ask, asked, body_of, error_of, never, unavailable, ACCOUNT, GET, LOGOUT, NO_HEADERS, POST, SESSION};
 use crate::gateway::portal::EARLY_KEPT;
 use crate::session::cookie::{Session, DEVELOPMENT_COOKIE};
 use crate::testing::*;
@@ -107,13 +107,15 @@ fn the_account_alone_asks_the_portal_itself() {
 }
 
 #[test]
-fn only_the_moved_routes_are_answered() {
+fn what_is_no_route_is_a_404_and_the_site_is_left() {
     let campus = campus();
-    let gateway = campus.gateway();
+    let gateway = campus.server_gateway();
     let cookie = campus.alive();
-    for (method, path) in [(&GET, "/__ent_auth/planning"), (&POST, SESSION), (&GET, "/__ent_auth/login"), (&GET, "/")] {
-        assert!(block_on(gateway.answer(&asked(method, path, &NO_HEADERS, &[]), || Some(cookie.clone()), never)).is_none(), "{method} {path}");
+    for (method, path) in [(&GET, "/__ent_auth/planning"), (&POST, SESSION), (&GET, "/__ent_auth/login"), (&GET, "/__ent_auth")] {
+        let response = block_on(gateway.answer(&asked(method, path, &NO_HEADERS, &[]), || Some(cookie.clone()), never)).unwrap();
+        assert_eq!((response.status().as_u16(), body_of(&response)), (404, serde_json::json!({ "error": "Not found." })), "{method} {path}");
     }
+    assert!(block_on(gateway.answer(&asked(&GET, "/", &NO_HEADERS, &[]), || Some(cookie.clone()), never)).is_none());
     assert!(campus.seen.lock().unwrap().is_empty());
 }
 
@@ -241,30 +243,47 @@ fn a_session_without_a_portal_cookie_opens_the_portal_with_its_ticket() {
     assert_eq!(ask(&gateway, ACCOUNT, &cookie).unwrap()["account"]["sub"], "jdoe");
 }
 
+// Nobody's answers, as Node gave them where it read no session.
+fn signed_out(gateway: &Gateway, cookie: &str) {
+    let check = ask(gateway, SESSION, cookie).unwrap();
+    assert_eq!((&check["authenticated"], &check["user"], &check["university"]), (&false.into(), &serde_json::Value::Null, &UNIVERSITY.into()));
+    assert!(check.get("expired").is_none());
+    assert_eq!(ask(gateway, ACCOUNT, cookie).unwrap(), serde_json::json!({ "authenticated": false, "account": null, "sessionMode": null }));
+}
+
 #[test]
-fn what_is_not_a_plain_signed_in_session_is_nodes_without_a_request() {
+fn what_is_not_a_plain_signed_in_session_is_nobodys_without_a_request() {
     let campus = campus();
-    let gateway = campus.gateway();
+    let gateway = campus.server_gateway().without_node();
     let alive = [("JSESSIONID", "alive")];
     for (why, cookie) in [
         ("a demo cookie from before", campus.cookie(serde_json::json!({ "mode": "demo" }), &alive)),
         ("another university", campus.cookie(serde_json::json!({ "uni": "univ-rennes-2" }), &alive)),
-        ("no CAS ticket", campus.cookie(serde_json::json!({ "jar": [["JSESSIONID", "alive", "127.0.0.1", "/", 1, 1, null]] }), &[])),
         ("past its lifetime", campus.cookie(serde_json::json!({ "createdAt": crate::gateway::now_ms() - 31 * 24 * 60 * 60 * 1000 }), &alive)),
         ("not Node's cookie", "v1.AAAA.AAAA.AAAA".to_string()),
     ] {
-        assert_eq!(ask(&gateway, SESSION, &cookie), None, "{why}");
-        assert_eq!(ask(&gateway, ACCOUNT, &cookie), None, "{why}");
+        let _ = why;
+        signed_out(&gateway, &cookie);
     }
-    assert!(block_on(gateway.answer(&asked(&GET, SESSION, &NO_HEADERS, &[]), || None, never)).is_none());
+    // Without a cookie, the session check alone says nothing of a session
+    // over: every other route does.
+    let response = block_on(gateway.answer(&asked(&GET, SESSION, &NO_HEADERS, &[]), || None, never)).unwrap();
+    assert!(response.headers().get("x-tafac-session").is_none());
+    let response = block_on(gateway.answer(&asked(&GET, ACCOUNT, &NO_HEADERS, &[]), || None, never)).unwrap();
+    assert_eq!(response.headers()["x-tafac-session"], "expired");
+    // A session of the gateway's without its CAS ticket: nothing can be
+    // asked with it, it is over.
+    let without_ticket = campus.cookie(serde_json::json!({ "jar": [["JSESSIONID", "alive", "127.0.0.1", "/", 1, 1, null]] }), &[]);
+    let check = ask(&gateway, SESSION, &without_ticket).unwrap();
+    assert_eq!((&check["authenticated"], &check["expired"]), (&false.into(), &true.into()));
     assert!(campus.seen.lock().unwrap().is_empty());
 }
 
 #[test]
-fn a_cookie_sealed_with_another_secret_is_nodes() {
+fn a_cookie_sealed_with_another_secret_is_nobodys() {
     let campus = campus();
-    let other = Gateway::for_tests(vec![campus.settings()], "another secret, as long as the first one is", COOKIE_NAME);
-    assert_eq!(ask(&other, SESSION, &campus.alive()), None);
+    let other = Gateway::for_tests(vec![campus.settings()], "another secret, as long as the first one is", COOKIE_NAME).serving(crate::own::universities::Served::from_environment(|_| None, false).unwrap());
+    signed_out(&other, &campus.alive());
     assert!(campus.seen.lock().unwrap().is_empty());
 }
 
@@ -305,28 +324,36 @@ fn a_portal_that_cant_be_asked_is_the_routes_error_and_the_session_lives() {
 }
 
 #[test]
-fn a_session_gone_while_the_portal_was_asked_is_nodes() {
+fn a_session_gone_while_the_portal_was_asked_is_answered_as_nobodys() {
     let campus = campus();
-    let gateway = campus.gateway();
-    let cookie = campus.alive();
+    let gateway = campus.server_gateway();
     // The jar holds the cookie when the request comes, no longer when the
-    // portal has answered (a sign-out went through meanwhile).
-    let shown = AtomicU32::new(0);
-    let jar = || (shown.fetch_add(1, Ordering::SeqCst) == 0).then(|| cookie.clone());
-    assert!(block_on(gateway.answer(&asked(&GET, SESSION, &NO_HEADERS, &[]), jar, never)).is_none());
+    // portal has answered: a sign-out went through meanwhile.
+    let gateway = &gateway;
+    let signed_out_meanwhile = |cookie: String| {
+        let shown = AtomicU32::new(0);
+        move || {
+            if shown.fetch_add(1, Ordering::SeqCst) == 0 {
+                return Some(cookie.clone());
+            }
+            gateway.saw_request(&POST, LOGOUT, Some(&cookie));
+            None
+        }
+    };
+    let response = block_on(gateway.answer(&asked(&GET, SESSION, &NO_HEADERS, &[]), signed_out_meanwhile(campus.alive()), never)).unwrap();
+    assert_eq!(body_of(&response)["authenticated"], false);
     assert_eq!(campus.paths().len(), 1);
 
     // The same for an error: it is about a session that is no longer there.
-    let someone_else = campus.cookie(serde_json::json!({}), &[("JSESSIONID", "someone-else")]);
-    let shown = AtomicU32::new(0);
-    let jar = || (shown.fetch_add(1, Ordering::SeqCst) == 0).then(|| someone_else.clone());
-    assert!(block_on(gateway.answer(&asked(&GET, SESSION, &NO_HEADERS, &[]), jar, never)).is_none());
+    let someone_else = campus.cookie(serde_json::json!({ "id": "another-session" }), &[("JSESSIONID", "someone-else")]);
+    let response = block_on(gateway.answer(&asked(&GET, ACCOUNT, &NO_HEADERS, &[]), signed_out_meanwhile(someone_else), never)).unwrap();
+    assert_eq!((response.status().as_u16(), body_of(&response)), (200, serde_json::json!({ "authenticated": false, "account": null, "sessionMode": null })));
 }
 
 #[test]
 fn a_session_signed_out_is_no_longer_answered_for() {
     let campus = campus();
-    let gateway = campus.gateway();
+    let gateway = campus.server_gateway();
     let cookie = campus.alive();
     let other = campus.cookie(serde_json::json!({ "id": "another-session" }), &[("JSESSIONID", "alive")]);
     assert!(ask(&gateway, SESSION, &cookie).is_some());
@@ -340,8 +367,7 @@ fn a_session_signed_out_is_no_longer_answered_for() {
     // nothing here from then on, as at Node's.
     gateway.saw_request(&Method::POST, "/__ent_auth/logout", Some(&cookie));
     let asked = campus.paths().len();
-    assert_eq!(ask(&gateway, SESSION, &cookie), None);
-    assert_eq!(ask(&gateway, ACCOUNT, &cookie), None);
+    signed_out(&gateway, &cookie);
     assert_eq!(campus.paths().len(), asked);
     assert!(ask(&gateway, SESSION, &other).is_some());
 }
@@ -350,7 +376,7 @@ fn a_session_signed_out_is_no_longer_answered_for() {
 fn a_session_node_says_is_gone_is_gone_here_too() {
     let campus = campus();
     let said = |gone: (&'static str, &'static str)| {
-        let gateway = campus.gateway();
+        let gateway = campus.server_gateway();
         let cookie = campus.alive();
         let mut headers = HeaderMap::new();
         // Node's ordinary answer: the cookie set again.
@@ -373,9 +399,9 @@ fn a_session_node_says_is_gone_is_gone_here_too() {
     assert_eq!(account.headers()["x-tafac-session"], "expired");
     assert!(account.headers().get(SET_COOKIE).is_none());
 
-    // Node took the cookie away (a sign-out it answered): Node's to refuse.
+    // Node took the cookie away (a sign-out it answered): nobody's.
     let (check, account) = said(("set-cookie", "__Host-lent_session=; Path=/; Expires=Thu, 01 Jan 1970 00:00:00 GMT; HttpOnly; Secure; SameSite=Lax"));
-    assert!(check.is_none() && account.is_none());
+    assert_eq!((&check.unwrap()["authenticated"], account.unwrap().status().as_u16()), (&false.into(), 200));
 }
 
 #[test]

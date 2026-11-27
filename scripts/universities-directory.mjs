@@ -32,6 +32,15 @@ function pageText(branding = {}) {
   }
 }
 
+// The services whose routes Node refuses for a university that hasn't them
+// (server/entAuthApp.js: FEATURE_GATED_PREFIXES): what the gateway answers
+// for nobody signed in there too (gateway/nobody.rs).
+const GATED_FEATURES = ['ade', 'planning', 'grades', 'mail', 'moodleDeadlines']
+
+function gatedFeatures(features = {}) {
+  return Object.fromEntries(GATED_FEATURES.map((feature) => [feature, Boolean(features[feature])]))
+}
+
 // Every university of the repository, by id. Which ones a server serves is
 // its own setting (UNIVERSITY, UNIVERSITIES, MULTI_UNIVERSITY).
 export async function buildDirectory() {
@@ -52,6 +61,7 @@ export async function buildDirectory() {
       // The extension of universities/<id>/assets/logo.<ext>, or null.
       logo: logo ? path.extname(logo).slice(1) : null,
       page: pageText(shared.branding),
+      features: gatedFeatures(shared.features),
     })
   }
   // Tafac's own text, where every university is served (universities/neutral.js).

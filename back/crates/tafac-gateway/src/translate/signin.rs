@@ -29,8 +29,11 @@
 //       or mail didn't leave. Answered here.
 //   429 { error, code: 'mfa_send_limit' }, Retry-After: too many codes sent
 //       to this login. Answered here (gateway/attempts.rs).
-//   400 { error }: no login or no password. Node.
-//   any of these for another university than routes.rs': Node.
+//   400 { error }: no login or no password. Answered here
+//       (gateway/signin.rs; their Node in the apps).
+//   400 { error: 'Unknown university "<id>".' }: a university the gateway
+//       doesn't serve, Node's words for one it doesn't know. Answered here,
+//       Node never asked.
 //
 // The page reads `error` for its wording (src/App.jsx:
 // getFrenchAuthErrorMessage looks for « CAS login failed », « fetch »…): the
@@ -101,8 +104,8 @@ pub fn too_many(seconds: u64) -> http::Response<Vec<u8>> {
 }
 
 // POST /__ent_auth/logout: 200 { authenticated: false }, the cookie taken
-// away. Answered here for a session the gateway holds; Node's for another
-// university, a request without a session.
+// away. Answered here for anyone (gateway/nobody.rs; their Node in the
+// apps for a request without a session of the gateway's).
 pub fn signed_out(cookie_name: &str) -> http::Response<Vec<u8>> {
     let mut response = json(200, &serde_json::json!({ "authenticated": false }));
     if let Ok(value) = clear_cookie(cookie_name).parse() {

@@ -26,6 +26,13 @@
         "alternateNames": [
           "l'ent"
         ]
+      },
+      "features": {
+        "ade": true,
+        "planning": true,
+        "grades": true,
+        "mail": true,
+        "moodleDeadlines": true
       }
     },
     {
@@ -43,6 +50,13 @@
         "seoDescription": "Client alternatif non officiel aux services numériques de l'Université Rennes 2. Projet étudiant libre, non affilié à l'université.",
         "repoUrl": "https://github.com/l-ent-univ/tafac",
         "alternateNames": []
+      },
+      "features": {
+        "ade": true,
+        "planning": true,
+        "grades": false,
+        "mail": true,
+        "moodleDeadlines": true
       }
     },
     {
@@ -60,6 +74,13 @@
         "seoDescription": "Client alternatif non officiel aux services numériques de l'Université Sorbonne Nouvelle. Projet étudiant libre, non affilié à l'université.",
         "repoUrl": "https://github.com/l-ent-univ/tafac",
         "alternateNames": []
+      },
+      "features": {
+        "ade": true,
+        "planning": true,
+        "grades": false,
+        "mail": false,
+        "moodleDeadlines": true
       }
     }
   ]

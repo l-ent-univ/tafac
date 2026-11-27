@@ -57,20 +57,24 @@ fn the_icons_of_a_session_held_here_are_answered_from_nodes_file() {
 }
 
 #[test]
-fn the_icons_are_nodes_for_the_sessions_the_gateway_doesnt_hold_and_without_the_data_directory() {
+fn who_isnt_held_gets_nodes_refusal_here_and_the_apps_keep_theirs() {
     let (campus, data) = (campus(), DataDir::new("node"));
     let headers = json_headers();
-    let gateway = campus.gateway().with_icons_in(&data.0);
-    let without_ticket = campus.cookie(serde_json::json!({ "jar": [] }), &[]);
+    let gateway = campus.server_gateway().with_icons_in(&data.0);
     let elsewhere = campus.cookie(serde_json::json!({ "uni": "univ-rennes-2" }), &[]);
     let demo = campus.cookie(serde_json::json!({ "mode": "demo" }), &[]);
-    for cookie in [None, Some(without_ticket), Some(elsewhere), Some(demo), Some("not-a-cookie".to_string())] {
-        assert!(block_on(gateway.answer(&asked(&POST, ICONS, &headers, BODY), || cookie.clone(), never)).is_none(), "{cookie:?}");
+    for cookie in [None, Some(elsewhere), Some(demo), Some("not-a-cookie".to_string())] {
+        assert_eq!(nobodys(&gateway, &POST, ICONS, &headers, BODY, cookie.clone()), (401, serde_json::json!({ "ok": false, "error": "Authentication required." })), "{cookie:?}");
     }
-    // Not JSON: Node reads it its own way.
-    assert!(block_on(gateway.answer(&asked(&POST, ICONS, &NO_HEADERS, BODY), || Some(campus.alive()), never)).is_none());
-    // A gateway without Node's data directory (the apps): Node's.
-    assert!(block_on(campus.gateway().answer(&asked(&POST, ICONS, &headers, BODY), || Some(campus.alive()), never)).is_none());
+    // A session of the gateway's without its CAS ticket: over (no Node
+    // behind to be told).
+    let without_ticket = campus.cookie(serde_json::json!({ "jar": [] }), &[]);
+    assert_eq!(nobodys(&campus.server_gateway().with_icons_in(&data.0).without_node(), &POST, ICONS, &headers, BODY, Some(without_ticket)), (401, serde_json::json!({ "error": "session_expired" })));
+    // Not said to be JSON: no services, in Node's words.
+    let response = block_on(gateway.answer(&asked(&POST, ICONS, &NO_HEADERS, BODY), || Some(campus.alive()), never)).unwrap();
+    assert_eq!((response.status().as_u16(), body_of(&response)), (400, serde_json::json!({ "ok": false, "error": "Expected { services: [...] }." })));
+    // A gateway without Node's data directory (the apps): their Node's.
+    assert!(block_on(campus.server_gateway().answer(&asked(&POST, ICONS, &headers, BODY), || Some(campus.alive()), never)).is_none());
     assert!(!data.0.exists());
 }
 

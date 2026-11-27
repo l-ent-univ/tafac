@@ -15,8 +15,8 @@
 //                           over (mod.rs); when it isn't, the route's own
 //                           answer
 //
-// Node is still behind for who isn't held: nobody signed in (the gateway
-// doesn't know which university an address is for), another university.
+// Who isn't held (nobody signed in, a session ended, another university)
+// gets Node's answer for nobody (nobody.rs).
 
 use std::future::Future;
 
@@ -34,8 +34,8 @@ impl Gateway {
     }
 
     // The answer to one of them. `value`: the session's cookie as the
-    // request came with it; `cookie`: as the caller holds it now. None:
-    // Node's (nobody the gateway holds a session for).
+    // request came with it; `cookie`: as the caller holds it now. None: the
+    // apps' Node's (who isn't held there).
     pub(super) async fn settled<C, N, Fut>(&self, route: Moved, asked: &Asked<'_>, value: &str, cookie: &C, node: &N) -> Option<http::Response<Vec<u8>>>
     where
         C: Fn() -> Option<String>,
@@ -45,7 +45,7 @@ impl Gateway {
         if let Some(told) = self.ended_already(route, asked, value) {
             return Some(told);
         }
-        let held = self.signed_in(Some(value))?;
+        let Some(held) = self.signed_in(Some(value)) else { return self.unheld(route, asked, value, node).await };
         let settled = match route {
             Moved::Launch => self.launch(&held, asked).await,
             Moved::LaunchPreview => self.launch_preview(&held, asked).await,
@@ -53,7 +53,7 @@ impl Gateway {
             Moved::StudentPicture => self.student_picture(&held, asked.query).await,
             Moved::CertificateStatus => self.certificate_status(&held).await,
             Moved::Certificate => self.certificate(&held).await,
-            _ => return None,
+            _ => return Some(super::nobody::not_found()),
         };
         let response = match settled {
             Settled::Answer(response) => response,
@@ -65,10 +65,7 @@ impl Gateway {
                 None => otherwise,
             },
         };
-        // Signed out, or in again, while the university was asked: the
-        // session this answer is about is no longer the one there is.
-        let still = self.signed_in(cookie().as_deref()).is_some_and(|current| current.session.id == held.session.id);
-        still.then_some(response)
+        self.still_the_sessions(route, asked, value, &held, cookie, response, node).await
     }
 
     // A request that still shows the cookie of a session found expired

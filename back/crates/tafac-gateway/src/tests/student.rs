@@ -4,7 +4,7 @@
 
 use http::header::SET_COOKIE;
 
-use super::{asked, body_of, cookie_set, never, Node, GET, NO_HEADERS};
+use super::{asked, body_of, cookie_set, nobodys, Node, GET, NO_HEADERS};
 use crate::testing::*;
 use crate::{Gateway, ANSWERED_BY};
 
@@ -203,14 +203,19 @@ fn a_session_the_cas_no_longer_knows_ends_here() {
 }
 
 #[test]
-fn who_isnt_held_here_is_nodes() {
+fn who_isnt_held_here_is_answered_as_node_answered_nobody() {
     let campus = campus();
-    let gateway = campus.gateway();
+    let gateway = campus.server_gateway();
     let demo = campus.cookie(serde_json::json!({ "mode": "demo" }), &[]);
     let elsewhere = campus.cookie(serde_json::json!({ "uni": "univ-rennes-2" }), &[("JSESSIONID", "alive")]);
     for cookie in [Some(demo), Some(elsewhere), None] {
-        for target in [PHOTO, PHOTO_META, STATUS, CERTIFICATE] {
-            assert!(block_on(gateway.answer(&asked(&GET, target, &NO_HEADERS, &[]), || cookie.clone(), never)).is_none(), "{target}");
+        for (target, status, said) in [
+            (PHOTO, 401, serde_json::json!({ "error": "Authentication required." })),
+            (PHOTO_META, 200, serde_json::json!({ "authenticated": false, "available": false, "source": "scodoc", "previewUrl": null })),
+            (STATUS, 401, serde_json::json!({ "available": false, "error": "Authentication required." })),
+            (CERTIFICATE, 401, serde_json::json!({ "ok": false, "error": "Authentication required." })),
+        ] {
+            assert_eq!(nobodys(&gateway, &GET, target, &NO_HEADERS, &[], cookie.clone()), (status, said), "{target}");
         }
     }
     assert!(campus.paths().is_empty());

@@ -3,10 +3,15 @@
 //
 // A sign-in, step by step:
 //
+//   the login      the body as Node reads it: no login or no password is
+//                  Node's 400
 //   whose          the university the page chose (`university` of the body,
-//                  else the X-Tafac-University header), when it is one of
-//                  routes.rs'. Any other, and a body Node would refuse, is
-//                  Node's
+//                  else the X-Tafac-University header: an id, an id without
+//                  its dashes, a slug), else the one the address is for,
+//                  else the default one (Node's resolveUniversity). One
+//                  named that the gateway doesn't serve is refused, in
+//                  Node's words for an unknown university: 400 { error:
+//                  'Unknown university "<id>".' }; Node is never asked
 //   the limits     too many failed attempts from this address or for this
 //                  login wait (attempts.rs)
 //   tonAPI         signs in at the CAS: the form, the password posted once,
@@ -36,7 +41,7 @@
 // to one login are counted (attempts.rs): past the limit none leaves
 // unasked, and asking waits.
 //
-// Node is asked nothing of a sign-in at a university of routes.rs'.
+// Node is asked nothing of a sign-in.
 
 use std::future::Future;
 
@@ -55,7 +60,8 @@ use crate::tonapi::{self, bounded, PORTAL_PATIENCE};
 use crate::translate::signin as said;
 use crate::universities::University;
 
-// A login or a password longer than this is nobody's: Node's to answer.
+// A login or a password longer than this is no CAS's: refused as the CAS
+// would refuse it, without asking it.
 const MAX_USERNAME_BYTES: usize = 256;
 const MAX_PASSWORD_BYTES: usize = 1024;
 
@@ -63,7 +69,7 @@ const MAX_PASSWORD_BYTES: usize = 1024;
 struct Login {
     username: String,
     password: String,
-    // The university the page chose, in the body.
+    // The university the page chose, in the body, as it was written.
     university: Option<String>,
     // The one-time code, without its spaces: what Node makes of `otp`.
     code: Option<String>,
@@ -101,8 +107,11 @@ fn only_way(ways: Option<&Ways>) -> Option<OtpTransport> {
     }
 }
 
-// None: a body Node would refuse or read its own way (not JSON, no login,
-// no password, a field that isn't text).
+// The body as Node reads it: JSON said to be JSON (express.json), each field
+// `String(field ?? '')`. None: no login or no password, which Node
+// refuses (400), and any body it doesn't read as an object: one that isn't
+// JSON, or isn't said to be (Node's own error then, a 400 or a 401 that
+// says nothing to the page; the page always sends JSON).
 fn read_login(asked: &Asked<'_>) -> Option<Login> {
     // As express.json: only a body said to be JSON is read.
     let content_type = asked.headers.get(CONTENT_TYPE)?.to_str().ok()?;
@@ -112,12 +121,11 @@ fn read_login(asked: &Asked<'_>) -> Option<Login> {
     let body: serde_json::Value = serde_json::from_slice(asked.body).ok()?;
     let body = body.as_object()?;
     let text = |name: &str| match body.get(name) {
-        None | Some(serde_json::Value::Null) => Some(String::new()),
-        Some(serde_json::Value::String(value)) => Some(value.clone()),
-        Some(_) => None,
+        None | Some(serde_json::Value::Null) => String::new(),
+        Some(value) => super::mail::js_string(value),
     };
-    let (username, password) = (text("username")?.trim().to_string(), text("password")?);
-    if username.is_empty() || password.is_empty() || username.len() > MAX_USERNAME_BYTES || password.len() > MAX_PASSWORD_BYTES {
+    let (username, password) = (text("username").trim().to_string(), text("password"));
+    if username.is_empty() || password.is_empty() {
         return None;
     }
     let code = read_code(body.get("otp"));
@@ -127,8 +135,21 @@ fn read_login(asked: &Asked<'_>) -> Option<Login> {
         _ => None,
     };
     let quiet = body.get("quiet").and_then(|quiet| quiet.as_bool()) == Some(true);
-    let university = text("university")?.trim().to_lowercase();
-    Some(Login { username, password, university: Some(university).filter(|id| !id.is_empty()), code, send, quiet })
+    // findUniversityId reads text only.
+    let university = body.get("university").and_then(|university| university.as_str()).map(str::to_string);
+    Some(Login { username, password, university, code, send, quiet })
+}
+
+// Node's answer to a login without a login or a password.
+fn no_login() -> http::Response<Vec<u8>> {
+    crate::translate::json_response(400, br#"{"error":"Username and password are required."}"#.to_vec())
+}
+
+// A university named that isn't served: Node's words for an unknown one
+// (universities/index.js, resolveUniversityId), as an answer.
+fn unknown_university(named: &str) -> http::Response<Vec<u8>> {
+    let error = format!("Unknown university \"{}\".", named.trim());
+    crate::translate::json_response(400, serde_json::to_vec(&serde_json::json!({ "error": error })).unwrap_or_default())
 }
 
 // The session's `user`: the portal's own name for the student, when it has
@@ -142,25 +163,42 @@ fn session_user<'a>(university: &University, named_by_the_portal: &'a str, who: 
 }
 
 impl Gateway {
-    // The university a login is for, when it is one answered here: the one
-    // the body names, else the one the header names (Node's resolveUniversity,
-    // for the ids; a slug, a host's university, the default one are Node's
-    // to know).
-    fn chosen(&self, login: &Login, asked: &Asked<'_>) -> Option<&University> {
-        let named = match &login.university {
-            Some(id) => id.clone(),
-            None => asked.headers.get(UNIVERSITY_HEADER)?.to_str().ok()?.trim().to_lowercase(),
+    // A university's id, from a name the page gave: through what the server
+    // serves where it says (an id, an id without its dashes, a slug), else
+    // an id of the gateway's.
+    fn university_named(&self, name: &str) -> Option<String> {
+        let id = match &self.served {
+            Some(served) => served.named(name)?.to_string(),
+            None => name.trim().to_lowercase(),
         };
-        self.universities.get(&named).map(|university| &**university)
+        self.universities.contains_key(&id).then_some(id)
     }
 
-    // POST /__ent_auth/login. None: a sign-in that is Node's (another
-    // university, a body Node reads its own way). The demo account's login
-    // never comes: the page signs in to the demo by itself
-    // (src/demoSession.js), and here it would be a login like any other.
+    // The university a login is for: the one the body names, else the one
+    // the header names, else the one a request without a session is for
+    // (nobody.rs). Err: the name given first, of a university not served
+    // here.
+    fn chosen(&self, login: &Login, asked: &Asked<'_>) -> Result<&University, String> {
+        let header = asked.headers.get(UNIVERSITY_HEADER).and_then(|value| value.to_str().ok());
+        let named: Vec<&str> = [login.university.as_deref(), header].into_iter().flatten().filter(|name| !name.trim().is_empty()).collect();
+        let id = match named.iter().find_map(|name| self.university_named(name)) {
+            Some(id) => id,
+            None if !named.is_empty() => return Err(named[0].to_string()),
+            None => self.university_for_nobody(asked.headers),
+        };
+        self.universities.get(&id).map(|university| &**university).ok_or(id)
+    }
+
+    // POST /__ent_auth/login. The demo account's login never comes: the
+    // page signs in to the demo by itself (src/demoSession.js), and here it
+    // would be a login like any other.
+    // None: a body the apps' own Node reads its own way (apps_node_answers).
     pub(super) async fn sign_in(&self, asked: &Asked<'_>) -> Option<http::Response<Vec<u8>>> {
-        let login = read_login(asked)?;
-        let university = self.chosen(&login, asked)?;
+        let Some(login) = read_login(asked) else { return (!self.apps_node_answers()).then(no_login) };
+        let university = match self.chosen(&login, asked) {
+            Ok(university) => university,
+            Err(named) => return Some(unknown_university(&named)),
+        };
         let who = Who::new(requester(asked.peer, asked.headers, self.trusted), &login.username);
         if let Some(seconds) = self.attempts.blocked(&who) {
             return Some(said::too_many(seconds));
@@ -173,6 +211,10 @@ impl Gateway {
         let codes_wait = self.attempts.codes_wait(&who);
         if let (Some(_), Some(seconds)) = (login.send, codes_wait) {
             return Some(said::too_many_codes(seconds));
+        }
+        // Longer than any login or password: no CAS's, a failed attempt.
+        if login.username.len() > MAX_USERNAME_BYTES || login.password.len() > MAX_PASSWORD_BYTES {
+            return Some(self.failed(&who, said::refused(None)));
         }
         Some(match tonapi::signin::sign_in(university, &login.username, &login.password, self.net).await {
             // No code asked for this time, whatever the page sent.
@@ -314,7 +356,7 @@ mod tests {
     #[test]
     fn a_login_is_read_as_node_reads_it() {
         let login = read("application/json; charset=utf-8", r#"{"username":" JDoe ","password":" pass word ","university":" Univ-Rennes "}"#).unwrap();
-        assert_eq!((login.username.as_str(), login.password.as_str(), login.university.as_deref()), ("JDoe", " pass word ", Some("univ-rennes")));
+        assert_eq!((login.username.as_str(), login.password.as_str(), login.university.as_deref()), ("JDoe", " pass word ", Some(" Univ-Rennes ")));
         assert_eq!((login.code, login.send, login.quiet), (None, None, false));
         let quiet = read(JSON, r#"{"username":"jdoe","password":"p","quiet":true}"#).unwrap();
         assert!(quiet.university.is_none() && quiet.quiet);
@@ -360,14 +402,12 @@ mod tests {
     }
 
     #[test]
-    fn what_node_would_refuse_or_read_its_own_way_is_nodes() {
+    fn a_body_without_a_login_is_none() {
         for (content_type, body) in [
             (JSON, r#"{"username":"","password":"p"}"#),
             (JSON, r#"{"username":"   ","password":"p"}"#),
             (JSON, r#"{"username":"jdoe"}"#),
             (JSON, r#"{"username":"jdoe","password":""}"#),
-            (JSON, r#"{"username":12,"password":"p"}"#),
-            (JSON, r#"{"username":"jdoe","password":"p","university":7}"#),
             (JSON, r#"["jdoe","p"]"#),
             (JSON, "not json"),
             (JSON, ""),
@@ -376,8 +416,17 @@ mod tests {
         ] {
             assert!(read(content_type, body).is_none(), "{content_type} {body}");
         }
-        let long = format!(r#"{{"username":"{}","password":"p"}}"#, "x".repeat(MAX_USERNAME_BYTES + 1));
-        assert!(read(JSON, &long).is_none());
+        // What isn't text is read as JavaScript writes it; a university
+        // that isn't text names none.
+        let login = read(JSON, r#"{"username":12,"password":["p",1],"university":7}"#).unwrap();
+        assert_eq!((login.username.as_str(), login.password.as_str(), login.university), ("12", "p,1", None));
+        assert_eq!(body_of(&no_login()), serde_json::json!({ "error": "Username and password are required." }));
+        assert_eq!(no_login().status(), 400);
+        assert_eq!(body_of(&unknown_university(" univ-nulle-part ")), serde_json::json!({ "error": "Unknown university \"univ-nulle-part\"." }));
+    }
+
+    fn body_of(response: &http::Response<Vec<u8>>) -> serde_json::Value {
+        serde_json::from_slice(response.body()).unwrap()
     }
 
     #[test]

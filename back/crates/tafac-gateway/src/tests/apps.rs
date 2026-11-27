@@ -3,7 +3,7 @@
 // gateway's own.
 
 
-use super::{ask, asked, body_of, cookie_set, error_of, never, Node, GET, NO_HEADERS};
+use super::{ask, asked, body_of, cookie_set, error_of, nobodys, Node, GET, NO_HEADERS};
 use crate::testing::*;
 use crate::Gateway;
 
@@ -104,7 +104,7 @@ fn a_session_the_cas_no_longer_knows_ends_here() {
 #[test]
 fn a_portal_that_cant_be_reached_is_said_in_the_sentence_the_page_shows() {
     let campus = campus();
-    let gateway = campus.gateway();
+    let gateway = campus.server_gateway();
     // The CAS is down: no portal session can be opened, and nothing says
     // the student's session is over. Node's own status and sentence for
     // the applications, and Node is asked nothing (`error_of`).
@@ -116,10 +116,11 @@ fn a_portal_that_cant_be_reached_is_said_in_the_sentence_the_page_shows() {
     campus.cas_is_down(false);
     assert_eq!(ask(&gateway, APPS, &cookie).unwrap()["apps"].as_array().unwrap().len(), 3);
 
-    // Nobody signed in, a demo cookie from before, another university: Node's.
+    // Nobody signed in, a demo cookie from before, another university:
+    // nobody's, as Node said it.
     let demo = campus.cookie(serde_json::json!({ "mode": "demo" }), &[]);
     let elsewhere = campus.cookie(serde_json::json!({ "uni": "univ-rennes-2" }), &[("JSESSIONID", "alive")]);
     for cookie in [Some(demo), Some(elsewhere), None] {
-        assert!(block_on(gateway.answer(&asked(&GET, APPS, &NO_HEADERS, &[]), || cookie.clone(), never)).is_none());
+        assert_eq!(nobodys(&gateway, &GET, APPS, &NO_HEADERS, &[], cookie), (200, serde_json::json!({ "authenticated": false, "apps": null })));
     }
 }

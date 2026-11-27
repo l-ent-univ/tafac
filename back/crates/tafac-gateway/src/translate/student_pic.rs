@@ -25,7 +25,7 @@
 //   500 { error }: ScoDoc down, slow, or answering what tonAPI doesn't
 //       read. Here, in the one sentence Node's production server says
 //       (translate/failed.rs holds it to Node's).
-//   401 for nobody signed in (200 with `meta`): Node.
+//   401 for nobody signed in (200 with `meta`): answered here (gateway/nobody.rs; their Node in the apps).
 
 use http::header::{CACHE_CONTROL, CONTENT_SECURITY_POLICY, CONTENT_TYPE};
 use http::HeaderValue;

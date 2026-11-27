@@ -30,14 +30,14 @@
 // goes to the university it is for (universities.rs: the one it names, an
 // old address', the default one).
 //
-// Still Node's, as the request came (None): anything this route would read
-// another way than Node, which no page sends. A session cookie the gateway
-// doesn't read (one of SESSION_SECRET_PREVIOUS, one from before sessions
-// named their university), a body that isn't UTF-8 or is compressed, one
-// whose length isn't said, and a body that isn't JSON serde reads
-// (JavaScript's JSON.parse takes a few more).
-// And every request where the gateway isn't told where PostHog is
-// (Gateway::sending_statistics): the apps, today.
+// What Node read another way, which no page sends, is answered 204 with
+// nothing sent: a body that isn't UTF-8 or is compressed, one that isn't
+// the length it said, one that isn't JSON serde reads (JavaScript's
+// JSON.parse takes a few more). A session cookie the gateway doesn't read
+// (one of SESSION_SECRET_PREVIOUS, one from before sessions named their
+// university) is a visitor's. Still the apps' own Node's (None): every
+// request where the gateway isn't told where PostHog is
+// (Gateway::sending_statistics).
 
 mod posthog;
 pub(crate) mod schema;
@@ -150,8 +150,9 @@ impl Gateway {
         self
     }
 
-    // The route's answer; None: Node's, as the request came. `cookie`: the
-    // session's cookie, when the request has one.
+    // The route's answer; None: the apps' Node's (the gateway isn't told
+    // where the statistics go). `cookie`: the session's cookie, when the
+    // request has one.
     pub(crate) fn statistics_posted(&self, asked: &Asked<'_>, cookie: Option<String>) -> Option<http::Response<Vec<u8>>> {
         let statistics = self.statistics_sent.as_ref()?;
         // Off: the body isn't even read.
@@ -164,14 +165,11 @@ impl Gateway {
         let text = match body(asked) {
             Body::Text(text) => text,
             Body::TooLong => return Some(said(413)),
-            Body::Nodes => return None,
+            Body::Unread => return Some(said(204)),
         };
         // A session goes to its university's app, which may still find it
         // over (signed out a moment ago): its events are then a visitor's.
-        let session = match cookie {
-            Some(value) => Some(self.codec.read(&value, now_ms())?),
-            None => None,
-        };
+        let session = cookie.and_then(|value| self.codec.read(&value, now_ms()));
         let routed = session.filter(|session| statistics.universities.serves(&session.university));
         let university = match &routed {
             Some(session) => session.university.clone(),
@@ -179,10 +177,15 @@ impl Gateway {
         };
         let session = routed.filter(|session| self.memory.ended(&session.id).is_none());
         // Nothing but spaces: JSON.parse fails, and nothing is sent.
-        let payload = if text.trim().is_empty() { Value::Null } else { serde_json::from_str(&text).ok()? };
+        let payload = if text.trim().is_empty() { Value::Null } else { serde_json::from_str(&text).unwrap_or(Value::Null) };
         statistics.ingest(posthog, &payload, session.as_ref(), &university);
         Some(said(204))
     }
+}
+
+// A body past the route's limit, which the server didn't read: 413.
+pub(crate) fn refused_too_large() -> http::Response<Vec<u8>> {
+    said(413)
 }
 
 // What Node's route says: a status, nothing else (`res.status(…).end()`).
@@ -201,8 +204,9 @@ fn from_another_site(headers: &HeaderMap) -> bool {
 enum Body {
     Text(String),
     TooLong,
-    // Read another way than here: Node's to read.
-    Nodes,
+    // Read another way by Node (compressed, another charset), or not the
+    // length it said: nothing sent.
+    Unread,
 }
 
 // The body as express.text reads it (any type, UTF-8 unless the type says
@@ -214,27 +218,27 @@ fn body(asked: &Asked<'_>) -> Body {
     let mut encodings = headers.get_all(CONTENT_ENCODING).iter();
     if let Some(encoding) = encodings.next() {
         if encodings.next().is_some() || !(encoding.is_empty() || encoding.as_bytes().eq_ignore_ascii_case(b"identity")) {
-            return Body::Nodes;
+            return Body::Unread;
         }
     }
     if let Some(content_type) = headers.get(CONTENT_TYPE) {
-        let Ok(content_type) = content_type.to_str() else { return Body::Nodes };
+        let Ok(content_type) = content_type.to_str() else { return Body::Unread };
         let charset = content_type.split(';').skip(1).find_map(|parameter| {
             let (name, value) = parameter.split_once('=')?;
             name.trim().eq_ignore_ascii_case("charset").then(|| value.trim().trim_matches('"').to_ascii_lowercase())
         });
         if charset.is_some_and(|charset| charset != "utf-8" && charset != "utf8") {
-            return Body::Nodes;
+            return Body::Unread;
         }
     }
-    // Its length said, and all of it here (a body without one is passed on
-    // as it streams, not read).
-    let Some(length) = headers.get(CONTENT_LENGTH).and_then(|length| length.to_str().ok()?.trim().parse::<u64>().ok()) else { return Body::Nodes };
-    if length > MAX_BODY_BYTES as u64 {
+    // All of it here: its length, when said, is the body's (one sent in
+    // pieces is read whole by the server first).
+    let length = headers.get(CONTENT_LENGTH).and_then(|length| length.to_str().ok()?.trim().parse::<u64>().ok());
+    if length.unwrap_or(asked.body.len() as u64) > MAX_BODY_BYTES as u64 || asked.body.len() > MAX_BODY_BYTES {
         return Body::TooLong;
     }
-    if length != asked.body.len() as u64 {
-        return Body::Nodes;
+    if length.is_some_and(|length| length != asked.body.len() as u64) {
+        return Body::Unread;
     }
     let text = String::from_utf8_lossy(asked.body);
     Body::Text(text.strip_prefix('\u{feff}').unwrap_or(&text).to_string())

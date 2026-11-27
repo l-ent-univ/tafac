@@ -15,9 +15,10 @@
 //   200 { authenticated: false, expired: true, … }, the cookie cleared: the
 //       CAS no longer knows the ticket. Answered here (translate/expired.rs),
 //       and Node is told.
-//   200 { authenticated: false, … }: nobody signed in. Node, which knows
-//       which university the address is for.
-//   200 { degraded: true } without a CAS ticket: Node.
+//   200 { authenticated: false, … }: nobody signed in, at the university
+//       the request is for. Answered here (gateway/nobody.rs; their Node in the apps).
+//   200 { degraded: true } without a CAS ticket: Node's. Here such a
+//       session is over (gateway/mod.rs: unheld).
 //   500 { error }: the portal down, slow, or answering something else
 //       (the CAS still knowing the ticket, or not saying). Answered here
 //       (translate/failed.rs).

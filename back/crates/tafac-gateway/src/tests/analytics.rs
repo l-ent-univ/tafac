@@ -206,8 +206,8 @@ fn sent_with(mut properties: Value, extra: Value) -> Value {
 #[test]
 fn the_statistics_route_is_answered_here() {
     assert_eq!(routes::backend(&Method::POST, ANALYTICS), Backend::TonApi(Moved::Analytics));
-    assert_eq!(routes::backend(&Method::GET, ANALYTICS), Backend::Node);
-    assert_eq!(routes::backend(&Method::POST, "/__ent_auth/analytics/"), Backend::Node);
+    assert_eq!(routes::backend(&Method::GET, ANALYTICS), Backend::TonApi(Moved::NotFound));
+    assert_eq!(routes::backend(&Method::POST, "/__ent_auth/analytics/"), Backend::TonApi(Moved::NotFound));
     assert!(Gateway::reads_body(&Method::POST, ANALYTICS));
     assert!(!Gateway::reads_body(&Method::GET, ANALYTICS));
 }
@@ -438,17 +438,14 @@ fn a_body_is_read_as_express_reads_text() {
 }
 
 #[test]
-fn what_node_would_read_another_way_is_left_to_it() {
+fn what_node_would_read_another_way_is_answered_and_nothing_sent() {
     let posthog = posthog(&[]);
     let gateway = gateway(&posthog);
     let body = events(&[login_failed()]).to_string();
     let left = |headers: HeaderMap, sent: &[u8], cookie: Option<&str>| {
-        assert!(post_with(&gateway, &headers, sent, cookie).is_none());
+        assert_eq!(said(post_with(&gateway, &headers, sent, cookie)), 204);
     };
-    // A body whose length isn't said, or isn't all here (not read).
-    let mut unsaid = beacon(body.as_bytes(), &[]);
-    unsaid.remove("content-length");
-    left(unsaid, body.as_bytes(), None);
+    // A body that isn't all here.
     left(beacon(body.as_bytes(), &[]), &[], None);
     // Compressed, in another charset.
     left(beacon(body.as_bytes(), &[("content-encoding", "gzip")]), body.as_bytes(), None);
@@ -460,15 +457,24 @@ fn what_node_would_read_another_way_is_left_to_it() {
     let lone = body.replace("failure\"", "failure\",\"x\":\"\\ud800\"");
     left(beacon(lone.as_bytes(), &[]), lone.as_bytes(), None);
     left(beacon(b"not json", &[]), b"not json", None);
+    std::thread::sleep(Duration::from_millis(300));
+    posthog.sent_nothing();
     // A cookie the gateway doesn't read: another secret's (SESSION_SECRET_PREVIOUS),
-    // from before sessions named their university, the demo's, not one.
+    // from before sessions named their university, the demo's, not one:
+    // a visitor's events (a random id, not the session's of the day). And
+    // a body whose length isn't said (sent in
+    // pieces, read whole by the server first).
     let previous = seal("an older secret of the tests, long enough", &json!({ "id": "s", "uni": UNIVERSITY, "user": "jdoe", "createdAt": crate::gateway::now_ms(), "jar": [] }));
     let without_university = seal(SECRET, &json!({ "id": "s", "user": "jdoe", "createdAt": crate::gateway::now_ms(), "jar": [] }));
     let demo = seal(SECRET, &json!({ "id": "s", "uni": UNIVERSITY, "user": "demo", "mode": "demo", "createdAt": crate::gateway::now_ms(), "jar": [] }));
     for cookie in [previous.as_str(), &without_university, &demo, "v1.not.one"] {
         left(beacon(body.as_bytes(), &[]), body.as_bytes(), Some(cookie));
     }
-    posthog.sent_nothing();
+    let mut unsaid = beacon(body.as_bytes(), &[]);
+    unsaid.remove("content-length");
+    left(unsaid, body.as_bytes(), None);
+    let batches = posthog.batches(5);
+    assert!(batches.iter().flat_map(|batch| batch["batch"].as_array().unwrap()).all(|event| event["distinct_id"].as_str().unwrap().contains('-')), "{batches:?}");
 }
 
 #[test]
@@ -528,10 +534,10 @@ fn while_posthog_keeps_batches_waiting_the_ones_beyond_are_dropped() {
 }
 
 // tafac.fr: the body read by the server in front of Node, Node asked
-// nothing; and what is Node's reaches it whole.
+// nothing, whatever the body.
 #[cfg(feature = "server")]
 #[test]
-fn through_the_server_the_statistics_are_answered_here_and_what_is_nodes_reaches_it() {
+fn through_the_server_the_statistics_are_answered_here_and_node_is_asked_nothing() {
     use crate::proxy::{serve, Proxy};
 
     let posthog = posthog(&[]);
@@ -539,7 +545,7 @@ fn through_the_server_the_statistics_are_answered_here_and_what_is_nodes_reaches
     let node = crate::tests::analytics::posthog(&[Reply::NoContent]);
     let listener = block_on(TcpListener::bind("127.0.0.1:0")).unwrap();
     let address = listener.local_addr().unwrap().to_string();
-    let proxy = Arc::new(Proxy::new(Some(gateway(&posthog)), &node.address));
+    let proxy = Arc::new(Proxy::new(Some(gateway(&posthog)), Some(&node.address)));
     spawn(async move {
         let _ = serve(listener, proxy).await;
     });
@@ -559,11 +565,10 @@ fn through_the_server_the_statistics_are_answered_here_and_what_is_nodes_reaches
     assert_eq!(header_of(&answer, "cache-control"), "no-store");
     assert_eq!(posthog.events().len(), 1);
     assert_eq!(node.count(), 0);
-    // Another charset: Node's, with the body it was sent.
+    // Another charset: answered all the same, nothing sent.
     let answer = send("text/plain; charset=latin1", &body);
     assert!(answer.starts_with("HTTP/1.1 204"), "{answer}");
-    let got = node.got.lock().unwrap().clone();
-    assert_eq!(got.len(), 1);
-    assert!(got[0].0.starts_with("POST /__ent_auth/analytics HTTP/1.1"), "{}", got[0].0);
-    assert_eq!(got[0].1, body.as_bytes());
+    std::thread::sleep(Duration::from_millis(300));
+    assert_eq!(posthog.events().len(), 1);
+    assert_eq!(node.count(), 0);
 }

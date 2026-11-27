@@ -164,7 +164,7 @@ mod tests {
         let (node, asked) = node();
         let campus = campus();
         for gateway in [None, Some(campus.gateway())] {
-            let address = server(Proxy::new(gateway, &node).serving(AppSettings::new("")).serving(DesktopUpdate::new("", &manifest)));
+            let address = server(Proxy::new(gateway, Some(&node)).serving(AppSettings::new("")).serving(DesktopUpdate::new("", &manifest)));
             let (head, body) = send(&address, "GET", "/desktop/latest.json");
             assert!(head.starts_with("HTTP/1.1 200 OK"), "{head}");
             assert_eq!(header_of(&head, "cache-control"), "no-cache");

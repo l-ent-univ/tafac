@@ -130,6 +130,19 @@ pub(crate) fn nothing(asked: &Asked<'_>) -> Response<Vec<u8>> {
     finished(asked, builder(404), Vec::new())
 }
 
+// What Express answers a request no route took (finalhandler's 404): its
+// page, « Cannot <method> <path> », with finalhandler's own headers. The
+// server without Node gives it where Node's server would have (proxy.rs).
+pub(crate) fn not_found(method: &Method, path: &str) -> Response<Vec<u8>> {
+    let message = escape_html(&format!("Cannot {method} {}", encode_url(path))).replace("  ", " &nbsp;");
+    let body = format!("<!DOCTYPE html>\n<html lang=\"en\">\n<head>\n<meta charset=\"utf-8\">\n<title>Error</title>\n</head>\n<body>\n<pre>{message}</pre>\n</body>\n</html>\n");
+    let builder = builder(404).header(CONTENT_TYPE, "text/html; charset=utf-8");
+    let mut response = finished(&Asked { route: Servers::Page, under: None, head: method == Method::HEAD, headers: &HeaderMap::new() }, builder, body.into_bytes());
+    // finalhandler's own policy, over the baseline's.
+    response.headers_mut().insert("content-security-policy", http::HeaderValue::from_static("default-src 'none'"));
+    response
+}
+
 // res.setHeader('Cache-Control', …), then res.type(…).send(text): `kind` is
 // a type Express gives its charset, as it does to a text.
 pub(crate) fn text(asked: &Asked<'_>, cache: &'static str, kind: &str, body: String) -> Response<Vec<u8>> {

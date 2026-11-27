@@ -7,7 +7,7 @@ use std::time::Duration;
 
 use http::Method;
 
-use super::{ask, asked, error_of, never, unavailable, GET, NO_HEADERS, SESSION};
+use super::{ask, asked, error_of, never, nobodys, unavailable, GET, NO_HEADERS, SESSION};
 use crate::session::memory::Remembered;
 use crate::testing::*;
 use crate::Gateway;
@@ -187,7 +187,7 @@ fn each_students_moodle_is_their_own() {
 #[test]
 fn a_session_signed_out_leaves_nothing_behind() {
     let campus = campus();
-    let gateway = campus.gateway();
+    let gateway = campus.server_gateway();
     let cookie = campus.alive();
     ask(&gateway, DEADLINES, &cookie).unwrap();
     assert!(gateway.memory.remembers("one-session"));
@@ -195,22 +195,23 @@ fn a_session_signed_out_leaves_nothing_behind() {
     gateway.saw_request(&Method::POST, "/__ent_auth/logout", Some(&cookie));
     assert!(!gateway.memory.remembers("one-session"));
     let asked = campus.paths().len();
-    assert_eq!(ask(&gateway, DEADLINES, &cookie), None);
+    assert_eq!(nobodys(&gateway, &Method::GET, DEADLINES, &NO_HEADERS, &[], Some(cookie)), (200, serde_json::json!({ "authenticated": false, "deadlines": null })));
     assert_eq!(campus.paths().len(), asked);
 }
 
 #[test]
-fn what_is_not_a_plain_signed_in_session_is_nodes_without_a_request() {
+fn what_is_not_a_plain_signed_in_session_is_answered_without_a_request() {
     let campus = campus();
-    let gateway = campus.gateway();
+    let gateway = campus.server_gateway().without_node();
     let alive = [("JSESSIONID", "alive")];
     for (why, cookie) in [
         ("a demo cookie from before", campus.cookie(serde_json::json!({ "mode": "demo" }), &alive)),
         ("another university", campus.cookie(serde_json::json!({ "uni": "univ-rennes-2" }), &alive)),
-        ("no CAS ticket", campus.cookie(serde_json::json!({ "jar": [["JSESSIONID", "alive", "127.0.0.1", "/", 1, 1, null]] }), &[])),
     ] {
-        assert_eq!(ask(&gateway, DEADLINES, &cookie), None, "{why}");
+        assert_eq!(nobodys(&gateway, &Method::GET, DEADLINES, &NO_HEADERS, &[], Some(cookie)), (200, serde_json::json!({ "authenticated": false, "deadlines": null })), "{why}");
     }
+    let without_ticket = campus.cookie(serde_json::json!({ "jar": [["JSESSIONID", "alive", "127.0.0.1", "/", 1, 1, null]] }), &[]);
+    assert_eq!(nobodys(&gateway, &Method::GET, DEADLINES, &NO_HEADERS, &[], Some(without_ticket)), (401, serde_json::json!({ "error": "session_expired" })));
     assert!(campus.seen.lock().unwrap().is_empty());
 }
 

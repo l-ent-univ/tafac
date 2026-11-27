@@ -18,7 +18,6 @@ import { answerDemoRequest, isDemoSignedIn, signInToDemo, signOutOfDemo, uploadD
 
 // Null on the neutral page (no university picked yet).
 export const ENT_ORIGIN = universityConfig.origins.ent
-const ENT_HOST = ENT_ORIGIN ? new URL(ENT_ORIGIN).hostname : ''
 const APP_BASE_URL = (() => {
   const rawBaseUrl = String(import.meta.env?.BASE_URL || '/').trim()
 
@@ -29,7 +28,6 @@ const APP_BASE_URL = (() => {
   return rawBaseUrl.endsWith('/') ? rawBaseUrl.slice(0, -1) : rawBaseUrl
 })()
 
-export const ENT_PROXY_PREFIX = `${APP_BASE_URL}/__ent_proxy`
 export const ENT_AUTH_PREFIX = `${APP_BASE_URL}/__ent_auth`
 export const DEFAULT_REFERER = `${ENT_ORIGIN}${universityConfig.auth?.portalEntryPath ?? '/'}`
 // Public entry point of the grade service (ScoDoc/Notes9), opened through the
@@ -39,7 +37,6 @@ const GRADES_SERVICE_URL = universityConfig.grades?.serviceUrl ?? null
 export const GRADES_LAUNCH_HREF = GRADES_SERVICE_URL
   ? `${ENT_AUTH_PREFIX}/launch?url=${encodeURIComponent(GRADES_SERVICE_URL)}`
   : null
-const DEFAULT_ACCEPT = 'application/json, text/html;q=0.9, text/plain;q=0.8, */*;q=0.5'
 const RECENT_LOGIN_SESSION_KEY = 'l-ent:recent-login-at'
 // Whether the session is still valid, as the server's answers say
 // (src/sessionSignal.js).
@@ -118,69 +115,6 @@ export function getRecentEntLoginAgeMs() {
 
 export function isRecentEntLogin(windowMs) {
   return getRecentEntLoginAgeMs() <= Math.max(0, Number(windowMs) || 0)
-}
-
-function normalizeProxyPath(input) {
-  if (!input) {
-    return '/'
-  }
-
-  if (input.startsWith(ENT_ORIGIN)) {
-    const url = new URL(input)
-    return `${url.pathname}${url.search}`
-  }
-
-  if (input.startsWith('http://') || input.startsWith('https://')) {
-    throw new Error(`Only ${ENT_HOST} URLs are supported by the local proxy.`)
-  }
-
-  return input.startsWith('/') ? input : `/${input}`
-}
-
-export function buildEntProxyHref(input) {
-  return `${ENT_PROXY_PREFIX}${normalizeProxyPath(input)}`
-}
-
-function normalizeExtraHeaders(extraHeaders = {}) {
-  const headers = {}
-
-  for (const [name, value] of Object.entries(extraHeaders)) {
-    if (value === undefined || value === null || value === '') {
-      continue
-    }
-
-    const lowerName = name.toLowerCase()
-    if (lowerName === 'cookie' || lowerName === 'referer') {
-      continue
-    }
-
-    headers[name] = String(value)
-  }
-
-  return headers
-}
-
-function buildFetchHeaders(auth = {}, extraHeaders = {}) {
-  const headers = new Headers()
-  const mergedExtraHeaders = normalizeExtraHeaders({
-    Accept: DEFAULT_ACCEPT,
-    ...(auth.extraHeaders ?? {}),
-    ...extraHeaders,
-  })
-
-  if (auth.cookie?.trim()) {
-    headers.set('x-ent-cookie', auth.cookie.trim())
-  }
-
-  if (auth.referer?.trim()) {
-    headers.set('x-ent-referer', auth.referer.trim())
-  }
-
-  if (Object.keys(mergedExtraHeaders).length > 0) {
-    headers.set('x-ent-extra-headers', JSON.stringify(mergedExtraHeaders))
-  }
-
-  return headers
 }
 
 async function parseResponse(response) {
@@ -266,22 +200,14 @@ async function parseJsonPayload(response) {
   return data
 }
 
-export async function requestEnt(path, options = {}) {
-  const {
-    auth = {},
-    method = 'GET',
-    body = '',
-    headers = {},
-  } = options
-  const normalizedPath = normalizeProxyPath(path)
-  const upperMethod = method.toUpperCase()
-  const hasBody = body !== '' && body !== undefined && body !== null && !['GET', 'HEAD'].includes(upperMethod)
-
-  const response = await serverFetch(`${ENT_PROXY_PREFIX}${normalizedPath}`, {
-    method: upperMethod,
+// One of the page's own routes, asked as it is (the debug menu's request):
+// a path under /__ent_auth, with or without its prefix.
+export async function requestApi(path) {
+  const route = String(path ?? '').trim()
+  const target = route.startsWith('/__ent_auth') ? `${APP_BASE_URL}${route}` : `${ENT_AUTH_PREFIX}${route.startsWith('/') ? route : `/${route}`}`
+  const response = await serverFetch(target, {
     credentials: 'same-origin',
-    headers: buildFetchHeaders(auth, headers),
-    body: hasBody ? body : undefined,
+    headers: getUniversityRequestHeaders(),
   })
 
   return parseResponse(response)

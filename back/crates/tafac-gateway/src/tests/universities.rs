@@ -1,6 +1,7 @@
 // Tafac's own routes about the universities (own/universities.rs), through
-// the gateway: answered where the server said what it serves, Node's
-// elsewhere; and the session check nobody is signed in for.
+// the gateway: answered where the server said what it serves, the apps'
+// Node's elsewhere; and the routes nobody is signed in for, at the
+// university the request is for.
 
 use http::HeaderMap;
 
@@ -49,22 +50,29 @@ fn the_list_and_the_logos_are_answered_where_the_server_says_what_it_serves() {
 }
 
 #[test]
-fn what_only_node_can_say_of_them_is_nodes() {
+fn a_cookie_not_read_here_is_no_session_and_the_apps_keep_their_list() {
     let campus = campus();
     // A cookie that isn't read here (another secret, or from before
-    // sessions named their university): Node knows what it holds.
+    // sessions named their university): no session.
     let gateway = serving(campus.gateway());
     for cookie in ["v1.made.by.another.secret".to_string(), campus.cookie(serde_json::json!({ "uni": null }), &[])] {
-        assert!(get(&gateway, UNIVERSITIES, &NO_HEADERS, Some(&cookie)).is_none());
+        assert_eq!(body_of(&get(&gateway, UNIVERSITIES, &NO_HEADERS, Some(&cookie)).unwrap())["session"], serde_json::Value::Null);
     }
-    // A path under the folder that is no logo's.
-    assert!(get(&gateway, "/__ent_auth/universities/univ-rennes/settings", &NO_HEADERS, None).is_none());
-    // Where the gateway isn't told what is served (the apps): every one of
-    // these routes, and the session check of nobody.
+    // A path under the folder that is no logo's: no route.
+    let other = get(&gateway, "/__ent_auth/universities/univ-rennes/settings", &NO_HEADERS, None).unwrap();
+    assert_eq!((other.status().as_u16(), body_of(&other)), (404, serde_json::json!({ "error": "Not found." })));
+    // Where the gateway isn't told what is served (the apps): the list and
+    // the logos, which carry their remote settings, are their Node's, and
+    // so is the session check of nobody, for now.
     let apps = campus.gateway();
     for target in [UNIVERSITIES, LOGO, SESSION] {
         assert!(get(&apps, target, &NO_HEADERS, None).is_none(), "{target}");
     }
+    // Without a Node behind, the session check of nobody is answered, at
+    // the university the page chose.
+    let mut chosen = HeaderMap::new();
+    chosen.insert("x-tafac-university", UNIVERSITY.parse().unwrap());
+    assert_eq!(body_of(&get(&apps.without_node(), SESSION, &chosen, None).unwrap())["university"], UNIVERSITY);
 }
 
 #[test]
@@ -101,12 +109,33 @@ fn a_session_check_without_a_cookie_is_nobody_at_the_university_asked_for() {
     let counted = serving(campus.gateway()).with_statistics(Some("phc_key"));
     assert_eq!(body_of(&get(&counted, SESSION, &NO_HEADERS, None).unwrap())["analyticsEnabled"], true);
 
-    // A cookie that is nobody's session (expired, signed out, unread) is
-    // still Node's to answer: it may say the session expired. And the
-    // other routes have each their own answer for nobody, Node's.
-    assert!(get(&gateway, SESSION, &NO_HEADERS, Some("v1.made.by.another.secret")).is_none());
-    for target in ["/__ent_auth/account", "/__ent_auth/apps", "/__ent_auth/grades", "/__ent_auth/moodle/deadlines"] {
-        assert!(get(&gateway, target, &NO_HEADERS, None).is_none(), "{target}");
+    // A cookie that is nobody's session (signed out, unread): the same.
+    assert_eq!(body_of(&get(&gateway, SESSION, &NO_HEADERS, Some("v1.made.by.another.secret")).unwrap())["authenticated"], false);
+    // The other routes have each their own answer for nobody, Node's, and
+    // say there is no session.
+    for (target, field) in [("/__ent_auth/apps", "apps"), ("/__ent_auth/grades", "grades"), ("/__ent_auth/moodle/deadlines", "deadlines")] {
+        let response = get(&gateway, target, &NO_HEADERS, None).unwrap();
+        assert_eq!(response.headers()["x-tafac-session"], "expired", "{target}");
+        assert_eq!(body_of(&response), serde_json::json!({ "authenticated": false, field: null }), "{target}");
     }
     assert!(campus.paths().is_empty());
+}
+
+// Node's feature gate, before a route's own answer for nobody: a university
+// without the service (Node's settings) says it is disabled.
+#[test]
+fn a_service_the_university_hasnt_is_disabled_for_nobody() {
+    let campus = campus();
+    let gateway = serving(campus.gateway());
+    let mut rennes_2 = HeaderMap::new();
+    rennes_2.insert("x-tafac-university", "univ-rennes-2".parse().unwrap());
+    for (target, feature) in [("/__ent_auth/grades", "grades"), ("/__ent_auth/grades/report.pdf", "grades")] {
+        let response = get(&gateway, target, &rennes_2, None).unwrap();
+        assert_eq!((response.status().as_u16(), body_of(&response)), (404, serde_json::json!({ "ok": false, "disabled": true, "feature": feature })), "{target}");
+        assert_eq!(response.headers()["x-tafac-session"], "expired");
+    }
+    // Moodle's deadlines are Rennes 2's: its own answer for nobody.
+    assert_eq!(body_of(&get(&gateway, "/__ent_auth/moodle/deadlines", &rennes_2, None).unwrap())["deadlines"], serde_json::Value::Null);
+    // At Rennes, the grades' own.
+    assert_eq!(get(&gateway, "/__ent_auth/grades", &NO_HEADERS, None).unwrap().status(), 200);
 }

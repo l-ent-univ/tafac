@@ -1,12 +1,13 @@
 // Tafac's backend in Rust: it signs the student in, holds the session, and
-// answers what has moved to tonAPI. Node is behind it for the rest.
+// answers every route of the page's API. On tafac.fr it can run with no
+// Node behind it; the apps' bridge still has their own.
 //
 // The page asks /__ent_auth/* and /__ent_proxy/*. tonAPI
 // (github.com/l-ent-univ/tonAPI, in Rust: one provider per software, one
 // settings file per university) signs in at the university and reads what
-// its services say; Node (server.js) still answers the routes that haven't
-// moved, with the session made here. This crate is where a route moves,
-// once, for every place Tafac runs.
+// its services say; Node (server.js), where it is still behind, is told
+// when a session ends, and gets what is left (routes.rs says what). This
+// crate is where a route moves, once, for every place Tafac runs.
 //
 // A request goes down this file's list:
 //
@@ -36,11 +37,13 @@
 // And two ways in:
 //
 //   the apps         call Gateway::answer from their bridge, in the app
-//                    itself (src-tauri/src/bridge.rs), then ask Node
-//   tafac.fr         runs the binary in front of Node (proxy.rs, main.rs):
-//                    it answers the same way and passes everything else on,
-//                    but for tafac.fr's own routes, which it answers itself
-//                    (own/: the apps' remote settings, the desktop update)
+//                    itself (src-tauri/src/bridge.rs), then ask their Node
+//                    what it leaves (None)
+//   tafac.fr         runs the binary (proxy.rs, main.rs), alone or in front
+//                    of Node: it answers the same way, and tafac.fr's own
+//                    routes (own/: the apps' remote settings, the desktop
+//                    update, the page's files); with a Node behind
+//                    (TAFAC_GATEWAY_NODE), it passes on what is left
 //
 // The page doesn't change: /__ent_auth/* stays the only contract.
 //

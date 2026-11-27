@@ -1,10 +1,14 @@
-// tafac.fr's side of the gateway: an HTTP server in front of Node.
+// tafac.fr's side of the gateway: its HTTP server, alone or in front of
+// Node.
 //
 // It answers tafac.fr's own routes first (own/: the apps' remote settings,
-// the desktop update), which the apps' bridge never sees; then what the
-// gateway answers, as the apps' bridge does
-// (Gateway::answer: the sign-in, the session, the moved routes), and passes
-// every other request on to Node as it came, and Node's answer back as it
+// the desktop update), which the apps' bridge never sees; then every
+// request of the page's API, as the apps' bridge does (Gateway::answer: the
+// sign-in, the session, every route, for anyone). What is left, an address
+// outside the API that the page's files don't take (a POST to /, any
+// address where the server has no build), is Express's 404 without Node
+// (no TAFAC_GATEWAY_NODE: nothing is ever passed on). With a Node behind,
+// it is passed on as it came, and Node's answer back as it
 // came: the method, the path and its query, every header (Host, Cookie,
 // X-Forwarded-*: none added, none renamed), the body as it streams (an
 // upload, a download), the status (a redirect is passed on, never
@@ -14,8 +18,8 @@
 //
 // Three bodies are read here before anything is decided: a sign-in's, which
 // says who signs in, the statistics', and the applications' list their
-// icons are for (Gateway::reads_body). They are small, and go to Node whole
-// when the request is Node's.
+// icons are for (Gateway::reads_body). They are small: one past express.json's
+// limit is refused unread (Gateway::body_too_large).
 //
 // Given the page's build, it answers the page's files itself
 // (own/statics.rs), before the gateway and Node.
@@ -62,8 +66,8 @@ pub struct Proxy {
     // None: every request goes to Node (no secret to read the session's
     // cookie with, or to write it).
     gateway: Option<Gateway>,
-    // Node's address, host:port.
-    node: String,
+    // Node's address, host:port, when there is one behind.
+    node: Option<String>,
     client: Client<HttpConnector, Body>,
     // tafac.fr's own services (own/), with or without a gateway.
     own: Vec<Box<dyn Service>>,
@@ -100,17 +104,26 @@ fn strip_hop_by_hop(headers: &mut HeaderMap) {
     }
 }
 
+// A body refused for its size, read a little further and thrown away: the
+// client that is still sending it gets the refusal rather than a
+// connection reset. A megabyte and five seconds at most.
+async fn drained(body: Incoming) {
+    let _ = tokio::time::timeout(std::time::Duration::from_secs(5), http_body_util::Limited::new(body, 1024 * 1024).collect()).await;
+}
+
 fn is_upgrade(headers: &HeaderMap) -> bool {
     headers.contains_key(UPGRADE)
         && headers.get_all(CONNECTION).iter().filter_map(|value| value.to_str().ok()).any(|value| value.to_ascii_lowercase().contains("upgrade"))
 }
 
 impl Proxy {
-    pub fn new(gateway: Option<Gateway>, node: &str) -> Self {
+    // `node`: where Node listens, when there is one behind. Without it the
+    // gateway answers alone: a gateway is wanted then (main.rs).
+    pub fn new(gateway: Option<Gateway>, node: Option<&str>) -> Self {
         // One connection per request, as the apps' bridge: Node is on the
         // same machine, and closes an idle connection when it likes.
         let client = Client::builder(TokioExecutor::new()).pool_max_idle_per_host(0).build_http();
-        Self { gateway, node: node.to_string(), client, own: Vec::new(), statics: None, page: None }
+        Self { gateway, node: node.map(str::to_string), client, own: Vec::new(), statics: None, page: None }
     }
 
     // One of tafac.fr's own services, answered before the gateway and Node.
@@ -128,7 +141,7 @@ impl Proxy {
     pub fn with_page_files(mut self, dist: std::path::PathBuf, apple_app_ids: &str, served: crate::own::universities::Served) -> Self {
         self.page = crate::own::page::Page::read(&dist, served);
         if self.page.is_none() {
-            eprintln!("Tafac gateway: no index.html in {}: the page itself is Node's", dist.display());
+            eprintln!("Tafac gateway: no index.html in {}: the page itself is Node's, or a 404 without Node", dist.display());
         }
         self.statics = Some(crate::own::statics::Statics::new(dist, apple_app_ids));
         self
@@ -174,10 +187,25 @@ impl Proxy {
         let mut read = None;
 
         if let Some(gateway) = &self.gateway {
-            let declared = request.headers().get(CONTENT_LENGTH).and_then(|length| length.to_str().ok()?.parse::<u64>().ok());
-            if Gateway::reads_body(&method, &path) && declared.is_some_and(|length| length <= MAX_SIGN_IN_BYTES) {
-                match request.body_mut().collect().await {
+            if Gateway::reads_body(&method, &path) {
+                // Past the limit, declared or sent: refused, and the
+                // connection closed after it.
+                let declared = request.headers().get(CONTENT_LENGTH).and_then(|length| length.to_str().ok()?.parse::<u64>().ok());
+                let too_large = || {
+                    let mut refused = Gateway::body_too_large(&method, &path).map(full);
+                    refused.headers_mut().insert(CONNECTION, http::HeaderValue::from_static("close"));
+                    refused
+                };
+                if declared.is_some_and(|length| length > MAX_SIGN_IN_BYTES) {
+                    drained(request.into_body()).await;
+                    return too_large();
+                }
+                match http_body_util::Limited::new(request.body_mut(), MAX_SIGN_IN_BYTES as usize).collect().await {
                     Ok(body) => read = Some(body.to_bytes()),
+                    Err(error) if error.is::<http_body_util::LengthLimitError>() => {
+                        drained(request.into_body()).await;
+                        return too_large();
+                    }
                     Err(_) => return plain(StatusCode::BAD_REQUEST, "Requête interrompue"),
                 }
             }
@@ -193,10 +221,20 @@ impl Proxy {
             if let Some(response) = answered {
                 return response.map(full);
             }
-            gateway.saw_request(&method, &path, cookie.as_deref());
+            if self.node.is_some() {
+                gateway.saw_request(&method, &path, cookie.as_deref());
+            }
         }
 
-        let passed = if is_upgrade(request.headers()) { self.join(request).await } else { self.pass_on(request, read).await };
+        // No Node behind: nothing is passed on. Express's 404, as Node's
+        // server would end the request (the page's API's as JSON).
+        let Some(node) = &self.node else {
+            if crate::routes::is_api(&path) {
+                return crate::gateway::not_found().map(full);
+            }
+            return own::express::not_found(&method, &path).map(full);
+        };
+        let passed = if is_upgrade(request.headers()) { self.join(node, request).await } else { self.pass_on(node, request, read).await };
         match passed {
             Ok(response) => {
                 if let Some(gateway) = &self.gateway {
@@ -213,10 +251,10 @@ impl Proxy {
 
     // A request to Node as it came, and Node's answer as it comes. `read`:
     // its body, when it was read here.
-    async fn pass_on(&self, request: Request<Incoming>, read: Option<Bytes>) -> Result<Response<Body>, BoxError> {
+    async fn pass_on(&self, node: &str, request: Request<Incoming>, read: Option<Bytes>) -> Result<Response<Body>, BoxError> {
         let (mut parts, body) = request.into_parts();
         let path = parts.uri.path_and_query().map_or("/", |path| path.as_str());
-        parts.uri = format!("http://{}{path}", self.node).parse()?;
+        parts.uri = format!("http://{node}{path}").parse()?;
         parts.version = Version::HTTP_11;
         strip_hop_by_hop(&mut parts.headers);
         let body = match read {
@@ -231,8 +269,8 @@ impl Proxy {
 
     // A connection the page asks to upgrade (a WebSocket): Node's answer,
     // then the two connections joined, each side's bytes passed to the other.
-    async fn join(&self, mut request: Request<Incoming>) -> Result<Response<Body>, BoxError> {
-        let stream = TcpStream::connect(&self.node).await?;
+    async fn join(&self, node: &str, mut request: Request<Incoming>) -> Result<Response<Body>, BoxError> {
+        let stream = TcpStream::connect(node).await?;
         let (mut sender, connection) = hyper::client::conn::http1::Builder::new().preserve_header_case(true).handshake(TokioIo::new(stream)).await?;
         tokio::spawn(async move {
             let _ = connection.with_upgrades().await;
@@ -256,11 +294,13 @@ impl Proxy {
     }
 
     // A request the gateway makes to Node (node.rs says which: Node told
-    // that a session ended), and Node's whole answer.
+    // that a session ended), and Node's whole answer. None without a Node
+    // (the gateway asks nothing then: Gateway::without_node).
     async fn ask_node(&self, request: NodeRequest) -> NodeAnswer {
+        let node = self.node.as_ref()?;
         let (mut parts, body) = request.into_parts();
         let path = parts.uri.path_and_query().map_or("/", |path| path.as_str());
-        parts.uri = format!("http://{}{path}", self.node).parse().ok()?;
+        parts.uri = format!("http://{node}{path}").parse().ok()?;
         parts.version = Version::HTTP_11;
         strip_hop_by_hop(&mut parts.headers);
 
@@ -400,7 +440,7 @@ mod tests {
     fn gateway_before(node: &Node, campus: Option<&Campus>) -> String {
         let listener = block_on(TcpListener::bind("127.0.0.1:0")).unwrap();
         let address = listener.local_addr().unwrap().to_string();
-        let proxy = Arc::new(Proxy::new(campus.map(Campus::gateway), &node.address));
+        let proxy = Arc::new(Proxy::new(campus.map(Campus::server_gateway), Some(&node.address)));
         spawn(async move {
             let _ = serve(listener, proxy).await;
         });
@@ -518,21 +558,27 @@ mod tests {
     }
 
     #[test]
-    fn what_the_gateway_leaves_is_nodes_own_answer() {
+    fn the_page_s_api_is_answered_here_for_anyone_and_node_gets_the_rest() {
         let (campus, node) = (campus(), node());
         let address = gateway_before(&node, Some(&campus));
         // A session the gateway doesn't hold (a cookie from when Node
-        // served the demo account, read as nobody's): Node's.
+        // served the demo account, read as nobody's), and nobody signed in.
         let demo = campus.cookie(serde_json::json!({ "mode": "demo" }), &[]);
-        let (head, body) = get(&address, "/__ent_auth/session", &session_cookie(&demo));
-        assert_eq!(header_of(&head, crate::ANSWERED_BY), "");
-        assert_eq!(body, NODES_SESSION.as_bytes());
-        // Nobody signed in, and a route that hasn't moved.
-        let (_, body) = get(&address, "/__ent_auth/session", "");
-        assert_eq!(body, NODE_SAYS);
-        let (_, body) = get(&address, "/__ent_auth/planning", &session_cookie(&campus.alive()));
+        for cookie in [session_cookie(&demo), String::new()] {
+            let (head, body) = get(&address, "/__ent_auth/session", &cookie);
+            assert_eq!(header_of(&head, crate::ANSWERED_BY), "tonapi");
+            let answer: serde_json::Value = serde_json::from_slice(&body).unwrap();
+            assert_eq!((&answer["authenticated"], &answer["university"]), (&false.into(), &"univ-rennes".into()));
+        }
+        // Node's old planning route, no longer asked: no route.
+        let (head, body) = get(&address, "/__ent_auth/planning", &session_cookie(&campus.alive()));
+        assert!(head.starts_with("HTTP/1.1 404"), "{head}");
+        assert_eq!(body, br#"{"error":"Not found."}"#);
+        assert!(node.heads().is_empty());
+        // An address outside the API no line takes: Node's.
+        let (_, body) = post(&address, "/somewhere", "", "");
         assert_eq!(body, br#"{"from":"node"}"#);
-        assert!(node.heads().iter().any(|head| head.starts_with("GET /__ent_auth/planning") && header_of(head, "cookie").contains("__Host-lent_session=")));
+        assert_eq!(node.heads().len(), 1);
     }
 
     fn post(address: &str, path: &str, headers: &str, body: &str) -> (String, Vec<u8>) {
@@ -562,35 +608,36 @@ mod tests {
         let (head, body) = get(&address, "/__ent_auth/session", &session_cookie(value));
         assert_eq!(header_of(&head, crate::ANSWERED_BY), "tonapi");
         assert_eq!(serde_json::from_slice::<serde_json::Value>(&body).unwrap()["user"], "jdoe");
-        get(&address, "/__ent_auth/planning", &session_cookie(value));
-        assert!(node.heads().iter().any(|head| head.starts_with("GET /__ent_auth/planning") && header_of(head, "cookie").contains(value)));
+        assert!(node.heads().is_empty());
     }
 
     #[test]
-    fn a_sign_in_that_is_nodes_reaches_it_whole() {
+    fn a_sign_in_is_never_nodes() {
         let (campus, node) = (campus(), node());
         let address = gateway_before(&node, Some(&campus));
-        // Another university; a body Node reads its own way; one too large
-        // to be read here.
+        // A university the gateway doesn't serve; a body that isn't JSON;
+        // one too large to be read, declared or sent in pieces.
         let here = r#"{"username":"jdoe","password":"p","university":"univ-rennes"}"#.to_string();
-        let elsewhere = r#"{"username":"jdoe","password":"p","university":"univ-rennes-2"}"#.to_string();
+        let elsewhere = r#"{"username":"jdoe","password":"p","university":"univ-nulle-part"}"#.to_string();
         let large = format!(r#"{{"username":"jdoe","password":"{}","university":"univ-rennes"}}"#, "p".repeat(MAX_SIGN_IN_BYTES as usize));
-        for (headers, sent) in [(JSON, &elsewhere), ("content-type: text/plain\r\n", &here), (JSON, &large)] {
+        for (headers, sent, status, said) in [
+            (JSON, &elsewhere, "400", r#"{"error":"Unknown university \"univ-nulle-part\"."}"#),
+            ("content-type: text/plain\r\n", &here, "400", r#"{"error":"Username and password are required."}"#),
+            (JSON, &large, "413", r#"{"error":"Request body too large."}"#),
+        ] {
             let (head, body) = post(&address, "/__ent_auth/login", headers, sent);
-            assert!(head.starts_with("HTTP/1.1 200 OK"), "{head}");
-            assert_eq!(header_of(&head, crate::ANSWERED_BY), "");
-            // Node's own answer, with the cookie of the session it made.
-            let answer: serde_json::Value = serde_json::from_slice(&body).unwrap();
-            assert_eq!((&answer["from"], &answer["read"]), (&"node".into(), &sent.len().into()));
-            assert!(header_of(&head, "set-cookie").starts_with("__Host-lent_session=v1.made.by.node"));
+            assert!(head.starts_with(&format!("HTTP/1.1 {status}")), "{head}");
+            assert_eq!(header_of(&head, crate::ANSWERED_BY), "tonapi");
+            assert_eq!(String::from_utf8_lossy(&body), said);
+            assert_eq!(header_of(&head, "set-cookie"), "");
         }
+        let chunked = format!("POST /__ent_auth/login HTTP/1.1\r\nhost: tafac.exemple.test\r\n{JSON}transfer-encoding: chunked\r\nconnection: close\r\n\r\n{:x}\r\n{large}\r\n0\r\n\r\n", large.len());
+        let (head, _) = send(&address, chunked.as_bytes());
+        assert!(head.starts_with("HTTP/1.1 413"), "{head}");
         assert!(campus.seen.lock().unwrap().is_empty());
-        let received = node.heads();
-        assert_eq!(received.len(), 3);
-        assert_eq!(header_of(&received[0], "content-length"), elsewhere.len().to_string());
-        assert_eq!(header_of(&received[0], "host"), "tafac.exemple.test");
+        assert!(node.heads().is_empty());
 
-        // Without a gateway, every sign-in is Node's.
+        // Without a gateway (no SESSION_SECRET), every sign-in is Node's.
         let address = gateway_before(&node, None);
         let (_, body) = post(&address, "/__ent_auth/login", JSON, r#"{"username":"jdoe","password":"the-password","university":"univ-rennes"}"#);
         assert_eq!(serde_json::from_slice::<serde_json::Value>(&body).unwrap()["from"], "node");
@@ -618,10 +665,11 @@ mod tests {
         assert!(header_of(&told, "cookie").contains("__Host-lent_session=v1."));
         assert_eq!(header_of(&told, "content-length"), "0");
 
-        // A copy of the cookie kept past the sign-out: Node's to refuse.
+        // A copy of the cookie kept past the sign-out: nobody's, here.
         let (head, body) = get(&address, "/__ent_auth/session", &cookie);
-        assert_eq!(header_of(&head, crate::ANSWERED_BY), "");
-        assert_eq!(body, NODES_SESSION.as_bytes());
+        assert_eq!(header_of(&head, crate::ANSWERED_BY), "tonapi");
+        assert_eq!(serde_json::from_slice::<serde_json::Value>(&body).unwrap()["authenticated"], false);
+        assert_eq!(node.heads().len(), 1);
     }
 
     #[test]
@@ -653,6 +701,55 @@ mod tests {
         let address = gateway_before(&nowhere, None);
         let (head, _) = get(&address, "/__ent_auth/planning", "");
         assert!(head.starts_with("HTTP/1.1 502"), "{head}");
+    }
+
+    // The gateway with no Node behind: every request answered, none passed
+    // on, Node never told a session ended. A Node listens all the same,
+    // not given to the server: nothing reaches it.
+    #[test]
+    fn without_node_every_request_is_answered_here_and_none_is_passed_on() {
+        let (campus, node) = (campus(), node());
+        let listener = block_on(TcpListener::bind("127.0.0.1:0")).unwrap();
+        let address = listener.local_addr().unwrap().to_string();
+        let proxy = Arc::new(Proxy::new(Some(campus.gateway().without_node()), None));
+        spawn(async move {
+            let _ = serve(listener, proxy).await;
+        });
+        let alive = session_cookie(&campus.alive());
+        // Nobody signed in, at each kind of route: Node's words, here.
+        for (path, status, said) in [
+            ("/__ent_auth/account", "200", serde_json::json!({ "authenticated": false, "account": null, "sessionMode": null })),
+            ("/__ent_auth/apps", "200", serde_json::json!({ "authenticated": false, "apps": null })),
+            ("/__ent_auth/grades/report.pdf", "401", serde_json::json!({ "error": "Not signed in." })),
+            ("/__ent_auth/ade/tree", "404", serde_json::json!({ "error": "Not found." })),
+            ("/__ent_proxy/api/v4-3/dlm/layout.json", "401", serde_json::json!({ "error": "Authentication required." })),
+        ] {
+            let (head, body) = get(&address, path, "");
+            assert!(head.starts_with(&format!("HTTP/1.1 {status}")), "{path}: {head}");
+            assert_eq!(header_of(&head, "x-tafac-session"), "expired", "{path}");
+            assert_eq!(serde_json::from_slice::<serde_json::Value>(&body).unwrap(), said, "{path}");
+        }
+        // Signed in, then signed out: the CAS is told, Node isn't.
+        assert_eq!(header_of(&get(&address, "/__ent_auth/session", &alive).0, crate::ANSWERED_BY), "tonapi");
+        let (head, _) = post(&address, "/__ent_auth/logout", &alive, "");
+        assert!(head.starts_with("HTTP/1.1 200"), "{head}");
+        assert!(!campus.cas_knows_the_ticket());
+        // A session found expired: said, and Node isn't told.
+        let other = session_cookie(&campus.alive());
+        campus.cas_forgets();
+        let (head, _) = get(&address, "/__ent_auth/grades", &other);
+        assert_eq!(header_of(&head, "x-tafac-session"), "expired");
+        // What Node's server would have ended: Express's 404, no build here.
+        let (head, body) = post(&address, "/", "", "");
+        assert!(head.starts_with("HTTP/1.1 404"), "{head}");
+        assert_eq!(header_of(&head, "content-security-policy"), "default-src 'none'");
+        assert!(String::from_utf8_lossy(&body).contains("<pre>Cannot POST /</pre>"));
+        let (head, _) = get(&address, "/some/page", "");
+        assert!(head.starts_with("HTTP/1.1 404"), "{head}");
+        // A connection asked to upgrade isn't joined to anything.
+        let (head, _) = get(&address, "/socket", "connection: Upgrade\r\nupgrade: echo\r\n");
+        assert!(head.starts_with("HTTP/1.1 404"), "{head}");
+        assert!(node.heads().is_empty());
     }
 
     #[test]

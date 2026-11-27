@@ -93,7 +93,7 @@ impl Drop for Build {
 #[test]
 fn the_pages_files_are_answered_here_when_the_server_has_the_build() {
     let (node, build) = (node(), Build::new("served"));
-    let address = server(Proxy::new(None, &node.address).with_page_files(build.0.clone(), "", crate::own::universities::Served::from_environment(|_| None, false).unwrap()));
+    let address = server(Proxy::new(None, Some(&node.address)).with_page_files(build.0.clone(), "", crate::own::universities::Served::from_environment(|_| None, false).unwrap()));
 
     let (head, body) = get(&address, "GET", "/assets/index-abc.js", "");
     assert!(head.starts_with("HTTP/1.1 200 OK"), "{head}");
@@ -176,7 +176,7 @@ fn the_pages_files_are_answered_here_when_the_server_has_the_build() {
 fn a_build_without_its_page_leaves_the_page_to_node() {
     let (node, build) = (node(), Build::new("no-page"));
     std::fs::remove_file(build.0.join("index.html")).unwrap();
-    let address = server(Proxy::new(None, &node.address).with_page_files(build.0.clone(), "", crate::own::universities::Served::from_environment(|_| None, false).unwrap()));
+    let address = server(Proxy::new(None, Some(&node.address)).with_page_files(build.0.clone(), "", crate::own::universities::Served::from_environment(|_| None, false).unwrap()));
     assert_eq!(get(&address, "GET", "/assets/index-abc.js", "").1, b"console.log(1)");
     for path in ["/", "/index.html", "/rennes", "/sitemap.xml", "/assets/missing.js"] {
         assert_eq!(get(&address, "GET", path, "").1, br#"{"from":"node"}"#, "{path}");
@@ -186,7 +186,7 @@ fn a_build_without_its_page_leaves_the_page_to_node() {
 #[test]
 fn without_the_build_the_pages_files_are_nodes() {
     let node = node();
-    let address = server(Proxy::new(None, &node.address));
+    let address = server(Proxy::new(None, Some(&node.address)));
     for path in ["/assets/index-abc.js", "/robots.txt", "/.well-known/apple-app-site-association"] {
         assert_eq!(get(&address, "GET", path, "").1, br#"{"from":"node"}"#, "{path}");
     }
@@ -194,11 +194,11 @@ fn without_the_build_the_pages_files_are_nodes() {
 }
 
 #[test]
-fn the_icons_body_is_read_on_its_way_and_goes_to_node_whole_when_its_nodes() {
+fn the_icons_body_is_read_on_its_way_and_node_is_asked_nothing() {
     let (campus, node) = (campus(), node());
     let data = std::env::temp_dir().join(format!("tafac-gateway-proxy-icons-{}", std::process::id()));
     let _ = std::fs::remove_dir_all(&data);
-    let address = server(Proxy::new(Some(campus.gateway().with_icons_in(&data)), &node.address));
+    let address = server(Proxy::new(Some(campus.server_gateway().with_icons_in(&data)), Some(&node.address)));
     let cookie = format!("cookie: {COOKIE_NAME}={}\r\n", campus.alive());
     let post = |headers: &str, body: &str| {
         send(&address, format!("POST /__ent_auth/app-icons HTTP/1.1\r\nhost: tafac.exemple.test\r\n{headers}content-length: {}\r\nconnection: close\r\n\r\n{body}", body.len()).as_bytes())
@@ -207,15 +207,19 @@ fn the_icons_body_is_read_on_its_way_and_goes_to_node_whole_when_its_nodes() {
     let (head, body) = post(&format!("{cookie}content-type: application/json\r\n"), r#"{"services":[{"id":"webapp-mail","title":"Messagerie"}]}"#);
     assert_eq!(header_of(&head, ANSWERED_BY), "tonapi", "{head}");
     assert_eq!(serde_json::from_slice::<serde_json::Value>(&body).unwrap()["icons"]["webapp-mail"]["icon"], "ph:envelope-simple-duotone");
-    assert!(node.got.lock().unwrap().is_empty());
 
-    // Nobody signed in, a body Node reads its own way, one past the limit:
-    // Node gets each whole.
+    // Nobody signed in, a body not said to be JSON, one past the limit:
+    // each refused here, as Node refused it.
     let large = format!(r#"{{"services":[],"x":"{}"}}"#, "x".repeat(100 * 1024));
-    for (headers, sent) in [("content-type: application/json\r\n".to_string(), r#"{"services":[]}"#.to_string()), (cookie.clone(), r#"{"services":[]}"#.to_string()), (format!("{cookie}content-type: application/json\r\n"), large)] {
-        let (_, body) = post(&headers, &sent);
-        assert_eq!(body, br#"{"from":"node"}"#);
-        assert_eq!(node.got.lock().unwrap().last().unwrap().1, sent.len());
+    for (headers, sent, status) in [
+        ("content-type: application/json\r\n".to_string(), r#"{"services":[]}"#.to_string(), "401"),
+        (cookie.clone(), r#"{"services":[]}"#.to_string(), "400"),
+        (format!("{cookie}content-type: application/json\r\n"), large, "413"),
+    ] {
+        let (head, _) = post(&headers, &sent);
+        assert!(head.starts_with(&format!("HTTP/1.1 {status}")), "{head}");
+        assert_eq!(header_of(&head, ANSWERED_BY), "tonapi", "{head}");
     }
+    assert!(node.got.lock().unwrap().is_empty());
     let _ = std::fs::remove_dir_all(&data);
 }

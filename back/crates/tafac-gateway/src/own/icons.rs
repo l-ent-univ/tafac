@@ -22,12 +22,17 @@
 //       once in the log, and a broken file is left as it is.
 //   400 { ok: false, error: 'Expected { services: [...] }.' }: JSON, but
 //       not that.
-//   Still Node's: 401 for nobody signed in, a session the gateway doesn't
-//       hold, a body Node reads its own way (not said to be JSON, another
-//       charset, compressed, empty, past 100 kB, not JSON serde_json reads),
-//       a university whose look icons.json doesn't have, and every request
-//       when the gateway isn't given the data directory (the apps: their
-//       Node keeps its own file, in the app's data folder).
+//   401 { ok: false, error: 'Authentication required.' }: nobody signed
+//       in, a session the gateway doesn't hold (gateway/nobody.rs).
+//   A body Node read its own way, which the page never sends: not said to
+//       be JSON, empty (Node: no services, 400 as above), another charset
+//       (415), compressed (Node inflated it: refused here, 415), past 100
+//       kB (413), not JSON serde_json reads (400), in the words the mail's
+//       routes give the same refusals.
+//   Still the apps' own Node's: every request when the gateway isn't given
+//       the data directory (their Node keeps its own file, in the app's
+//       data folder), and a university whose look icons.json doesn't have
+//       (none the gateway serves).
 //
 // The picking is the page's too (src/appIconPicks.js, for the demo
 // account): its lists aren't typed again here. scripts/gateway-data.mjs
@@ -385,24 +390,33 @@ fn is_json_in_utf8(content_type: &str) -> bool {
     charset.is_none_or(|charset| charset.eq_ignore_ascii_case("utf-8"))
 }
 
-// The body as express.json() reads it, for a request it reads the way it
-// is read here: said to be JSON in UTF-8, not compressed, within the
-// limit, an object or a list. None: Node's to read.
-fn read_body(asked: &Asked<'_>) -> Option<serde_json::Value> {
-    if !is_json_in_utf8(asked.headers.get(CONTENT_TYPE)?.to_str().ok()?) {
-        return None;
+// The body as express.json() reads it: said to be JSON in UTF-8, not
+// compressed, within the limit, an object or a list. Err: the answer to a
+// body read another way (what express.json's errors come to, worded as the
+// mail's routes word them); a body not said to be JSON, or empty, is no
+// services.
+fn read_body(asked: &Asked<'_>) -> Result<serde_json::Value, http::Response<Vec<u8>>> {
+    let refused = |status: u16, error: &str| json_response(status, serde_json::to_vec(&serde_json::json!({ "error": error })).unwrap_or_default());
+    let Some(content_type) = asked.headers.get(CONTENT_TYPE).and_then(|value| value.to_str().ok()) else { return Ok(serde_json::Value::Null) };
+    if !content_type.split(';').next().unwrap_or_default().trim().eq_ignore_ascii_case("application/json") {
+        return Ok(serde_json::Value::Null);
     }
     let mut encodings = asked.headers.get_all(CONTENT_ENCODING).iter();
-    if let Some(encoding) = encodings.next() {
-        if !encoding.as_bytes().eq_ignore_ascii_case(b"identity") || encodings.next().is_some() {
-            return None;
-        }
+    let encoded = encodings.next().is_some_and(|encoding| !encoding.as_bytes().eq_ignore_ascii_case(b"identity")) || encodings.next().is_some();
+    if !is_json_in_utf8(content_type) || encoded {
+        return Err(refused(415, "Unsupported charset."));
     }
-    if asked.body.is_empty() || asked.body.len() > MAX_BODY_BYTES {
-        return None;
+    if asked.body.len() > MAX_BODY_BYTES {
+        return Err(refused(413, "Request body too large."));
     }
-    let body: serde_json::Value = serde_json::from_slice(asked.body).ok()?;
-    (body.is_object() || body.is_array()).then_some(body)
+    let body = asked.body.strip_prefix(b"\xef\xbb\xbf").unwrap_or(asked.body);
+    if body.is_empty() {
+        return Ok(serde_json::Value::Null);
+    }
+    match serde_json::from_slice::<serde_json::Value>(body) {
+        Ok(body) if body.is_object() || body.is_array() => Ok(body),
+        _ => Err(refused(400, "Invalid JSON.")),
+    }
 }
 
 // --- The file ----------------------------------------------------------------------
@@ -632,7 +646,10 @@ impl Icons {
         let data = data();
         let theme = data.themes.get(university)?;
         let palette = data.color_modes.get(&theme.color_mode).filter(|palette| data.hues.iter().all(|hue| palette.contains_key(hue)))?;
-        let body = read_body(asked)?;
+        let body = match read_body(asked) {
+            Ok(body) => body,
+            Err(refused) => return Some(refused),
+        };
         let Some(services) = sanitize(&body) else { return Some(json_response(400, WRONG_SHAPE.as_bytes().to_vec())) };
 
         let store = {
@@ -847,7 +864,7 @@ mod tests {
     }
 
     #[test]
-    fn a_body_node_reads_its_own_way_is_left_to_it() {
+    fn a_body_node_reads_its_own_way_is_refused_here_and_nothing_written() {
         let folder = Folder::new("bodies");
         let icons = Icons::new(&folder.0);
         let with = |pairs: &[(&'static str, &'static str)]| {
@@ -873,13 +890,24 @@ mod tests {
             (json_headers(), &b"\"services\""[..]),
             (json_headers(), &b"7"[..]),
             (json_headers(), &b"{ broken"[..]),
-            (json_headers(), &b"\xef\xbb\xbf{\"services\":[]}"[..]),
             (json_headers(), &br#"{"services":[{"id":"a","title":"\ud83d"}]}"#[..]),
         ] {
-            assert!(icons.answer_on("univ-rennes", &post(&headers, body), "2026-11-26").is_none(), "{headers:?} {}", String::from_utf8_lossy(body));
+            let answer = icons.answer_on("univ-rennes", &post(&headers, body), "2026-11-26").unwrap();
+            assert!([400, 415].contains(&answer.status().as_u16()), "{headers:?} {}: {}", String::from_utf8_lossy(body), answer.status());
         }
+        // Not said to be JSON, or empty: no services, in Node's words.
+        for (headers, body) in [(with(&[]), &services[..]), (with(&[("content-type", "text/plain")]), &services[..]), (json_headers(), &b""[..])] {
+            let answer = icons.answer_on("univ-rennes", &post(&headers, body), "2026-11-26").unwrap();
+            assert_eq!((answer.status().as_u16(), answer.body().as_slice()), (400, WRONG_SHAPE.as_bytes()));
+        }
+        let charset = icons.answer_on("univ-rennes", &post(&with(&[("content-type", "application/json; charset=latin1")]), services), "2026-11-26").unwrap();
+        assert_eq!((charset.status().as_u16(), charset.body().as_slice()), (415, &br#"{"error":"Unsupported charset."}"#[..]));
         let large = format!(r#"{{"services":[],"padding":"{}"}}"#, "x".repeat(MAX_BODY_BYTES));
-        assert!(icons.answer_on("univ-rennes", &post(&json_headers(), large.as_bytes()), "2026-11-26").is_none());
+        assert_eq!(icons.answer_on("univ-rennes", &post(&json_headers(), large.as_bytes()), "2026-11-26").unwrap().status(), 413);
+        assert!(!folder.0.join("app-icons").join("univ-rennes.json").exists());
+        // A byte order mark is taken off, as express.json does.
+        let marked = icons.answer_on("univ-rennes", &post(&json_headers(), b"\xef\xbb\xbf{\"services\":[]}"), "2026-11-26").unwrap();
+        assert_eq!(marked.status(), 200);
         // A university whose look isn't known here.
         assert!(icons.answer_on("univ-nowhere", &post(&json_headers(), services), "2026-11-26").is_none());
 

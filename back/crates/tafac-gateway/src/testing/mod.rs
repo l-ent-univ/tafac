@@ -929,8 +929,16 @@ impl Campus {
         ResolvedUniversity { dir: Default::default(), university: toml::from_str(&file).unwrap(), establishments: Default::default() }
     }
 
+    // As the apps' bridge has it: not told what is served, their own Node
+    // behind for who holds no session of the gateway's.
     pub fn gateway(&self) -> Gateway {
         Gateway::for_tests(vec![self.settings()], SECRET, COOKIE_NAME)
+    }
+
+    // As tafac.fr's server has it: told what is served (every university,
+    // nothing set in the environment), every route answered for anyone.
+    pub fn server_gateway(&self) -> Gateway {
+        self.gateway().serving(crate::own::universities::Served::from_environment(|_| None, false).expect("the directory's universities"))
     }
 
     // The gateway of the campus whose Moodle is behind the federation.

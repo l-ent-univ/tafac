@@ -1,16 +1,20 @@
-// The gateway as tafac.fr runs it: an HTTP server in front of Node
-// (proxy.rs). It signs students in, holds their sessions and answers the
-// routes that moved to tonAPI (routes.rs); it passes everything else on to
-// Node as it came.
+// The gateway as tafac.fr runs it: an HTTP server, alone or in front of
+// Node (proxy.rs). It signs students in, holds their sessions and answers
+// every route of the page's API (routes.rs), and the page's files given the
+// build; with a Node behind, it passes on what is left as it came.
 //
 // Its settings, from the environment (SESSION_SECRET, TRUST_PROXY and
 // POSTHOG_PROJECT_KEY are Node's own, read from the same place):
 //
 //   TAFAC_GATEWAY_LISTEN  where it listens (default 127.0.0.1:3100)
-//   TAFAC_GATEWAY_NODE    where Node listens (default 127.0.0.1:3000, Node's PORT)
+//   TAFAC_GATEWAY_NODE    where Node listens, when there is one behind
+//                         (host:port, Node's PORT). Unset, there is none:
+//                         nothing is passed on, Node is never told a
+//                         session ended, and what is left is Express's 404
 //   SESSION_SECRET        the session's cookie is written and read with it,
 //                         here and by Node. Without it every request goes
-//                         to Node, the sign-in too
+//                         to Node, the sign-in too; without it and without
+//                         Node, the server doesn't start
 //   TRUST_PROXY           whose word is taken for a student's address (the
 //                         sign-in's limits): unset, the server in front on
 //                         this machine or a private network, as Node
@@ -33,7 +37,8 @@
 //                         here, from the file Node keeps there (the same
 //                         folder for both: a relative one is each one's own
 //                         folder's). Unset, they are Node's (its default,
-//                         ./data, is its own folder's)
+//                         ./data, is its own folder's); without Node, ./data
+//                         of the folder the server runs in, as Node's
 //   TAFAC_GATEWAY_DIST    the page's build (Node's dist/): the page, its
 //                         files, the sitemap, robots.txt and Apple's file
 //                         are answered here, as Node answers them. Unset,
@@ -75,7 +80,7 @@ async fn stopped() {
 #[tokio::main]
 async fn main() -> std::io::Result<()> {
     let listen = setting("TAFAC_GATEWAY_LISTEN", "127.0.0.1:3100");
-    let node = setting("TAFAC_GATEWAY_NODE", "127.0.0.1:3000");
+    let node = Some(setting("TAFAC_GATEWAY_NODE", "")).filter(|node| !node.is_empty());
     // The cookie Node itself reads: under the other name the gateway would
     // make sessions Node doesn't see.
     let development = !setting("TAFAC_GATEWAY_DEV", "").is_empty();
@@ -96,30 +101,38 @@ async fn main() -> std::io::Result<()> {
     // start, neither does this.
     let environment = |name: &str| std::env::var(name).ok();
     let served = Served::from_environment(environment, development).map_err(|why| std::io::Error::new(std::io::ErrorKind::InvalidInput, why))?;
-    let data_dir = setting("DATA_DIR", "");
+    if secret.is_empty() && node.is_none() {
+        return Err(std::io::Error::new(std::io::ErrorKind::InvalidInput, "SESSION_SECRET is not set, and there is no Node behind (TAFAC_GATEWAY_NODE) to answer in its place"));
+    }
+    // Node's default folder, without a Node to keep it.
+    let data_dir = Some(setting("DATA_DIR", "")).filter(|dir| !dir.is_empty()).or_else(|| node.is_none().then(|| "data".to_string()));
     let gateway = (!secret.is_empty()).then(|| {
-        let gateway = Gateway::new(&secret, cookie).trusting(trusted).with_statistics(statistics.as_deref()).sending_statistics(Statistics::read(statistics.as_deref(), environment)).serving(served.clone());
-        if data_dir.is_empty() {
-            return gateway;
+        let mut gateway = Gateway::new(&secret, cookie).trusting(trusted).with_statistics(statistics.as_deref()).sending_statistics(Statistics::read(statistics.as_deref(), environment)).serving(served.clone());
+        if node.is_none() {
+            gateway = gateway.without_node();
         }
-        gateway.with_icons_in(std::path::absolute(&data_dir).unwrap_or_else(|_| data_dir.clone().into()))
+        match &data_dir {
+            Some(dir) => gateway.with_icons_in(std::path::absolute(dir).unwrap_or_else(|_| dir.into())),
+            None => gateway,
+        }
     });
     let listener = tokio::net::TcpListener::bind(&listen).await?;
+    let behind = node.as_deref().map_or_else(|| "no Node behind".to_string(), |node| format!("Node at {node}"));
     match &gateway {
         Some(gateway) => println!(
-            "Tafac gateway on http://{listen}, Node at {node} (tonAPI {} for {}; session cookie {cookie})",
+            "Tafac gateway on http://{listen}, {behind} (tonAPI {} for {}; session cookie {cookie})",
             &TONAPI_COMMIT[..TONAPI_COMMIT.len().min(7)],
             gateway.universities().join(", "),
         ),
-        None => eprintln!("Tafac gateway on http://{listen}, Node at {node}: SESSION_SECRET is not set, every request but tafac.fr's own goes to Node"),
+        None => eprintln!("Tafac gateway on http://{listen}, {behind}: SESSION_SECRET is not set, every request but tafac.fr's own goes to Node"),
     }
 
     let latest = setting("DESKTOP_LATEST_FILE", "");
     let _following = follow_releases(&latest, &setting("DESKTOP_LATEST_FROM", ""), !setting("DESKTOP_LATEST_PIN", "").is_empty());
-    let mut proxy = Proxy::new(gateway, &node).serving(AppSettings::new(&setting("APP_SETTINGS_FILE", "")));
+    let mut proxy = Proxy::new(gateway, node.as_deref()).serving(AppSettings::new(&setting("APP_SETTINGS_FILE", "")));
     // server.js answers the desktop app's update itself, 404 without a
     // manifest. The development server has no such route: there, without a
-    // manifest, the request stays its own, as before.
+    // manifest, the request stays its own, as before (a 404 without Node).
     let manifest = setting("DESKTOP_LATEST_JSON", "");
     if !development || !latest.is_empty() || !manifest.is_empty() {
         proxy = proxy.serving(DesktopUpdate::new(&latest, &manifest));

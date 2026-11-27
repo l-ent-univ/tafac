@@ -1,5 +1,6 @@
 // The gateway on a made-up campus (testing/): what it answers, its errors
-// too, and what it leaves to Node or tells it.
+// too, for a session it holds and for nobody, and what it tells Node when
+// there is one.
 //
 //   signin.rs             the session made and ended: a sign-in, its
 //                         refusals and limits, what is Node's, a sign-out
@@ -33,6 +34,9 @@
 //   icons.rs              the applications' icons, Tafac's own: Node's file
 //   own.rs                tafac.fr's server on the wire: the page's files,
 //                         the icons' body read on its way
+//   without_node.rs       no Node at all: every route answered for anyone,
+//                         Node never asked or told; the portal proxy's
+//                         old links and refusals
 
 mod analytics;
 mod apps;
@@ -51,6 +55,7 @@ mod portal;
 mod signin;
 mod student;
 mod universities;
+mod without_node;
 
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{LazyLock, Mutex};
@@ -170,4 +175,14 @@ fn cookie_set(response: &http::Response<Vec<u8>>) -> Option<String> {
     let set = response.headers().get(SET_COOKIE)?.to_str().unwrap();
     let value = set.strip_prefix(&format!("{COOKIE_NAME}="))?.split(';').next()?;
     Some(if value.is_empty() { "cleared".to_string() } else { value.to_string() })
+}
+
+// A request that holds no session of the gateway's, answered here as Node
+// answered nobody (gateway/nobody.rs): Node is asked nothing. Its status
+// and its body; the page is told there is no session.
+fn nobodys(gateway: &Gateway, method: &Method, target: &str, headers: &HeaderMap, body: &[u8], cookie: Option<String>) -> (u16, serde_json::Value) {
+    let response = block_on(gateway.answer(&asked(method, target, headers, body), || cookie.clone(), never)).expect("an answer made here");
+    assert_eq!(response.headers()[ANSWERED_BY], "tonapi", "{target}");
+    assert_eq!(response.headers()["x-tafac-session"], "expired", "{target}");
+    (response.status().as_u16(), serde_json::from_slice(response.body()).unwrap_or(serde_json::Value::Null))
 }

@@ -22,7 +22,7 @@ import {
   getTimetableResources,
   getTimetableTree,
   logoutFromEnt,
-  requestEnt,
+  requestApi,
 } from '../../entApi'
 import { DebugButton, DebugField, DebugRow, DebugSection, DebugSegmented, DebugSwitchRow } from './DebugControls'
 import CloseButton from '../CloseButton'
@@ -31,7 +31,7 @@ import { clearClientRuntimeState, getErrorMessage, resolveDebugImagePreviewFromS
 import { NEXT_CLASS_LOOKAHEAD_DAYS, planningResources } from '../../upcomingClasses'
 import { addDays } from '../../planningDates'
 
-const DEFAULT_REQUEST_PATH = '/api/v4-3/dlm/layout.json'
+const DEFAULT_REQUEST_PATH = '/__ent_auth/account'
 // Both read once, at load (src/papillon.js, src/serviceNoticeDebug.js):
 // their toggles write the override, then reload.
 const PAPILLON_OVERRIDE = readPapillonDebugOverride()
@@ -280,7 +280,7 @@ export default function DebugMenu({
       return
     }
 
-    void runDebugAction(`GET ${path}`, () => requestEnt(path))
+    void runDebugAction(`GET ${path}`, () => requestApi(path))
   }
 
   function handleAdeSearch(event) {
@@ -618,7 +618,7 @@ export default function DebugMenu({
             </form>
             <form className="flex items-end gap-2 px-4 py-3" onSubmit={handleCustomRequest}>
               <DebugField
-                label="Endpoint ENT"
+                label="Route de l’API"
                 type="text"
                 mono
                 value={requestPath}

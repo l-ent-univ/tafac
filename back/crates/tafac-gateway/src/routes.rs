@@ -1,29 +1,36 @@
 // The one table: which side answers each of the page's routes.
 //
 // The page asks /__ent_auth/* and /__ent_proxy/* and nothing else, on
-// tafac.fr and in the apps alike. The gateway is in front: it signs the
-// student in, holds the session, and answers the routes that have moved to
-// tonAPI. Node is behind it for the rest, each listed here with what keeps
-// it there, so this file says where the move stands. A route not listed is
-// Node's.
+// tafac.fr and in the apps alike. The gateway answers every one of them:
+// it signs the student in, holds the session, and answers each route for a
+// session it holds and for nobody (gateway/nobody.rs: Node's answers when it
+// read no session), a university it doesn't serve included. A path of the
+// page's API not listed is no route: 404, as Express says it (Moved::NotFound).
 //
 // The page's own files are at the end: tafac.fr's server answers them when
 // it is given the build, and the last line takes every GET left (a file of
-// the build, or Node's page where there is none).
+// the build, or the page where there is none).
+//
+// What is left of Node: an address outside the page's API that no line
+// takes (a POST to /, a GET where the server has no build), passed on when
+// a Node is behind (TAFAC_GATEWAY_NODE), Express's 404 without one
+// (proxy.rs); and in the apps, whose bridge still has their own Node
+// behind: the list of universities (it carries their remote settings), the
+// statistics and the icons, which the bridge doesn't set the gateway up for.
 //
 // A moved route is written once more in translate/ (tonAPI's answer as the
-// page reads it today, its errors too). It is still Node's for the sessions
-// the gateway doesn't hold: nobody signed in, another university. The
-// planning's are the exception: the page reads tonAPI's own answers there
-// (gateway/planning.rs), and Node has no such route.
+// page reads it today, its errors too). The planning's are the exception:
+// the page reads tonAPI's own answers there (gateway/planning.rs), and Node
+// has no such route.
 
 use http::Method;
 
 // The universities the gateway signs in at and answers for: named alike in
 // tonAPI's settings and in Tafac's (universities/<id>), and checked there on
 // a real account (back/README.md, « The universities answered here »). Any
-// other university is Node's, sign-in included. One added here brings the
-// relay's own lists (launch/targets.rs).
+// other university is refused at the sign-in, and a session of one is
+// nobody's (gateway/signin.rs, gateway/nobody.rs). One added here brings
+// the relay's own lists (launch/targets.rs).
 pub const UNIVERSITIES: &[&str] = &["univ-rennes", "univ-rennes-2", "univ-sorbonne-nouvelle"];
 
 // A route tonAPI answers, by its translator (translate/<name>.rs), or with
@@ -61,6 +68,12 @@ pub enum Moved {
     UniversityLogo,
     Analytics,
     AppIcons,
+    // /__ent_proxy/*: the portal's pages Node relayed. An old link to one
+    // goes to the launch relay; nothing else is relayed any more
+    // (gateway/portal_proxy.rs).
+    PortalProxy,
+    // Any other path of the page's API: no route (Express's 404).
+    NotFound,
 }
 
 // A route of tafac.fr's own that its server answers itself, before Node
@@ -91,6 +104,8 @@ pub enum Backend {
     // given the build (TAFAC_GATEWAY_DIST) for the page's files; Node
     // otherwise, and in the apps.
     Server(Servers),
+    // An address outside the page's API that no line takes: Node's, when
+    // there is one behind (proxy.rs).
     Node,
 }
 
@@ -100,20 +115,14 @@ pub struct Route {
     // A path, or every path under one ("/…/*").
     pub path: &'static str,
     pub backend: Backend,
-    // For a route of Node's: what tonAPI lacks to answer it as Node does.
-    pub why: &'static str,
 }
 
 const fn moved(method: &'static str, path: &'static str, to: Moved) -> Route {
-    Route { method, path, backend: Backend::TonApi(to), why: "" }
+    Route { method, path, backend: Backend::TonApi(to) }
 }
 
 const fn servers(method: &'static str, path: &'static str, to: Servers) -> Route {
-    Route { method, path, backend: Backend::Server(to), why: "" }
-}
-
-const fn node(method: &'static str, path: &'static str, why: &'static str) -> Route {
-    Route { method, path, backend: Backend::Node, why }
+    Route { method, path, backend: Backend::Server(to) }
 }
 
 pub const ROUTES: &[Route] = &[
@@ -136,8 +145,9 @@ pub const ROUTES: &[Route] = &[
     moved("GET", "/__ent_auth/universities", Moved::Universities),
     moved("GET", "/__ent_auth/universities/*", Moved::UniversityLogo),
     moved("POST", "/__ent_auth/analytics", Moved::Analytics),
-    // The portal.
-    node("*", "/__ent_proxy/*", "the account's photo, and an old link to a page of the portal's (sent on to the launch relay)"),
+    // The portal's pages Node relayed: an old link to one, sent on to the
+    // launch relay; anything else refused (gateway/portal_proxy.rs).
+    moved("*", "/__ent_proxy/*", Moved::PortalProxy),
     moved("POST", "/__ent_auth/app-icons", Moved::AppIcons),
     // Tafac's own relay: a service opened signed in (launch/).
     moved("GET", "/__ent_auth/launch", Moved::Launch),
@@ -146,9 +156,6 @@ pub const ROUTES: &[Route] = &[
     moved("GET", "/__ent_auth/timetable", Moved::Timetable),
     moved("GET", "/__ent_auth/timetable/tree", Moved::TimetableTree),
     moved("GET", "/__ent_auth/timetable/resources", Moved::TimetableResources),
-    // The planning's routes before: the page no longer asks them.
-    node("GET", "/__ent_auth/planning", "no longer asked by the page, which reads the planning at /__ent_auth/timetable; kept until Node goes"),
-    node("*", "/__ent_auth/ade/*", "no longer asked by the page, which reads the planning at /__ent_auth/timetable; kept until Node goes"),
     // The student's own files: the photo ScoDoc keeps, the school certificate.
     moved("GET", "/__ent_auth/student-pic", Moved::StudentPicture),
     moved("GET", "/__ent_auth/documents/school-certificate/status", Moved::CertificateStatus),
@@ -177,7 +184,7 @@ pub const ROUTES: &[Route] = &[
 ];
 
 // The page's API: never a file.
-fn is_api(path: &str) -> bool {
+pub(crate) fn is_api(path: &str) -> bool {
     ["/__ent_auth", "/__ent_proxy"].iter().any(|api| path.strip_prefix(api).is_some_and(|rest| rest.is_empty() || rest.starts_with('/')))
 }
 
@@ -192,15 +199,24 @@ fn matches(route: &Route, method: &Method, path: &str) -> bool {
     method_matches && path_matches
 }
 
-// Which side answers a request: the first line of the table that fits it,
-// Node when none does.
+// Which side answers a request: the first line of the table that fits it;
+// for a path of the page's API that none fits, no route (Express's 404);
+// Node for any other address.
 pub fn backend(method: &Method, path: &str) -> Backend {
     // The mail's, in any case and with or without a slash at the end, as
     // Express matches them: none of its paths reaches Node.
     if crate::gateway::is_mail_path(path) {
         return Backend::TonApi(Moved::Mail);
     }
-    ROUTES.iter().find(|route| matches(route, method, path)).map_or(Backend::Node, |route| route.backend)
+    // Node mounted its portal proxy on the prefix itself too.
+    if path == "/__ent_proxy" {
+        return Backend::TonApi(Moved::PortalProxy);
+    }
+    match ROUTES.iter().find(|route| matches(route, method, path)) {
+        Some(route) => route.backend,
+        None if is_api(path) => Backend::TonApi(Moved::NotFound),
+        None => Backend::Node,
+    }
 }
 
 // The route a request is, when tonAPI answers it.
@@ -271,6 +287,7 @@ mod tests {
         ] {
             assert_eq!(backend(&Method::GET, path), Backend::TonApi(route), "{path}");
         }
+        // Any other path of the page's API: no route, answered here.
         for (method, path) in [
             (Method::POST, "/__ent_auth/session"),
             (Method::POST, "/__ent_auth/moodle/deadlines"),
@@ -291,15 +308,25 @@ mod tests {
             (Method::GET, "/__ent_auth/launch/"),
             (Method::GET, "/__ent_auth/documents/school-certificate/"),
             (Method::GET, "/__ent_auth/documents/something-new"),
+            (Method::GET, "/__ent_auth/planning"),
             (Method::POST, "/__ent_auth/ade/upcoming"),
             (Method::GET, "/__ent_auth/ade/tree"),
             (Method::POST, "/__ent_auth/timetable"),
             (Method::GET, "/__ent_auth/timetable/"),
             (Method::GET, "/__ent_auth/timetable/groups"),
-            (Method::GET, "/__ent_proxy/api/v4-3/dlm/layout.json"),
             (Method::GET, "/__ent_auth/something-new"),
+            (Method::HEAD, "/__ent_auth/session"),
             (Method::GET, "/__ent_auth"),
-            (Method::GET, "/__ent_proxy"),
+        ] {
+            assert_eq!(backend(&method, path), Backend::TonApi(Moved::NotFound), "{method} {path}");
+            assert_eq!(server_route(&method, path), None);
+        }
+        for (method, path) in [(Method::GET, "/__ent_proxy/api/v4-3/dlm/layout.json"), (Method::POST, "/__ent_proxy/api/layout"), (Method::GET, "/__ent_proxy"), (Method::GET, "/__ent_proxy/")] {
+            assert_eq!(backend(&method, path), Backend::TonApi(Moved::PortalProxy), "{method} {path}");
+        }
+        // Outside the page's API, what no line takes: Node's, when there is
+        // one behind.
+        for (method, path) in [
             (Method::POST, "/"),
             (Method::POST, "/sitemap.xml"),
             (Method::POST, "/desktop/latest.json"),
@@ -317,7 +344,7 @@ mod tests {
         for (method, path) in [(Method::POST, "/__ent_auth/mail/send"), (Method::GET, "/__ent_auth/MAIL/recent"), (Method::POST, "/__ent_auth/Mail/Send/"), (Method::GET, "/__ent_auth/mail"), (Method::PUT, "/__ent_auth/mail/x")] {
             assert_eq!(backend(&method, path), Backend::TonApi(Moved::Mail), "{method} {path}");
         }
-        assert_eq!(backend(&Method::GET, "/__ent_auth/mailbox"), Backend::Node);
+        assert_eq!(backend(&Method::GET, "/__ent_auth/mailbox"), Backend::TonApi(Moved::NotFound));
     }
 
     #[test]
@@ -342,17 +369,16 @@ mod tests {
     }
 
     #[test]
-    fn every_line_is_a_route_of_the_page_and_says_why_it_stays() {
+    fn every_line_is_a_route_of_the_page_and_none_is_nodes() {
         for route in ROUTES {
             // A moved route is one of the page's API; the server's own are
             // the site's other addresses.
             match route.backend {
-                Backend::TonApi(_) => assert!(route.path.starts_with("/__ent_auth/"), "{}", route.path),
+                Backend::TonApi(_) => assert!(is_api(route.path.trim_end_matches("/*")), "{}", route.path),
                 Backend::Server(_) => assert!(route.path.starts_with('/') && !is_api(route.path), "{}", route.path),
-                Backend::Node => assert!(route.path.starts_with('/'), "{}", route.path),
+                Backend::Node => panic!("{} is Node's", route.path),
             }
             assert!(["GET", "POST", "*"].contains(&route.method), "{}", route.method);
-            assert_eq!(route.backend == Backend::Node, !route.why.is_empty(), "{}", route.path);
         }
         // The whole site's line is the last: every line above it counts.
         assert_eq!(ROUTES.iter().position(|route| route.path == "/*"), Some(ROUTES.len() - 1));
@@ -375,6 +401,10 @@ mod tests {
         // file of the build if there were one, as for Node.
         assert_eq!(backend(&Method::GET, "/desktop/download"), Backend::Server(Servers::BuiltFile));
     }
+
+    // Node's routes that the page no longer asks, which have no line: they
+    // answer 404 here (Moved::NotFound), and go with Node's code.
+    const DROPPED: &[&str] = &["/__ent_auth/planning", "/__ent_auth/ade"];
 
     // Node's routes, read from its source: one added there shows here, to be
     // listed above with the side that answers it. The API's, and the ones
@@ -406,7 +436,8 @@ mod tests {
                     let folder = route.path.strip_suffix("/*");
                     route.path == path || folder.is_some_and(|folder| path == folder || path.starts_with(&format!("{folder}/")))
                 });
-                if !listed && !(is_use && path == "/__ent_auth") {
+                let dropped = DROPPED.iter().any(|dropped| path == *dropped || path.starts_with(&format!("{dropped}/")));
+                if !listed && !dropped && !(is_use && path == "/__ent_auth") {
                     missing.push(path.to_string());
                 }
             }

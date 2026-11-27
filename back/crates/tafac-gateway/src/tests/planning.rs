@@ -154,8 +154,12 @@ fn a_session_the_cas_no_longer_knows_is_over_here_too() {
 }
 
 #[test]
-fn nobody_signed_in_is_nodes() {
+fn nobody_signed_in_is_refused_as_tonapi_refuses_a_request_without_a_session() {
     let campus = campus();
-    let gateway = campus.gateway();
-    assert!(block_on(gateway.answer(&asked(&GET, WEEK, &NO_HEADERS, &[]), || None, never)).is_none());
+    let gateway = campus.server_gateway();
+    let response = block_on(gateway.answer(&asked(&GET, WEEK, &NO_HEADERS, &[]), || None, never)).unwrap();
+    assert_eq!(response.status(), 401);
+    assert_eq!(response.headers()["content-type"], "application/problem+json");
+    assert_eq!(response.headers()["x-tafac-session"], "expired");
+    assert_eq!(serde_json::from_slice::<serde_json::Value>(response.body()).unwrap()["code"], "invalid_token");
 }

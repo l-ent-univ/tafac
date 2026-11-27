@@ -328,9 +328,9 @@ fn the_codes_sent_to_one_student_are_counted() {
 }
 
 #[test]
-fn what_is_not_a_sign_in_at_a_university_answered_here_is_nodes() {
+fn a_sign_in_is_never_nodes() {
     let campus = campus();
-    let gateway = campus.gateway();
+    let gateway = campus.server_gateway();
     let json = json_headers();
     let mut by_header = json_headers();
     by_header.insert(UNIVERSITY_HEADER, UNIVERSITY.parse().unwrap());
@@ -341,29 +341,40 @@ fn what_is_not_a_sign_in_at_a_university_answered_here_is_nodes() {
         Some(id) => serde_json::json!({ "username": STUDENT, "password": PASSWORD, "university": id }).to_string(),
         None => serde_json::json!({ "username": STUDENT, "password": PASSWORD }).to_string(),
     };
-    for (why, headers, body) in [
-        ("another university", &json, credentials(Some("univ-rennes-2"))),
-        ("another university, by the header", &elsewhere, credentials(None)),
-        ("the body's choice before the header's", &by_header, credentials(Some("univ-rennes-2"))),
-        ("no university said", &json, credentials(None)),
-        ("no password", &json, serde_json::json!({ "username": STUDENT, "university": UNIVERSITY }).to_string()),
-        ("not JSON", &no_type, credentials(Some(UNIVERSITY))),
+    // Refused, in Node's words, the CAS asked nothing: a university the
+    // gateway doesn't serve, by the body or by the header; no login or no
+    // password, or no JSON to read them from.
+    let unknown = serde_json::json!({ "error": "Unknown university \"univ-rennes-2\"." });
+    let no_login = serde_json::json!({ "error": "Username and password are required." });
+    for (why, headers, body, said) in [
+        ("another university", &json, credentials(Some("univ-rennes-2")), &unknown),
+        ("another university, by the header", &elsewhere, credentials(None), &unknown),
+        ("no password", &json, serde_json::json!({ "username": STUDENT, "university": UNIVERSITY }).to_string(), &no_login),
+        ("not JSON", &no_type, credentials(Some(UNIVERSITY)), &no_login),
     ] {
-        let answer = block_on(gateway.answer(&asked(&POST, LOGIN, headers, body.as_bytes()), || None, never));
-        assert!(answer.is_none(), "{why}");
+        let answer = block_on(gateway.answer(&asked(&POST, LOGIN, headers, body.as_bytes()), || None, never)).unwrap();
+        assert_eq!((answer.status().as_u16(), &body_of(&answer)), (400, said), "{why}");
+        assert!(answer.headers().get(http::header::SET_COOKIE).is_none(), "{why}");
     }
     assert!(campus.seen.lock().unwrap().is_empty());
 
-    // The university by the header alone, as a page without the body's
-    // choice sends it.
-    let answer = block_on(gateway.answer(&asked(&POST, LOGIN, &by_header, credentials(None).as_bytes()), || None, never)).unwrap();
-    assert_eq!(answer.status(), 200);
+    // Signed in, as Node chose the university: the body's when it names
+    // one served, else the header's, else the one the request is for (the
+    // default one here).
+    for (why, headers, body) in [
+        ("the header's, the body's naming none served", &by_header, credentials(Some("univ-rennes-2"))),
+        ("the header alone", &by_header, credentials(None)),
+        ("none said", &json, credentials(None)),
+    ] {
+        let answer = block_on(gateway.answer(&asked(&POST, LOGIN, headers, body.as_bytes()), || None, never)).unwrap();
+        assert_eq!((answer.status().as_u16(), &body_of(&answer)["university"]), (200, &UNIVERSITY.into()), "{why}");
+    }
 }
 
 #[test]
 fn a_sign_out_ends_the_session_at_the_cas_here_and_at_nodes() {
     let campus = campus();
-    let gateway = campus.gateway();
+    let gateway = campus.server_gateway();
     let node = Node::default();
     let cookie = cookie_set(&sign_in(&gateway, &node, &login(STUDENT, PASSWORD)).unwrap()).unwrap();
     assert!(ask(&gateway, SESSION, &cookie).is_some());
@@ -384,7 +395,7 @@ fn a_sign_out_ends_the_session_at_the_cas_here_and_at_nodes() {
     // the session stays.
     assert!(gateway.signed_in(Some(&cookie)).is_none());
     let asked_before = campus.paths().len();
-    assert_eq!(ask(&gateway, SESSION, &cookie), None);
+    assert_eq!(ask(&gateway, SESSION, &cookie).unwrap()["authenticated"], false);
     assert_eq!(campus.paths().len(), asked_before);
 }
 
@@ -403,14 +414,20 @@ fn a_sign_out_goes_through_whatever_the_cas_and_node_say() {
 }
 
 #[test]
-fn a_sign_out_without_a_session_held_here_is_nodes() {
+fn a_sign_out_without_a_session_held_here_is_answered_as_nodes() {
     let campus = campus();
-    let gateway = campus.gateway();
+    let gateway = campus.server_gateway().without_node();
     let demo = campus.cookie(serde_json::json!({ "mode": "demo" }), &[]);
     let elsewhere = campus.cookie(serde_json::json!({ "uni": "univ-rennes-2" }), &[("JSESSIONID", "alive")]);
-    for cookie in [Some(demo), Some(elsewhere), Some("v1.AAAA.AAAA.AAAA".to_string()), None] {
+    let without_ticket = campus.cookie(serde_json::json!({ "jar": [] }), &[]);
+    for cookie in [Some(demo), Some(elsewhere), Some("v1.AAAA.AAAA.AAAA".to_string()), Some(without_ticket.clone()), None] {
         let headers = HeaderMap::new();
-        assert!(block_on(gateway.answer(&asked(&POST, LOGOUT, &headers, &[]), || cookie.clone(), never)).is_none());
+        let response = block_on(gateway.answer(&asked(&POST, LOGOUT, &headers, &[]), || cookie.clone(), never)).unwrap();
+        assert_eq!((response.status().as_u16(), body_of(&response)), (200, serde_json::json!({ "authenticated": false })));
+        assert_eq!(cookie_set(&response).as_deref(), Some("cleared"));
+        assert!(response.headers().get("x-tafac-session").is_none());
     }
+    // The session without its ticket ended with it.
+    assert!(gateway.memory.ended(&crate::session::cookie::Codec::new(SECRET).read(&without_ticket, crate::gateway::now_ms()).unwrap().id).is_some());
     assert!(campus.seen.lock().unwrap().is_empty());
 }

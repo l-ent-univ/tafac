@@ -2,7 +2,7 @@
 // ScoDoc gateway with the CAS ticket, and its report goes to the page in
 // ScoDoc's own shape. What the routes refuse is refused in Node's words.
 
-use super::{ask, asked, error_of, never, unavailable, GET, NO_HEADERS};
+use super::{ask, asked, body_of, error_of, never, unavailable, GET, NO_HEADERS};
 use crate::testing::*;
 use crate::ANSWERED_BY;
 
@@ -103,7 +103,7 @@ fn the_report_is_kept_and_scodocs_session_with_it() {
 #[test]
 fn what_node_refuses_is_refused_here_in_its_words() {
     let campus = campus();
-    let gateway = campus.gateway();
+    let gateway = campus.server_gateway();
     let cookie = campus.alive();
     // Ids that aren't ids: Node's own 400, on any server, nothing asked.
     for (path, said) in [
@@ -120,9 +120,11 @@ fn what_node_refuses_is_refused_here_in_its_words() {
         assert_eq!(error_of(&gateway, path, &cookie), (400, serde_json::json!({ "error": said })), "{path}");
     }
     // A path Node's own route doesn't read an id from is no route of the
-    // page's: Node's, as any other.
+    // page's: 404, as any other.
     for path in ["/__ent_auth/grades/semester/12/34x", "/__ent_auth/grades/semester/12/34", "/__ent_auth/grades/semester/"] {
-        assert!(block_on(gateway.answer(&asked(&GET, path, &NO_HEADERS, &[]), || Some(cookie.clone()), never)).is_none(), "{path}");
+        let response = block_on(gateway.answer(&asked(&GET, path, &NO_HEADERS, &[]), || Some(cookie.clone()), never)).unwrap();
+        assert_eq!((response.status().as_u16(), body_of(&response)), (404, serde_json::json!({ "error": "Not found." })), "{path}");
+        assert!(response.headers().get("x-tafac-session").is_none());
     }
     assert!(campus.seen.lock().unwrap().is_empty());
 }

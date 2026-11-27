@@ -245,9 +245,9 @@ fn a_portal_that_is_down_is_said_here() {
     }
 }
 
-// The gateway that runs (every university of routes.rs') answers for both:
-// a sign-in for one of them is no longer Node's. One for a university that
-// isn't there still is, without a request to anything.
+// The gateway that runs (every university of routes.rs') answers for both.
+// A sign-in for a university that isn't there is refused, in Node's words
+// for an unknown university, without a request to anything.
 #[test]
 fn both_universities_are_switched_on() {
     let gateway = Gateway::new(SECRET, COOKIE_NAME);
@@ -258,5 +258,7 @@ fn both_universities_are_switched_on() {
     let mut headers = HeaderMap::new();
     headers.insert(CONTENT_TYPE, "application/json".parse().unwrap());
     let body = serde_json::json!({ "username": "jdoe", "password": "a-password", "university": "univ-nowhere" }).to_string();
-    assert!(block_on(gateway.answer(&asked(&POST, LOGIN, &headers, body.as_bytes()), || None, never)).is_none());
+    let refused = block_on(gateway.answer(&asked(&POST, LOGIN, &headers, body.as_bytes()), || None, never)).unwrap();
+    assert_eq!(refused.status(), 400);
+    assert_eq!(serde_json::from_slice::<serde_json::Value>(refused.body()).unwrap(), serde_json::json!({ "error": "Unknown university \"univ-nowhere\"." }));
 }

@@ -1,14 +1,16 @@
 # back
 
 Tafac's backend in Rust. It signs the student in, holds the session and
-answers the routes that have moved to
-[tonAPI](https://github.com/l-ent-univ/tonAPI); the Node server (`server.js`,
-`server/`) is behind it for the routes that haven't.
+answers every route of the page's API, through
+[tonAPI](https://github.com/l-ent-univ/tonAPI). On tafac.fr it can run
+alone: the Node server (`server.js`, `server/`) is behind it only when it
+is told where Node is (`TAFAC_GATEWAY_NODE`). The apps' bridge still has
+its own Node behind.
 
 One Cargo workspace; each crate under `crates/`. Today there is one,
 `tafac-gateway`. The apps call it in-process from their bridge
-(`src-tauri/src/bridge.rs`); on tafac.fr it is a small server in front of
-Node. How it fits with the rest: `docs/DESKTOP.md`, « tonAPI ».
+(`src-tauri/src/bridge.rs`); on tafac.fr it is the server itself, alone or
+in front of Node. How it fits with the rest: `docs/DESKTOP.md`, « tonAPI ».
 
 ```sh
 cd back
@@ -27,15 +29,16 @@ the page ──▶ the gateway (Rust) ──▶ tonAPI ──▶ the university
                    │                            (CAS, portal, Moodle, ScoDoc,
                    │                             school records, planning,
                    │                             the webmail)
-                   └──▶ Node
-                        the routes that haven't moved,
-                        with the session made above
+                   └┄┄▶ Node, when there is one behind:
+                        told when a session ends; on tafac.fr what is
+                        left outside the API, in the apps what their
+                        bridge leaves it
 ```
 
 - **The gateway** answers `POST /login`, `POST /logout`, `GET /session`,
   `GET /account`, the portal's applications (`GET /apps`), the Moodle
   deadlines and the five grades routes, for the universities of `routes.rs`
-  (today: Rennes). It makes the session at the
+  (Rennes, Rennes 2, the Sorbonne Nouvelle). It makes the session at the
   sign-in and says when it is over. It is also the launch relay (`GET
   /launch`, `/launch-preview`: a service opened signed in, `launch/`), and
   answers what Moodle's view in the apps may show (`GET /moodle/view`), the
@@ -88,14 +91,38 @@ the page ──▶ the gateway (Rust) ──▶ tonAPI ──▶ the university
   release's manifest followed). The apps ask tafac.fr for them, never their
   bridge: none of it is in the library they embed. Their settings are
   Node's (`APP_SETTINGS_FILE`, `DESKTOP_LATEST_*`), read by `main.rs`.
-- **Node** answers everything else: the
-  account's photo (the portal's proxy), the icons, the page and its files
-  where the gateway isn't given what they need (the apps: their Node keeps
-  them), and every route of the other universities, sign-in and
-  applications included.
-  `routes.rs` lists them with what keeps each there. The moved routes are
-  still Node's for the sessions the gateway doesn't hold: nobody signed in,
-  another university.
+- **Nobody signed in** is answered here too, on every route
+  (`gateway/nobody.rs`): no cookie, a cookie that isn't read (past its
+  lifetime, the demo account's from before, sealed with a secret no longer
+  taken), a session signed out, a session of a university the gateway
+  doesn't serve. Each route says what Node's said where it read no session,
+  its status and its JSON, Node's feature gate first (a university without
+  grades or Moodle's deadlines: 404 `disabled`, from Node's settings, which
+  `universities/directory.json` carries), and `X-Tafac-Session: expired`
+  on every answer but the session check's, the sign-out's and the
+  statistics', as Node's middleware said it. The planning's routes, never
+  Node's, refuse nobody as tonAPI does (`invalid_token`). A session of one
+  of the gateway's universities without its CAS ticket can't be asked
+  with: it is over (the page is told, as by the mail). A sign-in at a
+  university the gateway doesn't serve is refused, in Node's words for an
+  unknown university (`400 { error: 'Unknown university "<id>".' }`); one
+  without a login or a password as Node refuses it (400).
+- **What is no route** is a 404 here: any other path of the page's API,
+  Node's old `/__ent_auth/planning` and `/__ent_auth/ade/*` among them
+  (`404 { error: 'Not found.' }`). `/__ent_proxy/*`, Node's portal proxy,
+  is down to what still comes: an old link to a page of the portal's, sent
+  on to the launch relay as Node sent it; anything else refused in Node's
+  words (`gateway/portal_proxy.rs`). The account's photo is
+  `/__ent_auth/student-pic` (ScoDoc's): the page no longer asks the portal
+  for one.
+- **Node**, where it is still behind: on tafac.fr, with
+  `TAFAC_GATEWAY_NODE`, it gets what is left outside the page's API (a
+  POST to `/`, an address where the server has no build); without it, that
+  is Express's own 404 page, and nothing is ever passed on. In the apps,
+  their Node still answers who holds no session of the gateway's (but for
+  another university's), what is no route, `/__ent_proxy/*`, the list of
+  universities (it carries their remote settings), the statistics and the
+  icons: their bridge goes without it in a step of its own.
   Rennes 2 and the Sorbonne Nouvelle are answered here like Rennes: see
   « Rennes 2 and the Sorbonne Nouvelle ».
 - **The demo account is nobody's here.** The page serves it by itself,
@@ -105,7 +132,8 @@ the page ──▶ the gateway (Rust) ──▶ tonAPI ──▶ the university
   those when it served the demo) is read as nobody signed in, by the
   gateway (`session/cookie.rs`) as by Node.
 - **Node is told** when a session ends here (signed out, or found expired:
-  `node.rs`), for what it kept of it. The gateway asks it nothing else: a
+  `node.rs`), for what it kept of it, when there is one behind; without
+  one, nobody is. The gateway asks it nothing else: a
   sign-in at Rennes is made here, the CAS's second factor included; a
   portal session that lapsed is opened again by tonAPI, with the CAS
   ticket; an error is worded here; and whether the statistics are on
@@ -124,7 +152,7 @@ crates/tafac-gateway/
    ├─ lib.rs              what the crate is, and its public names
    ├─ routes.rs           THE TABLE: each route of the page, moved or Node's, and why
    │
-   ├─ gateway/            a request in, its answer out, or None (Node answers)
+   ├─ gateway/            a request in, its answer out (None: the apps' own Node, for what their bridge leaves it)
    │  ├─ mod.rs           the Gateway: which route, whose session, a route that fails, and a session the university no longer knows
    │  ├─ signin.rs        POST /login and /logout: the session made (tonAPI signs in, one-time code included), and ended
    │  ├─ attempts.rs      the sign-in's limits, the codes sent, and the address a request came from
@@ -133,7 +161,9 @@ crates/tafac-gateway/
    │  ├─ behind.rs        the home page's three answers: an old one given while the university is asked again, all three asked at the sign-in
    │  ├─ settled.rs       routes answered to their end here, failures included: the two files below
    │  ├─ launch.rs        GET /launch and /launch-preview: the target, who asks, the walk
-   │  └─ student.rs       the student's own files: ScoDoc's photo, the school certificate
+   │  ├─ student.rs       the student's own files: ScoDoc's photo, the school certificate
+   │  ├─ nobody.rs        every route for who holds no session here: Node's answers for nobody, its feature gate, the 404
+   │  └─ portal_proxy.rs  /__ent_proxy/*: an old link to the portal's page sent to the relay, anything else refused
    │
    ├─ own/                Tafac's own routes, which no university answers
    │  ├─ universities.rs  the universities served, the one a request is for, GET /universities and the logos
@@ -192,12 +222,12 @@ crates/tafac-gateway/
    │  ├─ student_pic.rs   GET /__ent_auth/student-pic
    │  └─ school_certificate.rs   GET /__ent_auth/documents/school-certificate and its /status
    │
-   ├─ node.rs             Node behind: what it is told, and what the two share (the User-Agent, whether the statistics are on)
+   ├─ node.rs             Node, where it is behind: what it is told, and what the two share (the User-Agent, whether the statistics are on)
    ├─ universities.rs     tonAPI's settings, and where each university's services are
    ├─ portals.rs          what differs from one portal software to another (uPortal, Drupal, iSorbonne)
    │
-   ├─ proxy.rs            tafac.fr: the HTTP server in front of Node
-   ├─ main.rs             tafac.fr: the binary, and its settings
+   ├─ proxy.rs            tafac.fr: the HTTP server, alone or in front of Node
+   ├─ main.rs             tafac.fr: the binary, and its settings (TAFAC_GATEWAY_NODE: where Node is, if anywhere)
    │
    ├─ testing/            a made-up campus (portal, CAS, Moodle, ScoDoc, school records, a federation) for the tests, here and in the apps,
    │                      and two more whose portal is not uPortal (other_portals.rs, pages/)
@@ -206,9 +236,10 @@ crates/tafac-gateway/
 
 ## The rules
 
-- **One table.** `routes.rs` says which side answers each route, and for
-  Node's, what tonAPI lacks. A route not listed is Node's; a test fails when
-  Node gains a route the table doesn't have.
+- **One table.** `routes.rs` says what answers each route of the page's
+  API: every one is the gateway's. A path of the API not listed is a 404; a
+  test fails when Node gains a route the table doesn't have (but for the
+  two the page no longer asks, which go with Node's code).
 - **The session is made here.** tonAPI signs in at the CAS; the gateway
   writes the session's cookie (`session/cookie.rs`) and ends the session
   (signed out, or found expired: only the CAS says a session is over). It
@@ -266,7 +297,7 @@ crates/tafac-gateway/
 
 ## To move a route
 
-1. Its line in `routes.rs` (from `node(…)` to `moved(…)`).
+1. Its line in `routes.rs` (`moved(…)`).
 2. Its question in `tonapi/`: which of tonAPI's providers is asked.
 3. Its translator in `translate/`: the page's JSON from tonAPI's answer,
    with each of Node's answers written at the top, its errors and its
@@ -384,7 +415,21 @@ The timetables are tonAPI's at Rennes (ADE's portal) and Rennes 2 (TEMPO,
 tried on a real account on 27/11/2026). The Sorbonne Nouvelle's ADE 6.12
 has no provider in tonAPI (tonAPI's `docs/recherche/sorbonne-nouvelle.md`).
 Node's `/__ent_auth/planning` and `/__ent_auth/ade/*` are no longer asked
-by the page.
+by the page: the gateway answers them 404.
+
+## Alone
+
+With the page's build and no Node at all, as tafac.fr will run it:
+
+```sh
+npm run build
+cd back && SESSION_SECRET="$(openssl rand -hex 32)" TAFAC_GATEWAY_DIST=../dist \
+  TAFAC_GATEWAY_LISTEN=127.0.0.1:3297 cargo run -p tafac-gateway
+```
+
+It says « no Node behind » as it starts. Without `SESSION_SECRET` and
+without Node it doesn't start. The applications' icons are kept in
+`./data` (Node's `DATA_DIR`, by default the folder it runs in).
 
 ## To see it work
 

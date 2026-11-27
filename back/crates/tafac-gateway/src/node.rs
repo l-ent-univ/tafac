@@ -1,9 +1,11 @@
-// Node, behind the gateway: what it is told, and what the two share.
+// Node, behind the gateway where there still is one: what it is told, and
+// what the two share.
 //
-// Node answers every route that hasn't moved (routes.rs), with the
-// session's cookie, which it reads as the gateway does. For the routes that
-// have moved, the gateway goes to it for one thing, a request to one of
-// Node's own routes:
+// Where it is behind (the apps' bridge; tafac.fr's server given
+// TAFAC_GATEWAY_NODE), Node gets what the gateway leaves (routes.rs), with
+// the session's cookie, which it reads as the gateway does. The gateway
+// goes to it for one thing, a request to one of Node's own routes, and
+// asks nothing without a Node (Gateway::without_node):
 //
 //   a session ended         signed out here, or found expired: Node drops
 //                           what it kept of it (its copy of the cookies,

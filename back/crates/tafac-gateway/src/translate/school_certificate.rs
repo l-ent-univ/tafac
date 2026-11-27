@@ -29,7 +29,7 @@
 //         Node took the CAS's login form in place of the school records
 //         for « no certificate », and kept that answer a quarter of an
 //         hour.
-//     401 for nobody signed in: Node.
+//     401 for nobody signed in: answered here (gateway/nobody.rs; their Node in the apps).
 
 use http::header::{CACHE_CONTROL, CONTENT_DISPOSITION, CONTENT_TYPE};
 use http::HeaderValue;

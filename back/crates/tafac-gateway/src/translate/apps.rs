@@ -18,7 +18,8 @@
 //   502 { error }: the portal is down or slow, or answered what tonAPI
 //       doesn't read. Answered here (translate/failed.rs), in the sentence
 //       the page shows as it is.
-//   401 for nobody signed in; another university's list: Node.
+//   200 { authenticated: false, apps: null }: nobody signed in, another
+//       university. Answered here (gateway/nobody.rs; their Node in the apps).
 
 use tonapi_core::App;
 

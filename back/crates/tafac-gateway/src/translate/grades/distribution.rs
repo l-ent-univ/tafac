@@ -13,7 +13,8 @@
 //   404 { error }: an evaluation that isn't in the student's own report
 //       (tonAPI's `not_found`: it checks the same). Answered here, in
 //       Node's words (translate/failed.rs).
-//   200 { authenticated: false, … 'signed-out' }: nobody signed in. Node.
+//   200 { authenticated: false, … 'signed-out' }: nobody signed in.
+//       Answered here (gateway/nobody.rs; their Node in the apps).
 //   400 { error }: ids that aren't ids. Answered here, in Node's words.
 //   500 { error }: ScoDoc down or answering something else. Answered here
 //       (translate/failed.rs).

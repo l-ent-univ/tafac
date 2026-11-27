@@ -1,5 +1,4 @@
-// The gateway itself: a request of the page in, its answer out, or None
-// when the answer is Node's to give.
+// The gateway itself: a request of the page in, its answer out.
 //
 //   mod.rs        the Gateway: which route, whose session, whether the
 //                 answer made is still the session's when it is ready, a
@@ -23,24 +22,35 @@
 //                 too, with no translator
 //   mail/         the mail page's routes, /__ent_auth/mail/*: the webmail
 //                 signed in to with the CAS ticket, Node's JSON
+//   nobody.rs     what every moved route says when the request holds no
+//                 session of the gateway's: Node's answers for nobody
+//   portal_proxy.rs   /__ent_proxy/*: an old link to a portal's page sent
+//                 on to the launch relay, anything else refused
 //
 // And one route of Tafac's own, which asks the university nothing: the
 // applications' icons (own/icons.rs).
 //
 // The session is the gateway's: it signs the student in, holds what tonAPI
-// got from the university, and says when the session is over. For a session
-// it holds, every moved route is answered here, its errors too
-// (translate/failed.rs). Node is behind it for what hasn't moved
-// (routes.rs), and is told when a session ends (node.rs). None from here
-// means the request goes to Node as it came: a route of Node's, another
-// university, nobody signed in, a cookie that isn't read.
+// got from the university, and says when the session is over. Every route
+// of the page's API is answered here: for a session it holds, its errors
+// too (translate/failed.rs); for nobody, a cookie that isn't read, a
+// session of a university it doesn't serve, as Node answered nobody
+// (nobody.rs); a path that is no route, 404. A Node behind, when there is
+// one, is only told when a session ends (node.rs). None from here is left
+// for the apps' own Node alone (apps_node_answers), until their bridge goes
+// without it: who holds no session of the gateway's (a session of a
+// university it doesn't serve aside), what is no route, /__ent_proxy/*;
+// and what the bridge doesn't set the gateway up for: the list of
+// universities, the statistics, the icons.
 
 mod attempts;
 mod behind;
 mod launch;
 mod mail;
+mod nobody;
 mod planning;
 pub(crate) mod portal;
+mod portal_proxy;
 mod services;
 mod settled;
 mod signin;
@@ -57,6 +67,8 @@ use tonapi_providers::NetSettings;
 
 pub use attempts::TrustedProxies;
 pub(crate) use mail::is_mail_path;
+#[cfg(feature = "server")]
+pub(crate) use nobody::not_found;
 pub use mail::{BoxError, ByteStream, MailBody};
 use behind::Lasting;
 
@@ -123,6 +135,9 @@ pub struct Gateway {
     // The mail's sessions with the webmail, and its limits (gateway/mail/).
     pub(crate) mail_memory: mail::state::MailMemory,
     pub(crate) mail_limits: crate::mail::MailLimits,
+    // Whether a Node is behind, to be told when a session ends: in the apps
+    // (their bridge's server) and on a server given TAFAC_GATEWAY_NODE.
+    node_behind: bool,
 }
 
 pub(crate) fn now_ms() -> i64 {
@@ -155,7 +170,15 @@ impl Gateway {
             icons: None,
             mail_memory: mail::state::MailMemory::default(),
             mail_limits: crate::mail::MailLimits::default(),
+            node_behind: true,
         }
+    }
+
+    // No Node behind (tafac.fr's server without TAFAC_GATEWAY_NODE):
+    // nothing is ever told it.
+    pub fn without_node(mut self) -> Self {
+        self.node_behind = false;
+        self
     }
 
     // The applications' icons answered here, from the file Node keeps in
@@ -166,9 +189,11 @@ impl Gateway {
         self
     }
 
-    // What this server serves, as Node behind it is set up
-    // (`Served::from_environment`). Without it (the apps), the list of
-    // universities and a request nobody is signed in for stay Node's.
+    // What this server serves, as Node is set up (`Served::from_environment`):
+    // the university a request without a session is for. Without it (the
+    // apps), the list of universities stays their Node's, and a request
+    // without a session is for the university the page chose
+    // (nobody.rs).
     pub fn serving(mut self, served: Served) -> Self {
         self.served = Some(served);
         self
@@ -227,13 +252,23 @@ impl Gateway {
 
     // Whether a request's body is read here: a sign-in's, which says who
     // signs in, the statistics', and the applications' list their icons
-    // are for. Every other body goes to Node as it streams.
+    // are for. No other route reads one (the mail streams its own).
     pub fn reads_body(method: &Method, path: &str) -> bool {
         matches!(routes::moved_route(method, path), Some(Moved::Login | Moved::Analytics | Moved::AppIcons))
     }
 
-    // The answer to a request, when its route has moved (routes.rs) and the
-    // answer is one made here. None: Node's to give, as the request came.
+    // The answer to one of those whose body is longer than Node's limit
+    // (express.json's, the statistics' own), which its server doesn't read.
+    pub fn body_too_large(method: &Method, path: &str) -> http::Response<Vec<u8>> {
+        match routes::moved_route(method, path) {
+            Some(Moved::Analytics) => crate::own::analytics::refused_too_large(),
+            _ => translate::json_response(413, br#"{"error":"Request body too large."}"#.to_vec()),
+        }
+    }
+
+    // The answer to a request of the page's API (routes.rs), for anyone.
+    // None: not one of the page's API (an address of the site), or a route
+    // the apps' own Node still answers (the top of this file).
     //
     // `cookie`: the value of the session cookie as the caller holds it now
     // (asked again before answering: the session may have ended meanwhile).
@@ -263,38 +298,54 @@ impl Gateway {
         // The mail's, with the body read whole (the apps' bridge): its answer
         // read whole too. tafac.fr's server streams them (proxy.rs).
         if route == Moved::Mail {
-            if !self.takes_mail(asked.path, cookie().as_deref()) {
-                return None;
-            }
             let answered = self.mail(asked, MailBody::Whole(asked.body.to_vec()), &cookie, node).await;
             let (parts, body) = answered.into_parts();
             let body = body.read(usize::MAX).await.ok()?;
             return Some(http::Response::from_parts(parts, body));
         }
+        // No route: Express's 404, whoever asks.
+        let semester_unread = route == Moved::GradesSemester && !routes::under(route, asked.path).is_some_and(|id| !id.is_empty() && !id.contains('/'));
+        if route == Moved::NotFound || semester_unread {
+            if self.apps_node_answers() {
+                return None;
+            }
+            let held = cookie().is_some_and(|value| self.signed_in(Some(&value)).is_some());
+            return Some(if held { nobody::not_found() } else { nobody::says_no_session(nobody::not_found(), asked.path) });
+        }
         let Some(value) = cookie() else {
-            return self.nobody(route, asked);
+            return (!self.apps_node_answers()).then(|| self.for_nobody(route, asked));
         };
         // Tafac's own icons: nothing asked of the university.
         if route == Moved::AppIcons {
-            return self.icons.as_ref()?.answer(&self.signed_in(Some(&value))?.session.university, asked);
+            let Some(held) = self.signed_in(Some(&value)) else { return self.unheld(route, asked, &value, &node).await };
+            return self.icons.as_ref()?.answer(&held.session.university, asked);
         }
         // The routes answered to their end here, failures included.
         if Self::settles(route) {
             return self.settled(route, asked, &value, &cookie, &node).await;
+        }
+        if route == Moved::PortalProxy {
+            if self.apps_node_answers() {
+                return None;
+            }
+            return match self.signed_in(Some(&value)) {
+                Some(held) => Some(self.portal_proxy(asked, Some(&held))),
+                None => self.unheld(route, asked, &value, &node).await,
+            };
         }
         if route != Moved::Logout {
             if let Some(expired) = self.found_expired_already(route, &value) {
                 return Some(expired);
             }
         }
-        let held = self.signed_in(Some(&value))?;
+        let Some(held) = self.signed_in(Some(&value)) else { return self.unheld(route, asked, &value, &node).await };
         let query = asked.query;
 
         let translated = match route {
             // A sign-in was answered above, and so were the routes of
             // settled.rs and Tafac's own.
             Moved::Login | Moved::Launch | Moved::LaunchPreview | Moved::MoodleView | Moved::StudentPicture | Moved::CertificateStatus | Moved::Certificate => return None,
-            Moved::Universities | Moved::UniversityLogo | Moved::Analytics | Moved::AppIcons | Moved::Mail => return None,
+            Moved::Universities | Moved::UniversityLogo | Moved::Analytics | Moved::AppIcons | Moved::Mail | Moved::PortalProxy | Moved::NotFound => return None,
             // The session ends: nothing to check of it after.
             Moved::Logout => return Some(self.sign_out(&held, &value, &node).await),
             Moved::Session => self.session_check(&held).await,
@@ -303,8 +354,8 @@ impl Gateway {
             Moved::MoodleDeadlines => self.lasting(&held, Lasting::Deadlines, query).await,
             Moved::Grades => self.lasting(&held, Lasting::Grades, query).await,
             // Node's route reads one part of the path after the folder: a
-            // path with none, or more, is no route of the page's.
-            Moved::GradesSemester => self.grades(&held, routes::under(route, asked.path).filter(|id| !id.is_empty() && !id.contains('/'))?).await,
+            // path with none, or more, was answered 404 above.
+            Moved::GradesSemester => self.grades(&held, routes::under(route, asked.path).unwrap_or_default()).await,
             Moved::GradesMessage => self.grades_message(&held, query).await,
             Moved::GradesDistribution => self.grades_distribution(&held, query).await,
             Moved::GradesTranscript => self.grades_transcript(&held, query).await,
@@ -323,36 +374,86 @@ impl Gateway {
                 None => self.route_failed(route, &Failure::Unavailable(REFUSED_NOT_OVER.to_string())),
             },
         };
-        // Signed out, or in again, while the university was asked: the
-        // session this answer is about is no longer the one there is.
+        self.still_the_sessions(route, asked, &value, &held, &cookie, response, &node).await
+    }
+
+    // In the apps, whose bridge doesn't tell the gateway what is served and
+    // has their own Node behind: that Node still answers who holds no
+    // session of the gateway's, and what is no route, until the bridge goes
+    // without it. None from the routes then. A session of a university the
+    // gateway doesn't serve is answered here all the same (unheld).
+    pub(super) fn apps_node_answers(&self) -> bool {
+        self.served.is_none() && self.node_behind
+    }
+
+    // An answer made for a session, once it is ready. Signed out while the
+    // university was asked (or out and in again): the session this answer
+    // is about is over, and the request is answered as one that holds no
+    // session.
+    #[allow(clippy::too_many_arguments)]
+    async fn still_the_sessions<C, N, Fut>(&self, route: Moved, asked: &Asked<'_>, value: &str, held: &Held<'_>, cookie: &C, response: http::Response<Vec<u8>>, node: &N) -> Option<http::Response<Vec<u8>>>
+    where
+        C: Fn() -> Option<String>,
+        N: Fn(NodeRequest) -> Fut,
+        Fut: Future<Output = NodeAnswer>,
+    {
         let still = self.signed_in(cookie().as_deref()).is_some_and(|current| current.session.id == held.session.id);
-        still.then_some(response)
+        if still || self.signed_in(Some(value)).is_some() {
+            return Some(response);
+        }
+        self.unheld(route, asked, value, node).await
+    }
+
+    // A request whose session cookie holds no session the gateway answers
+    // with: found expired a moment ago (told so again); one of its own
+    // universities without the CAS ticket, which nothing can be asked with
+    // (ended here, as the mail ends it); else nobody's (nobody.rs): a
+    // cookie past its lifetime or not read, a session signed out, the demo
+    // account's from before, a university the gateway doesn't serve. In
+    // the apps, their Node's (None) but for the last.
+    async fn unheld<N, Fut>(&self, route: Moved, asked: &Asked<'_>, value: &str, node: &N) -> Option<http::Response<Vec<u8>>>
+    where
+        N: Fn(NodeRequest) -> Fut,
+        Fut: Future<Output = NodeAnswer>,
+    {
+        if !matches!(route, Moved::PortalProxy | Moved::Logout) {
+            if let Some(expired) = self.found_expired_already(route, value) {
+                return Some(expired);
+            }
+        }
+        let session = self.codec.read(value, now_ms());
+        let elsewhere = session.as_ref().is_some_and(|session| !self.universities.contains_key(&session.university));
+        if self.apps_node_answers() && !elsewhere {
+            return None;
+        }
+        if let Some(session) = session {
+            if !elsewhere && self.memory.ended(&session.id).is_none() {
+                let why = if route == Moved::Logout { Ended::SignedOut } else { Ended::Expired };
+                self.memory.end(&session.id, why);
+                self.mail_ended(&session.id).await;
+                self.tell_node_it_ended(value, node).await;
+                if route == Moved::Logout {
+                    return Some(translate::signin::signed_out(&self.cookie_name));
+                }
+                eprintln!("[tafac] session: signed out, no CAS ticket to ask the university with");
+                let over = self.expired(route, &session.university, true);
+                return Some(if route == Moved::Launch { translate::launch::expired(&over) } else { over });
+            }
+        }
+        Some(self.for_nobody(route, asked))
     }
 
     // GET /__ent_auth/universities and a university's logo
     // (own/universities.rs), where the server said what it serves. None
-    // elsewhere, and for a session cookie that isn't read here: Node knows
-    // what it holds (a cookie sealed with the secret before, or from before
-    // sessions named their university).
+    // elsewhere: the apps' Node, whose list carries their remote settings.
+    // A session cookie that isn't read here is no session.
     fn own_universities(&self, route: Moved, asked: &Asked<'_>, cookie: Option<&str>) -> Option<http::Response<Vec<u8>>> {
         let served = self.served.as_ref()?;
         if route == Moved::UniversityLogo {
-            return served.logo(routes::under(route, asked.path)?, asked.headers);
+            return Some(routes::under(route, asked.path).and_then(|id| served.logo(id, asked.headers)).unwrap_or_else(nobody::not_found));
         }
-        let session = match cookie {
-            Some(cookie) => Some(self.codec.read(cookie, now_ms())?.university),
-            None => None,
-        };
+        let session = cookie.and_then(|cookie| self.codec.read(cookie, now_ms())).map(|session| session.university);
         Some(served.list(asked.headers, session.as_deref()))
-    }
-
-    // A moved route asked without a session cookie: nobody signed in. The
-    // session check says so here, at the university the request is for,
-    // where the server said what it serves. None: Node's (the other
-    // routes, each with its own answer for nobody; the apps).
-    fn nobody(&self, route: Moved, asked: &Asked<'_>) -> Option<http::Response<Vec<u8>>> {
-        let served = self.served.as_ref()?;
-        (route == Moved::Session).then(|| translate::expired::nobody_signed_in(served.for_nobody(asked.headers), self.statistics))
     }
 
     // A moved route without an answer of its own: its error, worded here as
@@ -441,12 +542,16 @@ impl Gateway {
     }
 
     // Node told a session ended here, with the session's cookie: its own
-    // sign-out, whose answer isn't the page's.
+    // sign-out, whose answer isn't the page's. Nothing without a Node
+    // behind.
     pub(crate) async fn tell_node_it_ended<N, Fut>(&self, cookie: &str, node: &N)
     where
         N: Fn(NodeRequest) -> Fut,
         Fut: Future<Output = NodeAnswer>,
     {
+        if !self.node_behind {
+            return;
+        }
         let Some(request) = node::session_ended(&self.cookie_name, cookie) else { return };
         if tokio::time::timeout(NODE_TOLD_PATIENCE, node(request)).await.ok().flatten().is_none() {
             eprintln!("[tafac] session: Node wasn't told that a session ended (it didn't answer)");

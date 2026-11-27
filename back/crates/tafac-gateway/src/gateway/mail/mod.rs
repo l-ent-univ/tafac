@@ -387,20 +387,14 @@ pub(crate) struct Call<'a, 'b> {
 }
 
 impl Gateway {
-    // Whether a mail request is answered here: a mail path, unless its
-    // cookie holds a session of a university the gateway doesn't serve (one
-    // Node alone serves: its own mail). A cookie that is nobody's (not
-    // readable, past its lifetime, the demo account's from before, made
-    // with a secret no longer taken) is answered here as no session: Node
-    // answered it so too, and its routes are never reached by the mail's
-    // paths. The server streams the body in then (proxy.rs).
-    pub fn takes_mail(&self, path: &str, cookie: Option<&str>) -> bool {
-        if !is_mail_path(path) {
-            return false;
-        }
-        cookie
-            .and_then(|cookie| self.codec.read(cookie, now_ms()))
-            .is_none_or(|session| self.universities.contains_key(&session.university))
+    // Whether a request is the mail's, answered here whatever its cookie:
+    // one that is nobody's (not readable, past its lifetime, the demo
+    // account's from before, made with a secret no longer taken, a session
+    // of a university the gateway doesn't serve) is answered as no
+    // session, as Node answered it. The server streams the body in then
+    // (proxy.rs).
+    pub fn takes_mail(&self, path: &str, _cookie: Option<&str>) -> bool {
+        is_mail_path(path)
     }
 
     // A mail request (takes_mail), its body as it comes, and its answer.
@@ -433,9 +427,10 @@ impl Gateway {
     }
 
     // The university a request is about: its session's, or the one the
-    // server says a request without one is for.
+    // server says a request without one (or with one of a university the
+    // gateway doesn't serve) is for.
     fn mail_university(&self, cookie: Option<&str>, asked: &Asked<'_>) -> Option<String> {
-        match cookie.and_then(|cookie| self.codec.read(cookie, now_ms())) {
+        match cookie.and_then(|cookie| self.codec.read(cookie, now_ms())).filter(|session| self.universities.contains_key(&session.university)) {
             Some(session) => Some(session.university),
             None => self.served.as_ref().map(|served| served.for_nobody(asked.headers).to_string()),
         }

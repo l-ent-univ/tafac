@@ -10,7 +10,8 @@
 //       the current semester, { relevé, absences, totauxAbsences } for one
 //       asked for. tonAPI reads the same answer into its own report:
 //       answered here, with ScoDoc's shape written back from it.
-//   200 { authenticated: false, grades: null }: nobody signed in. Node.
+//   200 { authenticated: false, grades: null }: nobody signed in.
+//       Answered here (gateway/nobody.rs; their Node in the apps).
 //   the same for a student without a semester, `grades` being ScoDoc's own
 //       empty report: answered here, written back as empty.
 //   400 { error }: a semester id that isn't one. Answered here, in Node's

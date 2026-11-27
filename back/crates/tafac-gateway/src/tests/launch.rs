@@ -396,21 +396,33 @@ fn the_preview_refuses_what_isnt_a_target_as_node_does() {
 }
 
 #[test]
-fn who_isnt_held_here_is_nodes() {
+fn who_isnt_held_here_is_answered_as_node_answered_nobody() {
     let campus = campus();
-    let gateway = campus.gateway();
+    let gateway = campus.server_gateway().without_node();
     let catalogue = format!("http://127.0.0.1:{}/library/catalogue", campus.port());
-    // Nobody signed in, the demo account, another university, a session
-    // without its CAS ticket: Node's, which knows what to answer each.
+    // Nobody signed in, the demo account, another university: as Node
+    // answered nobody, the university asked nothing.
     let demo = campus.cookie(serde_json::json!({ "mode": "demo" }), &[]);
     let elsewhere = campus.cookie(serde_json::json!({ "uni": "univ-rennes-2" }), &[("JSESSIONID", "alive")]);
-    let without_ticket = campus.cookie(serde_json::json!({ "jar": [["JSESSIONID", "alive", "127.0.0.1", "/", 1, 1, null]] }), &[]);
-    for cookie in [Some(demo), Some(elsewhere), Some(without_ticket), None] {
-        for route in [LAUNCH, PREVIEW, VIEW] {
+    for cookie in [Some(demo), Some(elsewhere), None] {
+        let answer = |route: &str| {
             let path = format!("{route}?url={}", encoded(&catalogue));
-            assert!(block_on(gateway.answer(&asked(&GET, &path, &NO_HEADERS, &[]), || cookie.clone(), never)).is_none(), "{route}");
-        }
+            let response = block_on(gateway.answer(&asked(&GET, &path, &NO_HEADERS, &[]), || cookie.clone(), never)).unwrap();
+            assert_eq!(response.headers()["x-tafac-session"], "expired", "{route}");
+            response
+        };
+        let launched = answer(LAUNCH);
+        assert_eq!((launched.status().as_u16(), &launched.headers()["location"]), (302, &catalogue.parse::<http::HeaderValue>().unwrap()));
+        let previewed = answer(PREVIEW);
+        assert_eq!((previewed.status().as_u16(), &body_of(&previewed)["reason"]), (200, &"missing-session".into()));
+        let view = answer(VIEW);
+        assert_eq!((view.status().as_u16(), body_of(&view)), (404, serde_json::json!({ "ok": false })));
     }
+    // A session without its CAS ticket: nothing to sign in with, over.
+    let without_ticket = campus.cookie(serde_json::json!({ "jar": [["JSESSIONID", "alive", "127.0.0.1", "/", 1, 1, null]] }), &[]);
+    let path = format!("{LAUNCH}?url={}", encoded(&catalogue));
+    let response = block_on(gateway.answer(&asked(&GET, &path, &NO_HEADERS, &[]), || Some(without_ticket.clone()), never)).unwrap();
+    assert_eq!((response.status().as_u16(), &response.headers()["location"]), (302, &"/login?session=expired".parse::<http::HeaderValue>().unwrap()));
     assert!(campus.paths().is_empty());
 }
 

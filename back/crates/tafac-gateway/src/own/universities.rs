@@ -51,7 +51,7 @@ include!(concat!(env!("OUT_DIR"), "/logos.rs"));
 
 const DIRECTORY_FILE: &str = include_str!("../../../../../universities/directory.json");
 // universities/index.js: DEFAULT_UNIVERSITY_ID.
-const DEFAULT_UNIVERSITY: &str = "univ-rennes";
+pub(crate) const DEFAULT_UNIVERSITY: &str = "univ-rennes";
 // How long a browser keeps a logo (Node: maxAge '1d').
 const LOGO_KEPT: &str = "public, max-age=86400";
 
@@ -75,6 +75,33 @@ struct Entry {
     hostnames: Vec<String>,
     // What its page's shell is filled with (shell.rs).
     page: PageText,
+    // Whether it has the services whose routes Node refuses where it
+    // hasn't them (gateway/nobody.rs).
+    features: Features,
+}
+
+#[derive(Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct Features {
+    grades: bool,
+    moodle_deadlines: bool,
+}
+
+// A service of a university's, as Node's feature gate names it.
+#[derive(Clone, Copy)]
+pub(crate) enum Feature {
+    Grades,
+    MoodleDeadlines,
+}
+
+// Whether a university has a service, as Node's settings say
+// (universities/<id>/shared.js, `features`). One the directory doesn't
+// know has none.
+pub(crate) fn has(university: &str, feature: Feature) -> bool {
+    DIRECTORY.iter().find(|entry| entry.id == university).is_some_and(|entry| match feature {
+        Feature::Grades => entry.features.grades,
+        Feature::MoodleDeadlines => entry.features.moodle_deadlines,
+    })
 }
 
 static DIRECTORY_READ: LazyLock<DirectoryFile> = LazyLock::new(|| serde_json::from_str(DIRECTORY_FILE).expect("universities/directory.json is the script's own"));
@@ -216,7 +243,7 @@ impl Served {
     }
 
     // An id or a slug of a served university (findUniversityId).
-    fn named(&self, name: &str) -> Option<&str> {
+    pub(crate) fn named(&self, name: &str) -> Option<&str> {
         self.by_name.get(&name.trim().to_lowercase()).map(String::as_str)
     }
 
