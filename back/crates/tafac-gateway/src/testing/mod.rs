@@ -16,6 +16,7 @@ use crate::session::cookie;
 use crate::Gateway;
 
 mod other_portals;
+mod webmail;
 
 pub use other_portals::{drupal_campus, isorbonne_campus, OtherCampus};
 
@@ -109,6 +110,10 @@ struct State {
     records_down: AtomicBool,
     // TEMPO's sessions: it forgets the one before when this goes up.
     tempo_sessions: AtomicU32,
+    // The webmail's sessions: the same (webmail.rs).
+    webmail_sessions: AtomicU32,
+    // Each SOAP request the webmail answered: its name and its body.
+    soap_requests: Mutex<Vec<(String, serde_json::Value)>>,
 }
 
 // Moodle's state: the session it knows (a number: it forgets the one before
@@ -653,6 +658,9 @@ fn portal_layout() -> String {
 
 fn campus_answer(received: &Received<'_>, port: &str, state: &State) -> Answer {
     let Received { method, path, cookies, .. } = *received;
+    if path.starts_with("/webmail/") || path.starts_with("/service/") {
+        return webmail::webmail_answer(received, port, state);
+    }
     if path.starts_with("/api/v4-3/dlm/layout.json") {
         let layout = match cookies.split("; ").any(|cookie| cookie == portal_session(state)) {
             true => portal_layout(),
@@ -911,6 +919,10 @@ impl Campus {
             [services.timetable]
             provider = "tempo"
             base-url = "http://127.0.0.1:{port}/tempo/"
+            [services.mail]
+            provider = "zimbra-rest"
+            base-url = "http://127.0.0.1:{port}/"
+            entry-url = "http://127.0.0.1:{port}/webmail/"
             "#,
             port = self.port
         );
@@ -954,6 +966,16 @@ impl Campus {
 
     // TEMPO no longer knows the session it gave: the next question signs in
     // again.
+    // The webmail forgets the sessions it gave.
+    pub fn webmail_forgets(&self) {
+        self.state.webmail_sessions.fetch_add(1, Ordering::SeqCst);
+    }
+
+    // The bodies of the webmail's SOAP requests of that name, in order.
+    pub fn soap_sent(&self, name: &str) -> Vec<serde_json::Value> {
+        self.state.soap_requests.lock().unwrap().iter().filter(|(asked, _)| asked == name).map(|(_, body)| body.clone()).collect()
+    }
+
     pub fn tempo_forgets(&self) {
         self.state.tempo_sessions.fetch_add(1, Ordering::SeqCst);
     }

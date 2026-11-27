@@ -287,8 +287,10 @@ impl Gateway {
         N: Fn(NodeRequest) -> Fut,
         Fut: Future<Output = NodeAnswer>,
     {
+        // The webmail's session read first, then the session ended, then
+        // the webmail's and the CAS's ended together.
         self.memory.end(&held.session.id, Ended::SignedOut);
-        tokio::join!(tonapi::signin::sign_out(held.university, &held.session, self.net), self.tell_node_it_ended(cookie, node));
+        tokio::join!(self.mail_ended(&held.session.id), tonapi::signin::sign_out(held.university, &held.session, self.net), self.tell_node_it_ended(cookie, node));
         said::signed_out(&self.cookie_name)
     }
 }

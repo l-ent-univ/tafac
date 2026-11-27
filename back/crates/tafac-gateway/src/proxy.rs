@@ -31,12 +31,14 @@ use bytes::Bytes;
 use http::header::{HeaderName, CONNECTION, CONTENT_LENGTH, COOKIE, UPGRADE};
 use http::{HeaderMap, Request, Response, StatusCode, Version};
 use http_body_util::combinators::UnsyncBoxBody;
-use http_body_util::{BodyExt, Full};
+use futures_util::StreamExt;
+use http_body_util::{BodyExt, Full, StreamBody};
+use hyper::body::Frame;
 use hyper::body::Incoming;
 use hyper::service::service_fn;
 use hyper_util::client::legacy::connect::HttpConnector;
 use hyper_util::client::legacy::Client;
-use hyper_util::rt::{TokioExecutor, TokioIo};
+use hyper_util::rt::{TokioExecutor, TokioIo, TokioTimer};
 use tokio::net::{TcpListener, TcpStream};
 
 use crate::own::{self, Service};
@@ -49,6 +51,9 @@ type Body = UnsyncBoxBody<Bytes, BoxError>;
 // The largest body read here, a sign-in's or the icons' (express.json's own
 // limit: Node refuses a larger one, and gets it as it streams).
 const MAX_SIGN_IN_BYTES: u64 = 100 * 1024;
+
+// How long a request's head may take to come (Node's headersTimeout).
+const HEADER_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(60);
 
 // What a hop keeps to itself (RFC 9110 § 7.6.1), besides what Connection names.
 const HOP_BY_HOP: &[&str] = &["connection", "keep-alive", "proxy-authenticate", "proxy-authorization", "proxy-connection", "te", "trailer", "transfer-encoding", "upgrade"];
@@ -150,6 +155,21 @@ impl Proxy {
             let header: Vec<&str> = request.headers().get_all(COOKIE).iter().filter_map(|value| value.to_str().ok()).collect();
             cookie::cookie_in_header(&header.join("; "), gateway.cookie_name()).map(str::to_string)
         });
+        // The mail's: its body as it streams in, its answer as it streams
+        // out (an upload, a part), never held whole here.
+        if let Some(gateway) = &self.gateway {
+            if gateway.takes_mail(&path, cookie.as_deref()) {
+                let (parts, body) = request.into_parts();
+                let stream: crate::ByteStream = Box::pin(body.into_data_stream().map(|chunk| chunk.map_err(BoxError::from)));
+                let asked = Asked { method: &method, path: &path, query: parts.uri.query(), headers: &parts.headers, body: &[], peer: Some(peer) };
+                let answered = gateway.mail(&asked, crate::MailBody::Stream(stream), || cookie.clone(), |to_node| self.ask_node(to_node)).await;
+                return answered.map(|body| match body {
+                    crate::MailBody::Whole(bytes) => full(bytes),
+                    crate::MailBody::Stream(stream) => StreamBody::new(stream.map(|chunk| chunk.map(Frame::data))).boxed_unsync(),
+                });
+            }
+        }
+
         // A sign-in's body, read here.
         let mut read = None;
 
@@ -261,7 +281,15 @@ pub async fn serve(listener: TcpListener, proxy: Arc<Proxy>) -> std::io::Result<
                 let proxy = proxy.clone();
                 async move { Ok::<_, Infallible>(proxy.handle(request, peer.ip()).await) }
             });
-            let connection = hyper::server::conn::http1::Builder::new().preserve_header_case(true).serve_connection(TokioIo::new(stream), service);
+            // A request's head within a minute, as Node's server waits for
+            // it: a slow client holds no connection longer. A body's own
+            // pace is each route's (the mail's upload: a minute between
+            // two pieces).
+            let connection = hyper::server::conn::http1::Builder::new()
+                .preserve_header_case(true)
+                .timer(TokioTimer::new())
+                .header_read_timeout(HEADER_TIMEOUT)
+                .serve_connection(TokioIo::new(stream), service);
             let _ = connection.with_upgrades().await;
         });
     }

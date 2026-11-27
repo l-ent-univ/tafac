@@ -169,6 +169,12 @@ fn packed(cookie: &UpstreamCookie, secure: bool) -> serde_json::Value {
 }
 
 // A session id as Node makes them (randomUUID): a version 4 UUID.
+// A random id, as a session's (the system's random bytes): a mail's
+// Content-ID, unique to it.
+pub(crate) fn random_id() -> Option<String> {
+    new_id()
+}
+
 fn new_id() -> Option<String> {
     let mut bytes = <[u8; 16]>::try_generate().ok()?;
     bytes[6] = (bytes[6] & 0x0f) | 0x40;
@@ -216,6 +222,18 @@ impl Codec {
             user: stored.user.filter(|user| !user.is_empty())?,
             cookies,
         })
+    }
+
+    // The id a cookie's value holds, whatever else it holds (an expired
+    // session's, the demo account's): what the mail routes' limit counts by
+    // (Node's readSessionCookie(req)?.data?.id). None: not this server's.
+    pub fn read_id(&self, value: &str) -> Option<String> {
+        #[derive(Deserialize)]
+        struct OnlyId {
+            id: serde_json::Value,
+        }
+        let stored: OnlyId = serde_json::from_slice(&self.open(value)?).ok()?;
+        stored.id.as_str().filter(|id| !id.is_empty()).map(str::to_string)
     }
 
     // A new session's cookie (its value) and the session it holds, signed in

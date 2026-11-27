@@ -478,6 +478,23 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "92d699e522242e69e3003b94ecc1f960f3a5e015aa7c5d7486e65ad01dd94f5e"
 
 [[package]]
+name = "futures-io"
+version = "0.3.34"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "53c0fa8157de1303bfffdaa1cc2a673bfffb60102f76b0ef4441659124373fed"
+
+[[package]]
+name = "futures-macro"
+version = "0.3.34"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9fb9654ba8355388abeb8dcb4fc62f511300867002afc858860463bdd9fe0c44"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 3.0.10",
+]
+
+[[package]]
 name = "futures-sink"
 version = "0.3.34"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -496,7 +513,11 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0d50a92467f8ba5dd6e3ee5d4bd04d73ab2e4e1c44474a0674821dfce14b79bc"
 dependencies = [
  "futures-core",
+ "futures-io",
+ "futures-macro",
+ "futures-sink",
  "futures-task",
+ "memchr",
  "pin-project-lite",
  "slab",
 ]
@@ -1285,6 +1306,7 @@ dependencies = [
  "bytes",
  "encoding_rs",
  "futures-core",
+ "futures-util",
  "h2",
  "http",
  "http-body",
@@ -1303,12 +1325,14 @@ dependencies = [
  "sync_wrapper",
  "tokio",
  "tokio-native-tls",
+ "tokio-util",
  "tower",
  "tower-http",
  "tower-service",
  "url",
  "wasm-bindgen",
  "wasm-bindgen-futures",
+ "wasm-streams",
  "web-sys",
 ]
 
@@ -1736,6 +1760,7 @@ dependencies = [
  "hyper",
  "hyper-util",
  "minisign-verify",
+ "reqwest",
  "serde",
  "serde_json",
  "sha2",
@@ -1800,6 +1825,12 @@ dependencies = [
  "displaydoc",
  "zerovec",
 ]
+
+[[package]]
+name = "tinyvec"
+version = "1.13.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "fd3ca314f692efd6c868f8408f53fe444634a845f96c028b97d35f6a1f79f0ee"
 
 [[package]]
 name = "tokio"
@@ -1904,7 +1935,7 @@ checksum = "009dbb7700f11c55ef83aebbe4c0e9cf1f1ac0844bd8d6f00dc38f302026e13a"
 [[package]]
 name = "tonapi-config"
 version = "0.1.0"
-source = "git+https://github.com/l-ent-univ/tonAPI?rev=f2258c075b295848aa0683ddee5f65e7fe59cd06#f2258c075b295848aa0683ddee5f65e7fe59cd06"
+source = "git+https://github.com/l-ent-univ/tonAPI?rev=e5b9f34a451f7da69c189f172a0003ff83e0ebfa#e5b9f34a451f7da69c189f172a0003ff83e0ebfa"
 dependencies = [
  "schemars",
  "serde",
@@ -1918,7 +1949,7 @@ dependencies = [
 [[package]]
 name = "tonapi-core"
 version = "0.1.0"
-source = "git+https://github.com/l-ent-univ/tonAPI?rev=f2258c075b295848aa0683ddee5f65e7fe59cd06#f2258c075b295848aa0683ddee5f65e7fe59cd06"
+source = "git+https://github.com/l-ent-univ/tonAPI?rev=e5b9f34a451f7da69c189f172a0003ff83e0ebfa#e5b9f34a451f7da69c189f172a0003ff83e0ebfa"
 dependencies = [
  "chrono",
  "serde",
@@ -1928,8 +1959,9 @@ dependencies = [
 [[package]]
 name = "tonapi-http"
 version = "0.1.0"
-source = "git+https://github.com/l-ent-univ/tonAPI?rev=f2258c075b295848aa0683ddee5f65e7fe59cd06#f2258c075b295848aa0683ddee5f65e7fe59cd06"
+source = "git+https://github.com/l-ent-univ/tonAPI?rev=e5b9f34a451f7da69c189f172a0003ff83e0ebfa#e5b9f34a451f7da69c189f172a0003ff83e0ebfa"
 dependencies = [
+ "bytes",
  "chrono",
  "reqwest",
  "scraper",
@@ -1947,31 +1979,35 @@ dependencies = [
 [[package]]
 name = "tonapi-metrics"
 version = "0.1.0"
-source = "git+https://github.com/l-ent-univ/tonAPI?rev=f2258c075b295848aa0683ddee5f65e7fe59cd06#f2258c075b295848aa0683ddee5f65e7fe59cd06"
+source = "git+https://github.com/l-ent-univ/tonAPI?rev=e5b9f34a451f7da69c189f172a0003ff83e0ebfa#e5b9f34a451f7da69c189f172a0003ff83e0ebfa"
 
 [[package]]
 name = "tonapi-providers"
 version = "0.1.0"
-source = "git+https://github.com/l-ent-univ/tonAPI?rev=f2258c075b295848aa0683ddee5f65e7fe59cd06#f2258c075b295848aa0683ddee5f65e7fe59cd06"
+source = "git+https://github.com/l-ent-univ/tonAPI?rev=e5b9f34a451f7da69c189f172a0003ff83e0ebfa#e5b9f34a451f7da69c189f172a0003ff83e0ebfa"
 dependencies = [
  "base64",
  "chrono",
  "chrono-tz",
+ "percent-encoding",
  "reqwest",
  "serde",
  "serde_json",
+ "tokio",
  "tonapi-config",
  "tonapi-core",
  "tonapi-http",
  "tonapi-session",
  "tracing",
+ "unicode-general-category",
+ "unicode-normalization",
  "url",
 ]
 
 [[package]]
 name = "tonapi-session"
 version = "0.1.0"
-source = "git+https://github.com/l-ent-univ/tonAPI?rev=f2258c075b295848aa0683ddee5f65e7fe59cd06#f2258c075b295848aa0683ddee5f65e7fe59cd06"
+source = "git+https://github.com/l-ent-univ/tonAPI?rev=e5b9f34a451f7da69c189f172a0003ff83e0ebfa#e5b9f34a451f7da69c189f172a0003ff83e0ebfa"
 dependencies = [
  "aes-gcm",
  "base64",
@@ -2076,10 +2112,25 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b6f5e870be6c3b371b77fe0ee0bafb859fa4964b4404c27de1d380043c4dda20"
 
 [[package]]
+name = "unicode-general-category"
+version = "1.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0b993bddc193ae5bd0d623b49ec06ac3e9312875fdae725a975c51db1cc1677f"
+
+[[package]]
 name = "unicode-ident"
 version = "1.0.27"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a2c754d6c33795a1c324727428e5a7dedb5b06195f9890bdbcba760d3e246563"
+
+[[package]]
+name = "unicode-normalization"
+version = "0.1.26"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "75cd3fb03d5288b3ba9a1ee103ac7e9cbb59f0b03d64f8ddfcc04dd42758a85d"
+dependencies = [
+ "tinyvec",
+]
 
 [[package]]
 name = "unicode-width"
@@ -2234,6 +2285,19 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3b1f9c3798725016c6ee5f2f57869ec0831e8bbc0ab0310a86e787e97f41389e"
 dependencies = [
  "unicode-ident",
+]
+
+[[package]]
+name = "wasm-streams"
+version = "0.5.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9d1ec4f6517c9e11ae630e200b2b65d193279042e28edd4a2cda233e46670bbb"
+dependencies = [
+ "futures-util",
+ "js-sys",
+ "wasm-bindgen",
+ "wasm-bindgen-futures",
+ "web-sys",
 ]
 
 [[package]]

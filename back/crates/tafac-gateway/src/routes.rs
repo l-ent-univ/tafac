@@ -52,6 +52,9 @@ pub enum Moved {
     Timetable,
     TimetableTree,
     TimetableResources,
+    // The mail page's: every path under /__ent_auth/mail, in any case
+    // (gateway/mail/: tonAPI's webmail, Node's JSON).
+    Mail,
     // Tafac's own (own/): no university answers them, and tonAPI is asked
     // nothing.
     Universities,
@@ -151,7 +154,7 @@ pub const ROUTES: &[Route] = &[
     moved("GET", "/__ent_auth/documents/school-certificate/status", Moved::CertificateStatus),
     moved("GET", "/__ent_auth/documents/school-certificate", Moved::Certificate),
     // Mail, Moodle.
-    node("*", "/__ent_auth/mail/*", "tonAPI reads an inbox only, and Rennes' stops at the SAML step: no message, folder, draft or send"),
+    moved("*", "/__ent_auth/mail/*", Moved::Mail),
     // Tafac's own, for the apps' Moodle page: what its view may show.
     moved("GET", "/__ent_auth/moodle/view", Moved::MoodleView),
     // tafac.fr's own, for the apps: their remote settings, the desktop app's
@@ -192,6 +195,11 @@ fn matches(route: &Route, method: &Method, path: &str) -> bool {
 // Which side answers a request: the first line of the table that fits it,
 // Node when none does.
 pub fn backend(method: &Method, path: &str) -> Backend {
+    // The mail's, in any case and with or without a slash at the end, as
+    // Express matches them: none of its paths reaches Node.
+    if crate::gateway::is_mail_path(path) {
+        return Backend::TonApi(Moved::Mail);
+    }
     ROUTES.iter().find(|route| matches(route, method, path)).map_or(Backend::Node, |route| route.backend)
 }
 
@@ -288,7 +296,6 @@ mod tests {
             (Method::POST, "/__ent_auth/timetable"),
             (Method::GET, "/__ent_auth/timetable/"),
             (Method::GET, "/__ent_auth/timetable/groups"),
-            (Method::POST, "/__ent_auth/mail/send"),
             (Method::GET, "/__ent_proxy/api/v4-3/dlm/layout.json"),
             (Method::GET, "/__ent_auth/something-new"),
             (Method::GET, "/__ent_auth"),
@@ -303,6 +310,14 @@ mod tests {
             assert_eq!(moved_route(&method, path), None);
             assert_eq!(server_route(&method, path), None);
         }
+    }
+
+    #[test]
+    fn every_mail_path_is_the_gateways() {
+        for (method, path) in [(Method::POST, "/__ent_auth/mail/send"), (Method::GET, "/__ent_auth/MAIL/recent"), (Method::POST, "/__ent_auth/Mail/Send/"), (Method::GET, "/__ent_auth/mail"), (Method::PUT, "/__ent_auth/mail/x")] {
+            assert_eq!(backend(&method, path), Backend::TonApi(Moved::Mail), "{method} {path}");
+        }
+        assert_eq!(backend(&Method::GET, "/__ent_auth/mailbox"), Backend::Node);
     }
 
     #[test]

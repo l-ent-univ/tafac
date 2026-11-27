@@ -16,7 +16,6 @@ server = [
     "dep:hyper",
     "dep:hyper-util",
     "dep:http-body-util",
-    "dep:bytes",
     "dep:minisign-verify",
     "tokio/rt-multi-thread",
     "tokio/net",
@@ -36,13 +35,13 @@ required-features = ["server"]
 # tonAPI's own code, at one commit of its repository, never a copy of it: it
 # signs in at the university, its providers ask the services, its settings
 # say where (build.rs puts them in the crate), its session holds the cookies.
-tonapi-providers = { git = "https://github.com/l-ent-univ/tonAPI", rev = "f2258c075b295848aa0683ddee5f65e7fe59cd06" }
-tonapi-config = { git = "https://github.com/l-ent-univ/tonAPI", rev = "f2258c075b295848aa0683ddee5f65e7fe59cd06" }
-tonapi-session = { git = "https://github.com/l-ent-univ/tonAPI", rev = "f2258c075b295848aa0683ddee5f65e7fe59cd06" }
-tonapi-core = { git = "https://github.com/l-ent-univ/tonAPI", rev = "f2258c075b295848aa0683ddee5f65e7fe59cd06" }
+tonapi-providers = { git = "https://github.com/l-ent-univ/tonAPI", rev = "e5b9f34a451f7da69c189f172a0003ff83e0ebfa" }
+tonapi-config = { git = "https://github.com/l-ent-univ/tonAPI", rev = "e5b9f34a451f7da69c189f172a0003ff83e0ebfa" }
+tonapi-session = { git = "https://github.com/l-ent-univ/tonAPI", rev = "e5b9f34a451f7da69c189f172a0003ff83e0ebfa" }
+tonapi-core = { git = "https://github.com/l-ent-univ/tonAPI", rev = "e5b9f34a451f7da69c189f172a0003ff83e0ebfa" }
 # tonAPI's own browser (a jar of cookies, one request at a time, the CAS's
 # pages read): the launch relay walks a service's sign-in with it.
-tonapi-http = { git = "https://github.com/l-ent-univ/tonAPI", rev = "f2258c075b295848aa0683ddee5f65e7fe59cd06" }
+tonapi-http = { git = "https://github.com/l-ent-univ/tonAPI", rev = "e5b9f34a451f7da69c189f172a0003ff83e0ebfa" }
 # The time a provider is asked at (tonAPI's Context).
 chrono = { version = "0.4", default-features = false, features = ["clock"] }
 # The university's own time: ScoDoc dates an evaluation at its midnight.
@@ -67,10 +66,13 @@ serde_json = { version = "1", features = ["raw_value"] }
 tokio = { version = "1", features = ["sync", "time", "macros", "rt"] }
 # A panic inside a provider is one route's error, not a request lost.
 futures-util = { version = "0.3", default-features = false, features = ["std"] }
+# The mail's streamed bodies: what tonAPI's webmail is sent (an upload).
+reqwest = { version = "0.13", default-features = false, features = ["stream"] }
 hyper = { version = "1", features = ["client", "server", "http1"], optional = true }
 hyper-util = { version = "0.1", features = ["tokio", "client-legacy", "http1"], optional = true }
 http-body-util = { version = "0.1", optional = true }
-bytes = { version = "1", optional = true }
+# The mail's bodies as they stream (an upload, a part), in the apps too.
+bytes = "1"
 # The apps' remote settings' signature (own/settings/minisign.rs): Ed25519
 # over BLAKE2b, as `tauri signer` signs, verification only, no dependency of
 # its own. The apps have the same one, through Tauri's updater.

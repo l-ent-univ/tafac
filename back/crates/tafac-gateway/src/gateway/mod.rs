@@ -21,6 +21,8 @@
 //                 (the photo, the school certificate)
 //   planning.rs   the planning's routes: tonAPI's own answers, its refusals
 //                 too, with no translator
+//   mail/         the mail page's routes, /__ent_auth/mail/*: the webmail
+//                 signed in to with the CAS ticket, Node's JSON
 //
 // And one route of Tafac's own, which asks the university nothing: the
 // applications' icons (own/icons.rs).
@@ -36,6 +38,7 @@
 mod attempts;
 mod behind;
 mod launch;
+mod mail;
 mod planning;
 pub(crate) mod portal;
 mod services;
@@ -53,6 +56,8 @@ use http::{HeaderMap, Method};
 use tonapi_providers::NetSettings;
 
 pub use attempts::TrustedProxies;
+pub(crate) use mail::is_mail_path;
+pub use mail::{BoxError, ByteStream, MailBody};
 use behind::Lasting;
 
 use crate::node::{self, NodeAnswer, NodeRequest};
@@ -115,6 +120,9 @@ pub struct Gateway {
     // The applications' icons, when the gateway has Node's data directory
     // (own/icons.rs); None: Node answers them.
     icons: Option<crate::own::icons::Icons>,
+    // The mail's sessions with the webmail, and its limits (gateway/mail/).
+    pub(crate) mail_memory: mail::state::MailMemory,
+    pub(crate) mail_limits: crate::mail::MailLimits,
 }
 
 pub(crate) fn now_ms() -> i64 {
@@ -145,6 +153,8 @@ impl Gateway {
             asks_ahead: true,
             served: None,
             icons: None,
+            mail_memory: mail::state::MailMemory::default(),
+            mail_limits: crate::mail::MailLimits::default(),
         }
     }
 
@@ -250,6 +260,17 @@ impl Gateway {
         if route == Moved::Analytics {
             return self.statistics_posted(asked, cookie());
         }
+        // The mail's, with the body read whole (the apps' bridge): its answer
+        // read whole too. tafac.fr's server streams them (proxy.rs).
+        if route == Moved::Mail {
+            if !self.takes_mail(asked.path, cookie().as_deref()) {
+                return None;
+            }
+            let answered = self.mail(asked, MailBody::Whole(asked.body.to_vec()), &cookie, node).await;
+            let (parts, body) = answered.into_parts();
+            let body = body.read(usize::MAX).await.ok()?;
+            return Some(http::Response::from_parts(parts, body));
+        }
         let Some(value) = cookie() else {
             return self.nobody(route, asked);
         };
@@ -273,7 +294,7 @@ impl Gateway {
             // A sign-in was answered above, and so were the routes of
             // settled.rs and Tafac's own.
             Moved::Login | Moved::Launch | Moved::LaunchPreview | Moved::MoodleView | Moved::StudentPicture | Moved::CertificateStatus | Moved::Certificate => return None,
-            Moved::Universities | Moved::UniversityLogo | Moved::Analytics | Moved::AppIcons => return None,
+            Moved::Universities | Moved::UniversityLogo | Moved::Analytics | Moved::AppIcons | Moved::Mail => return None,
             // The session ends: nothing to check of it after.
             Moved::Logout => return Some(self.sign_out(&held, &value, &node).await),
             Moved::Session => self.session_check(&held).await,
@@ -373,6 +394,7 @@ impl Gateway {
         // The one request that ends the session takes its cookie away; one
         // that found it expired at the same moment says so, no more.
         let ends_it = self.memory.end(&held.session.id, Ended::Expired);
+        self.mail_ended_behind(&held.session.id);
         if ends_it {
             eprintln!("[tafac] session: signed out, the CAS no longer knows it");
             self.tell_node_it_ended(cookie, node).await;
@@ -454,6 +476,7 @@ impl Gateway {
     fn end(&self, cookie: Option<&str>, why: Ended) {
         let Some(session) = cookie.and_then(|cookie| self.codec.read(cookie, now_ms())) else { return };
         self.memory.end(&session.id, why);
+        self.mail_ended_behind(&session.id);
     }
 
     // The session a cookie holds, when it is one answered from here: at one

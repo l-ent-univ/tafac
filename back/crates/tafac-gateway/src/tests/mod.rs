@@ -21,6 +21,9 @@
 //                         same
 //   other_portals.rs      the same routes at a university whose portal is
 //                         not uPortal (Drupal, iSorbonne)
+//   mail.rs               the mail page's routes: the webmail signed in to
+//                         once, Node's JSON, the checks before a route,
+//                         the part, an upload, a sign-out
 //   planning.rs           the planning's routes: tonAPI's own answers and
 //                         refusals, the planning's session held
 //   universities.rs       Tafac's own: the universities served, their logos,
@@ -38,6 +41,7 @@ mod expiry;
 mod grades;
 mod icons;
 mod launch;
+mod mail;
 mod moodle_deadlines;
 mod other_portals;
 #[cfg(feature = "server")]

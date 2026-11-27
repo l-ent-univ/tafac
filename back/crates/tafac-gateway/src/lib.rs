@@ -55,6 +55,7 @@ pub mod translate;
 
 mod gateway;
 mod launch;
+mod mail;
 mod node;
 mod portals;
 mod tonapi;
@@ -65,7 +66,7 @@ pub mod proxy;
 #[cfg(any(test, feature = "testing"))]
 pub mod testing;
 
-pub use crate::gateway::{Asked, Gateway, TrustedProxies};
+pub use crate::gateway::{Asked, BoxError, ByteStream, Gateway, MailBody, TrustedProxies};
 pub use crate::node::{NodeAnswer, NodeRequest, UNIVERSITY_HEADER};
 pub use crate::own::analytics::Statistics;
 pub use crate::session::cookie::{DEVELOPMENT_COOKIE, PRODUCTION_COOKIE};
