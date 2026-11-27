@@ -9,7 +9,6 @@
 /* Begin PBXBuildFile section */
 		09E44491DF62D2F9350DC7AF /* QuartzCore.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 23BD9B20B1F4D435777C5A8F /* QuartzCore.framework */; };
 		1D2D46762C650397AFD7DE39 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = 474B593A371F2B2AC6E33F40 /* PrivacyInfo.xcprivacy */; };
-		1FBAADAC15139710C798038D /* NodeMobile.xcframework in Frameworks */ = {isa = PBXBuildFile; fileRef = FF5E93D02EB2F35217A8ACE3 /* NodeMobile.xcframework */; };
 		2510CE4CE36CACD631ADC86E /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = AE23E54D2BB998DF0FC7E4DE /* Assets.xcassets */; };
 		37EC43E18CABAA298B4FD77A /* WebKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 916A7D50131D6F10A4EAF072 /* WebKit.framework */; };
 		43984D9DE96372C715A3F8A1 /* Metal.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 76D9FA59DB9C0A437B72AC83 /* Metal.framework */; };
@@ -18,25 +17,10 @@
 		775AAFB4D2EA9E2894EAFBE7 /* assets in Resources */ = {isa = PBXBuildFile; fileRef = C73F0A77DDC2F1E90C1F9612 /* assets */; };
 		7EF511362B92EA2B2ADA0558 /* MetalKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 4A40EFA94EE885E4EE4DC369 /* MetalKit.framework */; };
 		8558EFC74D2407B088A15687 /* CoreGraphics.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = E18AD4FDA7EC6708ED835C68 /* CoreGraphics.framework */; };
-		8D49A107E1AD5712A18D14AA /* NodeMobile.xcframework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = FF5E93D02EB2F35217A8ACE3 /* NodeMobile.xcframework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
 		A5D0656CC9E1E2C678AD1A4E /* libapp.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 976F66505EB769740876DC23 /* libapp.a */; };
 		B94BD6BBC9650C0E5F25D420 /* Security.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 1566860B3733FA15654A0DBB /* Security.framework */; };
 		D28AA5C377E7398F26AED4EE /* main.mm in Sources */ = {isa = PBXBuildFile; fileRef = 515EDEFBFE87EA61E00A43FF /* main.mm */; };
 /* End PBXBuildFile section */
-
-/* Begin PBXCopyFilesBuildPhase section */
-		A2ABF36A95055D26E0BC9A3C /* Embed Frameworks */ = {
-			isa = PBXCopyFilesBuildPhase;
-			buildActionMask = 2147483647;
-			dstPath = "";
-			dstSubfolderSpec = 10;
-			files = (
-				8D49A107E1AD5712A18D14AA /* NodeMobile.xcframework in Embed Frameworks */,
-			);
-			name = "Embed Frameworks";
-			runOnlyForDeploymentPostprocessing = 0;
-		};
-/* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
 		0948BC441F90ED2CC2B5A70E /* menu.rs */ = {isa = PBXFileReference; path = menu.rs; sourceTree = "<group>"; };
@@ -62,7 +46,6 @@
 		78D2E46B142D1AE163FB026D /* moodle_native.rs */ = {isa = PBXFileReference; path = moodle_native.rs; sourceTree = "<group>"; };
 		81CBC253C8A97CB94668D30C /* bindings.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = bindings.h; sourceTree = "<group>"; };
 		8B37DF684862EA0CF5DD71F8 /* UIKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = UIKit.framework; path = System/Library/Frameworks/UIKit.framework; sourceTree = SDKROOT; };
-		8C3224A9C38C64F218016627 /* node.rs */ = {isa = PBXFileReference; path = node.rs; sourceTree = "<group>"; };
 		916A7D50131D6F10A4EAF072 /* WebKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = WebKit.framework; path = System/Library/Frameworks/WebKit.framework; sourceTree = SDKROOT; };
 		91EC9B99E3419165B26CA266 /* links.rs */ = {isa = PBXFileReference; path = links.rs; sourceTree = "<group>"; };
 		976F66505EB769740876DC23 /* libapp.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; path = libapp.a; sourceTree = "<group>"; };
@@ -75,7 +58,6 @@
 		C21AA3E341DC520DD7B310D7 /* tafac-desktop_iOS.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = "tafac-desktop_iOS.entitlements"; sourceTree = "<group>"; };
 		C40E667179AC50C842F6B3FA /* moodle_ios.rs */ = {isa = PBXFileReference; path = moodle_ios.rs; sourceTree = "<group>"; };
 		C73F0A77DDC2F1E90C1F9612 /* assets */ = {isa = PBXFileReference; lastKnownFileType = folder; path = assets; sourceTree = SOURCE_ROOT; };
-		C796002BBF891FE1C8DDBD7F /* sidecar.rs */ = {isa = PBXFileReference; path = sidecar.rs; sourceTree = "<group>"; };
 		C97158B6C7849F7C3566F759 /* moodle_style.js */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.javascript; path = moodle_style.js; sourceTree = "<group>"; };
 		CF2EBDC95A82F99DDC1B0CAC /* remote_settings.rs */ = {isa = PBXFileReference; path = remote_settings.rs; sourceTree = "<group>"; };
 		D37D72EF1075CE66754B321F /* secret.rs */ = {isa = PBXFileReference; path = secret.rs; sourceTree = "<group>"; };
@@ -84,7 +66,6 @@
 		E733DE340264AB07B8F2CC75 /* bridge.rs */ = {isa = PBXFileReference; path = bridge.rs; sourceTree = "<group>"; };
 		EA1AADE522532B58D8949C1B /* window.rs */ = {isa = PBXFileReference; path = window.rs; sourceTree = "<group>"; };
 		FC462FE777777C8AC2E17CB4 /* ios.rs */ = {isa = PBXFileReference; path = ios.rs; sourceTree = "<group>"; };
-		FF5E93D02EB2F35217A8ACE3 /* NodeMobile.xcframework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.xcframework; name = NodeMobile.xcframework; path = "../../../desktop-build/ios/NodeMobile.xcframework"; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -93,7 +74,6 @@
 			buildActionMask = 2147483647;
 			files = (
 				A5D0656CC9E1E2C678AD1A4E /* libapp.a in Frameworks */,
-				1FBAADAC15139710C798038D /* NodeMobile.xcframework in Frameworks */,
 				8558EFC74D2407B088A15687 /* CoreGraphics.framework in Frameworks */,
 				43984D9DE96372C715A3F8A1 /* Metal.framework in Frameworks */,
 				7EF511362B92EA2B2ADA0558 /* MetalKit.framework in Frameworks */,
@@ -129,7 +109,6 @@
 				976F66505EB769740876DC23 /* libapp.a */,
 				76D9FA59DB9C0A437B72AC83 /* Metal.framework */,
 				4A40EFA94EE885E4EE4DC369 /* MetalKit.framework */,
-				FF5E93D02EB2F35217A8ACE3 /* NodeMobile.xcframework */,
 				23BD9B20B1F4D435777C5A8F /* QuartzCore.framework */,
 				1566860B3733FA15654A0DBB /* Security.framework */,
 				8B37DF684862EA0CF5DD71F8 /* UIKit.framework */,
@@ -184,11 +163,9 @@
 				C97158B6C7849F7C3566F759 /* moodle_style.js */,
 				694801C7D9F2EA759C24E7A0 /* moodle_style.rs */,
 				708C957F345AA8B369E2A5E5 /* moodle.rs */,
-				8C3224A9C38C64F218016627 /* node.rs */,
 				A56C9D0EC200B4E5051E24CB /* passwords.rs */,
 				CF2EBDC95A82F99DDC1B0CAC /* remote_settings.rs */,
 				D37D72EF1075CE66754B321F /* secret.rs */,
-				C796002BBF891FE1C8DDBD7F /* sidecar.rs */,
 				C15C1209195246E37F40A8F6 /* signin.rs */,
 				4D3DE93F88295E568ECA82C7 /* updater.rs */,
 				EA1AADE522532B58D8949C1B /* window.rs */,
@@ -249,7 +226,6 @@
 				829BE6F2509ED0886353EA17 /* Sources */,
 				DE27E6A2760336EC8C372037 /* Resources */,
 				547BF43C1D90B7DEC55C2F8F /* Frameworks */,
-				A2ABF36A95055D26E0BC9A3C /* Embed Frameworks */,
 			);
 			buildRules = (
 			);
@@ -424,7 +400,6 @@
 				FRAMEWORK_SEARCH_PATHS = (
 					"$(inherited)",
 					"\".\"",
-					"\"../../../desktop-build/ios\"",
 				);
 				INFOPLIST_FILE = "tafac-desktop_iOS/Info.plist";
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -513,7 +488,6 @@
 				FRAMEWORK_SEARCH_PATHS = (
 					"$(inherited)",
 					"\".\"",
-					"\"../../../desktop-build/ios\"",
 				);
 				INFOPLIST_FILE = "tafac-desktop_iOS/Info.plist";
 				LD_RUNPATH_SEARCH_PATHS = (

@@ -85,10 +85,6 @@ targets:
     dependencies:
       - framework: libapp.a
         embed: false
-      # Node, inside the app (src-tauri/src/node.rs): nodejs-mobile's
-      # framework, fetched by scripts/ios-prepare.mjs.
-      - framework: ../../../desktop-build/ios/NodeMobile.xcframework
-        embed: true
       - sdk: CoreGraphics.framework
       - sdk: Metal.framework
       - sdk: MetalKit.framework
