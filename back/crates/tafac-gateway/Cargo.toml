@@ -42,13 +42,13 @@ required-features = ["server"]
 # tonAPI's own code, at one commit of its repository, never a copy of it: it
 # signs in at the university, its providers ask the services, its settings
 # say where (build.rs puts them in the crate), its session holds the cookies.
-tonapi-providers = { git = "https://github.com/l-ent-univ/tonAPI", rev = "1a2886da66b849c712c374f0e769e6829cacafdb" }
-tonapi-config = { git = "https://github.com/l-ent-univ/tonAPI", rev = "1a2886da66b849c712c374f0e769e6829cacafdb" }
-tonapi-session = { git = "https://github.com/l-ent-univ/tonAPI", rev = "1a2886da66b849c712c374f0e769e6829cacafdb" }
-tonapi-core = { git = "https://github.com/l-ent-univ/tonAPI", rev = "1a2886da66b849c712c374f0e769e6829cacafdb" }
+tonapi-providers = { git = "https://github.com/l-ent-univ/tonAPI", rev = "1ac9fdd7b9dfe4a61a41aa6ac1f75501419922e2" }
+tonapi-config = { git = "https://github.com/l-ent-univ/tonAPI", rev = "1ac9fdd7b9dfe4a61a41aa6ac1f75501419922e2" }
+tonapi-session = { git = "https://github.com/l-ent-univ/tonAPI", rev = "1ac9fdd7b9dfe4a61a41aa6ac1f75501419922e2" }
+tonapi-core = { git = "https://github.com/l-ent-univ/tonAPI", rev = "1ac9fdd7b9dfe4a61a41aa6ac1f75501419922e2" }
 # tonAPI's own browser (a jar of cookies, one request at a time, the CAS's
 # pages read): the launch relay walks a service's sign-in with it.
-tonapi-http = { git = "https://github.com/l-ent-univ/tonAPI", rev = "1a2886da66b849c712c374f0e769e6829cacafdb" }
+tonapi-http = { git = "https://github.com/l-ent-univ/tonAPI", rev = "1ac9fdd7b9dfe4a61a41aa6ac1f75501419922e2" }
 # The time a provider is asked at (tonAPI's Context).
 chrono = { version = "0.4", default-features = false, features = ["clock"] }
 # The university's own time: ScoDoc dates an evaluation at its midnight.

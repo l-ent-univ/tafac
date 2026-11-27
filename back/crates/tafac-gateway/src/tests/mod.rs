@@ -17,6 +17,9 @@
 //                         whose they are, and what a sign-in asks ahead
 //   grades.rs             the grades' routes: ScoDoc's shape written back,
 //                         and what the routes refuse
+//   components.rs         a university of components (the grades the
+//                         IUT's alone): the student's component found
+//                         again for a session restored after a restart
 //   launch.rs             the launch relay, its preview, and what Moodle's
 //                         view may show: answered to their end here
 //   student.rs            the student's photo and school certificate: the
@@ -43,6 +46,7 @@
 mod analytics;
 mod apps;
 mod behind;
+mod components;
 mod expiry;
 mod grades;
 mod icons;
