@@ -9,6 +9,10 @@
 //                 the PDF
 //   picture.rs    ScoDoc: the student's photo
 //   documents.rs  the school records: the documents listed, the file of one
+//   timetable.rs  the planning (ADE, TEMPO): the classes of a range, the
+//                 tree of groups, teachers and rooms, the ones searched for.
+//                 Their answers go to the page as tonAPI gives them, its
+//                 refusals too (gateway/planning.rs)
 //
 // tonAPI's providers are called in this process (no HTTP between the two),
 // with a session made for the one question: the cookies of the student's
@@ -27,6 +31,7 @@ pub(crate) mod homework;
 pub(crate) mod picture;
 pub(crate) mod profile;
 pub(crate) mod signin;
+pub(crate) mod timetable;
 
 use std::future::Future;
 use std::time::Duration;
@@ -132,8 +137,28 @@ pub(crate) struct Service<'a> {
     pub net: NetSettings,
 }
 
+// tonAPI's answer to a question as it gave it: its data and the provider
+// that answered, or its refusal with its words and its link. For the routes
+// that give the page tonAPI's own answers (gateway/planning.rs).
+pub(crate) struct Said<T> {
+    pub said: Result<Fetched<T>, Problem>,
+    pub keep_secs: Option<u32>,
+}
+
 impl Service<'_> {
     pub(crate) async fn ask<T, F>(&self, kind: ServiceKind, call: F) -> Result<Asked<T>, Unanswered>
+    where
+        F: AsyncFnOnce(&mut Context<'_>) -> Result<Fetched<T>, Problem>,
+    {
+        let Said { said, keep_secs } = self.ask_as_said(kind, call).await?;
+        match said {
+            Ok(fetched) => Ok(Asked { value: fetched.data, keep_secs }),
+            Err(problem) => Err(Unanswered::Problem(problem.code)),
+        }
+    }
+
+    // The same question, tonAPI's refusal kept as it said it.
+    pub(crate) async fn ask_as_said<T, F>(&self, kind: ServiceKind, call: F) -> Result<Said<T>, Unanswered>
     where
         F: AsyncFnOnce(&mut Context<'_>) -> Result<Fetched<T>, Problem>,
     {
@@ -160,7 +185,7 @@ impl Service<'_> {
         // What the question left is kept even when it has no answer: a
         // session the service refused is no longer handed back.
         memory.keep(&before, &data, &ticket);
-        Ok(Asked { value: answered(asked)?, keep_secs: tonapi_providers::keep_secs(&services, kind) })
+        Ok(Said { said: asked?, keep_secs: tonapi_providers::keep_secs(&services, kind) })
     }
 
     // The student's component (an IUT, a faculty), which decides where some

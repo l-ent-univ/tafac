@@ -25,10 +25,10 @@ access to it.
 ```
 the page ──▶ the gateway (Rust) ──▶ tonAPI ──▶ the university
                    │                            (CAS, portal, Moodle, ScoDoc,
-                   │                             school records)
+                   │                             school records, planning)
                    └──▶ Node ──────────────────▶ the university
-                        the routes that haven't moved,    (planning, ADE,
-                        with the session made above        mail)
+                        the routes that haven't moved,    (mail)
+                        with the session made above
 ```
 
 - **The gateway** answers `POST /login`, `POST /logout`, `GET /session`,
@@ -40,6 +40,11 @@ the page ──▶ the gateway (Rust) ──▶ tonAPI ──▶ the university
   answers what Moodle's view in the apps may show (`GET /moodle/view`), the
   student's photo (`GET /student-pic`, from ScoDoc) and the school
   certificate (`GET /documents/school-certificate`, and its `/status`).
+  The planning is answered here too, with no translator: `GET /timetable`,
+  `/timetable/tree` and `/timetable/resources` give the page tonAPI's own
+  answers, as tonAPI's server gives them on its `/v1` routes of the same
+  names, its refusals as problems (`gateway/planning.rs`). The page makes
+  of them what it shows (`src/planningTree.js`, `src/planningEvents.js`).
   With Node's `DATA_DIR`, it answers the applications' icons too (`POST
   /app-icons`, `own/icons.rs`), from and into Node's own file; and with
   the page's build (`TAFAC_GATEWAY_DIST`, tafac.fr's server only), the
@@ -71,7 +76,7 @@ the page ──▶ the gateway (Rust) ──▶ tonAPI ──▶ the university
   release's manifest followed). The apps ask tafac.fr for them, never their
   bridge: none of it is in the library they embed. Their settings are
   Node's (`APP_SETTINGS_FILE`, `DESKTOP_LATEST_*`), read by `main.rs`.
-- **Node** answers everything else: the planning and ADE, the mail, the
+- **Node** answers everything else: the mail, the
   account's photo (the portal's proxy), the icons, the page and its files
   where the gateway isn't given what they need (the apps: their Node keeps
   them), and every route of the other universities, sign-in and
@@ -305,8 +310,9 @@ What is known to differ from Node, at both:
    password is refused in the CAS's own words. An account the CAS asks a
    one-time code of: Node refuses those today (no `auth.mfa` in its
    settings); see what the gateway does with one.
-2. **Node with that session.** The planning (TEMPO) and the mail, which
-   stay Node's, work with the cookie the gateway wrote: Rennes 2's CAS
+2. **Node with that session.** The mail, which stays Node's, works with
+   the cookie the gateway wrote (the planning, TEMPO's, is the gateway's
+   own: `gateway/planning.rs`): Rennes 2's CAS
    binds its ticket to the User-Agent that signed in. The launch relay is
    the gateway's, for the services under `univ-rennes2.fr`.
 3. **Session check.** `GET /session` is answered here from one request to
@@ -340,8 +346,10 @@ too.
 1. **Sign-in.** As at Rennes 2, from the portal's page
    `/ENT/secure/index.xhtml` and with the CAS under `/cas/`; the cookie
    holds the `TGC` and iSorbonne's session cookie.
-2. **Node with that session.** The planning (ADE's GWT client), which
-   stays Node's, works with the cookie the gateway wrote. The launch relay
+2. **The planning.** ADE 6.12 has no provider in tonAPI: the planning's
+   routes answer tonAPI's `service_absent`, and the page says there is no
+   timetable there (Node's own reader, `planningRpc.js`, is no longer
+   asked). The launch relay
    is the gateway's, for the services under `sorbonne-nouvelle.fr` and
    `univ-paris3.fr`.
 3. **Session check.** One request to the portal's page with the cookie's
@@ -360,10 +368,11 @@ too.
    the « signed in » page while the ticket lives and the form once it
    doesn't.
 
-The timetables are another matter: tonAPI has a provider for TEMPO, tried
-on a fake server only, and none that fits the Sorbonne Nouvelle's ADE 6.12
-(tonAPI's `docs/recherche/sorbonne-nouvelle.md`). `/__ent_auth/planning`
-and `/__ent_auth/ade/*` stay Node's for every university.
+The timetables are tonAPI's at Rennes (ADE's portal) and Rennes 2 (TEMPO,
+tried on a real account on 27/11/2026). The Sorbonne Nouvelle's ADE 6.12
+has no provider in tonAPI (tonAPI's `docs/recherche/sorbonne-nouvelle.md`).
+Node's `/__ent_auth/planning` and `/__ent_auth/ade/*` are no longer asked
+by the page.
 
 ## To see it work
 

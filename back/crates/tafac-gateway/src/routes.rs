@@ -13,7 +13,9 @@
 //
 // A moved route is written once more in translate/ (tonAPI's answer as the
 // page reads it today, its errors too). It is still Node's for the sessions
-// the gateway doesn't hold: nobody signed in, another university.
+// the gateway doesn't hold: nobody signed in, another university. The
+// planning's are the exception: the page reads tonAPI's own answers there
+// (gateway/planning.rs), and Node has no such route.
 
 use http::Method;
 
@@ -24,7 +26,8 @@ use http::Method;
 // relay's own lists (launch/targets.rs).
 pub const UNIVERSITIES: &[&str] = &["univ-rennes", "univ-rennes-2", "univ-sorbonne-nouvelle"];
 
-// A route tonAPI answers, by its translator (translate/<name>.rs).
+// A route tonAPI answers, by its translator (translate/<name>.rs), or with
+// tonAPI's own answer (the planning's).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Moved {
     Login,
@@ -44,6 +47,11 @@ pub enum Moved {
     StudentPicture,
     CertificateStatus,
     Certificate,
+    // The planning, as tonAPI's server answers it on its /v1 routes of the
+    // same names: no translator (gateway/planning.rs).
+    Timetable,
+    TimetableTree,
+    TimetableResources,
     // Tafac's own (own/): no university answers them, and tonAPI is asked
     // nothing.
     Universities,
@@ -131,9 +139,13 @@ pub const ROUTES: &[Route] = &[
     // Tafac's own relay: a service opened signed in (launch/).
     moved("GET", "/__ent_auth/launch", Moved::Launch),
     moved("GET", "/__ent_auth/launch-preview", Moved::LaunchPreview),
-    // The planning.
-    node("GET", "/__ent_auth/planning", "tonAPI's timetable is the student's own groups only, without ADE's colours and ids"),
-    node("*", "/__ent_auth/ade/*", "tonAPI's timetable takes no resource to ask for, and has no tree, search, rooms or teachers"),
+    // The planning: tonAPI's own answers, read by the page as they are.
+    moved("GET", "/__ent_auth/timetable", Moved::Timetable),
+    moved("GET", "/__ent_auth/timetable/tree", Moved::TimetableTree),
+    moved("GET", "/__ent_auth/timetable/resources", Moved::TimetableResources),
+    // The planning's routes before: the page no longer asks them.
+    node("GET", "/__ent_auth/planning", "no longer asked by the page, which reads the planning at /__ent_auth/timetable; kept until Node goes"),
+    node("*", "/__ent_auth/ade/*", "no longer asked by the page, which reads the planning at /__ent_auth/timetable; kept until Node goes"),
     // The student's own files: the photo ScoDoc keeps, the school certificate.
     moved("GET", "/__ent_auth/student-pic", Moved::StudentPicture),
     moved("GET", "/__ent_auth/documents/school-certificate/status", Moved::CertificateStatus),
@@ -245,6 +257,9 @@ mod tests {
             ("/__ent_auth/documents/school-certificate", Moved::Certificate),
             ("/__ent_auth/universities", Moved::Universities),
             ("/__ent_auth/universities/univ-rennes/logo", Moved::UniversityLogo),
+            ("/__ent_auth/timetable", Moved::Timetable),
+            ("/__ent_auth/timetable/tree", Moved::TimetableTree),
+            ("/__ent_auth/timetable/resources", Moved::TimetableResources),
         ] {
             assert_eq!(backend(&Method::GET, path), Backend::TonApi(route), "{path}");
         }
@@ -269,6 +284,10 @@ mod tests {
             (Method::GET, "/__ent_auth/documents/school-certificate/"),
             (Method::GET, "/__ent_auth/documents/something-new"),
             (Method::POST, "/__ent_auth/ade/upcoming"),
+            (Method::GET, "/__ent_auth/ade/tree"),
+            (Method::POST, "/__ent_auth/timetable"),
+            (Method::GET, "/__ent_auth/timetable/"),
+            (Method::GET, "/__ent_auth/timetable/groups"),
             (Method::POST, "/__ent_auth/mail/send"),
             (Method::GET, "/__ent_proxy/api/v4-3/dlm/layout.json"),
             (Method::GET, "/__ent_auth/something-new"),

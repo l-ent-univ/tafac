@@ -1904,7 +1904,7 @@ checksum = "009dbb7700f11c55ef83aebbe4c0e9cf1f1ac0844bd8d6f00dc38f302026e13a"
 [[package]]
 name = "tonapi-config"
 version = "0.1.0"
-source = "git+https://github.com/l-ent-univ/tonAPI?rev=02958d38a07f33128c98679fd72b1a125b793783#02958d38a07f33128c98679fd72b1a125b793783"
+source = "git+https://github.com/l-ent-univ/tonAPI?rev=f2258c075b295848aa0683ddee5f65e7fe59cd06#f2258c075b295848aa0683ddee5f65e7fe59cd06"
 dependencies = [
  "schemars",
  "serde",
@@ -1918,7 +1918,7 @@ dependencies = [
 [[package]]
 name = "tonapi-core"
 version = "0.1.0"
-source = "git+https://github.com/l-ent-univ/tonAPI?rev=02958d38a07f33128c98679fd72b1a125b793783#02958d38a07f33128c98679fd72b1a125b793783"
+source = "git+https://github.com/l-ent-univ/tonAPI?rev=f2258c075b295848aa0683ddee5f65e7fe59cd06#f2258c075b295848aa0683ddee5f65e7fe59cd06"
 dependencies = [
  "chrono",
  "serde",
@@ -1928,7 +1928,7 @@ dependencies = [
 [[package]]
 name = "tonapi-http"
 version = "0.1.0"
-source = "git+https://github.com/l-ent-univ/tonAPI?rev=02958d38a07f33128c98679fd72b1a125b793783#02958d38a07f33128c98679fd72b1a125b793783"
+source = "git+https://github.com/l-ent-univ/tonAPI?rev=f2258c075b295848aa0683ddee5f65e7fe59cd06#f2258c075b295848aa0683ddee5f65e7fe59cd06"
 dependencies = [
  "chrono",
  "reqwest",
@@ -1947,12 +1947,12 @@ dependencies = [
 [[package]]
 name = "tonapi-metrics"
 version = "0.1.0"
-source = "git+https://github.com/l-ent-univ/tonAPI?rev=02958d38a07f33128c98679fd72b1a125b793783#02958d38a07f33128c98679fd72b1a125b793783"
+source = "git+https://github.com/l-ent-univ/tonAPI?rev=f2258c075b295848aa0683ddee5f65e7fe59cd06#f2258c075b295848aa0683ddee5f65e7fe59cd06"
 
 [[package]]
 name = "tonapi-providers"
 version = "0.1.0"
-source = "git+https://github.com/l-ent-univ/tonAPI?rev=02958d38a07f33128c98679fd72b1a125b793783#02958d38a07f33128c98679fd72b1a125b793783"
+source = "git+https://github.com/l-ent-univ/tonAPI?rev=f2258c075b295848aa0683ddee5f65e7fe59cd06#f2258c075b295848aa0683ddee5f65e7fe59cd06"
 dependencies = [
  "base64",
  "chrono",
@@ -1971,7 +1971,7 @@ dependencies = [
 [[package]]
 name = "tonapi-session"
 version = "0.1.0"
-source = "git+https://github.com/l-ent-univ/tonAPI?rev=02958d38a07f33128c98679fd72b1a125b793783#02958d38a07f33128c98679fd72b1a125b793783"
+source = "git+https://github.com/l-ent-univ/tonAPI?rev=f2258c075b295848aa0683ddee5f65e7fe59cd06#f2258c075b295848aa0683ddee5f65e7fe59cd06"
 dependencies = [
  "aes-gcm",
  "base64",

@@ -21,6 +21,8 @@
 //                         same
 //   other_portals.rs      the same routes at a university whose portal is
 //                         not uPortal (Drupal, iSorbonne)
+//   planning.rs           the planning's routes: tonAPI's own answers and
+//                         refusals, the planning's session held
 //   universities.rs       Tafac's own: the universities served, their logos,
 //                         and the session check nobody is signed in for
 //   analytics.rs          Tafac's own statistics: what reaches a made-up
@@ -40,6 +42,7 @@ mod moodle_deadlines;
 mod other_portals;
 #[cfg(feature = "server")]
 mod own;
+mod planning;
 mod portal;
 mod signin;
 mod student;

@@ -19,6 +19,8 @@
 //   settled.rs    the routes answered to their end here, failures included:
 //                 launch.rs (the launch relay, its preview) and student.rs
 //                 (the photo, the school certificate)
+//   planning.rs   the planning's routes: tonAPI's own answers, its refusals
+//                 too, with no translator
 //
 // And one route of Tafac's own, which asks the university nothing: the
 // applications' icons (own/icons.rs).
@@ -34,6 +36,7 @@
 mod attempts;
 mod behind;
 mod launch;
+mod planning;
 pub(crate) mod portal;
 mod services;
 mod settled;
@@ -284,6 +287,9 @@ impl Gateway {
             Moved::GradesMessage => self.grades_message(&held, query).await,
             Moved::GradesDistribution => self.grades_distribution(&held, query).await,
             Moved::GradesTranscript => self.grades_transcript(&held, query).await,
+            Moved::Timetable => self.timetable(&held, query).await,
+            Moved::TimetableTree => self.timetable_tree(&held, query).await,
+            Moved::TimetableResources => self.timetable_resources(&held, query).await,
         };
 
         let response = match translated {
@@ -339,6 +345,11 @@ impl Gateway {
             Failure::Unavailable(why) => eprintln!("[tafac] tonapi: {} failed ({why})", routes::written(route)),
             Failure::Said(status, _) if self.verbose => eprintln!("[tafac] tonapi: {} refused ({status})", routes::written(route)),
             Failure::Said(..) => {}
+        }
+        // The planning's routes say it as tonAPI does, whatever the server:
+        // their words are this crate's, never anything of the account.
+        if let (Moved::Timetable | Moved::TimetableTree | Moved::TimetableResources, Failure::Unavailable(why)) = (route, failure) {
+            return planning::unavailable(why);
         }
         translate::failed::answer(route, failure, self.in_production())
     }

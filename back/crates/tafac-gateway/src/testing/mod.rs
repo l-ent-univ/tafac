@@ -76,7 +76,9 @@ where
 // under /library/ is a service like any other behind the CAS, for the
 // launch relay to open. And the federation Moodle signs in through when the
 // campus is asked for one (federated_settings): its discovery page under
-// /wayf/, the university's IdP under /idp/.
+// /wayf/, the university's IdP under /idp/. The planning is a TEMPO, under
+// /tempo/: it opens its session for a ticket of the CAS's, and gives the
+// student's classes, its rooms' tree and a room's classes.
 pub struct Campus {
     port: String,
     // Each request received: its path and query, and its cookies.
@@ -105,6 +107,8 @@ struct State {
     // The school records list no certificate; answer nothing but an error.
     no_certificate: AtomicBool,
     records_down: AtomicBool,
+    // TEMPO's sessions: it forgets the one before when this goes up.
+    tempo_sessions: AtomicU32,
 }
 
 // Moodle's state: the session it knows (a number: it forgets the one before
@@ -704,10 +708,71 @@ fn campus_answer(received: &Received<'_>, port: &str, state: &State) -> Answer {
     if path.starts_with("/library/") {
         return library_answer(path, port);
     }
+    if path.starts_with("/tempo/") {
+        return tempo_answer(path, cookies, port, state);
+    }
     if path.starts_with("/wayf/") || path.starts_with("/idp/") {
         return federation_answer(received, port);
     }
     Answer::of("404 Not Found", "text/plain", String::new())
+}
+
+// TEMPO's classes as its API gives them, at the university's time: the
+// student's week of 23 November 2026, or a room's (the amphitheatre, 6).
+fn tempo_classes(room: Option<&str>) -> String {
+    let class = |id: u32, day: &str, start: &str, end: &str, title: &str, room: &str, link: &str| {
+        serde_json::json!({
+            "id": id, "start": format!("{day} {start}"), "end": format!("{day} {end}"), "str_start": start, "str_end": end,
+            "title": title, "description": "L2 Démo, Mineure L2", "location": room, "people": ["Exemple D."],
+            "color": "66ccff", "url": link, "url_label": if link.is_empty() { "" } else { "VOTRE PLANNING :" }, "info": "",
+        })
+    };
+    let amphi = "A1 Amphi (Démo) - 133 pl. Campus DEMO";
+    let classes = match room {
+        None => vec![
+            class(7002, "2026-11-26", "14:00", "16:00", "Théâtre & danse", "B019 Amphi - 92 pl. Campus DEMO", ""),
+            class(7001, "2026-11-24", "09:00", "10:00", "Sociologie des publics", amphi, "https://pix.exemple.test/planning"),
+        ],
+        Some("6") => vec![
+            class(7001, "2026-11-24", "09:00", "10:00", "Sociologie des publics", amphi, "https://pix.exemple.test/planning"),
+            class(7003, "2026-11-25", "08:30", "10:30", "Réunion de département", amphi, ""),
+        ],
+        Some(_) => Vec::new(),
+    };
+    serde_json::Value::from(classes).to_string()
+}
+
+// TEMPO's « Disponibilité des salles »: its rooms' tree, written in the page.
+const TEMPO_ROOMS: &str = r##"<html><body><main><div class="d-flex flex-row tempo-rooms gap-2">
+    <h3 class="accordion-header tempo-tree-header" id="heading-9001" filter="01 - amphitheatres (2)"><button class="accordion-button collapsed">01 - AMPHITHEATRES (2)</button></h3>
+    <h3 class="accordion-header tempo-tree-header" id="heading-9002" parentid="#heading-9001" filter="a1 amphi"><div class="accordion-button tempo-room-btn tempo-course-btn" value="6" ade-name="A1 Amphi (D&eacute;mo) - 133 pl.">A1 Amphi (Démo) - 133 pl.</div></h3>
+    <h3 class="accordion-header tempo-tree-header" id="heading-9003" parentid="#heading-9001" filter="b019 amphi"><div class="accordion-button tempo-room-btn tempo-course-btn" value="1503" ade-name="B019 Amphi - 92 pl.">B019 Amphi - 92 pl.</div></h3>
+    <h3 class="accordion-header tempo-tree-header" id="heading-9010" filter="02 - salles de cours (1)"><button class="accordion-button collapsed">02 - SALLES DE COURS (1)</button></h3>
+    <h3 class="accordion-header tempo-tree-header" id="heading-9011" parentid="#heading-9010" filter="b009"><div class="accordion-button tempo-room-btn tempo-course-btn" value="2204" ade-name="B009 (44 pl.+1)">B009 (44 pl.+1)</div></h3>
+    </div></main></body></html>"##;
+
+// TEMPO: its session (`PHPSESSID`), opened at /tempo/auth for a ticket of
+// the CAS's, which its API asks for with a 401 and its pages with the CAS.
+fn tempo_answer(path: &str, cookies: &str, port: &str, state: &State) -> Answer {
+    let session = format!("PHPSESSID=tempo{}", state.tempo_sessions.load(Ordering::SeqCst));
+    let signed_in = cookies.split("; ").any(|cookie| cookie == session);
+    let route = path.split('?').next().unwrap_or_default();
+    let json = |body: String| Answer::of("200 OK", "application/json", body);
+    let to_the_cas = || Answer::redirect(&format!("http://localhost:{port}/cas/login?service={}", percent_encoded(&format!("http://127.0.0.1:{port}/tempo/auth"))));
+    match route {
+        "/tempo/auth" if query_of(path, "ticket").as_deref() == Some("ST-campus") => {
+            Answer::redirect(&format!("http://127.0.0.1:{port}/tempo/auth")).with(format!("set-cookie: {session}; Path=/"))
+        }
+        "/tempo/auth" if signed_in => Answer::redirect(&format!("http://127.0.0.1:{port}/tempo/")),
+        "/tempo/auth" => to_the_cas(),
+        "/tempo/" => Answer::of("200 OK", "text/html; charset=utf-8", "<html><title>Tempo - Mon emploi du temps</title></html>".to_string()),
+        _ if route.starts_with("/tempo/api/") && !signed_in => Answer::of("401 Unauthorized", "application/json", r#"{"message":"Authentication required"}"#.to_string()),
+        "/tempo/api/events" => json(tempo_classes(None)),
+        _ if route.starts_with("/tempo/api/room/") && query_of(path, "c").is_some() => json(tempo_classes(route.strip_prefix("/tempo/api/room/"))),
+        "/tempo/rooms" if signed_in => Answer::of("200 OK", "text/html; charset=utf-8", TEMPO_ROOMS.to_string()),
+        "/tempo/rooms" => to_the_cas(),
+        _ => Answer::of("404 Not Found", "application/json", r#"{"title":"Not Found"}"#.to_string()),
+    }
 }
 
 // A request read from a connection: its head (the first line and the
@@ -843,6 +908,9 @@ impl Campus {
             [services.documents]
             provider = "mon-dossier-web"
             base-url = "http://127.0.0.1:{port}/mdw/"
+            [services.timetable]
+            provider = "tempo"
+            base-url = "http://127.0.0.1:{port}/tempo/"
             "#,
             port = self.port
         );
@@ -882,6 +950,12 @@ impl Campus {
     // The same student, the portal's session lapsed.
     pub fn lapsed(&self) -> String {
         self.cookie(serde_json::json!({}), &[("JSESSIONID", "lapsed")])
+    }
+
+    // TEMPO no longer knows the session it gave: the next question signs in
+    // again.
+    pub fn tempo_forgets(&self) {
+        self.state.tempo_sessions.fetch_add(1, Ordering::SeqCst);
     }
 
     // Moodle no longer knows the session it gave: the next question signs
