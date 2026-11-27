@@ -488,7 +488,7 @@ impl Gateway {
         let mut parts = Vec::new();
         for (index, logo) in signature.logos.iter().enumerate() {
             let name = format!("logo-{}.png", index + 1);
-            let sent = context.webmail.upload(RequestBody::from(logo.png.to_vec()), logo.png.len() as u64, "image/png", &upload_disposition(&name)).await;
+            let sent = context.webmail.upload(RequestBody::from(logo.png.to_vec()), None, logo.png.len() as u64, "image/png", &upload_disposition(&name)).await;
             let uploaded = match sent {
                 Ok((200, text)) => parse_upload_response(&text).filter(|parsed| parsed.status == 200 && parsed.uploads.len() == 1).and_then(|parsed| parsed.uploads.into_iter().next()),
                 Ok((status, _)) if status == 401 || status == 403 => return Err(MailError::Refused("upload")),

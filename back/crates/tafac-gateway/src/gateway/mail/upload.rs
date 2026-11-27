@@ -26,7 +26,8 @@ use bytes::Bytes;
 use futures_util::stream::{self, StreamExt};
 use http::header::{CONTENT_DISPOSITION, CONTENT_TYPE};
 use serde_json::json;
-use tonapi_http::RequestBody;
+use tokio::time::Instant;
+use tonapi_http::{BodySent, RequestBody};
 use tonapi_providers::mail::attachments::{normalize_attachment_type, sanitize_attachment_name, HARD_ATTACHMENT_LIMIT_BYTES};
 use tonapi_providers::zimbra::{message as zimbra_message, upload as zimbra_upload};
 
@@ -38,8 +39,10 @@ use crate::mail::request;
 use crate::node::{NodeAnswer, NodeRequest};
 use crate::routes::Moved;
 
-// The longest a client may go quiet while it sends.
+// The longest a client may go quiet while it sends, and the longest the
+// whole file may take to come.
 const IDLE: Duration = Duration::from_secs(60);
+const DEADLINE: Duration = Duration::from_secs(20 * 60);
 
 // Why the body stopped before its end.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -60,24 +63,32 @@ impl std::fmt::Display for UploadStopped {
 
 impl std::error::Error for UploadStopped {}
 
-// The body as the webmail gets it: counted (never more than declared), and
-// a minute at most between two pieces. Why it stopped, and how much came,
-// are kept for the answer.
-fn counted(body: ByteStream, declared: u64, stopped: Arc<Mutex<Option<Stopped>>>, received: Arc<AtomicU64>) -> ByteStream {
+// The body as the webmail gets it: counted (never more than declared), a
+// minute at most between two pieces, twenty minutes in all. Why it stopped,
+// and how much came, are kept for the answer; `sent` is told when it ended
+// (the webmail's 15 seconds count from then: tonapi_http::HeadWait).
+fn counted(body: ByteStream, declared: u64, stopped: Arc<Mutex<Option<Stopped>>>, received: Arc<AtomicU64>, sent: BodySent) -> ByteStream {
+    let end = Instant::now() + DEADLINE;
     Box::pin(stream::unfold((body, ByteCounter::new(declared), false), move |(mut body, mut counter, done)| {
         let stopped = stopped.clone();
         let received = received.clone();
+        let sent = sent.clone();
         async move {
             if done {
                 return None;
             }
             let stop = |why: Stopped, counter: ByteCounter| {
                 *stopped.lock().unwrap() = Some(why);
+                sent.done();
                 Some((Err(Box::new(UploadStopped(why)) as BoxError), (Box::pin(stream::empty()) as ByteStream, counter, true)))
             };
-            match tokio::time::timeout(IDLE, body.next()).await {
+            let wait = IDLE.min(end.saturating_duration_since(Instant::now()));
+            match tokio::time::timeout(wait, body.next()).await {
                 Err(_) => stop(Stopped::Idle, counter),
-                Ok(None) => None,
+                Ok(None) => {
+                    sent.done();
+                    None
+                }
                 Ok(Some(Err(_))) => stop(Stopped::Broken, counter),
                 Ok(Some(Ok(chunk))) => match counter.add(chunk.len()) {
                     Ok(_) => {
@@ -140,10 +151,15 @@ impl Gateway {
             return closing(reply(413, &json!({ "error": "mail_upload_too_large", "maxBytes": limits.max_file_bytes })));
         }
 
+        let Some(_turn) = call.mail.stream_turn().await else {
+            slot.settle(0);
+            return closing(retry_after(error(429, "mail_upload_rate_limited"), 5));
+        };
         let stopped = Arc::new(Mutex::new(None));
         let received = Arc::new(AtomicU64::new(0));
-        let sent = counted(body.into_stream(), length, stopped.clone(), received.clone());
-        let outcome = context.webmail.upload(RequestBody::wrap_stream(sent), length, &content_type, &zimbra_upload::upload_disposition(&name)).await;
+        let body_sent = BodySent::new();
+        let sent = counted(body.into_stream(), length, stopped.clone(), received.clone(), body_sent.clone());
+        let outcome = context.webmail.upload(RequestBody::wrap_stream(sent), Some(body_sent), length, &content_type, &zimbra_upload::upload_disposition(&name)).await;
         slot.settle(received.load(Ordering::SeqCst));
         let stopped = *stopped.lock().unwrap();
         match stopped {

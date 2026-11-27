@@ -369,3 +369,22 @@ fn the_signatures_and_the_custom_one_written() {
     let invalid = post(&gateway, "/__ent_auth/mail/signature", &json!({ "text": 3 }), Some(&cookie));
     assert_eq!(invalid.status(), 400);
 }
+
+// A cookie that is nobody's (not readable here, the demo account's from
+// before): answered here as no session, never handed to Node (whose mail
+// routes the gateway's checks would be skipped by).
+#[test]
+fn a_cookie_that_is_nobodys_is_answered_here_as_no_session() {
+    let campus = campus();
+    let gateway = campus.gateway();
+    for cookie in ["garbage", "v1.AAAA"] {
+        let recent = get(&gateway, "/__ent_auth/MAIL/recent", Some(cookie));
+        assert_eq!(recent.status(), 200);
+        assert_eq!(body_of(&recent), json!({ "authenticated": false, "mail": null }));
+        let part = get(&gateway, "/__ent_auth/mail/part?id=300&part=2", Some(cookie));
+        assert_eq!(part.status(), 404);
+        let action = post(&gateway, "/__ent_auth/mail/action", &json!({ "ids": ["300"], "action": "read" }), Some(cookie));
+        assert_eq!(action.status(), 401);
+        assert_eq!(action.headers()["connection"], "close");
+    }
+}

@@ -16,7 +16,12 @@
 //
 // The upstream's headers within 15 seconds, then a minute at most between
 // two pieces; the student's side gone, the upstream request goes with it
-// (the stream dropped). The bytes are counted as they go: a part that
+// (the stream dropped). The student's side too has a minute to take each
+// piece, and twenty minutes for the whole part: the pieces are passed on by
+// a task of their own, timed whether the student reads or not (a reader
+// that stops reading is never asked for the next piece, and would hold the
+// webmail's place for as long as it likes). Six at once per session, the
+// others waiting their turn (30 seconds at most, then an empty 429). The bytes are counted as they go: a part that
 // grows past 50 MiB without saying so is cut there (W11). Its length is
 // given only when the bytes come as they were sent (not decompressed on
 // the way).
@@ -24,7 +29,9 @@
 use std::time::Duration;
 
 use bytes::Bytes;
-use futures_util::stream;
+use futures_util::stream::{self, StreamExt};
+use tokio::sync::OwnedSemaphorePermit;
+use tokio::time::Instant;
 use http::header::{CONTENT_DISPOSITION, CONTENT_LENGTH, CONTENT_TYPE};
 use http::HeaderValue;
 use tonapi_http::Streamed;
@@ -35,8 +42,10 @@ use crate::gateway::Gateway;
 
 // A part's size at most, through Tafac's server.
 pub(crate) const MAX_PART_BYTES: u64 = 50 * 1024 * 1024;
-// The longest wait between two pieces of a part.
+// The longest wait between two pieces of a part, the webmail's or the
+// student's, and the longest a whole part may take.
 const IDLE: Duration = Duration::from_secs(60);
+const DEADLINE: Duration = Duration::from_secs(20 * 60);
 
 const PART_CSP: &str = "default-src 'none'; sandbox; frame-ancestors 'self'";
 
@@ -77,6 +86,34 @@ fn counted(streamed: Streamed) -> ByteStream {
     }))
 }
 
+// `source`'s pieces passed on by a task of their own: the student has IDLE
+// to take each one, DEADLINE for them all, whether it reads or not; past
+// either (or gone), the task stops and drops `source` with the webmail's
+// place it holds, and the session's `turn`.
+pub(super) fn pumped(mut source: ByteStream, turn: OwnedSemaphorePermit, idle: Duration, deadline: Duration) -> ByteStream {
+    let (sender, receiver) = tokio::sync::mpsc::channel::<Result<Bytes, BoxError>>(1);
+    tokio::spawn(async move {
+        let _turn = turn;
+        let end = Instant::now() + deadline;
+        loop {
+            let left = end.saturating_duration_since(Instant::now());
+            let Ok(Some(next)) = tokio::time::timeout(left, source.next()).await else {
+                if left.is_zero() || Instant::now() >= end {
+                    let _ = sender.try_send(Err(Box::new(PartBroke("past the part's time")) as BoxError));
+                }
+                return;
+            };
+            let failed = next.is_err();
+            let wait = idle.min(end.saturating_duration_since(Instant::now()));
+            match tokio::time::timeout(wait, sender.send(next)).await {
+                Ok(Ok(())) if !failed => {}
+                _ => return,
+            }
+        }
+    });
+    Box::pin(stream::unfold(receiver, |mut receiver| async move { receiver.recv().await.map(|next| (next, receiver)) }))
+}
+
 impl Gateway {
     pub(super) async fn mail_part(&self, call: &Call<'_, '_>, query: &Query<'_>) -> Result<http::Response<MailBody>, MailError> {
         let id = query.text("id").unwrap_or_default();
@@ -85,6 +122,9 @@ impl Gateway {
             return Ok(part_headers(empty(400)));
         }
         let download = query.text("download").as_deref() == Some("1");
+        let Some(turn) = call.mail.stream_turn().await else {
+            return Ok(part_headers(super::retry_after(empty(429), 5)));
+        };
         let (id, part) = (&id, &part);
         let streamed = self.with_webmail(call, |context| async move { Ok(context.webmail.part(id, part).await?) }).await?;
 
@@ -104,7 +144,7 @@ impl Gateway {
         let length = streamed.content_length().filter(|length| *length > 0);
 
         let mut response = empty(200);
-        *response.body_mut() = MailBody::Stream(counted(streamed));
+        *response.body_mut() = MailBody::Stream(pumped(counted(streamed), turn, IDLE, DEADLINE));
         let headers = response.headers_mut();
         let content_type = HeaderValue::from_str(&shown.content_type).map_err(|_| MailError::Other("a part's type that is no header".to_string()))?;
         let disposition = HeaderValue::from_str(&shown.disposition).map_err(|_| MailError::Other("a part's name that is no header".to_string()))?;
@@ -130,6 +170,49 @@ fn part_headers(mut response: http::Response<MailBody>) -> http::Response<MailBo
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    // A reader that stops reading: the piece it doesn't take ends the part
+    // after `idle`, and the webmail's request and the session's turn go
+    // with it.
+    #[tokio::test]
+    async fn a_reader_that_stops_reading_lets_its_turn_go() {
+        let turns = std::sync::Arc::new(tokio::sync::Semaphore::new(1));
+        let turn = turns.clone().try_acquire_owned().unwrap();
+        let (dropped, gone) = tokio::sync::oneshot::channel::<()>();
+        struct Upstream(Option<tokio::sync::oneshot::Sender<()>>);
+        impl Drop for Upstream {
+            fn drop(&mut self) {
+                if let Some(said) = self.0.take() {
+                    let _ = said.send(());
+                }
+            }
+        }
+        let upstream = Upstream(Some(dropped));
+        let source: ByteStream = Box::pin(stream::unfold(upstream, |upstream| async move { Some((Ok::<_, BoxError>(Bytes::from_static(b"x")), upstream)) }));
+        let mut read = pumped(source, turn, Duration::from_millis(50), Duration::from_secs(60));
+        // One piece taken, then nothing read.
+        assert!(read.next().await.is_some());
+        tokio::time::timeout(Duration::from_secs(2), gone).await.expect("the upstream is dropped").unwrap();
+        let _free = tokio::time::timeout(Duration::from_secs(2), turns.acquire()).await.expect("the turn is free again").unwrap();
+    }
+
+    // A part that takes longer than its time ends, with an error (not a
+    // part cut short that would look whole).
+    #[tokio::test]
+    async fn a_part_past_its_time_ends_in_an_error() {
+        let turns = std::sync::Arc::new(tokio::sync::Semaphore::new(1));
+        let turn = turns.clone().try_acquire_owned().unwrap();
+        let source: ByteStream = Box::pin(stream::unfold((), |()| async move {
+            tokio::time::sleep(Duration::from_millis(20)).await;
+            Some((Ok::<_, BoxError>(Bytes::from_static(b"x")), ()))
+        }));
+        let mut read = pumped(source, turn, Duration::from_secs(5), Duration::from_millis(200));
+        let mut last = None;
+        while let Some(next) = tokio::time::timeout(Duration::from_secs(2), read.next()).await.expect("ends") {
+            last = Some(next.is_err());
+        }
+        assert_eq!(last, Some(true));
+    }
 
     #[test]
     fn a_parts_answer_has_one_csp_and_is_never_kept() {

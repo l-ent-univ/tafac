@@ -37,6 +37,10 @@ const INBOX_KEPT: Duration = Duration::from_secs(2 * 60);
 const UNUSED_KEPT: Duration = Duration::from_secs(24 * 60 * 60);
 // Sessions remembered at once.
 const REMEMBERED: usize = 10_000;
+// Parts and uploads a session streams at once (a mail's inline images come
+// together: a few more wait their turn), and how long one waits for a turn.
+const STREAMS: usize = 6;
+const STREAM_WAIT: Duration = Duration::from_secs(30);
 
 #[derive(Default)]
 pub(crate) struct MailMemory {
@@ -56,6 +60,10 @@ pub(crate) struct MailSession {
     ended: AtomicBool,
     used: Mutex<Instant>,
     inbox: Mutex<Option<(Instant, Value)>>,
+    // The turns of the parts and uploads it streams (STREAMS at once): one
+    // student reading many large files slowly holds no more of the webmail's
+    // places than that.
+    streams: Arc<tokio::sync::Semaphore>,
 }
 
 // One sign-in to the webmail, and what was read with it.
@@ -108,6 +116,7 @@ impl MailMemory {
             ended: AtomicBool::new(false),
             used: Mutex::new(Instant::now()),
             inbox: Mutex::new(None),
+            streams: Arc::new(tokio::sync::Semaphore::new(STREAMS)),
         });
         sessions.insert(session.to_string(), made.clone());
         made
@@ -133,6 +142,12 @@ impl MailMemory {
 impl MailSession {
     pub(crate) fn has_ended(&self) -> bool {
         self.ended.load(Ordering::SeqCst)
+    }
+
+    // A turn to stream a part or an upload, held until it ends; None when
+    // none came free within STREAM_WAIT.
+    pub(crate) async fn stream_turn(&self) -> Option<tokio::sync::OwnedSemaphorePermit> {
+        tokio::time::timeout(STREAM_WAIT, self.streams.clone().acquire_owned()).await.ok()?.ok()
     }
 
     // The webmail's context: the one kept, or a new sign-in when there is

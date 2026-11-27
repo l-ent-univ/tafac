@@ -43,6 +43,9 @@ mod write;
 use std::future::Future;
 use std::pin::Pin;
 use std::sync::Arc;
+use std::time::Duration;
+
+use tokio::time::Instant;
 
 use bytes::Bytes;
 use futures_util::stream::{Stream, StreamExt};
@@ -77,21 +80,33 @@ impl MailBody {
     }
 
     // The body read whole, `limit` bytes at most: None past it (or a body
-    // that broke off).
+    // that broke off). A minute at most between two pieces, five minutes in
+    // all: a client sending a byte now and then holds no connection longer
+    // (Node's server bounds it so, its requestTimeout).
     pub(crate) async fn read(self, limit: usize) -> Result<Vec<u8>, Unread> {
+        self.read_within(limit, BODY_IDLE, BODY_DEADLINE).await
+    }
+
+    async fn read_within(self, limit: usize, idle: Duration, deadline: Duration) -> Result<Vec<u8>, Unread> {
         match self {
             MailBody::Whole(bytes) if bytes.len() > limit => Err(Unread::TooLarge),
             MailBody::Whole(bytes) => Ok(bytes),
             MailBody::Stream(mut stream) => {
+                let end = Instant::now() + deadline;
                 let mut bytes = Vec::new();
-                while let Some(chunk) = stream.next().await {
-                    let chunk = chunk.map_err(|_| Unread::Broken)?;
+                loop {
+                    let wait = idle.min(end.saturating_duration_since(Instant::now()));
+                    let next = match tokio::time::timeout(wait, stream.next()).await {
+                        Err(_) => return Err(Unread::Slow),
+                        Ok(None) => return Ok(bytes),
+                        Ok(Some(next)) => next,
+                    };
+                    let chunk = next.map_err(|_| Unread::Broken)?;
                     if bytes.len() + chunk.len() > limit {
                         return Err(Unread::TooLarge);
                     }
                     bytes.extend_from_slice(&chunk);
                 }
-                Ok(bytes)
             }
         }
     }
@@ -109,7 +124,13 @@ impl MailBody {
 pub(crate) enum Unread {
     TooLarge,
     Broken,
+    Slow,
 }
+
+// A JSON body's pace: a minute at most between two pieces, five minutes in
+// all.
+const BODY_IDLE: Duration = Duration::from_secs(60);
+const BODY_DEADLINE: Duration = Duration::from_secs(300);
 
 // The page's mail routes, by Node's paths.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -244,6 +265,7 @@ async fn read_json(asked: &Asked<'_>, body: MailBody, limit: usize) -> Result<Va
     let bytes = body.read(limit).await.map_err(|unread| match unread {
         Unread::TooLarge => request::BodyRefusal::TooLarge,
         Unread::Broken => request::BodyRefusal::Malformed,
+        Unread::Slow => request::BodyRefusal::Slow,
     })?;
     request::read_json(asked.headers, &bytes, limit)
 }
@@ -365,17 +387,20 @@ pub(crate) struct Call<'a, 'b> {
 }
 
 impl Gateway {
-    // Whether a mail request is answered here: a mail path, and a session
-    // cookie of a university the gateway holds, or none. The server streams
-    // its body in then (proxy.rs).
+    // Whether a mail request is answered here: a mail path, unless its
+    // cookie holds a session of a university the gateway doesn't serve (one
+    // Node alone serves: its own mail). A cookie that is nobody's (not
+    // readable, past its lifetime, the demo account's from before, made
+    // with a secret no longer taken) is answered here as no session: Node
+    // answered it so too, and its routes are never reached by the mail's
+    // paths. The server streams the body in then (proxy.rs).
     pub fn takes_mail(&self, path: &str, cookie: Option<&str>) -> bool {
         if !is_mail_path(path) {
             return false;
         }
-        match cookie {
-            None => true,
-            Some(cookie) => self.codec.read(cookie, now_ms()).is_some_and(|session| self.universities.contains_key(&session.university)),
-        }
+        cookie
+            .and_then(|cookie| self.codec.read(cookie, now_ms()))
+            .is_none_or(|session| self.universities.contains_key(&session.university))
     }
 
     // A mail request (takes_mail), its body as it comes, and its answer.
@@ -456,25 +481,47 @@ impl Gateway {
                 match read_json(asked, body, COMPOSE_LIMIT).await {
                     Ok(body) => body,
                     Err(request::BodyRefusal::TooLarge) => return refuse(error(413, "mail_send_too_large")),
+                    Err(request::BodyRefusal::Slow) => return refuse(error(408, "mail_send_timeout")),
                     // No JSON body: what the route sees is no payload.
                     Err(request::BodyRefusal::NotJson) => Value::Null,
                     Err(_) => return refuse(error(400, "mail_send_invalid")),
                 }
             }
-            Route::Action | Route::FolderAction | Route::Signature => match read_json(asked, body, JSON_LIMIT).await {
-                Ok(body) => body,
-                Err(request::BodyRefusal::TooLarge) => return error(413, "Request body too large."),
-                Err(request::BodyRefusal::NotJson) => Value::Null,
-                Err(request::BodyRefusal::Charset) => return error(415, "Unsupported charset."),
-                Err(_) => return error(400, "Invalid JSON."),
-            },
+            // The other routes with a body: refused before it is read too, as
+            // the composer's are, so that a client sending nothing (or a
+            // byte now and then) holds no connection without a session.
+            // Node read their body first; only the statuses of a request
+            // both malformed and refused differ.
+            Route::Action | Route::FolderAction | Route::Signature => {
+                let refuse = |response: http::Response<MailBody>| closing(response);
+                if !feature {
+                    return refuse(disabled());
+                }
+                if request::from_another_site(asked.headers) {
+                    return refuse(error(403, "Cross-site request."));
+                }
+                if cookie.and_then(|cookie| self.codec.read_id(cookie)).is_none() {
+                    return refuse(no_session());
+                }
+                if let Some(seconds) = self.mail_bucket(cookie) {
+                    return refuse(retry_after(error(429, "mail_rate_limited"), seconds));
+                }
+                match read_json(asked, body, JSON_LIMIT).await {
+                    Ok(body) => body,
+                    Err(request::BodyRefusal::TooLarge) => return refuse(error(413, "Request body too large.")),
+                    Err(request::BodyRefusal::Slow) => return refuse(error(408, "Request timeout.")),
+                    Err(request::BodyRefusal::NotJson) => Value::Null,
+                    Err(request::BodyRefusal::Charset) => return error(415, "Unsupported charset."),
+                    Err(_) => return error(400, "Invalid JSON."),
+                }
+            }
             _ => Value::Null,
         };
 
         if !feature {
             return disabled();
         }
-        if !matches!(route, Route::Send | Route::DraftSave) {
+        if !matches!(route, Route::Send | Route::DraftSave | Route::Action | Route::FolderAction | Route::Signature) {
             if let Some(seconds) = self.mail_bucket(cookie) {
                 return retry_after(error(429, "mail_rate_limited"), seconds);
             }
@@ -515,7 +562,7 @@ impl Gateway {
                     eprintln!("[tafac] session: signed out, no CAS ticket to open the webmail with");
                     self.expired(Moved::Mail, &university, true).map(MailBody::Whole)
                 }
-                _ => self.mail_nobody(route, None),
+                _ => self.mail_nobody(route, self.mail_university(None, asked).as_deref()),
             };
         };
         let call = Call { held: &held, mail: self.mail_memory.of(&held.session.id), route, cookie, own_host: own_host(asked) };
@@ -673,6 +720,27 @@ mod tests {
         ] {
             assert_eq!(js_string(&value), written, "{value}");
         }
+    }
+
+    // A body sent a byte now and then: refused once a piece is late, or
+    // once the whole took too long, never waited for.
+    #[tokio::test]
+    async fn a_slow_body_is_not_waited_for() {
+        let trickle = |gap: u64| -> ByteStream {
+            Box::pin(futures_util::stream::unfold(0_u32, move |sent| async move {
+                tokio::time::sleep(Duration::from_millis(gap)).await;
+                Some((Ok::<_, BoxError>(Bytes::from_static(b" ")), sent + 1))
+            }))
+        };
+        let idle = Duration::from_millis(50);
+        let started = std::time::Instant::now();
+        let late = MailBody::Stream(trickle(200)).read_within(1024, idle, Duration::from_secs(5)).await;
+        assert_eq!(late, Err(Unread::Slow));
+        let endless = MailBody::Stream(trickle(5)).read_within(1024 * 1024, idle, Duration::from_millis(300)).await;
+        assert_eq!(endless, Err(Unread::Slow));
+        assert!(started.elapsed() < Duration::from_secs(2), "{:?}", started.elapsed());
+        let whole = MailBody::Stream(Box::pin(futures_util::stream::iter([Ok::<_, BoxError>(Bytes::from_static(b"{}"))])));
+        assert_eq!(whole.read_within(1024, idle, Duration::from_secs(1)).await, Ok(b"{}".to_vec()));
     }
 
     #[test]

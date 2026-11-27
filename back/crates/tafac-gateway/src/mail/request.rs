@@ -118,6 +118,9 @@ pub(crate) enum BodyRefusal {
     Encoded,
     // Past the route's limit, declared or sent (Node: 413).
     TooLarge,
+    // Sent too slowly: a minute without a byte, or five minutes in all
+    // (Node's server: requestTimeout). 408, the connection closed.
+    Slow,
     // Not JSON, or not an object or a list at its top (`strict`), or not the
     // length it declared (Node: 400).
     Malformed,
