@@ -1,6 +1,6 @@
 // « Salles et personnels » (PlanningDirectoryPanel): the ADE tree's rooms
-// and staff as /ade/directory gives them ({ groups, items }, the server's
-// buildPortalDirectory), searched and laid out for the panel.
+// and staff as the planning's tree gives them ({ groups, items },
+// planningTree.js's buildDirectory), searched and laid out for the panel.
 
 // Lowercase, without accents or punctuation, for matching.
 export function foldDirectoryText(value) {
@@ -35,7 +35,7 @@ export function roomLabel(name) {
 const ENTRY_KINDS = new Set(['room', 'person', 'group'])
 
 // The entries with their kind and folders, and what a search reads.
-// `directory`: /ade/directory's { groups, items }.
+// `directory`: buildDirectory's { groups, items }.
 export function prepareDirectory(directory) {
   const groups = Array.isArray(directory?.groups) ? directory.groups : []
   const items = Array.isArray(directory?.items) ? directory.items : []

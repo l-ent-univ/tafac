@@ -101,6 +101,7 @@ import {
   clearGradesCache,
   detectScodocGroupSelection,
   findAdeGroupForScodoc,
+  forgetPlanningTrees,
   getAccountInfo,
   getAdeTree,
   getAuthSession,
@@ -149,14 +150,16 @@ function clearSignedOutClientCaches() {
   clearNextClassCache()
 }
 
-// What the mail page keeps at the module's level for the signed-in student:
-// the mails read, their webmail signatures, a send waiting or held. Logging
-// out doesn't reload the page, so it goes on logout and whenever the
-// signed-in user changes.
-function forgetMailAccount() {
+// What the page keeps at the module's level for the signed-in student: the
+// mail page's (the mails read, their webmail signatures, a send waiting or
+// held) and the planning's trees asked this visit. Logging out doesn't
+// reload the page, so it goes on logout and whenever the signed-in user
+// changes.
+function forgetStudentMemory() {
   clearMailReadCache()
   clearMailSignatures()
   clearMailSends()
+  forgetPlanningTrees()
 }
 
 // Signed in to another university than the one the page runs for (the demo
@@ -1142,7 +1145,7 @@ function App() {
         // Signed out here all the same: the server ended it already.
       }
       clearSignedOutClientCaches()
-      forgetMailAccount()
+      forgetStudentMemory()
       bindHistorySession(null)
       setActivePage('home')
       writeHistoryNav({ page: 'home' }, { replace: true })
@@ -2948,7 +2951,7 @@ function App() {
       // No reload follows: the mails read, the signatures, any send and the
       // history's mail entries must not carry over to whoever signs in
       // next in this tab.
-      forgetMailAccount()
+      forgetStudentMemory()
       bindHistorySession(null)
       setActivePage('home')
       writeHistoryNav({ page: 'home' }, { replace: true })
@@ -3017,7 +3020,7 @@ function App() {
   // an effect: the mail page reads its entry and the cache in its own first
   // render, which comes before any effect of this one. Idempotent.
   if (sessionState.authenticated && sessionState.user && bindHistorySession(sessionState.user)) {
-    forgetMailAccount()
+    forgetStudentMemory()
     keepMailFor(sessionState.user)
   }
 

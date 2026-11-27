@@ -751,6 +751,101 @@ export function buildDemoUpcomingPayload({ date, lookaheadDays = 14, selection =
   }
 }
 
+// The demo's planning as tonAPI gives a real one (src/demoServer.js's
+// /timetable routes): its courses, and its tree of groups, teachers and
+// rooms, `selected` on the student's own group.
+
+// The student's group when no other is asked: TP 3 (DEMO_DEFAULT_TREE_PATH).
+const DEMO_OWN_GROUP_ID = DEMO_DEFAULT_TREE_PATH[DEMO_DEFAULT_TREE_PATH.length - 1]
+
+// The courses of `from` to `to` (both included, YYYY-MM-DD): the demo week's,
+// every week, for the group, room or teacher of `resources` (a tree's ids),
+// the student's own group without any. An id the demo doesn't know gives
+// none.
+export function buildDemoCourses({ from, to, resources = [] } = {}) {
+  const first = parseDateOnly(from)
+  const last = addDays(parseDateOnly(to || from), 1)
+  const asked = resources.length > 0 ? resources.map(String) : [DEMO_OWN_GROUP_ID]
+  const group = asked.map((id) => findDemoTreeNodeById(DEMO_TREE_ROOT, id)).find((node) => node && node.id !== '-100')
+  const entry = asked.map((id) => DEMO_DIRECTORY_BY_ID.get(id)).find((item) => item && (item.location || item.teacher))
+  if (!group && !entry) return []
+  const label = group?.name ?? 'TP 3'
+
+  const courses = []
+  for (let monday = startOfWeek(first); monday < last; monday = addDays(monday, 7)) {
+    for (const event of buildDemoEventsForWeek(monday, label)) {
+      const start = new Date(event.start)
+      if (start < first || start >= last) continue
+      if (!group && !matchesDemoDirectoryEntry(event, entry)) continue
+      courses.push({
+        id: event.id,
+        title: event.title,
+        kind: null,
+        start: event.start,
+        end: event.end,
+        rooms: [event.location],
+        teachers: String(event.teacher ?? '').split(' - ').map((name) => name.trim()).filter(Boolean),
+        groups: event.groups,
+        description: null,
+        color: null,
+        activityId: null,
+        link: null,
+      })
+    }
+  }
+  return courses.sort((left, right) => left.start.localeCompare(right.start))
+}
+
+function demoTreeNode(node) {
+  const children = (node.children ?? []).map(demoTreeNode)
+  return {
+    id: String(node.id),
+    name: node.name,
+    kind: 'group',
+    folder: children.length > 0,
+    children,
+    ...(String(node.id) === DEMO_OWN_GROUP_ID ? { selected: true } : {}),
+  }
+}
+
+// The rooms and teachers of « Salles et personnels », under their folders.
+function demoDirectoryTree(kind) {
+  const roots = []
+  const folderIds = new Map()
+  const folderOf = (path) => {
+    let level = roots
+    let folder = null
+    path.forEach((name, depth) => {
+      const key = path.slice(0, depth + 1).join('\u0000')
+      if (!folderIds.has(key)) {
+        const node = { id: `demo-folder-${kind}-${folderIds.size + 1}`, name, kind, folder: true, children: [] }
+        folderIds.set(key, node)
+        level.push(node)
+      }
+      folder = folderIds.get(key)
+      level = folder.children
+    })
+    return folder
+  }
+  const directoryKind = kind === 'teacher' ? 'person' : kind
+  for (const item of DEMO_DIRECTORY_ITEMS) {
+    const group = DEMO_DIRECTORY_GROUPS[item.group]
+    if (group?.kind !== directoryKind) continue
+    folderOf(group.path).children.push({ id: item.id, name: item.name, kind, folder: false, children: [] })
+  }
+  return roots
+}
+
+// The tree of `kinds` ('group', 'teacher', 'room'; all without any).
+export function buildDemoTimetableTree(kinds = []) {
+  const wanted = (kind) => kinds.length === 0 || kinds.includes(kind)
+  return [
+    ...(wanted('group') ? DEMO_TREE_ROOT.children.map(demoTreeNode) : []),
+    ...(wanted('teacher') ? demoDirectoryTree('teacher') : []),
+    ...(wanted('room') ? demoDirectoryTree('room') : []),
+  ]
+}
+
 export function buildDemoAlertsPayload() {
   return [
     {

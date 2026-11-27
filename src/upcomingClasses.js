@@ -1,4 +1,7 @@
-import { getAdeUpcoming } from './entApi'
+import universityConfig from '@university'
+import { getTimetable } from './entApi'
+import { addDays } from './planningDates'
+import { classOfCourse } from './planningEvents'
 
 // Upcoming ADE classes, shared by the "Prochain cours" card and the greeting
 // briefing: both read the same on-device cache entry, and only one of them
@@ -87,6 +90,7 @@ export function readNextClassCache(cacheKey) {
 
 // Signed out: the classes kept for the next visit go with the session.
 export function clearNextClassCache() {
+  academicYears.clear()
   try {
     localStorage.removeItem(NEXT_CLASS_CACHE_KEY)
   } catch {
@@ -112,28 +116,64 @@ export function persistNextClassCache(cacheKey, result) {
   }
 }
 
-// One /ade/upcoming request; throws when the ENT session is gone.
+// The ids a selection asks the planning for: ADE's resources, digits only.
+// A personal timetable's own (« personal », TEMPO's « tempo ») is none: the
+// planning then gives the student's own classes.
+export function planningResources(selection) {
+  return buildResourceIdsFromSelection(selection).filter((id) => /^\d+$/.test(id))
+}
+
+// A personal timetable (planning.personal: TEMPO) can have no class at all
+// for the account, all year (another campus, a course outside it): not a
+// free week. Each academic year asked once (1 July to 31 August the next
+// year, as TEMPO's own), by its first year: whether it has none.
+const academicYears = new Map()
+
+function academicYearIsEmpty(year, signal) {
+  if (!academicYears.has(year)) {
+    const asked = getTimetable({ from: `${year}-07-01`, to: `${year + 1}-08-31`, signal })
+      .then((answer) => !(Array.isArray(answer?.data) && answer.data.length > 0))
+    asked.catch(() => academicYears.delete(year))
+    academicYears.set(year, asked)
+  }
+  return academicYears.get(year)
+}
+
+// Whether the academic years `from` to `to` meet have no class at all.
+async function hasNoTimetable(from, to, signal) {
+  const years = []
+  for (let year = Number(from.slice(0, 4)) - 1; year <= Number(to.slice(0, 4)); year += 1) {
+    if (`${year}-07-01` <= to && `${year + 1}-08-31` >= from) years.push(year)
+  }
+  const empty = await Promise.all(years.map((year) => academicYearIsEmpty(year, signal)))
+  return empty.length > 0 && empty.every(Boolean)
+}
+
+// The classes of `lookaheadDays` days from `startDate` (one request), as
+// the page keeps them (classOfCourse); throws when the planning can't say.
+// `noTimetable`: the student has none there at all, a personal timetable
+// without a class all year, or a university whose planning isn't served
+// (tonAPI's `service_absent`: a link to the university's own).
 export async function fetchUpcomingEvents({
   selection,
   signal,
   startDate = getTodayDateString(),
   lookaheadDays = NEXT_CLASS_LOOKAHEAD_DAYS,
 }) {
-  const data = await getAdeUpcoming({
-    date: startDate,
-    lookaheadDays,
-    selection,
-    signal,
-  })
-
-  if (!data?.authenticated) {
-    throw new Error('Connexion requise pour charger le planning')
+  const from = startDate
+  const to = addDays(startDate, Math.max(1, lookaheadDays) - 1)
+  let courses
+  try {
+    const answer = await getTimetable({ from, to, resources: planningResources(selection), signal })
+    courses = Array.isArray(answer?.data) ? answer.data : []
+  } catch (error) {
+    if (error?.code === 'service_absent') return { complete: true, events: [], noTimetable: true }
+    throw error
   }
 
-  return {
-    complete: data?.upcoming?.complete !== false,
-    events: Array.isArray(data?.upcoming?.events) ? data.upcoming.events : [],
-    // The planning service has no timetable at all for this account (TEMPO).
-    noTimetable: data?.upcoming?.noTimetable === true,
-  }
+  const events = courses.map(classOfCourse).filter(Boolean)
+  const noTimetable = events.length === 0 && universityConfig.planning?.personal === true
+    ? await hasNoTimetable(from, to, signal).catch(() => false)
+    : false
+  return { complete: true, events, noTimetable }
 }

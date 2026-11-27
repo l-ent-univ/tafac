@@ -8,7 +8,7 @@ import { shouldAskWeek } from './planningStates'
 import { usePullRefresh } from './usePullRefresh'
 
 // The planning's weeks, as the iOS app keeps them (PlanningEvents): one
-// /ade/upcoming request a week (its Monday and the six days after, the
+// /timetable request a week (its Monday and the six days after, the
 // student's groups), kept in memory for the visit, by account and groups.
 // A week that failed is asked again no sooner than 30 seconds later
 // (RETRY_AFTER_MS), at once on `retry`; one asked again (a refresh) keeps

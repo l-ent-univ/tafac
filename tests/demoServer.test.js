@@ -71,8 +71,8 @@ test('a service the university doesn\'t have says so, as the server\'s', async (
     ['/__ent_auth/mail/recent', 'mail'],
     ['/__ent_auth/mail', 'mail'],
     ['/__ent_auth/moodle/deadlines', 'moodleDeadlines'],
-    ['/__ent_auth/ade/tree', 'ade'],
-    ['/__ent_auth/planning', 'planning'],
+    ['/__ent_auth/timetable', 'planning'],
+    ['/__ent_auth/timetable/tree', 'planning'],
   ]) {
     assert.deepEqual(await ask(server, url).then(({ status, body }) => [status, body]), [404, { ok: false, disabled: true, feature }], url)
   }
@@ -97,16 +97,41 @@ test('what isn\'t a route of the demo\'s is answered here all the same, never se
   await assert.rejects(server.answer('/__ent_auth/mail/recent', { signal: AbortSignal.abort() }), { name: 'AbortError' })
 })
 
-test('a personal timetable: the demo adopts the student\'s own', async () => {
-  const personal = createDemoServer({ config: { id: 'univ-rennes-2', features: FEATURES, planning: { personal: true } } })
-  const { tree } = (await ask(personal, '/__ent_auth/ade/tree')).body
-  assert.equal(tree.selectionSchema, 'planning-personal')
-  assert.equal(tree.defaultSelection.label, 'Mon emploi du temps')
-  // Its id has no digit: the page takes it over a group picked before.
-  assert.doesNotMatch(tree.defaultSelection.resourceId, /\d/)
-  assert.equal((await ask(personal, '/__ent_auth/ade/tree?etabsVets=111')).body.tree.selectionSchema, undefined)
-  const groups = createDemoServer({ config: { id: 'univ-rennes', features: FEATURES } })
-  assert.equal((await ask(groups, '/__ent_auth/ade/tree')).body.tree.defaultSelection, undefined)
+// The planning, as the gateway gives a real one (tonAPI's own answers): the
+// server's demo has no such route, so these are the page's alone.
+test('the planning is tonAPI\'s model: courses, the tree, a search', async () => {
+  const server = createDemoServer({ config: { id: 'univ-rennes', features: FEATURES }, now: () => NOW })
+  const week = await ask(server, '/__ent_auth/timetable?from=2026-11-23&to=2026-11-29')
+  assert.equal(week.status, 200)
+  assert.deepEqual(week.body.meta, { university: 'univ-rennes', establishment: null, provider: 'demo', fetchedAt: new Date(NOW).toISOString(), cacheSecs: null })
+  const courses = week.body.data
+  assert.ok(courses.length > 5)
+  assert.deepEqual(Object.keys(courses[0]).sort(), ['activityId', 'color', 'description', 'end', 'groups', 'id', 'kind', 'link', 'rooms', 'start', 'teachers', 'title'])
+  assert.ok(courses.every((course) => course.start >= '2026-11-22' && course.start < '2026-11-30'))
+  // Without a resource: the student's own group, TP 3; another group's are its own.
+  assert.deepEqual([...new Set(courses.flatMap((course) => course.groups))], ['TP 3'])
+  const other = (await ask(server, '/__ent_auth/timetable?from=2026-11-23&to=2026-11-29&resources=11211')).body.data
+  assert.deepEqual([...new Set(other.flatMap((course) => course.groups))], ['TP 1'])
+  // A room: its classes alone; an id the demo doesn't know: none.
+  const room = (await ask(server, '/__ent_auth/timetable?from=2026-11-23&to=2026-11-29&resources=9106')).body.data
+  assert.ok(room.length > 0 && room.every((course) => course.rooms[0] === 'Amphi 1'))
+  assert.deepEqual((await ask(server, '/__ent_auth/timetable?from=2026-11-23&to=2026-11-29&resources=42')).body.data, [])
+
+  // The tree: groups (the student's own `selected`), teachers, rooms.
+  const tree = (await ask(server, '/__ent_auth/timetable/tree')).body.data
+  assert.deepEqual([...new Set(tree.map((node) => node.kind))], ['group', 'teacher', 'room'])
+  const followed = []
+  const walk = (nodes) => nodes.forEach((node) => {
+    if (node.selected) followed.push(node.id)
+    walk(node.children)
+  })
+  walk(tree)
+  assert.deepEqual(followed, ['11121'])
+  const rooms = (await ask(server, '/__ent_auth/timetable/tree?kind=room')).body.data
+  assert.ok(rooms.length > 0 && rooms.every((node) => node.kind === 'room' && node.folder))
+  const found = (await ask(server, '/__ent_auth/timetable/resources?kind=room&q=amphi')).body.data
+  assert.deepEqual(found.map((resource) => resource.id), ['9106', '9107', '9108'])
+  assert.deepEqual(found[0].path, ['Sites Univ Rennes', 'IUT Lannion', 'Amphithéâtre', 'Amphi 1 [180P]'])
 })
 
 test('the certificat de scolarité is a PDF of the page\'s making', async () => {
@@ -209,7 +234,6 @@ async function withBothSides(run) {
       university: shared.university,
       establishments: { byId: { iutlan: { label: shared.establishmentNames.iutlan } } },
     },
-    debug: true,
     pickIcons: (services) => pickAppIcons(sanitizeAppIconRequest({ services }) ?? [], shared.appIcons),
     readLogos: async (establishment) => [
       ...(establishment ? [await readLogo(establishment, shared.establishmentNames[establishment])] : []),
@@ -257,8 +281,6 @@ test('the page answers the demo as the server answered it', async (t) => {
     for (const url of [
       '/__ent_auth/account',
       '/__ent_auth/apps',
-      '/__ent_auth/planning',
-      '/__ent_auth/planning?date=2026-12-07&resourceId=1111',
       '/__ent_auth/grades',
       ...semesterIds.map((id) => `/__ent_auth/grades/semester/${id}`),
       '/__ent_auth/grades/semester/999999',
@@ -278,18 +300,6 @@ test('the page answers the demo as the server answered it', async (t) => {
       '/__ent_auth/student-pic',
       '/__ent_auth/documents/school-certificate/status',
       '/__ent_auth/documents/school-certificate',
-      '/__ent_auth/ade/calendar',
-      '/__ent_auth/ade/calendar?date=2026-12-07&resourceId=11111',
-      '/__ent_auth/ade/tree',
-      '/__ent_auth/ade/tree?etabsVets=1112',
-      '/__ent_auth/ade/tree?etabsVets=unknown',
-      '/__ent_auth/ade/directory',
-      '/__ent_auth/ade/search?q=info-com',
-      '/__ent_auth/ade/search?q=%20',
-      '/__ent_auth/ade/search',
-      '/__ent_auth/ade/timetable',
-      '/__ent_auth/ade/timetable?date=2026-12-07&resourceId=11211',
-      '/__ent_auth/ade/alerts',
       '/__ent_auth/mail/recent',
       '/__ent_auth/mail/recent?offset=20',
       '/__ent_auth/mail/recent?fresh=1',
@@ -324,10 +334,6 @@ test('the page answers the demo as the server answered it', async (t) => {
     }
 
     for (const [url, body] of [
-      ['/__ent_auth/ade/upcoming', {}],
-      ['/__ent_auth/ade/upcoming', { date: '2026-11-26', lookaheadDays: 14, selection: { tpLabel: 'TP 3', tpResourceId: '11121' } }],
-      ['/__ent_auth/ade/upcoming', { date: '2026-11-26', lookaheadDays: 500, selection: { resourceId: '9203' } }],
-      ['/__ent_auth/ade/upcoming', { date: '', lookaheadDays: 'x', selection: 'TP 3' }],
       ['/__ent_auth/mail/action', { ids: ['demo-mail-1', 'demo-mail-2'], action: 'read' }],
       ['/__ent_auth/mail/action', { ids: ['demo-mail-1'], action: 'move', folder: '300' }],
       ['/__ent_auth/mail/action', { ids: ['demo-mail-1'], action: 'move', folder: '999' }],

@@ -4,6 +4,7 @@ import { GRADES_UNAVAILABLE_MESSAGE } from './gradeFeatureState'
 import { evaluationTypeLabel, listGradesSemesters, summarizeAverage } from './gradesReport'
 import { readDistributionCounts } from './evaluationDistribution'
 import { pickAdeGroupForAlias } from './adeGroupMatch'
+import { adeTreeRoot, buildDirectory, focusAdeTree, followedGroups } from './planningTree'
 import { buildParcoursTpAliases } from './scodocParcoursGroups'
 import { getDefaultUniversityId, getLoadedUniversityId, getUniversityRequestHeaders } from './universityRuntime'
 import { buildUploadDisposition, normalizeAttachmentType, readAttachmentLimits, sanitizeAttachmentName } from './mailAttachments'
@@ -236,8 +237,10 @@ async function parseJsonPayload(response) {
   }
 
   if (!response.ok) {
-    const errorMessage = typeof data === 'object' && data?.error
-      ? data.error
+    // `error`: the server's words; `detail`: tonAPI's, on a refusal of its
+    // own (a problem: the planning's routes).
+    const errorMessage = typeof data === 'object' && (data?.error || data?.detail)
+      ? data.error || data.detail
       : typeof data === 'string' && data
         ? data
         : `Request failed with status ${response.status}.`
@@ -433,14 +436,6 @@ export async function getApps({ fresh = false } = {}) {
 
   const payload = await parseJsonPayload(response)
   return isOldAnswer(response) && payload && typeof payload === 'object' ? { ...payload, refreshing: true } : payload
-}
-
-export async function getPlanning() {
-  const response = await serverFetch(`${ENT_AUTH_PREFIX}/planning`, {
-    credentials: 'same-origin',
-  })
-
-  return parseJsonPayload(response)
 }
 
 // Recent inbox messages for the "Mails récents" widget and the mail page.
@@ -1767,180 +1762,160 @@ export function listGradedEvaluations(data) {
 }
 
 // ============================================================================
-// ADE Schedule API
+// The planning (tonAPI's model)
 // ============================================================================
+//
+// The planning is answered by the Rust gateway with tonAPI's own answers, as
+// tonAPI's server gives them on its /v1 routes of the same names (back/:
+// gateway/planning.rs): { data, meta }, and a refusal as a problem
+// ({ code, title, detail, link }, `error.code` here).
+//
+//   GET timetable?from=&to=&resources=   tonAPI's Course list
+//   GET timetable/tree?kind=             its ResourceNode tree, `selected`
+//                                        on the groups the student follows
+//   GET timetable/resources?kind=&q=     its TimetableResource list
+//
+// What the page makes of them is its own: the group picker's tree and the
+// rooms and staff (src/planningTree.js), a class as the page shows it
+// (src/planningEvents.js: classOfCourse).
 
+// The on-device timetable the planning's routes kept before (/ade/timetable),
+// still cleared for the devices that have one.
 const ADE_TIMETABLE_CACHE_KEY = 'l-ent:ade-timetable-cache'
-const ADE_TIMETABLE_CACHE_TTL_MS = 15 * 60 * 1000
 
-export async function getAdeStatus() {
-  const response = await serverFetch(`${ENT_AUTH_PREFIX}/ade/status`, {
-    credentials: 'same-origin',
-  })
-
-  return parseJsonPayload(response)
-}
-
-// `fallback`: the group standing in for the account's own when it has none
-// (findAdeGroupForScodoc).
-export async function getAdeTree(etabsVets = '', { fallback = '' } = {}) {
+function planningQuery(params) {
   const query = new URLSearchParams()
-  if (etabsVets) query.set('etabsVets', etabsVets)
-  if (fallback) query.set('fallback', fallback)
-  const params = query.size ? `?${query}` : ''
-  const response = await serverFetch(`${ENT_AUTH_PREFIX}/ade/tree${params}`, {
-    credentials: 'same-origin',
-  })
-
-  return parseJsonPayload(response)
-}
-
-// « Salles et personnels »: the ADE tree's rooms and staff
-// ({ groups, items }, planningPortalApi.js's buildPortalDirectory).
-export async function getAdeDirectory() {
-  const response = await serverFetch(`${ENT_AUTH_PREFIX}/ade/directory`, {
-    credentials: 'same-origin',
-  })
-
-  return parseJsonPayload(response)
-}
-
-export async function searchAde(query) {
-  if (!query?.trim()) {
-    return { results: [] }
+  for (const [key, value] of Object.entries(params)) {
+    const written = Array.isArray(value) ? value.join(',') : value
+    if (written != null && written !== '') query.set(key, String(written))
   }
-
-  const response = await serverFetch(
-    `${ENT_AUTH_PREFIX}/ade/search?q=${encodeURIComponent(query.trim())}`,
-    { credentials: 'same-origin' },
-  )
-
-  return parseJsonPayload(response)
+  return query.size ? `?${query}` : ''
 }
 
-function buildAdeQueryString({ date, ...extra } = {}) {
-  const params = new URLSearchParams()
-
-  if (date) {
-    params.set('date', date)
-  }
-
-  for (const [key, value] of Object.entries(extra)) {
-    if (value != null) {
-      params.set(key, String(value))
-    }
-  }
-
-  return params.toString()
-}
-
-export async function getAdeCalendarMetadata({ date, ...extra } = {}) {
-  const qs = buildAdeQueryString({ date, ...extra })
-  const response = await serverFetch(
-    `${ENT_AUTH_PREFIX}/ade/calendar${qs ? `?${qs}` : ''}`,
-    { credentials: 'same-origin' },
-  )
-
-  return parseJsonPayload(response)
-}
-
-export async function getAdeUpcoming({
-  date,
-  lookaheadDays = 21,
-  selection = null,
-  preferPlanning = false,
-  signal,
-} = {}) {
-  const response = await serverFetch(`${ENT_AUTH_PREFIX}/ade/upcoming`, {
-    method: 'POST',
+async function getPlanningAnswer(path, params = {}, { signal } = {}) {
+  const response = await serverFetch(`${ENT_AUTH_PREFIX}/${path}${planningQuery(params)}`, {
     credentials: 'same-origin',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      date,
-      lookaheadDays,
-      selection,
-      preferPlanning,
-    }),
     signal,
   })
-
   return parseJsonPayload(response)
 }
 
-export async function getAdeTimetable({
-  date,
-  force = false,
-  persist = true,
-  signal,
-  ...extra
-} = {}) {
-  const requestKey = buildAdeQueryString({ date, ...extra })
-
-  if (!force) {
-    try {
-      const raw = localStorage.getItem(ADE_TIMETABLE_CACHE_KEY)
-      if (raw) {
-        const cached = JSON.parse(raw)
-        if (cached?.data && Date.now() - cached.cachedAt < ADE_TIMETABLE_CACHE_TTL_MS) {
-          if (cached.requestKey === requestKey) {
-            return cached.data
-          }
-
-          // Legacy cache entries were keyed only by date.
-          if (!cached.requestKey && !requestKey && (!date || cached.date === date)) {
-            return cached.data
-          }
-        }
-      }
-    } catch {
-      // ignore corrupt cache
-    }
-  }
-
-  const qs = requestKey
-
-  const response = await serverFetch(
-    `${ENT_AUTH_PREFIX}/ade/timetable${qs ? `?${qs}` : ''}`,
-    {
-      credentials: 'same-origin',
-      signal,
-    },
-  )
-
-  const data = await parseJsonPayload(response)
-
-  if (persist && data.authenticated && data.timetable) {
-    try {
-      localStorage.setItem(
-        ADE_TIMETABLE_CACHE_KEY,
-        JSON.stringify({
-          data,
-          date: date || new Date().toISOString().split('T')[0],
-          requestKey,
-          cachedAt: Date.now(),
-        }),
-      )
-    } catch {
-      // storage full
-    }
-  }
-
-  return data
+// The classes of `from` to `to` (both included, YYYY-MM-DD): the student's
+// own, or those of `resources` (ids of the tree: groups, a room, a teacher).
+// → { data: Course[], meta }.
+export function getTimetable({ from, to, resources = [], signal } = {}) {
+  return getPlanningAnswer('timetable', { from, to, resources }, { signal })
 }
 
+// The tree of the university's resources of `kinds` ('group', 'teacher',
+// 'room'; all without any). → { data: ResourceNode[], meta }.
+export function getTimetableTree({ kinds = [] } = {}) {
+  return getPlanningAnswer('timetable/tree', { kind: kinds })
+}
+
+// The resources whose name has the words of `q`, each with its path.
+// → { data: TimetableResource[], meta }.
+export function getTimetableResources({ kinds = [], q = '', limit } = {}) {
+  return getPlanningAnswer('timetable/resources', { kind: kinds, q: q.trim(), limit })
+}
+
+// The trees asked this visit, by kind (the groups' a few hundred KB at
+// Rennes, its rooms' and staff's more): asked once, each, for the account.
+const planningTrees = new Map()
+
+function loadTree(kind) {
+  if (!planningTrees.has(kind)) {
+    const promise = getTimetableTree({ kinds: [kind] }).then((answer) => (Array.isArray(answer?.data) ? answer.data : []))
+    promise.catch(() => planningTrees.delete(kind))
+    planningTrees.set(kind, promise)
+  }
+  return planningTrees.get(kind)
+}
+
+// A personal timetable (planning.personal: TEMPO) has no group to pick: the
+// student's own, « Mon emploi du temps », which the page adopts as its group.
+// Its id has no digit, so it is never asked as a resource.
+const PERSONAL_PLANNING_SELECTION = Object.freeze({
+  resourceId: 'personal',
+  label: 'Mon emploi du temps',
+  parentResourceId: null,
+  parentLabel: null,
+  contextLabel: 'Mon emploi du temps',
+  programResourceId: null,
+  programLabel: null,
+  yearResourceId: null,
+  yearLabel: null,
+  tdResourceId: null,
+  tdLabel: null,
+  tpResourceId: null,
+  tpLabel: null,
+})
+
+// The groups' tree as the group picker reads it (App.jsx), focused on
+// `etabsVets` (a node of it), or on the student's own group; `fallback`:
+// the group standing in for the student's own when they follow none
+// (findAdeGroupForScodoc). → { authenticated, tree }.
+export async function getAdeTree(etabsVets = '', { fallback = '' } = {}) {
+  if (universityConfig.planning?.personal === true) {
+    return {
+      authenticated: true,
+      tree: { root: adeTreeRoot([]), currentPathIds: [], selectionPathIds: [], selectionSchema: 'planning-personal', defaultSelection: { ...PERSONAL_PLANNING_SELECTION } },
+    }
+  }
+  const groups = await loadTree('group')
+  const tree = focusAdeTree(adeTreeRoot(groups), {
+    requestedResourceId: etabsVets,
+    fallbackResourceId: fallback,
+    ownResources: followedGroups(groups),
+  })
+  return { authenticated: true, tree }
+}
+
+// « Salles et personnels »: the rooms, staff and groups of the tree
+// ({ groups, items }, src/planningTree.js's buildDirectory). `supported`:
+// false where the planning service has no tree to give.
+export async function getAdeDirectory() {
+  try {
+    const trees = await Promise.all(['room', 'teacher', 'group'].map(loadTree))
+    return { authenticated: true, supported: true, directory: buildDirectory(trees.flat()) }
+  } catch (error) {
+    if (['not_implemented', 'service_absent'].includes(error?.code)) {
+      return { authenticated: true, supported: false, directory: null }
+    }
+    throw error
+  }
+}
+
+// The student groups whose name has `query`, as the planning's search gives
+// them ({ id, name, path }: the path from « Ressources », dot-separated):
+// the groups' tree searched here, a hundred at most.
+export async function searchAde(query) {
+  const needle = String(query ?? '').replace(/\s+/g, ' ').trim().toLocaleLowerCase('fr')
+  if (!needle) {
+    return { results: [] }
+  }
+  const results = []
+  const walk = (node) => {
+    if (results.length >= 100) return
+    if (node.children.length === 0 && node.name.toLocaleLowerCase('fr').includes(needle)) {
+      results.push({ id: node.id, name: node.name, path: node.path, family: 'trainee' })
+    }
+    node.children.forEach(walk)
+  }
+  walk(adeTreeRoot(await loadTree('group')))
+  return { results }
+}
+
+// The legacy on-device timetable, kept by the planning's routes before
+// (signed out, or the student's group changed).
 export function clearAdeTimetableCache() {
   localStorage.removeItem(ADE_TIMETABLE_CACHE_KEY)
 }
 
-export async function getAdeAlerts(etabsVets = '') {
-  const params = etabsVets ? `?etabsVets=${encodeURIComponent(etabsVets)}` : ''
-  const response = await serverFetch(`${ENT_AUTH_PREFIX}/ade/alerts${params}`, {
-    credentials: 'same-origin',
-  })
-
-  return parseJsonPayload(response)
+// The trees asked this visit: another student's are not theirs (signed out,
+// or the signed-in student changed).
+export function forgetPlanningTrees() {
+  planningTrees.clear()
 }
 
 // ============================================================================

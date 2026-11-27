@@ -8,8 +8,8 @@ import { prepareDirectory } from './planningDirectory'
 export const HAS_PLANNING_DIRECTORY = (universityConfig.planning?.providerName ?? 'ADE') === 'ADE'
 
 // « Salles et personnels »' entries (prepareDirectory), asked of
-// /ade/directory once the panel first opens and kept for the visit, by
-// account (~600 KB at Rennes: not stored on the device). → { status:
+// the planning's trees once the panel first opens and kept for the visit,
+// by account (a few MB at Rennes: not stored on the device). → { status:
 // 'idle' | 'loading' | 'loaded' | 'unsupported' | 'unavailable', entries,
 // retry }.
 const loaded = new Map()

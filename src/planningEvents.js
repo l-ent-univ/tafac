@@ -1,7 +1,7 @@
 // The planning's classes as the page shows them (the iOS app's
-// ScheduleEvent and PlanningEvents): built from /ade/upcoming's events
-// (the portal's, or the demo account's, which have `id` and ISO times
-// only), without duplicates, by day. Pure, see tests/planningEvents.test.js.
+// ScheduleEvent and PlanningEvents): built from tonAPI's courses
+// (/__ent_auth/timetable), without duplicates, by day. Pure, see
+// tests/planningEvents.test.js.
 import { courseKey } from './eventAccents.js'
 import { addDays, toDayKey } from './planningDates.js'
 
@@ -20,6 +20,36 @@ function softenCapitals(label) {
   return label && label === label.toLocaleUpperCase('fr') && /\p{L}{2,}\s+\p{L}{2,}/u.test(label)
     ? label.charAt(0) + label.slice(1).toLocaleLowerCase('fr')
     : label
+}
+
+// A course of tonAPI's (its Course: ISO times with their offset, rooms,
+// teachers and groups as lists, a link) as the page keeps a class, the one
+// shape its cards, its briefing and the device's cache read: times in UTC
+// (compared as text), rooms and teachers joined with « - », groups with
+// « , », the course's text as its note. Null without a start.
+export function classOfCourse(course) {
+  const start = Date.parse(course?.start)
+  if (!Number.isFinite(start)) return null
+  const parsedEnd = Date.parse(course?.end)
+  const end = Number.isFinite(parsedEnd) && parsedEnd >= start ? parsedEnd : start
+  const list = (value) => (Array.isArray(value) ? value.map(text).filter(Boolean) : [])
+  const groups = list(course.groups)
+  const link = webLink(course.link?.url)
+  return {
+    uid: text(course.id),
+    title: text(course.title) ?? 'Cours',
+    start: new Date(start).toISOString(),
+    end: new Date(end).toISOString(),
+    startMs: start,
+    endMs: end,
+    location: list(course.rooms).join(' - '),
+    teacher: list(course.teachers).join(' - '),
+    groups,
+    groupsLabel: groups.join(', '),
+    notes: text(course.description),
+    link,
+    linkLabel: link ? text(course.link?.label) : null,
+  }
 }
 
 export function toPlanningEvent(raw) {

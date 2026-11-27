@@ -133,7 +133,7 @@ function useFontsReady() {
 // selected day's week as an agenda, its pages swiped by weeks, the day
 // picked scrolled to.
 // `selection`: the student's group (profileStorage), its weeks asked of
-// /ade/upcoming (usePlanningWeeks). `showWeekend`: the week's Saturday and
+// the planning (usePlanningWeeks). `showWeekend`: the week's Saturday and
 // Sunday even without classes (Mon compte). `onOpenAccount`: Mon compte,
 // where a student without a group chooses it. `initialDay`: a day to open on
 // ("YYYY-MM-DD", the dashboard's "Prochain cours"), handed back with

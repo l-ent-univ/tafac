@@ -16,19 +16,13 @@ import {
   DEMO_GRADES_DEPARTMENT_MESSAGE,
   DEMO_SESSION_MODE,
   DEMO_SIGNATURE_LOGIN,
-  buildDemoAdeDirectoryPayload,
-  buildDemoAdeTreePayload,
-  buildDemoAlertsPayload,
   buildDemoApps,
-  buildDemoCalendarPayload,
+  buildDemoCourses,
   buildDemoEvaluationDistribution,
   buildDemoGradesPayload,
   buildDemoMoodleDeadlinesPayload,
-  buildDemoPlanningPayload,
   buildDemoSemesterGradesPayload,
-  buildDemoTimetablePayload,
-  buildDemoUpcomingPayload,
-  searchDemoAdeTree,
+  buildDemoTimetableTree,
 } from './demoAccount.js'
 import { createDemoMailbox } from './demoMail.js'
 
@@ -38,8 +32,7 @@ const PROXY_PREFIX = '/__ent_proxy'
 // The services a university may not have: their routes then answer
 // « disabled », as the server's.
 const FEATURE_GATED_PREFIXES = [
-  ['/ade', 'ade'],
-  ['/planning', 'planning'],
+  ['/timetable', 'planning'],
   ['/grades', 'grades'],
   ['/mail', 'mail'],
   ['/moodle', 'moodleDeadlines'],
@@ -86,26 +79,6 @@ export function buildDemoCertificatePdf(schoolYear) {
   return Uint8Array.from(pdf, (character) => character.charCodeAt(0))
 }
 
-// A personal timetable (planning.personal: the student's own, no group to
-// pick): « Mon emploi du temps », which the page adopts as its group. Its id
-// has no digit, as the server's own.
-const PERSONAL_PLANNING_LABEL = 'Mon emploi du temps'
-const PERSONAL_PLANNING_SELECTION = Object.freeze({
-  resourceId: 'personal',
-  label: PERSONAL_PLANNING_LABEL,
-  parentResourceId: null,
-  parentLabel: null,
-  contextLabel: PERSONAL_PLANNING_LABEL,
-  programResourceId: null,
-  programLabel: null,
-  yearResourceId: null,
-  yearLabel: null,
-  tdResourceId: null,
-  tdLabel: null,
-  tpResourceId: null,
-  tpLabel: null,
-})
-
 const JSON_HEADERS = { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' }
 
 function json(status, body) {
@@ -128,8 +101,6 @@ function readJsonBody(init) {
 //   session    () → the demo's sign-in (src/demoSession.js), for /session
 //   storage    where the demo's mailbox is kept (src/demoMail.js)
 //   now        the clock
-//   debug      a development page: answers carry their `debug` field, as a
-//              development server's
 //   pickIcons  (services) → the tiles' { palette, icons }, or a promise of
 //              them (src/appIconPicks.js, with the university's look)
 //   readLogos  the automatic signature's logos (src/demoMail.js)
@@ -138,14 +109,18 @@ export function createDemoServer({
   session = () => null,
   storage = null,
   now = () => Date.now(),
-  debug = false,
   pickIcons = () => ({ palette: {}, icons: {} }),
   readLogos = () => [],
 } = {}) {
   const features = config.features ?? {}
   const mailbox = createDemoMailbox({ storage, now, config, login: DEMO_SIGNATURE_LOGIN, readLogos })
-  const source = debug ? { debug: { source: 'demo' } } : null
   const signedIn = (body) => ({ authenticated: true, sessionMode: DEMO_SESSION_MODE, ...body })
+  // tonAPI's answer, as the gateway passes it on: its data and `meta`.
+  const tonapi = (data) => ({
+    data,
+    meta: { university: config.id ?? null, establishment: null, provider: 'demo', fetchedAt: new Date(now()).toISOString(), cacheSecs: null },
+  })
+  const listed = (written) => String(written ?? '').split(',').map((value) => value.trim()).filter(Boolean)
   const mail = ({ status, body }) => json(status, body)
 
   async function route(method, path, query, init) {
@@ -189,18 +164,6 @@ export function createDemoServer({
 
       case 'GET /apps':
         return json(200, signedIn({ apps: buildDemoApps() }))
-
-      case 'GET /planning': {
-        const timetable = buildDemoPlanningPayload({ date: query.get('date') ?? today(now()), resourceId: query.get('resourceId') ?? '' })
-        return json(200, signedIn({
-          events: timetable.events,
-          weekLabel: timetable.weekLabel,
-          dayLabels: timetable.dayLabels,
-          resolvedWeek: timetable.resolvedWeek,
-          outOfRange: timetable.outOfRange,
-          ...source,
-        }))
-      }
 
       // ── Grades ──
 
@@ -301,51 +264,29 @@ export function createDemoServer({
         return json(200, { finalUrl: target, chain: [], useServerLaunch: false, reason: 'demo-session', canUseServerLaunch: false, degraded: false, degradedReason: null })
       }
 
-      // ── The planning (ADE) ──
+      // ── The planning, as tonAPI gives it (the gateway's /timetable routes) ──
 
-      case 'GET /ade/calendar':
-        return json(200, signedIn({
-          calendar: buildDemoCalendarPayload({ date: query.get('date')?.trim() || null, resourceId: query.get('resourceId') ?? '' }),
-          ...source,
-        }))
-
-      case 'GET /ade/tree': {
-        const requested = query.get('etabsVets') ?? ''
-        // A personal timetable has no group to pick: the demo adopts the
-        // student's own, as a real account does. Its timetable answers any
-        // group.
-        const tree = config.planning?.personal === true && !requested
-          ? { ...buildDemoAdeTreePayload(requested), selectionSchema: 'planning-personal', defaultSelection: { ...PERSONAL_PLANNING_SELECTION } }
-          : buildDemoAdeTreePayload(requested)
-        return json(200, signedIn({ tree, ...source }))
+      case 'GET /timetable': {
+        const from = query.get('from') ?? today(now())
+        return json(200, tonapi(buildDemoCourses({ from, to: query.get('to') ?? from, resources: listed(query.get('resources')) })))
       }
 
-      case 'GET /ade/directory':
-        return json(200, signedIn({ supported: true, directory: buildDemoAdeDirectoryPayload() }))
+      case 'GET /timetable/tree':
+        return json(200, tonapi(buildDemoTimetableTree(listed(query.get('kind')))))
 
-      case 'GET /ade/search': {
-        const searched = query.get('q') ?? ''
-        if (!searched.trim()) return json(400, { error: 'Query parameter "q" is required.' })
-        return json(200, signedIn({ results: searchDemoAdeTree(searched), ...source }))
+      case 'GET /timetable/resources': {
+        const words = (query.get('q') ?? '').toLocaleLowerCase('fr').split(/\s+/).filter(Boolean)
+        const found = []
+        const walk = (nodes, path) => nodes.forEach((node) => {
+          const at = [...path, node.name]
+          if (!node.folder && words.every((word) => node.name.toLocaleLowerCase('fr').includes(word))) {
+            found.push({ id: node.id, name: node.name, kind: node.kind, path: at })
+          }
+          walk(node.children, at)
+        })
+        walk(buildDemoTimetableTree(listed(query.get('kind'))), [])
+        return json(200, tonapi(found.slice(0, Number(query.get('limit')) || 100)))
       }
-
-      case 'GET /ade/timetable':
-        return json(200, signedIn({
-          timetable: buildDemoTimetablePayload({ date: query.get('date') ?? today(now()), resourceId: query.get('resourceId') ?? '' }),
-          ...source,
-        }))
-
-      case 'POST /ade/upcoming': {
-        const body = readJsonBody(init)
-        const date = typeof body.date === 'string' && body.date.trim() ? body.date.trim() : today(now())
-        // Capped at 60 days whatever the page asks.
-        const lookaheadDays = Math.max(1, Math.min(60, Number.parseInt(String(body.lookaheadDays ?? '21'), 10) || 21))
-        const selection = body.selection && typeof body.selection === 'object' ? body.selection : null
-        return json(200, signedIn({ upcoming: buildDemoUpcomingPayload({ date, lookaheadDays, selection }), ...source }))
-      }
-
-      case 'GET /ade/alerts':
-        return json(200, signedIn({ alerts: buildDemoAlertsPayload(), ...source }))
 
       default:
         return json(404, { error: 'Not found.' })

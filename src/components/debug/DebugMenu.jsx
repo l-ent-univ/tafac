@@ -12,27 +12,24 @@ import { findProfilePhotoCandidate } from '../../profilePhoto'
 import { MUTED_FILL_CLASSES } from '../../settingsStyles'
 import {
   getAccountInfo,
-  getAdeAlerts,
-  getAdeCalendarMetadata,
-  getAdeStatus,
-  getAdeTimetable,
   getAdeTree,
-  getAdeUpcoming,
   getApps,
   getAverageGrade,
   getGrades,
   getLatestGrade,
-  getPlanning,
   getStudentProfilePictureMeta,
+  getTimetable,
+  getTimetableResources,
+  getTimetableTree,
   logoutFromEnt,
   requestEnt,
-  searchAde,
 } from '../../entApi'
 import { DebugButton, DebugField, DebugRow, DebugSection, DebugSegmented, DebugSwitchRow } from './DebugControls'
 import CloseButton from '../CloseButton'
 import DebugOutput from './DebugOutput'
 import { clearClientRuntimeState, getErrorMessage, resolveDebugImagePreviewFromSnapshot } from './debugUtils'
-import { NEXT_CLASS_LOOKAHEAD_DAYS } from '../../upcomingClasses'
+import { NEXT_CLASS_LOOKAHEAD_DAYS, planningResources } from '../../upcomingClasses'
+import { addDays } from '../../planningDates'
 
 const DEFAULT_REQUEST_PATH = '/api/v4-3/dlm/layout.json'
 // Both read once, at load (src/papillon.js, src/serviceNoticeDebug.js):
@@ -45,7 +42,6 @@ const THEME_OPTIONS = [['auto', 'Auto'], ['light', 'Clair'], ['dark', 'Sombre']]
 const ENT_CALLS = [
   ['Account', getAccountInfo],
   ['Apps', getApps],
-  ['Planning', getPlanning],
   ['Grades', getGrades],
   ['Latest Grade', getLatestGrade],
   ['Average Grade', getAverageGrade],
@@ -266,18 +262,12 @@ export default function DebugMenu({
       : heroImages.length === 1 ? 'Une seule photo configurée' : 'Aucune photo : image générique'
   const canShiftHero = !hasCustomBackground && heroImages.length >= 2
   const loadedUniversityId = getLoadedUniversityId()
-  const selectedAdeResourceId = selectedTp?.resourceId ?? undefined
+  // The planning's routes (tonAPI's answers), and the group picker's tree.
+  const today = new Date().toISOString().slice(0, 10)
   const adeCalls = [
-    ['ADE Status', () => getAdeStatus()],
-    ['ADE Calendar', () => getAdeCalendarMetadata({ resourceId: selectedAdeResourceId })],
-    ['ADE Tree', () => getAdeTree()],
-    ['ADE Timetable', () => getAdeTimetable({ force: true, resourceId: selectedAdeResourceId })],
-    ['ADE Upcoming', () => getAdeUpcoming({
-      date: new Date().toISOString().slice(0, 10),
-      lookaheadDays: NEXT_CLASS_LOOKAHEAD_DAYS,
-      selection: selectedTp,
-    })],
-    ['ADE Alerts', () => getAdeAlerts()],
+    ['Timetable', () => getTimetable({ from: today, to: addDays(today, NEXT_CLASS_LOOKAHEAD_DAYS - 1), resources: planningResources(selectedTp) })],
+    ['Timetable Tree', () => getTimetableTree()],
+    ['Picker Tree', () => getAdeTree()],
   ]
   // The button whose answer the output shows.
   const callTone = (label) => (debugState.label === label ? 'active' : 'default')
@@ -295,7 +285,7 @@ export default function DebugMenu({
 
   function handleAdeSearch(event) {
     event.preventDefault()
-    void runDebugAction(`ADE Search: ${adeSearchQuery}`, () => searchAde(adeSearchQuery))
+    void runDebugAction(`Timetable Resources: ${adeSearchQuery}`, () => getTimetableResources({ q: adeSearchQuery }))
   }
 
   return (

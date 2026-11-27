@@ -91,7 +91,6 @@ function demoServer() {
     config: universityConfig,
     session: readDemoSession,
     storage: tabStorage(),
-    debug: Boolean(import.meta.env?.DEV),
     pickIcons,
     readLogos,
   })
