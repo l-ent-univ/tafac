@@ -201,8 +201,8 @@ mod tests {
         let rennes = &crate::universities::served()["univ-rennes"].settings;
         let Some(SignIn::Federated(moodle)) = sign_in(rennes, &at("https://foad.univ-rennes.fr/mod/assign/view.php?id=1")) else { panic!("Rennes' Moodle signs in through the federation") };
         assert_eq!(moodle.base.as_str(), "https://foad.univ-rennes.fr/");
-        // The name Node's settings gave the discovery page (moodle.wayfEntityId).
-        assert!(include_str!("../../../../../universities/univ-rennes/server.js").contains(&format!("wayfEntityId: '{}'", moodle.idp)));
+        // The name the discovery page knows Rennes' identity provider by.
+        assert_eq!(moodle.idp, "urn:mace:cru.fr:federation:univ-rennes1.fr");
         assert!(sign_in(rennes, &at("https://planning.univ-rennes.fr/portal/")).is_none());
 
         // A Moodle that signs in by the CAS, in a folder of its host.

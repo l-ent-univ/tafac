@@ -247,12 +247,4 @@ mod tests {
         assert_eq!((otherwise.status().as_u16(), body(&otherwise)), (502, serde_json::json!({ "ok": false, "error": FAILED })));
     }
 
-    // The sentences are the ones Node's routes say.
-    #[test]
-    fn the_refusals_are_nodes_words() {
-        let node = include_str!("../../../../../server/entAuthApp.js");
-        for sentence in [NO_SERVICE, NO_CERTIFICATE, FAILED] {
-            assert!(node.contains(&format!("'{sentence}'")), "{sentence}");
-        }
-    }
 }

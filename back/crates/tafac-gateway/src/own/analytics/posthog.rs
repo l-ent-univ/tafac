@@ -216,16 +216,6 @@ mod tests {
     use super::*;
 
     #[test]
-    fn the_patience_is_posthog_nodes_as_node_sets_it() {
-        let node = include_str!("../../../../../../server/analytics.js");
-        assert!(node.contains("requestTimeout: 5000,"));
-        assert_eq!(ATTEMPT, Duration::from_millis(5000));
-        assert!(node.contains("fetchRetryCount: 1,"));
-        assert_eq!(ATTEMPTS, 2);
-        assert!(node.contains("disableGeoip: true,"));
-    }
-
-    #[test]
     fn an_event_is_written_as_posthog_node_writes_it() {
         let now = DateTime::parse_from_rfc3339("2026-10-08T10:00:00.123Z").unwrap().with_timezone(&Utc);
         let mut properties = Map::new();

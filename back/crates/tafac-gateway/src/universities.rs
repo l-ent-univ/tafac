@@ -111,18 +111,18 @@ mod tests {
     }
 
     // Rennes 2 and the Sorbonne Nouvelle, whose portals are not uPortal:
-    // served, with the places Node's own settings name for them.
+    // served, with the places the page's own settings name for them.
     #[test]
-    fn rennes_2_and_the_sorbonne_nouvelle_are_served_at_nodes_own_places() {
-        // Node's own settings for a university: shared.js, server.js.
-        let node = |university: &str| match university {
-            "univ-rennes-2" => (include_str!("../../../../universities/univ-rennes-2/shared.js"), include_str!("../../../../universities/univ-rennes-2/server.js")),
-            _ => (include_str!("../../../../universities/univ-sorbonne-nouvelle/shared.js"), include_str!("../../../../universities/univ-sorbonne-nouvelle/server.js")),
+    fn rennes_2_and_the_sorbonne_nouvelle_are_served_at_the_pages_own_places() {
+        // The page's settings for a university: its shared.js.
+        let page = |university: &str| match university {
+            "univ-rennes-2" => include_str!("../../../../universities/univ-rennes-2/shared.js"),
+            _ => include_str!("../../../../universities/univ-sorbonne-nouvelle/shared.js"),
         };
-        // A value of Node's settings: « export const <name> = '<value>' ».
+        // A value of those settings: « export const <name> = '<value>' ».
         let said = |source: &str, name: &str| -> String {
             let declared = format!("export const {name} = '");
-            let rest = &source[source.find(&declared).unwrap_or_else(|| panic!("{name} is no longer one of Node's")) + declared.len()..];
+            let rest = &source[source.find(&declared).unwrap_or_else(|| panic!("{name} is no longer in shared.js")) + declared.len()..];
             rest[..rest.find('\'').unwrap()].to_string()
         };
         let host = |address: &str| Url::parse(address).unwrap().host_str().unwrap().to_string();
@@ -135,14 +135,13 @@ mod tests {
             assert_eq!(university.cas_login_path, cas_login_path);
             assert!(university.settings.establishments.is_empty());
 
-            // The same university, the same places, as Node's own settings.
-            let (shared, server) = node(id);
+            // The same university, the same places, as the page's settings.
+            let shared = page(id);
             assert_eq!(said(shared, "id"), id);
             assert_eq!(university.portal_host, host(&said(shared, "entOrigin")));
             assert_eq!(university.cas_host, host(&said(shared, "casOrigin")));
             assert_eq!(university.moodle.as_ref().and_then(|moodle| moodle.host_str()), Some(host(&said(shared, "moodleOrigin")).as_str()));
-            // Moodle's own CAS login, which tonAPI's `entry = "cas"` is.
-            assert!(server.contains("casLoginPath: '/login/index.php?authCAS=CAS'"));
+            // Moodle's own CAS login.
             assert!(embedded.university.contains("entry = \"cas\""));
 
             assert!(served().contains_key(id), "{id} is one of routes::UNIVERSITIES");

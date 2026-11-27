@@ -371,20 +371,4 @@ pub(super) mod tests {
         assert_eq!((newer.serial, resolved(&newer, "univ-rennes", "ios", "0.27.0").0.applied.len()), (3, 0));
     }
 
-    #[test]
-    fn what_is_read_is_what_nodes_document_reads() {
-        let document = include_str!("../../../../../../server/remoteSettings/document.ts");
-        let keys = PATCH_KEYS.iter().map(|key| format!("'{key}'")).collect::<Vec<_>>().join(", ");
-        assert!(document.contains(&format!("const PATCH_KEYS = new Set([{keys}])")), "PATCH_KEYS");
-        assert!(document.contains(&format!("const MAX_PATCHES = {MAX_PATCHES}\n")));
-        assert!(document.contains("const VERSION = /^\\d+\\.\\d+\\.\\d+$/"));
-        assert!(document.contains("const UNIVERSITY = /^[a-z0-9-]+$/"));
-        let shared = include_str!("../../../../../../src/remoteSettings.js");
-        let forbidden = FORBIDDEN_KEYS.iter().map(|key| format!("'{key}'")).collect::<Vec<_>>().join(", ");
-        assert!(shared.contains(&format!("const FORBIDDEN_KEYS = new Set([{forbidden}])")), "FORBIDDEN_KEYS");
-        let guard = include_str!("../../../../../../server/remoteSettings/guard.ts");
-        assert!(guard.contains("const ADDRESS = /https?:\\/\\/[^\\s\"'<>\\\\]+/gi"));
-        assert!(guard.contains("const BARE_HOST = /^(?:[a-z0-9-]+\\.)+[a-z]{2,}$/i"));
-        assert!(guard.contains("const DOMAIN_LIST = /domains$/i"));
-    }
 }

@@ -415,46 +415,4 @@ mod tests {
         assert_eq!(backend(&Method::GET, "/desktop/download"), Backend::Server(Servers::BuiltFile));
     }
 
-    // Node's routes that the page no longer asks, which have no line: they
-    // answer 404 here (Moved::NotFound), and go with Node's code.
-    const DROPPED: &[&str] = &["/__ent_auth/planning", "/__ent_auth/ade"];
-
-    // Node's routes, read from its source: one added there shows here, to be
-    // listed above with the side that answers it. The API's, and the ones
-    // server.js answers before the page's files (its own, and those of the
-    // routers it mounts for tafac.fr's own).
-    #[test]
-    fn every_route_node_has_is_in_the_table() {
-        let mut missing = Vec::new();
-        let sources = [
-            (include_str!("../../../../server/entAuthApp.js"), true),
-            (include_str!("../../../../server/universitiesApp.js"), true),
-            (include_str!("../../../../server.js"), false),
-            (include_str!("../../../../server/desktopUpdate/index.ts"), false),
-            (include_str!("../../../../server/remoteSettings/index.ts"), false),
-        ];
-        for (source, api_only) in sources {
-            for line in source.lines() {
-                let line = line.trim_start();
-                let Some(rest) = ["app.get(", "app.post(", "app.all(", "app.use(", "router.get(", "router.post(", "router.all("].iter().find_map(|call| line.strip_prefix(call)) else { continue };
-                let is_use = line.starts_with("app.use(");
-                let Some(path) = rest.strip_prefix('\'').and_then(|rest| rest.split('\'').next()) else { continue };
-                if api_only && !path.starts_with("/__ent_auth/") && !path.starts_with("/__ent_proxy") {
-                    continue;
-                }
-                // A parameter is a folder's content; a mounted prefix too.
-                let path = path.split("/:").next().unwrap_or(path);
-                // The whole site's line lists nothing by itself.
-                let listed = ROUTES.iter().filter(|route| route.path != "/*").any(|route| {
-                    let folder = route.path.strip_suffix("/*");
-                    route.path == path || folder.is_some_and(|folder| path == folder || path.starts_with(&format!("{folder}/")))
-                });
-                let dropped = DROPPED.iter().any(|dropped| path == *dropped || path.starts_with(&format!("{dropped}/")));
-                if !listed && !dropped && !(is_use && path == "/__ent_auth") {
-                    missing.push(path.to_string());
-                }
-            }
-        }
-        assert!(missing.is_empty(), "routes of Node's missing from routes.rs: {missing:?}");
-    }
 }

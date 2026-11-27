@@ -252,15 +252,4 @@ mod tests {
         assert!(update.answer(&asked).is_none());
     }
 
-    #[test]
-    fn what_is_served_is_what_nodes_router_serves() {
-        let node = include_str!("../../../../../server/desktopUpdate/index.ts");
-        assert_eq!(node.matches(&format!("res.setHeader('Cache-Control', '{CACHE}')")).count(), 2);
-        assert!(node.contains(&format!("res.type('{MANIFEST_TYPE}').send(manifest.text)")));
-        assert!(node.contains("res.redirect(302, installer)"));
-        assert_eq!(node.matches("res.status(404).end()").count(), 2);
-        assert!(node.contains("report(`Desktop update manifest (${origin}) not served: ${manifest.error}`)"));
-        assert!(node.contains("check(json, 'DESKTOP_LATEST_JSON', report)"));
-        assert!(node.contains("statSync(file).mtimeMs"));
-    }
 }

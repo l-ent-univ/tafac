@@ -469,13 +469,10 @@ pub(crate) fn batch(payload: &Value, has_session: bool) -> Vec<(&'static str, Pr
 
 #[cfg(test)]
 mod tests {
-    use std::collections::BTreeSet;
 
     use serde_json::json;
 
     use super::*;
-
-    const NODE: &str = include_str!("../../../../../../server/analyticsSchema.js");
 
     fn keep(event_name: &str, properties: Value, has_session: bool) -> Option<Value> {
         event(&json!({ "event": event_name, "properties": properties }), has_session).map(|(_, properties)| Value::Object(properties))
@@ -483,95 +480,6 @@ mod tests {
 
     fn kept(event_name: &str, properties: Value) -> Option<Value> {
         keep(event_name, properties, true)
-    }
-
-    // The words of Node's file: what it has between quotes, out of its
-    // comments, and its names (an event's, a property's) where it writes
-    // them bare. JavaScript's own words (typeof's) aside.
-    fn nodes_words() -> BTreeSet<String> {
-        let mut words = BTreeSet::new();
-        for line in NODE.lines() {
-            let code = line.split("//").next().unwrap_or_default();
-            let mut parts = code.split('\'');
-            parts.next();
-            while let (Some(word), Some(_)) = (parts.next(), parts.next()) {
-                words.insert(word.to_string());
-            }
-            // A name at the start of a line, before « : »: an event, a
-            // property, an action of a table.
-            let trimmed = code.trim_start();
-            if let Some((name, _)) = trimmed.split_once(':') {
-                if !name.is_empty() && name.bytes().all(|byte| byte.is_ascii_lowercase() || byte.is_ascii_digit() || byte == b'_') && code.starts_with("  ") {
-                    words.insert(name.to_string());
-                }
-            }
-        }
-        for javascript in ["string", "boolean", "object", "properties", "required", "refine", "allowWithoutSession"] {
-            words.remove(javascript);
-        }
-        words
-    }
-
-    fn checks_words(checks: &[(&str, Check)], words: &mut BTreeSet<String>) {
-        for (name, check) in checks {
-            words.insert(name.to_string());
-            match check {
-                OneOf(values) => words.extend(values.iter().map(|value| value.to_string())),
-                OneOfAny(lists) => words.extend(lists.iter().flat_map(|values| values.iter().map(|value| value.to_string()))),
-                _ => {}
-            }
-        }
-    }
-
-    fn table_words(table: &[(&str, &[&str])], words: &mut BTreeSet<String>) {
-        for (key, values) in table {
-            words.insert(key.to_string());
-            words.extend(values.iter().map(|value| value.to_string()));
-        }
-    }
-
-    fn our_words() -> BTreeSet<String> {
-        let mut words = BTreeSet::new();
-        checks_words(CONTEXT, &mut words);
-        for event in EVENTS {
-            words.insert(event.name.to_string());
-            checks_words(event.properties, &mut words);
-            words.extend(event.required.iter().map(|name| name.to_string()));
-        }
-        for table in [PAGE_SOURCES, PLANNING_ACTION_PROPERTIES, PLANNING_ACTION_REQUIRED, MAIL_ACTION_PROPERTIES, MAIL_ACTION_REQUIRED, SETTING_VALUES] {
-            table_words(table, &mut words);
-        }
-        for list in [ON_OFF, SIMULATOR_REVEAL_PROPERTIES, JUSTIFY_REACHED] {
-            words.extend(list.iter().map(|value| value.to_string()));
-        }
-        words
-    }
-
-    #[test]
-    fn every_word_of_nodes_allowlist_is_one_of_these_and_the_other_way_round() {
-        let (node, ours) = (nodes_words(), our_words());
-        assert!(node.len() > 200, "{node:?}");
-        let missing: Vec<&String> = node.difference(&ours).collect();
-        let more: Vec<&String> = ours.difference(&node).collect();
-        assert!(missing.is_empty(), "words of Node's allowlist this one doesn't have: {missing:?}");
-        assert!(more.is_empty(), "words this allowlist has and Node's doesn't: {more:?}");
-        // And as many events.
-        let node_events = NODE.lines().filter(|line| line.starts_with("  ") && !line.starts_with("   ") && line.trim_end().ends_with(": {")).count();
-        assert_eq!(node_events, EVENTS.len());
-    }
-
-    #[test]
-    fn the_limits_and_checks_are_nodes() {
-        assert!(NODE.contains("export const ANALYTICS_MAX_EVENTS_PER_BATCH = 20"));
-        assert_eq!(MAX_EVENTS_PER_BATCH, 20);
-        assert!(NODE.contains("establishment: slug(16),") && NODE.contains("formation: slug(32),") && NODE.contains("app: slug(64),"));
-        assert!(NODE.contains("new RegExp(`^[a-z0-9-]{1,${maxLength}}$`)"));
-        assert!(NODE.contains(r"/^\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(value)"));
-        assert!(NODE.contains("/^[a-z]{2}$/.test(value)"));
-        // The events taken without a session.
-        let without: Vec<&str> = EVENTS.iter().filter(|event| event.without_session).map(|event| event.name).collect();
-        assert_eq!(without, ["login_result", "pwa_update_applied", "settings_imported"]);
-        assert_eq!(NODE.matches("allowWithoutSession: true").count(), without.len());
     }
 
     #[test]

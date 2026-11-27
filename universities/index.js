@@ -1,6 +1,8 @@
 // University registry. Each university lives in universities/<id>/ with a
-// client.js (browser-safe), a server.js (origins, auth params, secrets) and a
-// shared.js (pure data read by both).
+// client.js (the page's settings) and a shared.js (pure data: branding,
+// features, the icons' look), read by the page and the build. How the
+// university is asked (origins, sign-in) is tonAPI's settings and the
+// gateway's (back/).
 import { existsSync, readdirSync } from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
@@ -27,15 +29,6 @@ export function resolveUniversityId(rawId = process.env.UNIVERSITY) {
   }
 
   return id
-}
-
-export async function loadServerConfig(rawId) {
-  const id = resolveUniversityId(rawId)
-  // Built as a runtime path (not a static template literal) so bundlers that
-  // process vite.config.js don't try to glob-bundle every university module.
-  const moduleUrl = pathToFileURL(path.join(UNIVERSITIES_DIR, id, 'server.js')).href
-  const module = await import(moduleUrl)
-  return module.default
 }
 
 // Pure-data subset (branding text, features…) usable from Node — e.g. by the

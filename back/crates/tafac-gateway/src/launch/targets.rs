@@ -301,33 +301,4 @@ mod tests {
         }
     }
 
-    // Tafac's own lists, as Node's settings have them, for every university
-    // the gateway answers for: a domain added or taken away there is to be
-    // here, and a university added to routes.rs brings its own.
-    #[test]
-    fn tafacs_own_lists_are_the_ones_of_nodes_settings() {
-        for university in crate::routes::UNIVERSITIES {
-            let file = format!("{}/../../../universities/{university}/server.js", env!("CARGO_MANIFEST_DIR"));
-            let node = std::fs::read_to_string(&file).unwrap_or_else(|_| panic!("{file} is no longer there"));
-            // « name: ['a', 'b'], » under one of the settings' own keys.
-            let listed = |section: &str, name: &str| -> Vec<String> {
-                let mut inside = "";
-                for line in node.lines() {
-                    if let Some(key) = line.strip_prefix("  ").filter(|rest| !rest.starts_with(' ')).and_then(|rest| rest.strip_suffix(": {")) {
-                        inside = key;
-                    }
-                    let list = line.trim_start().strip_prefix(&format!("{name}: [")).and_then(|rest| rest.split_once(']'));
-                    if let (true, Some((list, _))) = (inside == section, list) {
-                        return list.split(',').map(|domain| domain.trim().trim_matches('\'').to_string()).filter(|domain| !domain.is_empty()).collect();
-                    }
-                }
-                Vec::new()
-            };
-            let own = own(university);
-            assert_eq!(listed("launch", "allowedDomains"), own.launch, "{university}: launch.allowedDomains");
-            assert_eq!(listed("mail", "signInDomains"), own.mail_sign_in, "{university}: mail.signInDomains");
-            assert_eq!(listed("moodle", "signInDomains"), own.moodle_sign_in, "{university}: moodle.signInDomains");
-        }
-        assert!(own("univ-nowhere").launch.is_empty());
-    }
 }

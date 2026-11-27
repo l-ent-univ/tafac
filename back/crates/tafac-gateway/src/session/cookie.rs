@@ -668,17 +668,12 @@ mod tests {
     }
 
     #[test]
-    fn the_older_secrets_are_read_as_node_lists_them() {
+    fn the_older_secrets_are_read_from_their_list() {
         assert_eq!(previous_secrets(" now ", " old one , , now,old one,older,"), ["old one", "older"]);
         assert!(previous_secrets("now", "").is_empty());
         assert!(production_secret(&"x".repeat(MIN_SECRET_BYTES)).is_ok());
         let short = production_secret(&format!(" {} ", "x".repeat(MIN_SECRET_BYTES - 1))).unwrap_err();
         assert!(short.starts_with("SESSION_SECRET is too short (31 bytes, 32 required)."), "{short}");
-        // Node's own rule, read from its source.
-        let node = include_str!("../../../../../server/sessionCookie.js");
-        assert!(node.contains("export const MIN_SESSION_SECRET_BYTES = 32"));
-        assert!(node.contains("return String(value ?? '').split(',').map((entry) => entry.trim()).filter(Boolean)"));
-        assert!(node.contains("entry !== current && list.indexOf(entry) === index"));
     }
 
     #[test]

@@ -380,13 +380,6 @@ const DEMO_DIRECTORY_ITEMS = Object.freeze([
 ])
 const DEMO_DIRECTORY_BY_ID = new Map(DEMO_DIRECTORY_ITEMS.map((item) => [item.id, item]))
 
-export function buildDemoAdeDirectoryPayload() {
-  return {
-    groups: cloneDemoValue(DEMO_DIRECTORY_GROUPS),
-    items: DEMO_DIRECTORY_ITEMS.map(({ id, name, group }) => [id, name, group]),
-  }
-}
-
 // A directory entry's classes among the demo week's (its room, or its
 // teacher among those ADE joins with « - »; a group has the whole week).
 function matchesDemoDirectoryEntry(event, entry) {
@@ -427,31 +420,9 @@ export const DEMO_ACCOUNT = Object.freeze({
   picture: createDemoAvatarDataUri('CM'),
 })
 
-function normalizeDemoFavoriteIds(value) {
-  if (!Array.isArray(value)) {
-    return [...DEMO_DEFAULT_FAVORITE_IDS]
-  }
-
-  return value
-    .map((id) => String(id ?? '').trim())
-    .filter((id, index, ids) => id && ids.indexOf(id) === index && DEMO_APPLICATIONS_BY_ID.has(id))
-}
-
 export function isDemoCredentials(username, password) {
   return String(username ?? '').trim().toLowerCase() === DEMO_CREDENTIALS.username.toLowerCase()
     && String(password ?? '') === DEMO_CREDENTIALS.password
-}
-
-export function createInitialDemoState() {
-  return {
-    favoritePortletIds: [...DEMO_DEFAULT_FAVORITE_IDS],
-  }
-}
-
-export function normalizeDemoState(value) {
-  return {
-    favoritePortletIds: normalizeDemoFavoriteIds(value?.favoritePortletIds),
-  }
 }
 
 // The demo's applications as the page reads them (GET /__ent_auth/apps:
@@ -506,55 +477,6 @@ function findDemoTreePathIds(node, targetId, currentPath = []) {
   }
 
   return null
-}
-
-function collectDemoTreeNodes(node, collector) {
-  if (!node) {
-    return
-  }
-
-  collector.push(node)
-
-  for (const child of node.children ?? []) {
-    collectDemoTreeNodes(child, collector)
-  }
-}
-
-export function buildDemoAdeTreePayload(requestedResourceId = '') {
-  const normalizedRequestedResourceId = String(requestedResourceId ?? '').trim()
-  const hasRequestedResource = normalizedRequestedResourceId && findDemoTreeNodeById(DEMO_TREE_ROOT, normalizedRequestedResourceId)
-  const focusResourceId = hasRequestedResource ? normalizedRequestedResourceId : DEMO_DEFAULT_TREE_PATH[DEMO_DEFAULT_TREE_PATH.length - 1]
-  const currentPathIds = findDemoTreePathIds(DEMO_TREE_ROOT, focusResourceId) ?? [...DEMO_DEFAULT_TREE_PATH]
-
-  return {
-    source: 'demo',
-    root: cloneDemoValue(DEMO_TREE_ROOT),
-    currentResourceId: currentPathIds[currentPathIds.length - 1] ?? null,
-    focusResourceId,
-    currentPathIds,
-  }
-}
-
-export function searchDemoAdeTree(query) {
-  const normalizedQuery = String(query ?? '').trim().toLowerCase()
-  if (!normalizedQuery) {
-    return []
-  }
-
-  const nodes = []
-  collectDemoTreeNodes(DEMO_TREE_ROOT, nodes)
-
-  return nodes
-    .filter((node) => {
-      const haystack = [node.name, node.path, node.id].join(' | ').toLowerCase()
-      return haystack.includes(normalizedQuery) && String(node.id) !== '-100'
-    })
-    .map((node) => ({
-      id: String(node.id),
-      name: node.name,
-      path: node.path,
-      childrenCount: Array.isArray(node.children) ? node.children.length : 0,
-    }))
 }
 
 function parseDateOnly(dateString) {
@@ -669,51 +591,6 @@ export function buildDemoTimetablePayload({ date, resourceId } = {}) {
     outOfRange: false,
     dayLabels: Array.from({ length: 5 }, (_, index) => formatDateOnly(addDays(weekStart, index))),
     events,
-  }
-}
-
-export function buildDemoPlanningPayload({ date, resourceId } = {}) {
-  const timetable = buildDemoTimetablePayload({ date, resourceId })
-  return {
-    events: timetable.events,
-    weekLabel: timetable.weekLabel,
-    dayLabels: timetable.dayLabels,
-    resolvedWeek: timetable.resolvedWeek,
-    outOfRange: timetable.outOfRange,
-  }
-}
-
-export function buildDemoCalendarPayload({ date, resourceId } = {}) {
-  const anchorDate = parseDateOnly(date || formatDateOnly(new Date()))
-  const weekStart = startOfWeek(anchorDate)
-  const resolvedSelection = normalizeSelectionFromResource(resourceId)
-  const weeks = Array.from({ length: 6 }, (_, index) => {
-    const currentWeekStart = addDays(weekStart, index * 7)
-    const currentWeekEnd = addDays(currentWeekStart, 6)
-
-    return {
-      index,
-      label: buildWeekLabel(currentWeekStart),
-      start: formatDateOnly(currentWeekStart),
-      end: formatDateOnly(currentWeekEnd),
-      current: index === 0,
-    }
-  })
-
-  return {
-    source: 'demo',
-    resourceId: resolvedSelection.resourceId,
-    currentResourceId: resolvedSelection.resourceId,
-    requestedResourceId: String(resourceId ?? '').trim() || resolvedSelection.resourceId,
-    targetDate: formatDateOnly(anchorDate),
-    targetDateMatched: true,
-    outOfRange: false,
-    matchedWeek: weeks[0],
-    currentWeek: weeks[0],
-    firstWeek: weeks[0],
-    lastWeek: weeks[weeks.length - 1],
-    weekCount: weeks.length,
-    weeks,
   }
 }
 
@@ -843,16 +720,6 @@ export function buildDemoTimetableTree(kinds = []) {
     ...(wanted('group') ? DEMO_TREE_ROOT.children.map(demoTreeNode) : []),
     ...(wanted('teacher') ? demoDirectoryTree('teacher') : []),
     ...(wanted('room') ? demoDirectoryTree('room') : []),
-  ]
-}
-
-export function buildDemoAlertsPayload() {
-  return [
-    {
-      level: 'info',
-      title: 'Mode démo',
-      message: 'Certaines applications ouvrent des pages publiques pour illustrer le parcours.',
-    },
   ]
 }
 

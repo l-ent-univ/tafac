@@ -1,5 +1,5 @@
 {
-  "about": "Written by scripts/gateway-data.mjs from src/appIconPicks.js, server/appIcons.js and universities/*: never by hand.",
+  "about": "Written by scripts/gateway-data.mjs from src/appIconPicks.js and universities/*/shared.js: never by hand.",
   "fileVersion": 1,
   "maxStoredServices": 500,
   "maxRequestServices": 200,

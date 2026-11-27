@@ -75,14 +75,12 @@ mod tests {
     }
 
     #[test]
-    fn a_tool_keeps_the_id_node_gave_it() {
+    fn a_tool_keeps_the_id_the_page_knows() {
         let ids = |portal: Portal| portal.as_the_page_knows_them(vec![app("tempo"), app("35")]).into_iter().map(|app| app.id).collect::<Vec<_>>();
         assert_eq!(ids(Portal::Drupal), ["portal-tool-tempo", "portal-tool-35"]);
         assert_eq!(ids(Portal::Isorbonne), ["portal-tool-tempo", "portal-tool-35"]);
         // uPortal's own names are the ids, as they always were.
         assert_eq!(ids(Portal::Uportal), ["tempo", "35"]);
-        // The prefix is the one Node writes.
-        assert!(include_str!("../../../../server/portalSession.js").contains(&format!("id: `{TOOL_ID}${{tool.id}}`")));
     }
 
     #[test]

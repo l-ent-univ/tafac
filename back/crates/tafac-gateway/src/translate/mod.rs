@@ -130,18 +130,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn an_answer_made_here_carries_the_headers_nodes_do() {
-        let node = include_str!("../../../../../server/securityHeaders/baseline.ts");
-        for (name, value) in BASELINE_HEADERS {
-            let said = node.lines().find_map(|line| {
-                let (found, written) = line.trim().split_once(':')?;
-                found.trim_matches('\'').eq_ignore_ascii_case(name).then(|| written.trim().trim_end_matches(',').to_string())
-            });
-            let said = said.unwrap_or_else(|| panic!("{name} is no longer one of Node's"));
-            assert!(said == format!("'{value}'") || said == format!("\"{value}\""), "{name}: {said}");
-        }
-        assert_eq!(node.matches("': ").count(), BASELINE_HEADERS.len(), "Node has a header this crate doesn't");
-
+    fn an_answer_made_here_carries_the_baseline_headers() {
         let response = json_response(200, b"{}".to_vec());
         assert_eq!(response.headers()["x-frame-options"], "SAMEORIGIN");
         assert_eq!(response.headers()["strict-transport-security"], "max-age=31536000");

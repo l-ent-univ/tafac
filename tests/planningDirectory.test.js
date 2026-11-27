@@ -1,6 +1,5 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { buildPortalDirectory } from '../planningPortalApi.js'
 import {
   cleanFolderName,
   entryPlace,
@@ -15,9 +14,22 @@ import {
   siteEntries,
   siteLabelFromSelection,
 } from '../src/planningDirectory.js'
+import { buildDirectory } from '../src/planningTree.js'
 
 const leaf = (id, name) => ({ id, name, children: [] })
 const folder = (id, name, children) => ({ id, name, children })
+
+// The ADE portal's tree as it was (Ressources › Etudiants, Enseignants,
+// Salles), given as tonAPI gives it: one tree per kind, each node a folder
+// or not (src/planningTree.js reads it so).
+const KINDS = { '-1': 'group', '-2': 'teacher', '-3': 'room' }
+function asTonApi(node, kind) {
+  const children = node.children.map((child) => asTonApi(child, kind))
+  return { id: node.id, name: node.name, kind, folder: children.length > 0, children }
+}
+function buildPortalDirectory(root) {
+  return buildDirectory(root.children.filter((top) => KINDS[top.id]).flatMap((top) => top.children.map((node) => asTonApi(node, KINDS[top.id]))))
+}
 
 // The shape of the Rennes ADE portal's tree (normalizePortalTreePayload).
 const ROOT = folder('-100', 'Ressources', [
@@ -37,7 +49,6 @@ const ROOT = folder('-100', 'Ressources', [
       folder('703', 'Vacataires', [folder('704', 'BUT INFO-COM', [leaf('7201', 'CHAGNOUX Marie')])]),
     ]),
     folder('710', '.Chercheurs - laboratoires', [folder('711', 'IRISA UMR 6074', [leaf('7301', 'MARTIN Philippe')])]),
-    folder('portal-category-4', 'portal-category-4', [leaf('7401', 'DUPONT Leonard')]),
   ]),
   folder('-3', 'Salles', [
     folder('800', '19-Lannion IUT - Institut Universitaire de Technologie de Lannion', [
@@ -74,8 +85,6 @@ test('the directory lists the rooms, staff and student groups, their folders as 
   )
   // Placeholder rooms are left out, with all their folder holds.
   assert.ok(!ids.includes('8501') && !ids.includes('8502'))
-  // A synthetic folder name is left out of the path.
-  assert.deepEqual(directory.groups[directory.items.find(([id]) => id === '7401')[2]], { kind: 'person', path: [] })
 })
 
 test('an entry knows its kind and folders', () => {

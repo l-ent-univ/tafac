@@ -104,20 +104,4 @@ mod tests {
         assert!(page.contains("if (form) form.submit()") && page.contains("<noscript><button type=\"submit\">Continuer</button></noscript>"));
     }
 
-    // Node's own page, word for word: what is between the first line and
-    // the form, and after it.
-    #[test]
-    fn the_page_is_the_one_node_wrote() {
-        let node = include_str!("../../../../../server/entAuthApp.js");
-        let start = node.find("  return `<!DOCTYPE html>").expect("Node's page") + "  return `".len();
-        let written = &node[start..start + node[start..].find("</html>`").expect("the page's end") + "</html>".len()];
-        let ours = posting(&Words { title: "T", heading: "H", body: "B" }, "A", &[("n".to_string(), "v".to_string())]);
-        let node = written
-            .replace("${escapeHtmlAttribute(title)}", "T")
-            .replace("${escapeHtmlAttribute(heading)}", "H")
-            .replace("${escapeHtmlAttribute(body)}", "B")
-            .replace("${escapeHtmlAttribute(actionUrl)}", "A")
-            .replace("${hiddenFields}", r#"<input type="hidden" name="n" value="v" />"#);
-        assert_eq!(ours, node);
-    }
 }

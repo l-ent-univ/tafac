@@ -166,7 +166,6 @@ mod tests {
     use super::*;
 
     const FIXTURE: &str = include_str!("../../../../../tests/fixtures/static-files.json");
-    const NODE: &str = include_str!("../../../../../server/securityHeaders/pagePolicy.ts");
 
     #[test]
     fn the_policy_of_a_page_is_the_one_node_writes() {
@@ -176,30 +175,6 @@ mod tests {
         for page in pages {
             assert_eq!(page_policy(page[0].as_str().unwrap()), page[1].as_str().unwrap(), "{}", page[0]);
         }
-    }
-
-    // Each directive and each source as pagePolicy.ts writes it, in its
-    // order, and nothing more: one added or loosened there shows here.
-    #[test]
-    fn each_directive_and_source_is_nodes() {
-        let quoted = |line: &str| -> Option<String> {
-            let line = line.trim().trim_end_matches(',');
-            let inner = line.strip_prefix('"').and_then(|line| line.strip_suffix('"')).or_else(|| line.strip_prefix('\'').and_then(|line| line.strip_suffix('\'')))?;
-            Some(inner.to_string())
-        };
-        let sources: Vec<String> = NODE.split("export const CONNECT_SOURCES = [").nth(1).unwrap().split("\n]").next().unwrap().lines().filter_map(quoted).collect();
-        assert_eq!(sources, CONNECT_SOURCES);
-
-        let built = NODE.split("export function buildPagePolicy").nth(1).unwrap();
-        let directives: Vec<String> = built
-            .lines()
-            .map(str::trim)
-            .filter_map(|line| quoted(line).or_else(|| line.strip_prefix("[\"").and_then(|line| line.split('"').next()).map(str::to_string)))
-            .collect();
-        assert_eq!(directives, DIRECTIVES);
-        assert!(built.contains(r#"["script-src 'self'", ...hashInlineScripts(html)].join(' ')"#));
-        assert!(built.contains(r#"["connect-src 'self'", ...CONNECT_SOURCES].join(' ')"#));
-        assert!(built.contains("].join('; ')"));
     }
 
     #[test]

@@ -285,14 +285,4 @@ pub(crate) mod tests {
         }
     }
 
-    #[test]
-    fn what_is_checked_is_what_nodes_manifest_checks() {
-        let node = include_str!("../../../../../../server/desktopUpdate/manifest.ts");
-        assert!(node.contains("const VERSION = /^\\d+\\.\\d+\\.\\d+$/"));
-        assert!(node.contains("const PLATFORM = /^[a-z0-9]+(-[a-z0-9_]+){1,2}$/"));
-        assert!(node.contains("!/^\\d{4}-\\d{2}-\\d{2}T/.test(date)"));
-        for reason in ["not JSON", "not an object", "\"version\" is not x.y.z", "\"minimum\" is not x.y.z", "\"minimum\" is above \"version\"", "\"pub_date\" is not an RFC 3339 date", "no \"platforms\""] {
-            assert!(node.contains(&format!("{{ error: '{reason}' }}")), "{reason}");
-        }
-    }
 }

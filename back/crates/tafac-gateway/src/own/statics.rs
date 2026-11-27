@@ -357,7 +357,7 @@ mod tests {
     }
 
     #[test]
-    fn the_types_and_the_times_kept_are_nodes() {
+    fn the_types_and_the_times_kept_are_the_fixtures() {
         let fixture = fixture();
         let types = fixture["contentTypes"].as_object().unwrap();
         assert_eq!(types.len(), CONTENT_TYPES.len());
@@ -367,10 +367,6 @@ mod tests {
         for case in fixture["cacheControl"].as_array().unwrap() {
             assert_eq!(cache_control(case[0].as_str().unwrap()), case[1].as_str().unwrap(), "{}", case[0]);
         }
-        let node = include_str!("../../../../../server/staticFiles/index.ts");
-        assert!(node.contains(&format!("const HASHED_DIR = '{HASHED_DIR}'")));
-        let listed = ALWAYS_FRESH.iter().map(|name| format!("'{name}'")).collect::<Vec<_>>().join(", ");
-        assert!(node.contains(&format!("const ALWAYS_FRESH = new Set([{listed}])")));
     }
 
     fn headers(pairs: &[(&'static str, &'static str)]) -> HeaderMap {
@@ -431,15 +427,6 @@ mod tests {
         assert_eq!(status, 200);
         assert_eq!(String::from_utf8(body).unwrap(), r#"{"webcredentials":{"apps":["ABCDE12345.fr.tafac.desktop","FGHIJ67890.fr.tafac.desktop"]}}"#);
         assert_eq!(answered["content-type"], "application/json; charset=utf-8");
-        // server.js's own words for both, and its own variable.
-        let node = include_str!("../../../../../server.js");
-        assert!(node.contains("res.type('application/json').send(JSON.stringify({ webcredentials: { apps: APPLE_APP_IDS } }))"));
-        assert!(node.contains("String(process.env.APPLE_APP_IDS ?? '').split(',').map((id) => id.trim()).filter(Boolean)"));
-        for line in ROBOTS {
-            assert!(node.contains(&format!("'{line}',")), "{line}");
-        }
-        assert!(node.contains("...(origin ? [`Sitemap: ${origin}/sitemap.xml`] : []),"));
-        assert!(node.contains(r"const SAFE_ORIGIN = /^https?:\/\/[a-z0-9.-]+(:\d{1,5})?$/i"));
     }
 
     #[test]

@@ -1,12 +1,10 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { searchDemoMailContacts } from '../server/mailAutocomplete.js'
-import { buildDemoGradesPayload, buildDemoTimetablePayload } from '../src/demoAccount.js'
+import { buildDemoGradesPayload } from '../src/demoAccount.js'
 import { prepareGradeMail } from '../src/gradeMail.js'
 import { buildGradesReport } from '../src/gradesReport.js'
 import { findClassTeacherNames, findModuleTeacherNames, isModuleCode, moduleWindowMondays, normalizeModuleCode, titleModuleCodes } from '../src/moduleTeachers.js'
 import { mergeEvents, toPlanningEvent } from '../src/planningEvents.js'
-import { lookupTeacherRecipients, offerOnly } from '../src/teacherRecipients.js'
 
 const at = (month, day, hours) => new Date(2026, month - 1, day, hours).getTime()
 const lesson = (title, month, day, teacher) => toPlanningEvent({ uid: `${title}-${day}`, title, startMs: at(month, day, 8), endMs: at(month, day, 10), teacher })
@@ -54,21 +52,6 @@ test('a module\'s teachers: its classes in the window, the most seen first', () 
   assert.deepEqual(findModuleTeacherNames(events, 'Anglais', today), [])
   assert.deepEqual(findModuleTeacherNames([], 'R5.11', today), [])
   assert.deepEqual(findModuleTeacherNames(null, 'R5.11', today), [])
-})
-
-const demoSearch = async (query) => ({ status: 'ok', suggestions: searchDemoMailContacts(query) })
-
-test('a grade\'s teachers from the planning are offered, never put in À', async () => {
-  // The demo's: R5.03 is Mme Riou's in its planning.
-  const events = mergeEvents(buildDemoTimetablePayload({ date: today }).events.map(toPlanningEvent))
-  const names = findModuleTeacherNames(events, 'R5.03', today)
-  assert.deepEqual(names, ['Mme Riou'])
-  const found = await lookupTeacherRecipients(names.join('\n'), { search: demoSearch })
-  // As a class's teacher she'd be sure (one match): for a grade, offered.
-  assert.equal(found.prefill.length, 1)
-  const plan = offerOnly(found)
-  assert.deepEqual(plan.prefill, [])
-  assert.deepEqual(plan.suggestions, [{ name: 'Mme Riou', matches: [{ name: 'Sophie Riou', email: 'sophie.riou@univ-rennes.fr' }] }])
 })
 
 test('a grade\'s mail keeps its relevé teacher in À and names its module for the planning', async () => {

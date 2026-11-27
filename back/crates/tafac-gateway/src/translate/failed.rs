@@ -127,17 +127,4 @@ mod tests {
         }
     }
 
-    // The sentences are Node's own, read from its source: one changed there
-    // shows here.
-    #[test]
-    fn the_sentences_are_the_ones_node_says() {
-        let reporter = include_str!("../../../../../server/routeErrors/index.ts");
-        assert!(reporter.contains(&format!("UNAVAILABLE_MESSAGE = '{UNAVAILABLE}'")));
-        let routes = include_str!("../../../../../server/entAuthApp.js");
-        assert!(routes.contains(&format!("APPS_UNAVAILABLE_MESSAGE = '{PORTAL_UNAVAILABLE}'")));
-        for refusal in [SEMESTER_REFUSED, DEPARTMENT_REFUSED, IDS_REFUSED, UNKNOWN_EVALUATION, NO_PDF] {
-            let Failure::Said(status, error) = refusal else { panic!("a sentence of Node's") };
-            assert!(routes.contains(&format!("res.status({status}).json({{ error: '{error}' }})")), "{error}");
-        }
-    }
 }

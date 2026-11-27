@@ -347,15 +347,4 @@ mod tests {
         assert_eq!(DEFAULT_RELEASE_MANIFEST, "https://github.com/l-ent-univ/tafac/releases/latest/download/latest.json");
     }
 
-    #[test]
-    fn the_rhythm_and_the_address_are_nodes() {
-        let node = include_str!("../../../../../../server/desktopUpdate/follow.ts");
-        assert!(node.contains(&format!("export const DEFAULT_RELEASE_MANIFEST = '{DEFAULT_RELEASE_MANIFEST}'")));
-        assert!(node.contains(&format!("const EVERY_MS = {} * 60 * 1000", EVERY.as_secs() / 60)));
-        assert!(node.contains(&format!("const FIRST_AFTER_MS = {} * 1000", FIRST_AFTER.as_secs())));
-        assert!(node.contains(&format!("const TIMEOUT_MS = {} * 1000", TIMEOUT.as_secs())));
-        for words in ["Desktop update manifest from ${from} not published: ${manifest.error}", "Desktop update manifest: ${manifest.version} published", "Desktop update manifest pinned (DESKTOP_LATEST_PIN): not following the releases", "Desktop update manifest not published: "] {
-            assert!(node.contains(words), "{words}");
-        }
-    }
 }

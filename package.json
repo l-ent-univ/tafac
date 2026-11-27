@@ -6,7 +6,6 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "start": "node server.js",
     "build": "vite build && node --disable-warning=ExperimentalWarning scripts/prerender-landing.mjs",
     "build:all": "npm run build",
     "lint": "eslint .",
@@ -32,19 +31,14 @@
     "@tiptap/pm": "3.32.0",
     "@tiptap/react": "3.32.0",
     "@tiptap/starter-kit": "3.32.0",
-    "cookie-parser": "^1.4.7",
-    "express": "^5.2.1",
-    "posthog-node": "^5.55.0",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
-    "sanitize-html": "^2.18.1",
     "skullet": "0.0.3",
     "tailwindcss": "^4.2.2"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.1",
     "@tauri-apps/cli": "^2.12.4",
-    "@types/express": "^5.0.6",
     "@types/node": "^24.19.2",
     "@types/react": "^19.2.7",
     "@types/react-dom": "^19.2.3",

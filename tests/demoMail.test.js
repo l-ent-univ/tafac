@@ -1,15 +1,7 @@
 import assert from 'node:assert/strict'
 import { Buffer } from 'node:buffer'
 import test from 'node:test'
-import {
-  DEMO_MAIL_FOLDERS,
-  DEMO_MAIL_STORAGE_KEY,
-  createDemoMailbox,
-  isValidDemoMailMessageId,
-  readDemoComposeBody,
-  searchDemoMailContacts,
-} from '../src/demoMail.js'
-import { normalizeComposePayload } from '../server/mailSend.js'
+import { DEMO_MAIL_FOLDERS, DEMO_MAIL_STORAGE_KEY, createDemoMailbox, isValidDemoMailMessageId, searchDemoMailContacts } from '../src/demoMail.js'
 
 function createStorage() {
   const values = new Map()
@@ -52,61 +44,6 @@ const sendBody = (overrides = {}) => ({ ...MAIL, sendUid: `uid-0000000${uid += 1
 // ── The body's check, held to the server's ─────────────────────────────────
 
 const UPLOAD = 'demo-upload-00000000-0000-4000-8000-000000000001'
-const serverOptions = (draft) => ({
-  draft,
-  isValidMessageId: isValidDemoMailMessageId,
-  isValidUploadId: (aid) => typeof aid === 'string' && /^demo-upload-[0-9a-f-]{36}$/.test(aid),
-})
-
-test('a send\'s or a draft\'s body is checked as the server checks it', () => {
-  const valid = { ...MAIL, sendUid: 'uid-00000001' }
-  const bodies = [
-    valid,
-    { ...valid, to: [{ name: ' Léo‮ ', email: ' Leo@Univ.fr ' }, { email: 'leo@univ.fr' }], cc: [{ email: 'lea@univ.fr' }], bcc: [{ email: 'LEA@univ.fr' }] },
-    { ...valid, to: [{ email: 'pas une adresse' }, { email: '' }] },
-    { ...valid, to: [] },
-    { ...valid, to: Array.from({ length: 101 }, (_, index) => ({ email: `etu${index}@univ.fr` })) },
-    { ...valid, to: 'leo@univ.fr' },
-    { ...valid, subject: '  Un   objet\r\nsur deux lignes\u0000  ' },
-    { ...valid, subject: 42, html: undefined },
-    { ...valid, html: 42 },
-    { ...valid, html: '<p onclick="x()">Un <b>texte</b></p><script>alert(1)</script><div>dans un div</div>' },
-    { ...valid, attachments: [{ source: 'upload', aid: UPLOAD }, { source: 'upload', aid: UPLOAD }, { source: 'message', messageId: 'demo-mail-1', part: '2' }] },
-    { ...valid, attachments: [{ source: 'upload', aid: 'not-an-upload' }] },
-    { ...valid, attachments: [{ source: 'message', messageId: '257', part: '2' }] },
-    { ...valid, attachments: [{ source: 'message', messageId: 'demo-mail-1', part: '../2' }] },
-    { ...valid, attachments: 'a file' },
-    { ...valid, html: `<p><img data-inline-cid="${CID}" alt="Une note"></p>`, inlineImages: [{ cid: CID, source: 'upload', aid: UPLOAD, width: 1120, height: 600 }] },
-    { ...valid, html: '<p>sans image</p>', inlineImages: [{ cid: CID, source: 'upload', aid: UPLOAD, width: 100, height: 50 }] },
-    { ...valid, inlineImages: [{ cid: 'not-a-cid', source: 'upload', aid: UPLOAD, width: 100, height: 50 }] },
-    { ...valid, inlineImages: [{ cid: CID, source: 'upload', aid: UPLOAD, width: 0, height: 50 }] },
-    { ...valid, attachments: [{ source: 'upload', aid: UPLOAD }], inlineImages: [{ cid: CID, source: 'upload', aid: UPLOAD, width: 100, height: 50 }] },
-    { ...valid, origin: { kind: 'reply', messageId: 'demo-mail-1' } },
-    { ...valid, origin: { kind: 'forward', messageId: 'demo-sent-3' } },
-    { ...valid, origin: { kind: 'replyAll', messageId: '257' } },
-    { ...valid, origin: { kind: 'bounce', messageId: 'demo-mail-1' } },
-    { ...valid, identityId: 'demo-etudiant', draftId: 'demo-draft-2' },
-    { ...valid, identityId: 'not an id' },
-    { ...valid, draftId: 'demo-mail-x' },
-    { ...valid, sendUid: 'short' },
-    { ...valid, sendUid: undefined },
-    { ...valid, signature: { include: true, mode: 'custom', group: 'ignored', establishment: 'iutlan' } },
-    { ...valid, signature: { include: 'yes', mode: 'partage' } },
-    { ...valid, signature: { include: true, mode: 'other' } },
-    { ...valid, signature: { include: true, group: `  Info-Com\n3  ${'x'.repeat(200)}`, establishment: 'Not An Id' } },
-    { ...valid, signature: 'none' },
-    { ...valid, signature: undefined },
-    null,
-    [],
-    'a body',
-  ]
-  for (const body of bodies) {
-    for (const draft of [false, true]) {
-      assert.deepEqual(readDemoComposeBody(body, { draft }), normalizeComposePayload(body, serverOptions(draft)), `${draft ? 'draft' : 'send'} ${JSON.stringify(body)?.slice(0, 120)}`)
-    }
-  }
-})
-
 test('the demo\'s ids are its own', () => {
   for (const id of ['demo-mail-1', 'demo-mail-12', 'demo-draft-3', 'demo-sent-9999']) assert.ok(isValidDemoMailMessageId(id), id)
   for (const id of ['257', '-257', 'demo-mail-', 'demo-mail-1x', 'demo-mail-1:2', 'demo-moodle-1', 'x-demo-mail-1', 'demo-sent-12345', null, 1]) {

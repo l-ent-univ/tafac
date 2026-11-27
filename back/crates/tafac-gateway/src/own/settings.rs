@@ -84,7 +84,6 @@ pub(crate) mod tests {
 
     use super::*;
 
-    const NODE: &str = include_str!("../../../../../server/remoteSettings/index.ts");
     const FIXTURES: &str = include_str!("../../../../../tests/fixtures/remoteSettings.js");
 
     // Node's tests' files, signed with a key made for them alone
@@ -195,13 +194,4 @@ pub(crate) mod tests {
         assert!(settings.answer(&asked).is_none());
     }
 
-    #[test]
-    fn what_is_sent_is_what_nodes_router_sends() {
-        let router = NODE.split("export function createAppSettingsRouter").nth(1).expect("Node's router");
-        assert!(router.contains(&format!("res.setHeader('Cache-Control', '{CACHE}')")));
-        assert!(router.contains(&format!("router.get('/app/settings.json', send(file, '{SETTINGS_TYPE}'))")));
-        assert!(router.contains(&format!("router.get('/app/settings.json.sig', send(`${{file}}.sig`, '{SIGNATURE_TYPE}'))")));
-        assert!(router.contains("env.APP_SETTINGS_FILE?.trim()"));
-        assert!(router.contains("res.status(404).end()"));
-    }
 }

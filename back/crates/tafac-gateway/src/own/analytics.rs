@@ -270,38 +270,12 @@ impl DailySalt {
 mod tests {
     use super::*;
 
-    const ANALYTICS: &str = include_str!("../../../../../server/analytics.js");
-    const SCHEMA: &str = include_str!("../../../../../server/analyticsSchema.js");
-    const ROUTES: &str = include_str!("../../../../../server/entAuthApp.js");
-
     fn environment(settings: &'static [(&'static str, &'static str)]) -> impl Fn(&str) -> Option<String> {
         move |name| settings.iter().find(|(found, _)| *found == name).map(|(_, value)| value.to_string())
     }
 
     fn day(date: &str) -> NaiveDate {
         NaiveDate::parse_from_str(date, "%Y-%m-%d").unwrap()
-    }
-
-    #[test]
-    fn the_settings_and_limits_are_nodes() {
-        assert!(ANALYTICS.contains(&format!("export const DEFAULT_POSTHOG_HOST = '{DEFAULT_POSTHOG_HOST}'")));
-        assert!(ANALYTICS.contains(&format!("const DISTINCT_ID_HEX_LENGTH = {DISTINCT_ID_LENGTH}")));
-        assert!(ANALYTICS.contains("const host = String(env.POSTHOG_HOST ?? '').trim() || DEFAULT_POSTHOG_HOST"));
-        assert!(ANALYTICS.contains("const excludedUsers = String(env.ANALYTICS_EXCLUDED_USERS ?? '')\n    .split(/[\\s,]+/)"));
-        assert!(ANALYTICS.contains("return String(user ?? '').trim().toLowerCase()"));
-        assert!(ANALYTICS.contains("$process_person_profile: false,"));
-        assert!(ANALYTICS.contains("...(hasSession ? { demo: Boolean(session.demo) } : null),"));
-        assert!(ANALYTICS.contains("...(universityId ? { university: universityId } : null),"));
-        assert!(SCHEMA.contains("export const ANALYTICS_MAX_BODY_BYTES = 8 * 1024"));
-        assert_eq!(MAX_BODY_BYTES, 8 * 1024);
-        // The route itself: same-origin only, 413 for a body too long, 204
-        // for everything else.
-        let route = ROUTES.split("app.post('/__ent_auth/analytics'").nth(1).unwrap().split("\n})\n").next().unwrap();
-        assert!(route.contains("res.setHeader('Cache-Control', 'no-store')"));
-        assert!(route.contains("if (fetchSite && fetchSite !== 'same-origin') {"));
-        assert!(route.contains("return res.status(error.status === 413 ? 413 : 204).end()"));
-        assert_eq!(route.matches("status(204).end()").count(), 3);
-        assert!(ROUTES.contains("const parseAnalyticsBody = express.text({ type: () => true, limit: ANALYTICS_MAX_BODY_BYTES })"));
     }
 
     #[test]

@@ -536,20 +536,7 @@ mod tests {
     }
 
     #[test]
-    fn the_rules_are_nodes() {
-        let node = include_str!("../../../../../../server/remoteSettings/index.ts");
-        for rule in [
-            "const STALE_AFTER_MS = 6 * 60 * 60 * 1000",
-            "const START_WAIT_MS = 1500",
-            "const REQUEST_TIMEOUT_MS = 5000",
-            "const RECHECK_EVERY_MS = 60 * 60 * 1000",
-            "const MAX_BYTES = 256 * 1024",
-            "url.protocol === 'https:' || (url.protocol === 'http:' && ['127.0.0.1', 'localhost'].includes(url.hostname))",
-            "{ cache: 'no-store', redirect: 'error', signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS) }",
-            "writeFileSync(file, JSON.stringify(kept), { mode: 0o600 })",
-        ] {
-            assert!(node.contains(rule), "{rule}");
-        }
+    fn the_rules_are_as_written() {
         assert_eq!((STALE_AFTER_MS, START_WAIT.as_millis(), REQUEST_TIMEOUT.as_millis(), RECHECK_EVERY.as_millis(), MAX_BYTES), (21_600_000, 1500, 5000, 3_600_000, 262_144));
     }
 }

@@ -86,21 +86,3 @@ pub(crate) fn says_ended(headers: &HeaderMap, cookie_name: &str) -> Option<Ended
     cleared.then_some(Ended::SignedOut)
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn the_statistics_are_on_when_node_has_a_key() {
-        assert!(statistics_on(Some("phc_made_up")));
-        assert!(statistics_on(Some(" phc_made_up\n")));
-        for none in [None, Some(""), Some("  \n")] {
-            assert!(!statistics_on(none), "{none:?}");
-        }
-        // Node's own reading, from its source: the key without the spaces
-        // around it, and nothing sent without one.
-        let node = include_str!("../../../../server/analytics.js");
-        assert!(node.contains("const projectKey = String(env.POSTHOG_PROJECT_KEY ?? '').trim()"));
-        assert!(node.contains("if (!projectKey) {\n    return DISABLED_ANALYTICS"));
-    }
-}

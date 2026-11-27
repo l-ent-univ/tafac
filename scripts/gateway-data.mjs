@@ -1,5 +1,6 @@
-// What the gateway (back/crates/tafac-gateway) reads of Node's own modules,
-// written from them, and the fixtures that hold the two sides together.
+// What the gateway (back/crates/tafac-gateway) reads of the page's own
+// modules, written from them, and the fixture that holds the two sides
+// together.
 //
 //   node scripts/gateway-data.mjs
 //
@@ -7,28 +8,25 @@
 //   back/crates/tafac-gateway/src/own/icons.json
 //       the icons' lists as src/appIconPicks.js has them (the concepts and
 //       their icons in each style, the hues, the keywords, each university's
-//       look, the limits), and how a title's letters fold, accents and case
-//       away (normalizeText, one character at a time). The gateway picks
-//       with these (own/icons.rs): nothing of them is typed again in Rust.
+//       look from its shared.js, the limits), and how a title's letters
+//       fold, accents and case away (normalizeText, one character at a
+//       time). The gateway picks with these (own/icons.rs): nothing of them
+//       is typed again in Rust.
 //   tests/fixtures/app-icon-picks.json
-//       titles and ids with what the JS picks for them, and the route
-//       answered on a few files: the gateway's tests and tests/appIcons.test.js
-//       both hold to it.
-//   tests/fixtures/static-files.json
-//       the page's files as server.js serves them (each type's
-//       Content-Type, each path's Cache-Control, Express's ETags) and the
-//       page's Content-Security-Policy for a few pages: own/statics.rs and
-//       own/page_headers.rs hold to it, and so do tests/staticFiles.test.ts
-//       and tests/securityHeaders.test.ts.
+//       titles and ids with what the JS picks for them, and the route as
+//       Node answered it on a few files (kept, no longer written again: Node
+//       is gone). The gateway's tests and tests/appIcons.test.js both hold
+//       to it.
 //
-// Run it again after a change to any of those modules: the tests say when
-// a file is out of date.
-import { mkdir, mkdtemp, readFile, rm, stat, utimes, writeFile } from 'node:fs/promises'
-import { request } from 'node:http'
-import { tmpdir } from 'node:os'
+// tests/fixtures/static-files.json, the page's files as Node served them,
+// is no longer written: it is what the gateway holds to (own/statics.rs,
+// own/page_headers.rs, own/conditional.rs).
+//
+// Run it again after a change to src/appIconPicks.js or a university's
+// look: the tests say when a file is out of date.
+import { readFile, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
-import express from 'express'
 import {
   APP_ICON_COLOR_MODES,
   APP_ICON_HUES,
@@ -53,14 +51,14 @@ import {
   sanitizeAppIconRequest,
   toIconifyName,
 } from '../src/appIconPicks.js'
-import { APP_ICONS_FILE_VERSION, MAX_STORED_SERVICES } from '../server/appIcons.js'
-import { createEntAuthApp } from '../server/entAuthApp.js'
-import { createSessionCookieCodec } from '../server/sessionCookie.js'
-import { cacheControlFor, serveBuiltFiles } from '../server/staticFiles/index.ts'
-import { buildPagePolicy } from '../server/securityHeaders/index.ts'
-import { listUniversityIds, loadServerConfig } from '../universities/index.js'
+import { listUniversityIds, loadSharedConfig } from '../universities/index.js'
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
+
+// The icons' file as the gateway keeps it (own/icons.rs), as Node's server
+// kept it before: its version, and how many tiles it remembers.
+const APP_ICONS_FILE_VERSION = 1
+const MAX_STORED_SERVICES = 500
 
 // --- The icons' data -----------------------------------------------------------
 
@@ -108,11 +106,11 @@ function buildBuiltInIcons() {
 export async function buildIconData() {
   const themes = {}
   for (const id of listUniversityIds()) {
-    const { style, colorMode, icons } = resolveAppIconTheme((await loadServerConfig(id)).appIcons)
+    const { style, colorMode, icons } = resolveAppIconTheme((await loadSharedConfig(id)).appIcons)
     themes[id] = { style, colorMode, icons }
   }
   return {
-    about: 'Written by scripts/gateway-data.mjs from src/appIconPicks.js, server/appIcons.js and universities/*: never by hand.',
+    about: 'Written by scripts/gateway-data.mjs from src/appIconPicks.js and universities/*/shared.js: never by hand.',
     fileVersion: APP_ICONS_FILE_VERSION,
     maxStoredServices: MAX_STORED_SERVICES,
     maxRequestServices: MAX_REQUEST_SERVICES,
@@ -222,106 +220,21 @@ const BODIES = [
 
 const STORED = ['mail', 'library', 'moodle', 'generic', 'carbon:book', 'ph:book-open-duotone', 'devicon-plain:moodle', 'mdi:soccer', '???', 'nope', 'Mail', 'tabler:x']
 
-// --- The route, as Node answers it --------------------------------------------------
+// --- The route, as Node answered it ------------------------------------------------
 
-const SECRET = 'g'.repeat(44)
-
-// Node's own route, on a file of each university's: its status, its body
-// and the file as it is after each request. `file`: the file before the
-// first one, as Node or an admin wrote it (null: none).
-const ROUTE_CASES = [
-  {
-    university: 'univ-rennes',
-    file: null,
-    requests: [
-      { services: PICKS.map(({ id, title, description, category }) => ({ id, title, description, category })) },
-      // Some known, some new: the new ones take the hues used least.
-      { services: [{ id: 'mail', title: 'Webmail renamed' }, { id: 'nouveau', title: 'Nouveau service' }, { id: 'zz-wifi', title: 'Wifi' }, { id: '12', title: 'Douze' }, { id: '3', title: 'Trois' }] },
-      { services: 'nope' },
-      { services: [] },
-    ],
-  },
-  {
-    university: 'univ-sorbonne-nouvelle',
-    file: `${JSON.stringify({
-      version: 1,
-      university: 'univ-sorbonne-nouvelle',
-      services: {
-        'old-moodle': { icon: 'course', color: 'pink', title: 'Moodle', assignedAt: '2025-01-02' },
-        pinned: { icon: 'mdi:school', color: 'teal', title: 'Moodle', assignedAt: '2025-01-02T10:00:00Z' },
-        named: { icon: 'ph:books-duotone', color: 'lime', title: 'Annuaire' },
-        'bad-colour': { icon: 'mail', color: 'not-a-colour', title: 'Messagerie' },
-        'bad icon': { icon: 'mail', color: 'red' },
-        'long-title': { icon: 'library', color: 'sky', title: `${'L'.repeat(119)}📚`, assignedAt: 20250102 },
-        7: { icon: 'wifi', color: 'blue', title: 7 },
-        array: ['mail', 'red'],
-      },
-      extra: 'kept by nobody',
-    }, null, 2)}\n`,
-    requests: [
-      { services: [{ id: 'old-moodle', title: 'Moodle' }, { id: 'pinned', title: 'Moodle' }, { id: 'named', title: 'Annuaire' }, { id: 'bad-colour', title: 'Messagerie' }, { id: '7', title: 'Wifi' }, { id: 'new-one', title: 'Impression' }] },
-    ],
-  },
-  {
-    university: 'univ-rennes-2',
-    file: '{ broken',
-    requests: [
-      { services: [{ id: 'moodle', title: 'Cursus (Moodle)' }, { id: 'tempo', title: 'TEMPO', description: 'Emplois du temps' }] },
-    ],
-  },
-  {
-    university: 'univ-rennes-2',
-    file: `${JSON.stringify({ version: 1, university: 'univ-rennes-2', services: [{ icon: 'mail', color: 'red', title: 'An array' }] })}`,
-    requests: [
-      { services: [{ id: '0', title: 'Zéro' }, { id: 'one', title: 'Un' }] },
-    ],
-  },
-]
-
-async function answerRoute(routeCase) {
-  const dir = await mkdtemp(path.join(tmpdir(), 'tafac-gateway-icons-'))
-  const filePath = path.join(dir, 'app-icons', `${routeCase.university}.json`)
-  const readStored = () => readFile(filePath, 'utf8').catch(() => null)
-  try {
-    if (routeCase.file !== null) {
-      await mkdir(path.dirname(filePath), { recursive: true })
-      await writeFile(filePath, routeCase.file)
-    }
-    const config = await loadServerConfig(routeCase.university)
-    const app = createEntAuthApp(config, { analytics: {}, appIcons: { dataDir: dir }, session: { secret: SECRET, production: true }, demoAccount: false })
-    const server = app.listen(0, '127.0.0.1')
-    await new Promise((resolve) => server.once('listening', resolve))
-    const codec = createSessionCookieCodec({ secret: SECRET })
-    const cookie = `__Host-lent_session=${codec.encode({ id: 'fixture-session', uni: config.id, user: 'student', demoState: null, createdAt: Date.now(), mode: null, jar: [] })}`
-    const answered = []
-    // A broken file is said in the log, which isn't the fixture's.
-    const warn = console.warn
-    console.warn = () => {}
-    try {
-      for (const body of routeCase.requests) {
-        const response = await fetch(`http://127.0.0.1:${server.address().port}/__ent_auth/app-icons`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', Cookie: cookie },
-          body: JSON.stringify(body),
-        })
-        answered.push({ body: JSON.stringify(body), status: response.status, answer: await response.text(), file: await readStored() })
-      }
-    } finally {
-      console.warn = warn
-      await new Promise((resolve) => server.close(resolve))
-      await app.locals.analytics.shutdown?.()
-    }
-    return { university: routeCase.university, file: routeCase.file, requests: answered }
-  } finally {
-    await rm(dir, { recursive: true, force: true })
-  }
+// Node's route on a file of each university's, before Node went (27 November
+// 2026): its status, its body and the file after each request. Kept as they
+// were written, the gateway's (own/icons.rs) to answer alike; no longer
+// written again.
+async function nodesRoutes() {
+  const kept = JSON.parse(await readFile(outputPath('tests/fixtures/app-icon-picks.json'), 'utf8'))
+  return kept.routes
 }
 
 export async function buildIconFixture() {
   const themes = {}
-  for (const id of listUniversityIds()) themes[id] = resolveAppIconTheme((await loadServerConfig(id)).appIcons)
-  const routes = []
-  for (const routeCase of ROUTE_CASES) routes.push(await answerRoute(routeCase))
+  for (const id of listUniversityIds()) themes[id] = resolveAppIconTheme((await loadSharedConfig(id)).appIcons)
+  const routes = await nodesRoutes()
   return {
     about: 'Written by scripts/gateway-data.mjs from what the JS picks: the gateway (own/icons.rs) and tests/appIcons.test.js hold to it.',
     // The day the stores wrote down (assignedAt), for the files below.
@@ -349,208 +262,6 @@ export async function buildIconFixture() {
   }
 }
 
-// --- The page's files, and the page --------------------------------------------------
-
-// The types the build has (dist/), and a few more; another is Node's to serve.
-export const STATIC_EXTENSIONS = [
-  'js', 'mjs', 'css', 'html', 'json', 'map', 'webmanifest', 'txt', 'xml', 'svg', 'png', 'jpg', 'jpeg', 'gif', 'webp',
-  'avif', 'ico', 'woff', 'woff2', 'ttf', 'otf', 'mp4', 'webm', 'mov', 'mp3', 'wasm', 'pdf',
-]
-
-const CACHE_PATHS = [
-  'assets/index-DaeHe8mh.js', 'assets/lake-D07LPwNH.webp', 'assets/sub/x.css', 'assets', 'sw.js', 'index.html',
-  'manifest.webmanifest', 'icon.png', 'robots.txt', 'workbox-2fbc6a65.js', 'other/assets/x.js', 'other/sw.js', 'Assets/x.js', 'SW.JS',
-]
-
-// The files of a made-up build: their path in dist/, what they hold and
-// when they changed, in nanoseconds (a fraction of a millisecond too:
-// Node rounds it for the ETag and the date).
-const FILES = [
-  { path: 'assets/index-DaeHe8mh.js', content: 'console.log("hashed")\n', mtime: 1767323045.9996 },
-  { path: 'icon.png', content: 'not really a png', mtime: 1767323045.4994 },
-  { path: 'sw.js', content: '// worker', mtime: 1700000000 },
-  { path: 'empty.txt', content: '', mtime: 1700000000.25 },
-  { path: 'Upper.PNG', content: 'upper', mtime: 1700000000 },
-  { path: 'no-extension', content: 'what is it', mtime: 1700000000 },
-  { path: 'dotted.', content: 'a dot', mtime: 1700000000 },
-  { path: 'archive.tar.gz', content: 'gz', mtime: 1700000000 },
-  { path: 'with space.txt', content: 'space', mtime: 1700000000 },
-  { path: '.hidden', content: 'hidden', mtime: 1700000000 },
-  { path: 'assets/index.html', content: '<p>nested</p>', mtime: 1700000000 },
-  ...STATIC_EXTENSIONS.map((extension) => ({ path: `types/file.${extension}`, content: extension, mtime: 1700000000 })),
-]
-
-const JS_FILE = '/assets/index-DaeHe8mh.js'
-const ETAG_OF_JS = 'W/"16-19b7ca99070"'
-const MODIFIED_JS = 'Fri, 02 Jan 2026 03:04:06 GMT'
-
-// Requests, as a browser or a CDN sends them. `left`: one the gateway
-// leaves to Node on purpose (Node answers it, or the page after it does).
-const REQUESTS = [
-  { path: JS_FILE },
-  { path: JS_FILE, method: 'HEAD' },
-  { path: '/icon.png' },
-  { path: '/sw.js' },
-  { path: '/empty.txt' },
-  { path: '/Upper.PNG' },
-  { path: '/no-extension', left: true },
-  { path: '/dotted.', left: true },
-  { path: '/archive.tar.gz', left: true },
-  { path: '/with%20space.txt' },
-  { path: '/%61ssets/index-DaeHe8mh.js' },
-  ...STATIC_EXTENSIONS.map((extension) => ({ path: `/types/file.${extension}` })),
-  // Conditional.
-  { path: JS_FILE, headers: { 'if-none-match': ETAG_OF_JS } },
-  { path: JS_FILE, method: 'HEAD', headers: { 'if-none-match': ETAG_OF_JS } },
-  { path: JS_FILE, headers: { 'if-none-match': ETAG_OF_JS.slice(2) } },
-  { path: JS_FILE, headers: { 'if-none-match': `"other", ${ETAG_OF_JS}` } },
-  { path: JS_FILE, headers: { 'if-none-match': '"other"' } },
-  { path: JS_FILE, headers: { 'if-none-match': '*' } },
-  { path: JS_FILE, headers: { 'if-none-match': ETAG_OF_JS, 'cache-control': 'max-age=0, no-cache' } },
-  { path: JS_FILE, headers: { 'if-none-match': ETAG_OF_JS, 'cache-control': 'no-cache-please' } },
-  { path: JS_FILE, headers: { 'if-modified-since': MODIFIED_JS } },
-  { path: JS_FILE, headers: { 'if-modified-since': 'Sat, 03 Jan 2026 00:00:00 GMT' } },
-  { path: JS_FILE, headers: { 'if-modified-since': 'Fri, 02 Jan 2026 03:04:05 GMT' } },
-  { path: JS_FILE, headers: { 'if-modified-since': 'Thu, 01 Jan 1970 00:00:00 GMT' } },
-  { path: JS_FILE, headers: { 'if-modified-since': 'yesterday' }, left: true },
-  { path: JS_FILE, headers: { 'if-modified-since': '2026-01-03T00:00:00Z' }, left: true },
-  { path: JS_FILE, headers: { 'if-none-match': '"other"', 'if-modified-since': 'Sat, 03 Jan 2026 00:00:00 GMT' } },
-  { path: JS_FILE, headers: { 'if-match': ETAG_OF_JS } },
-  { path: JS_FILE, headers: { 'if-match': '*' } },
-  { path: JS_FILE, headers: { 'if-match': '"other"' }, left: true },
-  { path: JS_FILE, headers: { 'if-unmodified-since': 'Sat, 03 Jan 2026 00:00:00 GMT' } },
-  { path: JS_FILE, headers: { 'if-unmodified-since': 'Thu, 01 Jan 1970 00:00:00 GMT' }, left: true },
-  // Ranges.
-  { path: JS_FILE, headers: { range: 'bytes=0-3' } },
-  { path: JS_FILE, method: 'HEAD', headers: { range: 'bytes=0-3' } },
-  { path: JS_FILE, headers: { range: 'bytes=5-' } },
-  { path: JS_FILE, headers: { range: 'bytes=-4' } },
-  { path: JS_FILE, headers: { range: 'bytes=0-99999' } },
-  { path: JS_FILE, headers: { range: 'bytes=002-004' } },
-  { path: JS_FILE, headers: { range: 'bytes=0-1,4-5' }, left: true },
-  { path: JS_FILE, headers: { range: 'bytes=99-' }, left: true },
-  { path: JS_FILE, headers: { range: 'bytes=-0' }, left: true },
-  { path: JS_FILE, headers: { range: 'bytes=3-1' }, left: true },
-  { path: JS_FILE, headers: { range: 'bytes= 0-3' }, left: true },
-  { path: JS_FILE, headers: { range: 'items=0-3' } },
-  { path: JS_FILE, headers: { range: 'bytes=0-3', 'if-range': ETAG_OF_JS } },
-  { path: JS_FILE, headers: { range: 'bytes=0-3', 'if-range': '"other"' } },
-  { path: JS_FILE, headers: { range: 'bytes=0-3', 'if-range': MODIFIED_JS } },
-  { path: JS_FILE, headers: { range: 'bytes=0-3', 'if-range': 'Thu, 01 Jan 1970 00:00:00 GMT' } },
-  { path: JS_FILE, headers: { range: 'bytes=99-', 'if-range': '"other"' } },
-  { path: '/empty.txt', headers: { range: 'bytes=0-' }, left: true },
-  { path: JS_FILE, headers: { range: 'bytes=0-3', 'if-none-match': ETAG_OF_JS } },
-  // Not a file of the build: the page's, after.
-  { path: '/missing.js', left: true },
-  { path: '/assets', left: true },
-  { path: '/assets/', left: true },
-  { path: '/.hidden', left: true },
-  { path: '/assets/../icon.png', left: true },
-  { path: '/assets/%2e%2e/icon.png', left: true },
-  { path: '/../etc/passwd', left: true },
-  { path: '/%2e%2e/etc/passwd', left: true },
-  { path: '/%00', left: true },
-  { path: '/%E0%A4%A', left: true },
-  { path: '//icon.png', left: true },
-  { path: '/assets\\..\\icon.png', left: true },
-  { path: JS_FILE, method: 'POST', left: true },
-]
-
-// Node's static handler on its own, with what follows it marked: 299 for a
-// request it passes on (the page answers it on tafac.fr), 298 for an error
-// it passes on (Express's own page).
-async function answerStatics() {
-  const dist = await mkdtemp(path.join(tmpdir(), 'tafac-gateway-dist-'))
-  try {
-    for (const file of FILES) {
-      const filePath = path.join(dist, ...file.path.split('/'))
-      await mkdir(path.dirname(filePath), { recursive: true })
-      await writeFile(filePath, file.content)
-      await utimes(filePath, file.mtime, file.mtime)
-    }
-    const files = []
-    for (const file of FILES) {
-      const stats = await stat(path.join(dist, ...file.path.split('/')), { bigint: true })
-      files.push({ path: file.path, content: file.content, mtimeNs: String(stats.mtimeNs) })
-    }
-
-    const app = express()
-    app.disable('x-powered-by')
-    app.use(serveBuiltFiles(dist))
-    app.use((_req, res) => res.status(299).end())
-    app.use((_error, _req, res, _next) => res.status(298).end())
-    const server = app.listen(0, '127.0.0.1')
-    await new Promise((resolve) => server.once('listening', resolve))
-    const answers = []
-    try {
-      for (const asked of REQUESTS) {
-        const method = asked.method ?? 'GET'
-        const headers = Object.fromEntries(Object.entries(asked.headers ?? {}).filter(([name]) => name !== 'left'))
-        // node:http, not fetch: fetch adds headers of its own.
-        const answer = await new Promise((resolve, reject) => {
-          const sent = request({ host: '127.0.0.1', port: server.address().port, method, path: asked.path, headers }, (response) => {
-            const chunks = []
-            response.on('data', (chunk) => chunks.push(chunk))
-            response.on('end', () => resolve({ status: response.statusCode, headers: response.headers, body: Buffer.concat(chunks).toString('utf8') }))
-          })
-          sent.on('error', reject)
-          sent.end()
-        })
-        const kept = Object.fromEntries(Object.entries(answer.headers).filter(([name]) => !['date', 'connection', 'keep-alive', 'transfer-encoding'].includes(name)))
-        answers.push({ method, path: asked.path, headers, left: Boolean(asked.left), status: answer.status, answered: kept, body: answer.body })
-      }
-    } finally {
-      await new Promise((resolve) => server.close(resolve))
-    }
-    return { files, answers }
-  } finally {
-    await rm(dist, { recursive: true, force: true })
-  }
-}
-
-const ETAG_BODIES = [
-  '', 'User-agent: *\nAllow: /\nDisallow: /__ent_auth/\nDisallow: /__ent_proxy/',
-  'User-agent: *\nAllow: /\nDisallow: /__ent_auth/\nDisallow: /__ent_proxy/\nSitemap: https://tafac.fr/sitemap.xml',
-  JSON.stringify({ webcredentials: { apps: ['ABCDE12345.fr.tafac.desktop'] } }), 'é', 'x'.repeat(1000),
-]
-
-const PAGES = [
-  '<p>no script</p>',
-  '<script>theme()</script><script src="/app.js"></script>',
-  `<head>
-    <script type="application/ld+json">{"@context":"https://schema.org"}</script>
-    <script>document.documentElement.dataset.theme = 'dark'</script>
-    <script type="module">import '/x.js'</script>
-    <script type="module" crossorigin src="/assets/index.js"></script>
-    <script src="/a.js"> </script>
-    <script></script>
-  </head>`,
-  '<SCRIPT TYPE="TEXT/JAVASCRIPT">a()</SCRIPT><script type=" module ">b()</script><script type="text/plain">c()</script>',
-  '<script type>d()</script><script type="">e()</script><script data-src="x">f()</script><script srcset="x">g()</script>',
-  '<script SRC>h()</script><script src = \'x\'>i()</script><script src=x>j()</script><script x src="y"z>k()</script>',
-  '<scripts>l()</scripts><script>m()</script >n()</script><script>o()</SCRIPT><script>p()',
-  '<script>same()</script><script>same()</script><script>unicode("é ✓ 📚")</script><script\ttype="module"\n>q()</script>',
-  '<script type="application/javascript">r()</script><script type="text/ecmascript">s()</script><script type="text/javascripts">t()</script>',
-  '<script type=\'module\' src>u()</script><script type="module"src="x">v()</script><script\u00a0src="x">w()</script>',
-  '<script type="module" src="x" src>x()</script><script src="a"src="b">y()</script><script type=module>z()</script>',
-  '<script>a</script><script>b</script><scriptx>c</script><script/>d</script><script\n>e</script>',
-]
-
-export async function buildStaticFixture() {
-  const app = express()
-  const { files, answers } = await answerStatics()
-  return {
-    about: 'Written by scripts/gateway-data.mjs from server.js\'s modules: the gateway (own/statics.rs, own/page_headers.rs) and the Node tests hold to it.',
-    contentTypes: Object.fromEntries(STATIC_EXTENSIONS.map((extension) => [extension, answers.find((answer) => answer.path === `/types/file.${extension}`).answered['content-type']])),
-    cacheControl: CACHE_PATHS.map((relativePath) => [relativePath, cacheControlFor(relativePath)]),
-    files,
-    answers,
-    // Express's weak ETag of an answer sent whole (robots.txt, Apple's file).
-    etags: ETAG_BODIES.map((body) => [body, app.get('etag fn')(body, 'utf8')]),
-    pagePolicies: PAGES.map((html) => [html, buildPagePolicy(html)]),
-  }
-}
-
 // --- The files -------------------------------------------------------------------
 
 export function serialize(value) {
@@ -560,7 +271,6 @@ export function serialize(value) {
 export const OUTPUTS = [
   { file: 'back/crates/tafac-gateway/src/own/icons.json', build: buildIconData },
   { file: 'tests/fixtures/app-icon-picks.json', build: buildIconFixture },
-  { file: 'tests/fixtures/static-files.json', build: buildStaticFixture },
 ]
 
 export function outputPath(file) {
