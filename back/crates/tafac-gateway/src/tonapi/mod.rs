@@ -43,7 +43,7 @@ use tonapi_providers::{Context, Fetched, NetSettings};
 use tonapi_session::SessionData;
 
 use crate::session::cookie::Session;
-use crate::session::memory::Snapshot;
+use crate::session::memory::Turn;
 use crate::session::{handed, Held};
 use crate::universities::University;
 
@@ -167,6 +167,9 @@ impl Service<'_> {
         if ticket.is_empty() {
             return Err(Unanswered::NoTicket);
         }
+        if !memory.snapshot().detected && university.differs_by_component(kind) {
+            self.detect(kind, &ticket).await?;
+        }
         let before = memory.snapshot();
         let mut data = session_data(university, session, ticket.iter().chain(&before.cookies).cloned().collect())?;
         data.tokens = before.tokens.clone();
@@ -174,8 +177,6 @@ impl Service<'_> {
             if let Some(component) = &before.component {
                 data.establishment = Some(component.clone());
             }
-        } else if university.differs_by_component(kind) {
-            data = self.detect(data, &before, &ticket).await?;
         }
 
         let settings = &university.settings;
@@ -190,15 +191,52 @@ impl Service<'_> {
 
     // The student's component (an IUT, a faculty), which decides where some
     // services are. A sign-in made here found it already; for a session made
-    // elsewhere (Node's own sign-in, a process started again) tonAPI asks
-    // the university for it, once.
-    async fn detect(&self, data: SessionData, before: &Snapshot, ticket: &[tonapi_session::StoredCookie]) -> Result<SessionData, Unanswered> {
-        let Held { university, memory, .. } = self.held;
-        let detecting = tonapi_providers::with_detected_establishment(&university.settings, data, chrono::Utc::now(), self.net);
-        let data = bounded(SERVICE_PATIENCE, detecting).await?;
-        memory.keep(before, &data, ticket);
-        memory.detected(data.establishment.clone());
-        Ok(data)
+    // elsewhere (the app or the server started again since the sign-in, a
+    // session of Node's) tonAPI asks the university for it, kept once it
+    // knows. The memory holds it, not the cookie: every process that starts
+    // again looks for it again, at the first question that needs it.
+    //
+    //   one look at a time  the home page's questions come together (the
+    //                       grades, the photo, the absences): one looks,
+    //                       the others wait and find what it found
+    //   ADE's turn          the component is read in ADE's tree, whose
+    //                       session is the planning's too: the planning
+    //                       isn't asked at the same moment (two sessions of
+    //                       ADE's opened at once, one undoing the other)
+    //   a look that failed  the portal or ADE didn't answer, or the CAS
+    //                       refused the ticket: nothing kept, the next
+    //                       question looks again. The CAS's refusal is the
+    //                       question's (the session is lost); otherwise it
+    //                       is asked with the default component this once
+    //
+    // Found, or the university answered without the student matching any
+    // component: kept, never looked for again (as before).
+    async fn detect(&self, kind: ServiceKind, ticket: &[tonapi_session::StoredCookie]) -> Result<(), Unanswered> {
+        let Held { session, university, memory } = self.held;
+        // ADE's turn first, then the component's: the planning, which holds
+        // its own turn, may ask for the component too.
+        let _ade = if kind == ServiceKind::Timetable { None } else { Some(memory.turn(Turn::Service(ServiceKind::Timetable)).await) };
+        let _looking = memory.turn(Turn::Component).await;
+        // Another question found it while this one waited.
+        let before = memory.snapshot();
+        if before.detected {
+            return Ok(());
+        }
+        let mut data = session_data(university, session, ticket.iter().chain(&before.cookies).cloned().collect())?;
+        data.tokens = before.tokens.clone();
+        let looking = tonapi_providers::look_for_establishment(&university.settings, data, chrono::Utc::now(), self.net);
+        let (data, looked) = bounded(SERVICE_PATIENCE, looking).await?;
+        memory.keep(&before, &data, ticket);
+        match looked {
+            Ok(()) => memory.detected(data.establishment.clone()),
+            Err(problem) => {
+                eprintln!("[tafac] tonapi: the student's component wasn't found ({}), looked for again at the next question", problem.code);
+                if problem.code == ErrorCode::SessionExpired {
+                    return Err(Unanswered::Problem(problem.code));
+                }
+            }
+        }
+        Ok(())
     }
 }
 

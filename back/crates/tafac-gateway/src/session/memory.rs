@@ -136,6 +136,8 @@ impl Drop for Refreshing {
 pub(crate) enum Turn {
     Service(ServiceKind),
     Cas,
+    // The student's component, looked for once at a time (tonapi/mod.rs).
+    Component,
 }
 
 // One session's memory.
