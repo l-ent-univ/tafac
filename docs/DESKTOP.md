@@ -1,36 +1,36 @@
 # Desktop app (Tauri)
 
 The desktop app is the same app as tafac.fr, but the server runs on the
-student's computer. The login and every request to the university go from
-that computer straight to the university: credentials never pass through
-tafac.fr.
+student's computer, inside the app: the gateway (`back/crates/tafac-gateway`,
+Rust, tafac.fr's own). No other program runs, no Node. The login and every
+request to the university go from that computer straight to the university:
+credentials never pass through tafac.fr.
 
-The iOS app is the same code built for a phone, with Node inside the app:
-`docs/IOS.md`.
+The iOS app is the same code built for a phone: `docs/IOS.md`.
 
 ## How it fits together
 
 ```
-window (tafac://localhost/)          src-tauri/src/main.rs
+window (tafac://localhost/)          src-tauri/src/app.rs
    │  every request: page, /__ent_auth, /__ent_proxy
    ▼
 bridge (Rust)                        src-tauri/src/bridge.rs
    │  holds the session cookie (jar.rs): WebKit doesn't keep cookies
    │  from a custom scheme, and the page never sees it
-   ├─ the gateway, in the app itself     back/crates/tafac-gateway
-   │    signs in, holds the session, answers what moved to tonAPI
-   ▼  Unix socket (named pipe on Windows), no TCP port
-server.js, unchanged                 desktop/sidecar.mjs
-   │  PORT = the socket path, SESSION_SECRET made once per install
-   ▼
-the university (CAS, ADE, webmail…)
+   ├─ the page's API: the gateway, in the app's own process
+   │    signs in, holds the session, answers every route
+   │    through tonAPI                    back/crates/tafac-gateway
+   ├─ anything else: the page and its built files, from the app's
+   │    resources (dist/), as tafac.fr's server sends them
+   ▼  no TCP port, no socket: nothing else on the computer reaches it
+the university (CAS, portal, Moodle, ScoDoc, ADE, webmail…)
 ```
 
-- **The page's built files** (`/assets/…`) are asked of the server once and
-  answered from memory after that (`src-tauri/src/assets.rs`), whole or in
-  part. WebKit keeps nothing from the app's scheme, and reads a video a few
-  bytes at a time: the home page's animated icons alone were some sixty
-  requests a second to the server.
+- **The page's built files** (`/assets/…`) are read once from the build the
+  app carries and answered from memory after that
+  (`src-tauri/src/assets.rs`), whole or in part. WebKit keeps nothing from
+  the app's scheme, and reads a video a few bytes at a time: the home
+  page's animated icons alone were some sixty requests a second.
 - **Links** (`src-tauri/src/links.rs`): web addresses open in the browser.
   An app address opened in a new tab (the launch relay) opens where its
   redirect points. A new tab on Moodle (a deadline, Moodle's tile, a link
@@ -38,8 +38,9 @@ the university (CAS, ADE, webmail…)
   Downloads folder. The window itself only loads the app's pages: any other
   address (`file://`, another program's scheme) is refused.
 - **Data** (macOS: `~/Library/Application Support/fr.tafac.desktop/`, closed
-  to other accounts): `cookies.json` (the encrypted session cookie) and
-  `server/`, the remembered app icons (`DATA_DIR`). The secret that
+  to other accounts): `cookies.json` (the encrypted session cookie),
+  `server/`, the remembered app icons (the folder the app's Node kept them
+  in, `DATA_DIR`), and `remote-settings.json` (« Remote settings »). The secret that
   encrypts the cookie is not kept beside it: a packaged app puts it in the
   system's credential store (macOS Keychain, Windows Credential Manager,
   the Secret Service on Linux; `src-tauri/src/secret.rs`). Where there is
@@ -49,55 +50,53 @@ the university (CAS, ADE, webmail…)
 - **The login**: the student's login and password are kept in the same
   credential store to stay signed in (below, `src-tauri/src/signin.rs`),
   never in a file.
-- **Socket**: in a folder only the student's account can enter
-  (`$XDG_RUNTIME_DIR`, else the data folder), never the shared `/tmp`
-  (`src-tauri/src/sidecar.rs`).
-- The server stops with the app: its stdin is a pipe from the app, and when
-  the pipe closes the server exits, even if the app crashed.
+- **No Node** since 27 November 2026. Until then the server was Node
+  (`server.js`) in a process beside the app, on a Unix socket (a named
+  pipe on Windows), with a Node binary shipped in the app (117 MB) and a
+  copy of the server. What it did is the gateway's now (`back/README.md`,
+  « The apps »). A release build for a Mac is 40 MB (31 MB zipped): its
+  binary 12 MB, the page's files 27 MB. With Node it was 168 MB (81 MB
+  zipped).
 
 ## tonAPI
 
-The server is moving from Node to
-[tonAPI](https://github.com/l-ent-univ/tonAPI) (Rust: one provider per
-software, one settings file per university). The Rust side is in charge:
-it signs the student in, holds the session and answers the routes that
-have moved; Node is behind it for the ones that haven't. One crate does it
-for every place Tafac runs: `back/crates/tafac-gateway`. `back/` is the
-Rust backend's root (a Cargo workspace, `back/README.md`); the apps use
-its crates by path.
+The server is [tonAPI](https://github.com/l-ent-univ/tonAPI) (Rust: one
+provider per software, one settings file per university), through one
+crate that does it for every place Tafac runs: `back/crates/tafac-gateway`.
+It signs the student in, holds the session and answers every route of the
+page's API. `back/` is the Rust backend's root (a Cargo workspace,
+`back/README.md`); the apps use its crates by path.
 
 ```
 the page: /__ent_auth/*, /__ent_proxy/*      unchanged, the only contract
    ▼
 the gateway (Rust)                           back/crates/tafac-gateway
-   │  routes.rs      the one table: each route, moved or Node's
+   │  routes.rs      the one table: what answers each route
    │  gateway/       the sign-in and the sign-out, whose session a request
-   │                 is, the route's question, a session that is over
+   │                 is, the route's question, a session that is over,
+   │                 nobody signed in
    │  session/       the session's cookie read and written, what tonAPI is
    │                 handed, what the session holds in this process
    │  tonapi/        the questions to tonAPI, one file per thing asked
    │  translate/     tonAPI's answer as the page reads it today, its
    │                 errors too
-   │  node.rs        what Node is told, and what the two share
    │  launch/        the launch relay: a service's sign-in walked for the browser
-   ├─ login, logout, session, account, deadlines, grades,
-   │  applications, photo, school certificate ──▶ tonAPI ──▶ the university
-   ├─ the launch relay ──▶ the university
-   ▼  everything else, as it came, with the session's cookie
-Node (server.js)                             ──▶ the university
+   │  own/           Tafac's own: the universities, the statistics, the
+   │                 icons, the page's files, the remote settings
+   ▼
+tonAPI ──▶ the university
 ```
 
 - **In the apps** the bridge calls the gateway in the app's own process
-  before it asks Node (`bridge.rs`), on the desktop and on iOS alike.
-- **On tafac.fr** the same crate is a small server in front of Node
-  (`cargo build --release -p tafac-gateway` in `back/`, `src/main.rs`): it
-  answers what the gateway answers and passes every other request on as it
-  came (headers, cookies, bodies as they stream, redirects, WebSocket). Not
-  deployed.
-- **For the Université de Rennes only** (`routes.rs`: `UNIVERSITIES`).
-  Every other university is Node's as before, sign-in included.
+  (`bridge.rs`), on the desktop and on iOS alike, with no Node behind it.
+- **On tafac.fr** the same crate is the server (`cargo build --release -p
+  tafac-gateway` in `back/`, `src/main.rs`), alone or with a Node behind
+  for what is left outside the API. Not deployed.
+- **For the universities of `routes.rs`** (`UNIVERSITIES`: Rennes, Rennes 2,
+  the Sorbonne Nouvelle), the ones the app lists.
 
-What the gateway does, for Rennes:
+What the gateway does (first written for Rennes; Rennes 2 and the
+Sorbonne Nouvelle in `back/README.md`):
 
 - **Signs in** (`gateway/signin.rs`). `POST /__ent_auth/login` is answered
   by tonAPI's own sign-in: the CAS's form, the password posted once, the
@@ -177,10 +176,10 @@ What the gateway does, for Rennes:
   the ticket: if the CAS wants the password again, the session ends here,
   with the answers the page and the apps act on (`401 { error:
   'session_expired' }`, `X-Tafac-Session: expired`, the cookie taken away;
-  `expired: true` on the session check), and Node is told.
+  `expired: true` on the session check); on tafac.fr, a Node behind is
+  told.
 - **Signs out**: `POST /__ent_auth/logout` ends the session here, tells the
-  CAS (tonAPI), and tells Node, for what Node kept of it (the webmail's
-  session).
+  CAS (tonAPI), and ends the webmail's session.
 - **Words a moved route's errors** (`translate/failed.rs`). When tonAPI
   can't give the page's answer for a session that lives, the gateway
   answers what Node's own route does: `500 { error }` for a service down,
@@ -196,8 +195,8 @@ What the gateway does, for Rennes:
 - **Says whether the statistics are on** (`analyticsEnabled`, in the
   session check's answer) from the setting Node reads, without asking
   Node: `POSTHOG_PROJECT_KEY`. On tafac.fr it is in the environment of
-  both (`src/main.rs`); in the apps it is the key the app starts its
-  server with (`bridge.rs`, « Statistics » below).
+  both (`src/main.rs`); in the apps it is the key the app is built with
+  (`bridge.rs`, « Statistics » below).
 - **One User-Agent** for the whole of Tafac. The CAS binds its ticket to
   the User-Agent that signed in and deletes it when another shows it. The
   gateway and Node present themselves under the same name, the one Node
@@ -205,20 +204,9 @@ What the gateway does, for Rennes:
   `server/upstreamAgent`, held together by `tests/upstreamAgent.test.js`.
   So a session one of them made is used by the other.
 
-What is still Node's, and why:
-
-- **Every route that hasn't moved** (`routes.rs` says what tonAPI lacks for
-  each): the planning and ADE, the mail,
-  the icons, the statistics, and the portal's proxy for
-  what is left of it (the account's photo, an old link to a page of the
-  portal's).
-- **The moved routes, for a session the gateway doesn't hold**: nobody
-  signed in, another university, a cookie it can't read.
-  The request goes to Node's own route as it came. Each translator lists
-  the cases.
-- **A session that ended**: Node is told (its own sign-out, with the
-  session's cookie), for what it kept of the session. It is the one thing
-  the gateway goes to Node for.
+Nobody signed in, a cookie the gateway can't read, a session of another
+university: the gateway answers what Node's routes said with no session
+(`gateway/nobody.rs`). A path of the API that is no route: a 404.
 
 Neither's: **the demo account**. The page serves it by itself
 (`src/demoServer.js`), with no session: its login is checked in the page
@@ -230,8 +218,7 @@ the server as the demo starts, which forgets a login kept (below).
   a translator in `translate/`, three lines in `gateway/`, and the answer
   compared with Node's on a real account.
 - `TAFAC_LOG_REQUESTS=1` logs the page's requests in a debug build of the
-  app, with `tonapi` after the ones the gateway answered; `TAFAC_NO_TONAPI=1`
-  leaves every route to Node, sign-in included.
+  app, with `tonapi` after the ones the gateway answered.
 
 The grades come from tonAPI's own report, written back in ScoDoc's shape
 for the page: on a real account every field the page reads is Node's, value
@@ -242,8 +229,9 @@ without the hour). `translate/grades/report.rs` lists them. In development
 the page shows who answered each route
 (`back/README.md`, « To see it work »).
 
-On a real Rennes account, the gateway's server (a debug build, on a Mac) in
-front of the development server, each asked a few times:
+On a real Rennes account, before the apps went without Node, the gateway's
+server (a debug build, on a Mac) in front of the development server, each
+asked a few times:
 
 | | the gateway | Node |
 |---|---|---|
@@ -496,9 +484,10 @@ Apple only allows it when the app and tafac.fr name each other:
    `src-tauri/embedded.provisionprofile` (not committed). Built with
    `APPLE_SIGNING_IDENTITY="Developer ID Application: Tom Heliere (P8XRQT7Z4K)" npm run desktop:build:signed`.
    An unsigned build carrying the entitlement would be killed at launch, so
-   `desktop:build` leaves it out. The bundled Node is signed again on its own
-   (`scripts/desktop-sign.mjs`, `entitlements.node.plist`, JIT only): with
-   the app's entitlements macOS kills it, a helper has no profile.
+   `desktop:build` leaves it out. `scripts/desktop-sign.mjs` signs the app
+   again with them, the hardened runtime and a timestamp, and checks it.
+   The app needs no JIT or other exception of the hardened runtime: the
+   JIT entitlements were the bundled Node's, which is gone.
 2. **tafac.fr**: `APPLE_APP_IDS=<team id>.fr.tafac.desktop` in the server's
    environment; `server.js` then serves
    `/.well-known/apple-app-site-association`.
@@ -658,23 +647,22 @@ Then the repository variable `DESKTOP_RELEASE` = `true`, and
 
 ## Remote settings
 
-Between two updates, the app's server reads a small signed file from
-tafac.fr, patches over its universities' settings: a feature switched off,
-an address that moved within the university's own domains. Data only, never
-code, never a new domain. Read when the app starts (not when its window is
-closed and opened again): `docs/REMOTE_SETTINGS.md`.
+Between two updates, the app reads a small signed file from tafac.fr,
+patches over its universities' settings for the page: a feature switched
+off, a setting of the page's. Data only, never code, never a new domain.
+Read when the app starts (not when its window is closed and opened again):
+`docs/REMOTE_SETTINGS.md`.
 
 ## Statistics
 
-The app's own server sends the same anonymous statistics as tafac.fr
-(`docs/ANALYTICS.md`), from the student's computer to PostHog, never
-through tafac.fr, and only while « Statistiques anonymes » is on. Its
-events carry `client: desktop` and `app_version` (a browser tab says `web`,
-the installed PWA `pwa`). The key is built in by CI
-(`TAFAC_POSTHOG_PROJECT_KEY`, read by `src-tauri/src/sidecar.rs`): a local
-build sends nothing. The gateway in the app reads the same key
-(`src-tauri/src/bridge.rs`) to tell the page whether the statistics are
-on: the server isn't asked.
+The app's own server (the gateway, `own/analytics.rs`) sends the same
+anonymous statistics as tafac.fr (`docs/ANALYTICS.md`), from the student's
+computer to PostHog, never through tafac.fr, and only while « Statistiques
+anonymes » is on. Its events carry `client: desktop` and `app_version` (a
+browser tab says `web`, the installed PWA `pwa`). The key is built in by CI
+(`TAFAC_POSTHOG_PROJECT_KEY`, read by `src-tauri/src/bridge.rs`): a local
+build sends nothing. The same key tells the page whether the statistics
+are on.
 
 ## The disk image
 
@@ -714,14 +702,14 @@ before `desktop-sign.mjs`: fine unsigned, not for a release.
 
 | | |
 |---|---|
-| `npm run desktop:dev` | Builds `dist/`, then opens the app with the Node on the PATH and the repository's files (`TAFAC_START_PATH=/rennes` opens on that page) |
+| `npm run desktop:dev` | Builds `dist/`, then opens a debug build of the app on the repository's `dist/` (`TAFAC_START_PATH=/rennes` opens on that page) |
 | `npm run desktop:build` | Packaged app for this computer, unsigned: runs `desktop:prepare`, then `tauri build` |
 | `npm run desktop:build:signed` | The same, signed with the Developer ID certificate, entitlements and provisioning profile (saved passwords) |
 | `npm run desktop:dmg` | The disk image of the app just built (`scripts/desktop-dmg.mjs`) |
-| `npm run desktop:prepare` | `desktop-build/server/` (the server's files and the npm packages it imports, found through esbuild's import graph), `src-tauri/binaries/node-<triple>` (the official Node binary pinned in the Dockerfile, checksum checked) and on macOS the disk image's background |
+| `npm run desktop:prepare` | `dist/` (`npm run build`), which the app carries among its resources, and on macOS the disk image's background |
 
-Needs Rust (`rustup`). Frontend or server changes need no Rust work: the
-next build ships them. Local builds are version 0.0.0 (see Updates); the
+Needs Rust (`rustup`). Frontend changes need no Rust work: the next build
+ships them; a change to the gateway is one to the app. Local builds are version 0.0.0 (see Updates); the
 release scripts read the built app in `src-tauri/target/release/bundle`, or
 in `TAFAC_BUNDLE_DIR`.
 
