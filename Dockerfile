@@ -8,7 +8,7 @@
 # Dependabot (.github/dependabot.yml) proposes the next ones.
 
 # --- The page: install everything, build it ---
-FROM node:24.22.2-alpine AS page
+FROM node:26.13.1-alpine AS page
 WORKDIR /app
 COPY package.json package-lock.json ./
 RUN npm ci
