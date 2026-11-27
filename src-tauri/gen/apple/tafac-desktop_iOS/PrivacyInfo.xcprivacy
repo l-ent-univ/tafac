@@ -8,10 +8,11 @@
   pages and widgets are used, under an identifier that changes every day and
   leads back to no student.
 
-  The system APIs that need a reason, as found in the app's binary and in
-  Node's (nm -u): file dates (stat, by Node and Rust on the app's own
-  files), the time since boot (mach_absolute_time, Node's clock) and the
-  disk's free space (statfs, Node). Check again when a dependency changes.
+  The system APIs that need a reason, as found in the app's binary (nm -u):
+  file dates (stat, by Rust on the app's own files). The time since boot
+  (mach_absolute_time) and the disk's free space (statfs) were Node's, which
+  the app no longer has: not among the binary's imports on 27/11/2026,
+  still declared. Check again when a dependency changes.
 -->
 <plist version="1.0">
 <dict>

@@ -2,7 +2,8 @@ import { useMemo, useState } from 'react'
 import { Icon } from '@iconify/react'
 import { entryPlace, roomCapacity, roomLabel, searchDirectory, sectionEntries, siteEntries } from '../planningDirectory'
 import { SECONDARY_BUTTON } from '../scodocPageUtils'
-import { usePlanningDirectory } from '../usePlanningDirectory'
+import { PLANNING_DIRECTORY, usePlanningDirectory } from '../usePlanningDirectory'
+import universityConfig from '@university'
 import MailSearchField from './MailSearchField'
 import RoomIcon from './RoomIcon'
 import SegmentedControl from './SegmentedControl'
@@ -14,11 +15,16 @@ import { r } from '../register.js'
 import SmoothSurface from './SmoothSurface'
 import PlanningGroupCollections from './PlanningGroupCollections'
 
+// The tabs the university's planning offers (PLANNING_DIRECTORY).
 const TABS = [
   { id: 'room', label: 'Salles', placeholder: 'Salle, bâtiment…' },
   { id: 'person', label: 'Personnels', placeholder: 'Nom, département…' },
   { id: 'group', label: 'Formations', placeholder: 'Groupe, formation…' },
-]
+].filter((choice) => PLANNING_DIRECTORY?.kinds.includes(choice.id) ?? true)
+// A tree by site lists the student's site's; another, all of it.
+const BY_SITE = PLANNING_DIRECTORY?.bySite !== false
+// The planning service's name (planning.providerName), ADE by default.
+const PROVIDER = universityConfig.planning?.providerName ?? 'ADE'
 
 // A person's badge, as a mail's sender's (MailRowContent, mailSender.js):
 // their first letter on a colour of their own, by name (ADE gives no
@@ -182,8 +188,8 @@ function PlanningDirectoryContent({ header = null, stickyClassName = '', user = 
   const directory = usePlanningDirectory({ user, enabled: true })
   const { entries, status } = directory
   const results = useMemo(() => searchDirectory(entries, tab, query, { siteLabel }), [entries, tab, query, siteLabel])
-  const siteList = useMemo(() => siteEntries(entries, tab, siteLabel), [entries, tab, siteLabel])
-  const sections = useMemo(() => (tab === 'group' ? [] : sectionEntries(siteList, tab)), [siteList, tab])
+  const siteList = useMemo(() => (BY_SITE ? siteEntries(entries, tab, siteLabel) : entries.filter((entry) => entry.kind === tab)), [entries, tab, siteLabel])
+  const sections = useMemo(() => (tab === 'group' ? [] : sectionEntries(siteList, tab, { bySite: BY_SITE })), [siteList, tab])
 
   const tabInfo = TABS.find((choice) => choice.id === tab) ?? TABS[0]
   const isSearching = query.trim().length > 0
@@ -204,7 +210,7 @@ function PlanningDirectoryContent({ header = null, stickyClassName = '', user = 
   } else if (status === 'unavailable') {
     body = (
       <div className="grid justify-items-center gap-3 py-6">
-        <DirectoryNote>{r('ADE n’a pas répondu. Vérifie ta connexion, puis réessaie', 'ADE n’a pas répondu. Vérifiez votre connexion, puis réessayez')}</DirectoryNote>
+        <DirectoryNote>{r(`${PROVIDER} n’a pas répondu. Vérifie ta connexion, puis réessaie`, `${PROVIDER} n’a pas répondu. Vérifiez votre connexion, puis réessayez`)}</DirectoryNote>
         <button type="button" className={`${SECONDARY_BUTTON} cursor-pointer`} onClick={directory.retry}><SmoothSurface />Réessayer</button>
       </div>
     )
@@ -260,13 +266,16 @@ function PlanningDirectoryContent({ header = null, stickyClassName = '', user = 
         >
           <MailSearchField value={query} onChange={onQueryChange} placeholder={tabInfo.placeholder} label={`Rechercher dans ${tabInfo.label.toLowerCase()}`} inputRef={inputRef} />
         </form>
-        <SegmentedControl
-          kind="tabs"
-          options={TABS.map((choice) => ({ value: choice.id, label: choice.label }))}
-          value={tab}
-          onChange={onTabChange}
-          label="Annuaire"
-        />
+        {/* One kind alone (TEMPO's rooms): no tabs to choose from. */}
+        {TABS.length > 1 ? (
+          <SegmentedControl
+            kind="tabs"
+            options={TABS.map((choice) => ({ value: choice.id, label: choice.label }))}
+            value={tab}
+            onChange={onTabChange}
+            label="Annuaire"
+          />
+        ) : null}
       </div>
       {/* A little room under the sticky top: the first card's outer stroke
           would be painted over by it, the card looking cut off. */}

@@ -1,3 +1,4 @@
+import { markBackend } from '../dev/backendTrace.js'
 import { useEffect, useState } from 'react'
 import SidebarStatPocket from './SidebarStatPocket'
 import { getLatestGrade } from '../entApi'
@@ -81,4 +82,5 @@ function SidebarGradePocket({ onOpen }) {
   return <LiveSidebarGradePocket onOpen={onOpen} />
 }
 
-export default SidebarGradePocket
+// Development: outlined by who answered its route (src/dev/backendTrace.js).
+export default markBackend(SidebarGradePocket, ['/__ent_auth/grades', '/__ent_auth/grades/semester/:id'])

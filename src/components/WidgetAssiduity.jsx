@@ -1,3 +1,4 @@
+import { markBackend } from '../dev/backendTrace.js'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { Icon } from '@iconify/react'
@@ -438,4 +439,5 @@ function WidgetAssiduity({ payload, releve, config, status, onOpen = null, justi
   )
 }
 
-export default WidgetAssiduity
+// Development: outlined by who answered its route (src/dev/backendTrace.js).
+export default markBackend(WidgetAssiduity, ['/__ent_auth/grades', '/__ent_auth/grades/semester/:id'])

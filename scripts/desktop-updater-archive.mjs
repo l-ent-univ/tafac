@@ -5,7 +5,7 @@
 //
 // After the signed build (scripts/desktop-sign.mjs) and its notarization
 // (scripts/desktop-notarize.mjs): Tauri's own updater archive would be made
-// before both, with a Node macOS refuses to run.
+// before both, unnotarized.
 //
 //   <bundle>/macos/Tafac_<version>_<arch>.app.tar.gz
 //   <bundle>/macos/Tafac_<version>_<arch>.app.tar.gz.sig

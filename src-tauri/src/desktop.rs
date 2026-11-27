@@ -1,5 +1,5 @@
 // The app's own routes on the tafac:// scheme, answered here instead of by
-// the local server: /__desktop/*. Only the app's pages can reach them (the
+// the bridge (bridge.rs): /__desktop/*. Only the app's pages can reach them (the
 // scheme exists in its windows only), and each asks for a header no link,
 // image or form can send, so a mail's content can't set them off.
 //

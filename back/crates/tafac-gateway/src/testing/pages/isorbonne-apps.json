@@ -1,0 +1,5 @@
+[
+  { "id": "portal-tool-35", "title": "Mes documents U", "description": null, "url": "https://apps.exemple.test/Fichiers", "iconUrl": null, "category": "Accueil", "favorite": false },
+  { "id": "portal-tool-54", "title": "Mon dossier de scolarité", "description": "Notes et certificat de scolarité, à télécharger depuis le menu des inscriptions. Encore du texte d'aide, long, que la grille ne montre pas en entier :…", "url": "https://apps.exemple.test/dossier/", "iconUrl": null, "category": "Etudiant", "favorite": false },
+  { "id": "portal-tool-61", "title": "Aide", "description": "Une question ?", "url": "{origin}/ENT/secure/aide.xhtml", "iconUrl": null, "category": "Etudiant", "favorite": false }
+]

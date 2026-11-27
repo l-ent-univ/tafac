@@ -1,6 +1,8 @@
-// The student's photo as the account data or the ENT give it, made into an
-// <img> source: the account modal shows it, the debug menu inspects it.
-import { ENT_ORIGIN, buildEntProxyHref } from './entApi'
+// The student's photo as the account data gives it, made into an <img>
+// source: the account modal shows it, the debug menu inspects it. The photo
+// itself is /__ent_auth/student-pic (ScoDoc's); a photo on the portal is no
+// longer relayed (the portal proxy is gone), so a portal address is none.
+import { ENT_ORIGIN } from './entApi'
 
 // A query token so the browser fetches the photo again instead of its cache.
 export function appendPreviewToken(url, token) {
@@ -29,11 +31,9 @@ function normalizeProfilePhotoSource(value) {
   }
 
   if (/^https?:\/\//i.test(source)) {
+    // The portal's own: only its session could load it.
     if (source.startsWith(ENT_ORIGIN)) {
-      return {
-        src: buildEntProxyHref(source),
-        kind: 'ent-url',
-      }
+      return null
     }
 
     return {
@@ -42,11 +42,9 @@ function normalizeProfilePhotoSource(value) {
     }
   }
 
+  // A path of the portal's.
   if (source.startsWith('/')) {
-    return {
-      src: buildEntProxyHref(source),
-      kind: 'relative-url',
-    }
+    return null
   }
 
   if (source.length > 200 && /^[A-Za-z0-9+/=\s]+$/.test(source)) {

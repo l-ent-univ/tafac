@@ -13,7 +13,7 @@
 import { readFileSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { parseArgs } from 'node:util'
-import { parseDesktopManifest } from '../server/desktopUpdate/manifest.ts'
+import { parseDesktopManifest } from './desktopManifest.ts'
 
 const LIVE_URL = process.env.DESKTOP_LATEST_URL ?? 'https://tafac.fr/desktop/latest.json'
 

@@ -1,5 +1,5 @@
 {
-  // The server's TypeScript modules (server/**/*.ts, tests/*.test.ts): type
+  // The scripts' TypeScript modules (scripts/**/*.ts, tests/*.test.ts): type
   // checked here (`npm run typecheck`), never compiled. Node runs them as they
   // are, removing the types as it loads them, so only syntax it can remove is
   // allowed (erasableSyntaxOnly) and imports name the .ts file.
@@ -23,5 +23,5 @@
     "checkJs": false,
     "skipLibCheck": true
   },
-  "include": ["server/**/*.ts", "tests/**/*.ts"]
+  "include": ["scripts/**/*.ts", "tests/**/*.ts"]
 }

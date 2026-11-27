@@ -21,6 +21,7 @@ import WelcomeFromLent from './components/WelcomeFromLent'
 import { settingsTransfer } from './settingsTransferBoot'
 import { appendPreviewToken, findProfilePhotoCandidate } from './profilePhoto'
 import { DEMO_CREDENTIALS, DEMO_SESSION_MODE, DEMO_SIGNATURE_LOGIN } from './demoAccount'
+import { onDemoSessionChange, readDemoSession } from './demoSession'
 import { isDesktopApp, isIosApp, isMacDesktopApp, isMicaDesktopApp, isNativeApp } from './desktopApp'
 import { syncWindowTheme } from './desktopWindowTheme'
 import { syncIosAppearance } from './iosApp'
@@ -100,6 +101,8 @@ import {
   clearGradesCache,
   detectScodocGroupSelection,
   findAdeGroupForScodoc,
+  findScodocTpInYear,
+  forgetPlanningTrees,
   getAccountInfo,
   getAdeTree,
   getAuthSession,
@@ -119,6 +122,9 @@ const DEBUG_MENU_ENABLED = import.meta.env.DEV
 // Dev only: a constant false in production builds, so the menu's chunk is
 // never emitted there.
 const DebugMenu = DEBUG_MENU_ENABLED ? lazy(() => import('./components/debug/DebugMenu')) : null
+// Dev only: outlines what the Rust gateway answered, and lists every route
+// asked (src/dev/BackendMarks.jsx).
+const BackendMarks = import.meta.env.DEV ? lazy(() => import('./dev/BackendMarks')) : null
 const ACCOUNT_MODAL_PROFILE_PHOTO_TIMEOUT_MS = 3000
 const ONBOARDING_COMPLETION_SCREEN_MS = 1000
 const LEGACY_SESSION_CACHE_KEY = 'l-ent:session-cache'
@@ -145,14 +151,16 @@ function clearSignedOutClientCaches() {
   clearNextClassCache()
 }
 
-// What the mail page keeps at the module's level for the signed-in student:
-// the mails read, their webmail signatures, a send waiting or held. Logging
-// out doesn't reload the page, so it goes on logout and whenever the
-// signed-in user changes.
-function forgetMailAccount() {
+// What the page keeps at the module's level for the signed-in student: the
+// mail page's (the mails read, their webmail signatures, a send waiting or
+// held) and the planning's trees asked this visit. Logging out doesn't
+// reload the page, so it goes on logout and whenever the signed-in user
+// changes.
+function forgetStudentMemory() {
   clearMailReadCache()
   clearMailSignatures()
   clearMailSends()
+  forgetPlanningTrees()
 }
 
 // Signed in to another university than the one the page runs for (the demo
@@ -759,8 +767,8 @@ function buildStoredTpSelection(program, year, td, tp, contextLabel) {
 // asks for the TP (year and TD already picked) rather than saving a TD-only
 // selection with an empty timetable. `forceChoice` (debug panel) asks even
 // when the TP is known.
-async function resolveDefaultSelectionTp(adeDefaultSelection, { tdAliases = [], tpAliases = [], forceChoice = false } = {}) {
-  const defaultSelection = await correctDefaultSelectionWithScodoc(adeDefaultSelection, tdAliases, tpAliases)
+async function resolveDefaultSelectionTp(adeDefaultSelection, { tdAliases = [], tpAliases = [], hints = [], forceChoice = false } = {}) {
+  const defaultSelection = await correctDefaultSelectionWithScodoc(adeDefaultSelection, tdAliases, tpAliases, hints)
   const keepDefault = { selection: defaultSelection }
   if (!defaultSelection?.tdResourceId || (defaultSelection.tpResourceId && !forceChoice)) {
     return keepDefault
@@ -796,33 +804,43 @@ async function resolveDefaultSelectionTp(adeDefaultSelection, { tdAliases = [], 
 }
 
 // ADE's default can name the wrong group: Rennes ADE puts a 2A2 MMI student
-// on "2B2-StratUX MMI" while ScoDoc says TD 2A, TP 2A2. When ScoDoc names a TP
-// the default doesn't match, ScoDoc wins if its TD exists under the default's
-// year and its TP under that TD; otherwise ADE's default stays.
-async function correctDefaultSelectionWithScodoc(defaultSelection, tdAliases, tpAliases) {
+// on "2B2-StratUX MMI" while ScoDoc says TD 2A, TP 2B1. When ScoDoc names a TP
+// the default doesn't match, ScoDoc wins: its TD under the default's year
+// and its TP under that TD; else its TP anywhere under the year, the folder
+// above it as its TD (ScoDoc's TD « 2A » is no folder of 2B1's in ADE,
+// « 2B MMI »: adeGroupMatch's findTpUnderYear). Found nowhere, ADE's
+// default stays. `hints`: ScoDoc's other groups (its parcours), for a TP
+// named alike in two of them.
+async function correctDefaultSelectionWithScodoc(defaultSelection, tdAliases, tpAliases, hints = []) {
   const isDefaultTpScodocs = tpAliases.some((alias) => selectionLabelsMatch(defaultSelection?.tpLabel, alias))
-  if (!defaultSelection?.yearResourceId || !defaultSelection.tpResourceId || !tpAliases.length || !tdAliases.length || isDefaultTpScodocs) {
+  if (!defaultSelection?.yearResourceId || !defaultSelection.tpResourceId || !tpAliases.length || isDefaultTpScodocs) {
     return defaultSelection
   }
+  const program = buildStoredSelectionOption(defaultSelection.programResourceId, defaultSelection.programLabel)
+  const year = buildStoredSelectionOption(defaultSelection.yearResourceId, defaultSelection.yearLabel)
 
   try {
-    const yearTreeResponse = await getAdeTree(defaultSelection.yearResourceId)
-    const td = findTpOptionByLabel(buildNextTpStepFromTree(yearTreeResponse?.tree).options, tdAliases)
-    if (!td?.resourceId) {
-      return defaultSelection
+    if (tdAliases.length) {
+      const yearTreeResponse = await getAdeTree(defaultSelection.yearResourceId)
+      const td = findTpOptionByLabel(buildNextTpStepFromTree(yearTreeResponse?.tree).options, tdAliases)
+      if (td?.resourceId) {
+        const tdTreeResponse = await getAdeTree(td.resourceId)
+        const tp = findTpOptionByLabel(buildNextTpStepFromTree(tdTreeResponse?.tree).options, tpAliases)
+        if (tp?.resourceId) {
+          return buildStoredTpSelection(program, year, td, tp, defaultSelection.contextLabel)
+        }
+      }
     }
 
-    const tdTreeResponse = await getAdeTree(td.resourceId)
-    const tp = findTpOptionByLabel(buildNextTpStepFromTree(tdTreeResponse?.tree).options, tpAliases)
-    if (!tp?.resourceId) {
+    const found = await findScodocTpInYear(defaultSelection.yearResourceId, tpAliases, { hints, current: defaultSelection.tpResourceId })
+    if (!found || String(found.tp.id) === String(defaultSelection.tpResourceId)) {
       return defaultSelection
     }
-
     return buildStoredTpSelection(
-      buildStoredSelectionOption(defaultSelection.programResourceId, defaultSelection.programLabel),
-      buildStoredSelectionOption(defaultSelection.yearResourceId, defaultSelection.yearLabel),
-      td,
-      tp,
+      program,
+      year,
+      buildTpSelectionOption(found.td, null, defaultSelection.contextLabel),
+      buildTpSelectionOption(found.tp, found.td, defaultSelection.contextLabel),
       defaultSelection.contextLabel,
     )
   } catch {
@@ -1138,7 +1156,7 @@ function App() {
         // Signed out here all the same: the server ended it already.
       }
       clearSignedOutClientCaches()
-      forgetMailAccount()
+      forgetStudentMemory()
       bindHistorySession(null)
       setActivePage('home')
       writeHistoryNav({ page: 'home' }, { replace: true })
@@ -1262,6 +1280,18 @@ function App() {
   // The server's answers: the session expired.
   const sessionUser = sessionState.authenticated ? sessionState.user : null
   useEffect(() => onSessionExpired(() => void signOutExpiredSession(sessionUser)), [signOutExpiredSession, sessionUser])
+
+  // Another tab signed in to the demo or out of it (its sign-in is the
+  // browser's, src/demoSession.js): a tab that shows an account follows,
+  // rather than show one account with another's answers. A tab signed out
+  // stays as it is (someone may be typing their login there).
+  const isShowingAccount = sessionState.authenticated && !sessionState.checking
+  useEffect(() => {
+    if (!isShowingAccount) return undefined
+    return onDemoSessionChange(() => {
+      if (Boolean(readDemoSession()) !== (sessionUser === DEMO_CREDENTIALS.username)) void refreshSession()
+    })
+  }, [isShowingAccount, sessionUser, refreshSession])
 
   useEffect(() => {
     clearLegacySensitiveClientCaches()
@@ -1488,6 +1518,7 @@ function App() {
           ? await resolveDefaultSelectionTp(treePayload.defaultSelection, {
             tdAliases: scodocGroupSelection?.tdAliases ?? [],
             tpAliases: scodocGroupSelection?.tpAliases ?? [],
+            hints: scodocGroupSelection?.labels ?? [],
             forceChoice: forceTpChoice,
           })
           : null
@@ -2005,29 +2036,33 @@ function App() {
     user: sessionState.user,
   })
   const gradesSupported = gradesFormation !== 'other'
+  // What the navigation is built from (navItems.js): the demo account's
+  // links go to the services themselves.
+  const isDemoAccount = sessionState.authenticated && sessionState.user === DEMO_CREDENTIALS.username
+  const navOptions = useMemo(() => ({ gradesSupported, demo: isDemoAccount }), [gradesSupported, isDemoAccount])
   const hasGradesPage = useMemo(
-    () => getMobileTabItems(establishment, { gradesSupported }).some((item) => item.page === 'grades'),
-    [establishment, gradesSupported],
+    () => getMobileTabItems(establishment, navOptions).some((item) => item.page === 'grades'),
+    [establishment, navOptions],
   )
   // The in-app planning page, on the same terms as its nav item
   // (features.planning): the planning service's links open it instead.
   const hasPlanningPage = useMemo(
-    () => getMobileTabItems(establishment, { gradesSupported }).some((item) => item.page === 'planning'),
-    [establishment, gradesSupported],
+    () => getMobileTabItems(establishment, navOptions).some((item) => item.page === 'planning'),
+    [establishment, navOptions],
   )
   // The in-app mail page (features.mail, mail.page in client.js): the
   // dashboard's mail card opens it, Réglages › Messagerie comes with it.
   const hasMailPage = useMemo(
-    () => getMobileTabItems(establishment, { gradesSupported }).some((item) => item.page === 'mail'),
-    [establishment, gradesSupported],
+    () => getMobileTabItems(establishment, navOptions).some((item) => item.page === 'mail'),
+    [establishment, navOptions],
   )
   // « Moodle » as a page of the app (the desktop app's, navItems.js):
   // Moodle's links and its tile open it instead of the site.
   const hasMoodlePage = useMemo(
-    () => getMobileTabItems(establishment, { gradesSupported }).some((item) => item.page === 'moodle'),
-    [establishment, gradesSupported],
+    () => getMobileTabItems(establishment, navOptions).some((item) => item.page === 'moodle'),
+    [establishment, navOptions],
   )
-  const hasMobileTabBar =useMemo(() => getMobileTabItems(establishment, { gradesSupported }).length > 0, [establishment, gradesSupported])
+  const hasMobileTabBar =useMemo(() => getMobileTabItems(establishment, navOptions).length > 0, [establishment, navOptions])
   // « Nouveautés » about « Mes notes » only reach students who have it: a
   // school with the page and a relevé confirmed BUT (not while unknown, so
   // the pill doesn't come and go). Those about the Planning page, students
@@ -2049,23 +2084,23 @@ function App() {
   // Falls back to « Accueil » if the grades item goes away (establishment
   // without grade widgets, feature switched off, a relevé that isn't BUT).
   const isGradesPage = useMemo(
-    () => activePage === 'grades' && getMobileTabItems(establishment, { gradesSupported }).some((item) => item.page === 'grades'),
-    [activePage, establishment, gradesSupported],
+    () => activePage === 'grades' && getMobileTabItems(establishment, navOptions).some((item) => item.page === 'grades'),
+    [activePage, establishment, navOptions],
   )
   // Likewise for the planning page (features.planning).
   const isPlanningPage = useMemo(
-    () => activePage === 'planning' && getMobileTabItems(establishment, { gradesSupported }).some((item) => item.page === 'planning'),
-    [activePage, establishment, gradesSupported],
+    () => activePage === 'planning' && getMobileTabItems(establishment, navOptions).some((item) => item.page === 'planning'),
+    [activePage, establishment, navOptions],
   )
   // Likewise for the mail page (features.mail).
   const isMailPage = useMemo(
-    () => activePage === 'mail' && getMobileTabItems(establishment, { gradesSupported }).some((item) => item.page === 'mail'),
-    [activePage, establishment, gradesSupported],
+    () => activePage === 'mail' && getMobileTabItems(establishment, navOptions).some((item) => item.page === 'mail'),
+    [activePage, establishment, navOptions],
   )
   // Likewise for « Assiduité » (the ScoDoc relevé's absences, with « Mes notes »).
   const isAssiduityPage = useMemo(
-    () => activePage === 'assiduity' && getMobileTabItems(establishment, { gradesSupported }).some((item) => item.page === 'assiduity'),
-    [activePage, establishment, gradesSupported],
+    () => activePage === 'assiduity' && getMobileTabItems(establishment, navOptions).some((item) => item.page === 'assiduity'),
+    [activePage, establishment, navOptions],
   )
   // « Accueil » (HomeDraftPage), every university: the page shown when no
   // other is.
@@ -2200,8 +2235,8 @@ function App() {
   // native tab's (src/keptPages.js), for this account and the pages there
   // are: signed out, or with other pages, the hidden ones go.
   const pagesOnOffer = useMemo(
-    () => ['home', ...getMobileTabItems(establishment, { gradesSupported }).map((item) => item.page).filter(Boolean)],
-    [establishment, gradesSupported],
+    () => ['home', ...getMobileTabItems(establishment, navOptions).map((item) => item.page).filter(Boolean)],
+    [establishment, navOptions],
   )
   const { pages: keptPages, leave: leaveKeptPage } = useKeptPages({
     owner: isIosApp() && sessionState.authenticated ? `${universityConfig.id}:${sessionState.user ?? ''}` : null,
@@ -2316,8 +2351,8 @@ function App() {
   // the university has no Moodle. The apps': « Toutes les applications »,
   // the drawer of the app list, which opens on each new request.
   const moodleNavItem = useMemo(
-    () => buildNavItems(establishment, { gradesSupported }).find((item) => item.id === 'moodle') ?? null,
-    [establishment, gradesSupported],
+    () => buildNavItems(establishment, navOptions).find((item) => item.id === 'moodle') ?? null,
+    [establishment, navOptions],
   )
   const handleOpenMoodleFromIcon = useMemo(() => {
     if (!moodleNavItem) return null
@@ -2345,8 +2380,8 @@ function App() {
   // own, there only where Moodle is a page.
   const isSignedIn = sessionState.authenticated && !sessionState.checking
   const desktopMenuPages = useMemo(
-    () => (isSignedIn ? buildNavItems(establishment, { gradesSupported }).filter((item) => item.page).map((item) => ({ id: item.page, label: item.label })) : []),
-    [isSignedIn, establishment, gradesSupported],
+    () => (isSignedIn ? buildNavItems(establishment, navOptions).filter((item) => item.page).map((item) => ({ id: item.page, label: item.label })) : []),
+    [isSignedIn, establishment, navOptions],
   )
   useEffect(() => {
     if (!isMacDesktopApp()) return
@@ -2434,7 +2469,7 @@ function App() {
   }, [sessionState.user])
   // Réglages › Apparence offers it where there's an « Assiduité » page;
   // its words say whether Moodle gives way.
-  const tabBarShortcuts = useMemo(() => getMobileTabItems(establishment, { gradesSupported }), [establishment, gradesSupported])
+  const tabBarShortcuts = useMemo(() => getMobileTabItems(establishment, navOptions), [establishment, navOptions])
   const hasAssiduityPage = tabBarShortcuts.some((item) => item.page === 'assiduity')
   const hasMoodleTab = tabBarShortcuts.some((item) => item.id === 'moodle')
 
@@ -2928,7 +2963,7 @@ function App() {
       // No reload follows: the mails read, the signatures, any send and the
       // history's mail entries must not carry over to whoever signs in
       // next in this tab.
-      forgetMailAccount()
+      forgetStudentMemory()
       bindHistorySession(null)
       setActivePage('home')
       writeHistoryNav({ page: 'home' }, { replace: true })
@@ -2997,7 +3032,7 @@ function App() {
   // an effect: the mail page reads its entry and the cache in its own first
   // render, which comes before any effect of this one. Idempotent.
   if (sessionState.authenticated && sessionState.user && bindHistorySession(sessionState.user)) {
-    forgetMailAccount()
+    forgetStudentMemory()
     keepMailFor(sessionState.user)
   }
 
@@ -3152,6 +3187,7 @@ function App() {
             showUniversityLogo={showUniversityLogo}
             logoSource={logoSource}
             gradesSupported={gradesSupported}
+            demoAccount={isDemoAccount}
             activePage={shownPage}
             onNavigatePage={handleNavigatePage}
             nextClassSelection={hasPlanningPage ? selectedTp : null}
@@ -3270,7 +3306,6 @@ function App() {
               <MoodlePage
                 target={pendingMoodleTarget}
                 onTargetHandled={clearPendingMoodleTarget}
-                signsInOnMoodle={sessionState.user === DEMO_CREDENTIALS.username}
                 onHistoryChange={setMoodleHistory}
               />
             ) : null}
@@ -3298,6 +3333,7 @@ function App() {
           <MobileTabBar
             establishment={establishment}
             gradesSupported={gradesSupported}
+            demoAccount={isDemoAccount}
             activePage={shownPage}
             showAssiduity={showAssiduityTab}
             onNavigatePage={handleNavigatePage}
@@ -3379,6 +3415,12 @@ function App() {
         onUpdateAvailable={() => setHasPendingUpdate(true)}
         onApplyHandlerChange={(fn) => { applyUpdateRef.current = fn }}
       />
+
+      {BackendMarks ? (
+        <Suspense fallback={null}>
+          <BackendMarks />
+        </Suspense>
+      ) : null}
 
       {DebugMenu ? (
         <Suspense fallback={null}>

@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom'
 import { useSheetDrag } from '../useSheetDrag'
 import CloseButton from './CloseButton'
 import PlanningDirectoryContent from './PlanningDirectoryContent'
+import { DIRECTORY_TITLE } from '../usePlanningDirectory'
 
 // « Salles et personnels » on a phone: a sheet over the page as the
 // planning's others (PlanningShareSheet), tall from the start (its list
@@ -52,7 +53,7 @@ function PlanningDirectorySheet({ onClose, ...contentProps }) {
                 <div className="relative">
                   <span className="gd-grabber relative mx-auto hidden h-[4px] w-9 rounded-full bg-text-30 max-sm:block max-sm:translate-y-2" aria-hidden="true" />
                   <div className="flex items-center gap-3 pt-4 max-sm:pt-[18px]">
-                    <h2 id={titleId} className="m-0 min-w-0 flex-1 truncate font-body text-[16px] font-semibold leading-tight text-text">Salles et personnels</h2>
+                    <h2 id={titleId} className="m-0 min-w-0 flex-1 truncate font-body text-[16px] font-semibold leading-tight text-text">{DIRECTORY_TITLE}</h2>
                     <CloseButton glass onClick={dismiss} />
                   </div>
                 </div>

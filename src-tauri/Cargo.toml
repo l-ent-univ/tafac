@@ -18,10 +18,7 @@ tauri-build = { version = "2", features = [] }
 [dependencies]
 # unstable: a second web view in the window (src/moodle.rs, Window::add_child).
 tauri = { version = "2", features = ["macos-private-api", "unstable", "webview-data-url"] }
-tokio = { version = "1", features = ["net", "time", "io-util", "sync"] }
-hyper = { version = "1", features = ["client", "http1"] }
-hyper-util = { version = "0.1", features = ["tokio"] }
-http-body-util = "0.1"
+tokio = { version = "1", features = ["time", "sync"] }
 bytes = "1"
 http = "1"
 cookie = "0.18"
@@ -29,6 +26,10 @@ serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 rand = "0.8"
 tauri-plugin-opener = "2"
+# The app's server (src/bridge.rs): the page's API through tonAPI, the
+# page's files, the remote settings. Without its HTTP server, which is
+# tafac.fr's.
+tafac-gateway = { path = "../back/crates/tafac-gateway", default-features = false, features = ["app"] }
 
 # Desktop only: iOS has one window, and its updates are the App Store's.
 [target.'cfg(not(any(target_os = "ios", target_os = "android")))'.dependencies]
@@ -70,9 +71,7 @@ version = "3"
 default-features = false
 features = ["apple-native"]
 
-# iOS: the phone's time zone, for the Node inside the app (src/node.rs).
 [target.'cfg(target_os = "ios")'.dependencies]
-iana-time-zone = "0.1"
 # The web view below the status bar (src/ios_chrome.rs).
 objc2 = "0.6"
 # The system's tab bar under the page (plugins/tabbar, in Swift).
@@ -114,6 +113,10 @@ features = ["windows-native"]
 version = "3"
 default-features = false
 features = ["sync-secret-service"]
+
+# The gateway's made-up campus, for the bridge's tests.
+[dev-dependencies]
+tafac-gateway = { path = "../back/crates/tafac-gateway", default-features = false, features = ["testing"] }
 
 [profile.release]
 codegen-units = 1

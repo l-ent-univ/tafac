@@ -4,6 +4,7 @@ import {
   getGradesDepartmentMessage,
   getRequestErrorKind,
   getSemesterGrades,
+  onGradesRefreshed,
   peekGrades,
   peekSemesterGrades,
   prefetchSemesterGrades,
@@ -79,6 +80,12 @@ export function useScodocReleve() {
 
     return () => { cancelled = true }
   }, [reloadNonce, visit])
+
+  // The report shown was an old one the server gave while it asked ScoDoc
+  // again: the one that came replaces it (src/entApi.js).
+  useEffect(() => onGradesRefreshed((data) => {
+    setBase({ status: 'ok', payload: data.grades, error: null, fromCache: false })
+  }), [])
 
   const basePayload = base.payload
   const semesters = useMemo(() => listGradesSemesters(basePayload?.semestres), [basePayload])

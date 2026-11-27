@@ -5,8 +5,7 @@
   },
   "bundle": {
     "resources": {
-      "../desktop-build/server/": "server/"
-    },
-    "externalBin": ["binaries/node"]
+      "../dist/": "dist/"
+    }
   }
 }

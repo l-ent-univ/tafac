@@ -3,13 +3,26 @@ import universityConfig from '@university'
 import { getAdeDirectory } from './entApi'
 import { prepareDirectory } from './planningDirectory'
 
-// ADE's rooms and staff can be looked up; other planning services
-// (planning.providerName, ADE by default) don't offer it yet.
-export const HAS_PLANNING_DIRECTORY = (universityConfig.planning?.providerName ?? 'ADE') === 'ADE'
+// What the planning's directory offers: ADE's rooms, staff and groups,
+// listed under the student's site; or what the university's planning says
+// (planning.directory: its `kinds`, and `bySite: false` for a tree that
+// isn't by site, listed whole). None for another planning service.
+const DIRECTORY_KINDS = ['room', 'person', 'group']
+export const PLANNING_DIRECTORY = (() => {
+  const set = universityConfig.planning?.directory
+  if (set) {
+    const kinds = DIRECTORY_KINDS.filter((kind) => set.kinds?.includes(kind))
+    return kinds.length ? { kinds, bySite: set.bySite !== false } : null
+  }
+  return (universityConfig.planning?.providerName ?? 'ADE') === 'ADE' ? { kinds: DIRECTORY_KINDS, bySite: true } : null
+})()
+export const HAS_PLANNING_DIRECTORY = PLANNING_DIRECTORY !== null
+// Its name: « Salles et personnels », « Salles » with rooms alone.
+export const DIRECTORY_TITLE = PLANNING_DIRECTORY?.kinds.length === 1 && PLANNING_DIRECTORY.kinds[0] === 'room' ? 'Salles' : 'Salles et personnels'
 
 // « Salles et personnels »' entries (prepareDirectory), asked of
-// /ade/directory once the panel first opens and kept for the visit, by
-// account (~600 KB at Rennes: not stored on the device). → { status:
+// the planning's trees once the panel first opens and kept for the visit,
+// by account (a few MB at Rennes: not stored on the device). → { status:
 // 'idle' | 'loading' | 'loaded' | 'unsupported' | 'unavailable', entries,
 // retry }.
 const loaded = new Map()
@@ -17,7 +30,7 @@ const pending = new Map()
 
 function askDirectory(user) {
   if (pending.has(user)) return pending.get(user)
-  const promise = getAdeDirectory()
+  const promise = getAdeDirectory(PLANNING_DIRECTORY?.kinds)
     .then((data) => {
       if (!data?.authenticated) throw new Error('Connexion requise')
       const entry = data.supported === false

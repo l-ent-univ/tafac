@@ -38,8 +38,7 @@ export function isServiceHref(href, { serviceOrigin, base, launchPath = '', casO
   return parseUrl(wrapped)?.origin === serviceOrigin
 }
 
-// A portal app's own `href` is often the ENT's link to it (/__ent_proxy/…):
-// where it really goes is its resolved launch link, so both are checked.
+// `resolvedHref`: another address the app is known to lead to, checked too.
 export function isServiceApp(application, { resolvedHref = '', ...options } = {}) {
   if (!application) return false
   return [application.href, resolvedHref].some((href) => isServiceHref(href, options))

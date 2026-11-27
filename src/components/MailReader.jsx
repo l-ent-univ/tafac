@@ -41,7 +41,7 @@ const SECONDARY_BUTTON_CLASSES = 'material inline-flex shrink-0 items-center gap
 // lets in the mail's inline styles, data: images and the part proxy's
 // (inline cid: images); remote images only once the student asks. Not 'self'
 // for images: same-origin, the frame's requests carry the student's cookies,
-// and a path such as /__ent_proxy/… (forwarded to the ENT with the session)
+// and a path such as /__ent_auth/launch (a service opened with the session)
 // must not be reachable from a mail's CSS or markup. A path in a source
 // matches that path exactly, whatever its query.
 const MAIL_PART_PATH = '/__ent_auth/mail/part'

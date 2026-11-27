@@ -1,10 +1,11 @@
-// The app's own cookie jar for its local server's cookies (the encrypted
-// session cookie, lent_session).
+// The app's own cookie jar for its server's cookies (the encrypted session
+// cookie, __Host-lent_session, which the gateway writes and reads).
 //
 // The window is on the tafac:// scheme, and WebKit (macOS) does not keep
 // cookies that a custom scheme's responses set. So the bridge keeps them:
-// it takes Set-Cookie off each response and sends them back as Cookie on the
-// next request. The page never sees them (not even through document.cookie).
+// it takes Set-Cookie off each answer and hands the session's back to the
+// gateway with the next request. The page never sees them (not even through
+// document.cookie).
 //
 // One site, one user: cookies are kept by name only. The ones with an
 // expiry are saved to the app's data folder, so the student stays signed in
@@ -45,21 +46,12 @@ impl CookieJar {
         Self { path, cookies: Mutex::new(cookies) }
     }
 
-    // The Cookie header for the next request, without the expired ones.
-    pub fn header(&self) -> Option<String> {
-        let mut cookies = self.cookies.lock().unwrap();
-        let current = now();
-        cookies.retain(|_, cookie| cookie.expires_at.map_or(true, |expiry| expiry > current));
-        if cookies.is_empty() {
-            return None;
-        }
-        Some(
-            cookies
-                .iter()
-                .map(|(name, cookie)| format!("{name}={}", cookie.value))
-                .collect::<Vec<_>>()
-                .join("; "),
-        )
+    // One cookie's value, unless it has expired: the server's session
+    // cookie, for what the app answers itself (bridge.rs).
+    pub fn get(&self, name: &str) -> Option<String> {
+        let cookies = self.cookies.lock().unwrap();
+        let cookie = cookies.get(name)?;
+        cookie.expires_at.map_or(true, |expiry| expiry > now()).then(|| cookie.value.clone())
     }
 
     // A response's Set-Cookie headers: stored, replaced, or cleared (empty

@@ -131,13 +131,13 @@ jobs:
           chmod 600 "$HOME/.private_keys/AuthKey_$APPLE_API_KEY_ID.p8"
           echo "APPLE_API_KEY_PATH=$HOME/.private_keys/AuthKey_$APPLE_API_KEY_ID.p8" >> "$GITHUB_ENV"
 
-      # `npm run ios:build` prepares the server for the Node inside the app
-      # (scripts/ios-prepare.mjs), then builds, signs and exports the .ipa.
+      # `npm run ios:build` builds the page (which the app carries), then
+      # builds, signs and exports the .ipa.
       - name: Build and sign the app
         env:
           APPLE_API_KEY: ${{ secrets.APPLE_API_KEY_ID }}
           APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
-          # Anonymous statistics (src-tauri/src/node.rs): PostHog's public
+          # Anonymous statistics (src-tauri/src/bridge.rs): PostHog's public
           # project key, as tafac.fr's. Unset, the app sends nothing.
           TAFAC_POSTHOG_PROJECT_KEY: ${{ secrets.POSTHOG_PROJECT_KEY }}
         run: |

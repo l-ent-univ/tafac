@@ -1,49 +1,11 @@
 import assert from 'node:assert/strict'
-import { chmod, mkdtemp, readFile, rm, utimes, writeFile } from 'node:fs/promises'
-import { tmpdir } from 'node:os'
-import path from 'node:path'
-import process from 'node:process'
+import { APP_ICON_COLOR_MODES, APP_ICON_CONCEPTS, APP_ICON_HUES, APP_ICON_RULES, APP_ICON_STYLES, GENERIC_CONCEPT, MAX_REQUEST_SERVICES, assignAppIcon, hashString, isValidAppIconEntry, matchAppIcon, pickAppColor, resolveAppIconTheme, sanitizeAppIconRequest, toIconifyName } from '../src/appIconPicks.js'
+import { readFile } from 'node:fs/promises'
 import test from 'node:test'
-import {
-  APP_ICON_COLOR_MODES,
-  APP_ICON_CONCEPTS,
-  APP_ICON_HUES,
-  APP_ICON_RULES,
-  APP_ICON_STYLES,
-  GENERIC_CONCEPT,
-  MAX_REQUEST_SERVICES,
-  MAX_STORED_SERVICES,
-  assignAppIcon,
-  createAppIconStore,
-  hashString,
-  isValidAppIconEntry,
-  matchAppIcon,
-  pickAppColor,
-  resolveAppIconTheme,
-  sanitizeAppIconRequest,
-  toIconifyName,
-} from '../server/appIcons.js'
-import { createEntAuthApp } from '../server/entAuthApp.js'
-import { loadServerConfig } from '../universities/index.js'
-
-const silentLogger = { warn() {} }
-
-async function withTempDir(run) {
-  const dir = await mkdtemp(path.join(tmpdir(), 'tafac-app-icons-'))
-  try {
-    return await run(dir)
-  } finally {
-    await chmod(dir, 0o700).catch(() => {})
-    await rm(dir, { recursive: true, force: true })
-  }
-}
+import { buildIconData, buildIconFixture, outputPath } from '../scripts/gateway-data.mjs'
 
 function service(id, title, extra = {}) {
   return { id, title, description: '', category: '', ...extra }
-}
-
-async function readStoreFile(dir, universityId = 'univ-test') {
-  return JSON.parse(await readFile(path.join(dir, 'app-icons', `${universityId}.json`), 'utf8'))
 }
 
 // --- Keyword matching --------------------------------------------------------
@@ -250,185 +212,45 @@ test('sanitizeAppIconRequest caps the number of services', () => {
 
 // --- Store -----------------------------------------------------------------------
 
-test('the store writes first picks and a restarted server reads them back', () => withTempDir(async (dir) => {
-  const services = [service('demo-messagerie', 'Messagerie'), service('demo-moodle', 'Moodle')]
-  const first = await createAppIconStore({ universityId: 'univ-test', dataDir: dir, logger: silentLogger }).resolve(services)
-
-  assert.equal(first['demo-messagerie'].icon, 'mail')
-  assert.equal(first['demo-moodle'].icon, 'moodle')
-  assert.notEqual(first['demo-messagerie'].color, first['demo-moodle'].color)
-
-  const file = await readStoreFile(dir)
-  assert.equal(file.version, 1)
-  assert.equal(file.university, 'univ-test')
-  assert.equal(file.services['demo-moodle'].title, 'Moodle')
-  assert.equal(file.services['demo-moodle'].icon, 'moodle')
-
-  // A new process (fresh store) answers from the file, whatever order the
-  // services come in.
-  const restarted = createAppIconStore({ universityId: 'univ-test', dataDir: dir, logger: silentLogger })
-  assert.deepEqual(await restarted.resolve([...services].reverse()), first)
-}))
-
-test('stored picks survive a change of keywords or title', () => withTempDir(async (dir) => {
-  const store = createAppIconStore({ universityId: 'univ-test', dataDir: dir, logger: silentLogger })
-  // An older keyword list picked another icon: it's kept.
-  await store.resolve([service('demo-annuaire', 'Annuaire')])
-  const filePath = path.join(dir, 'app-icons', 'univ-test.json')
-  const file = await readStoreFile(dir)
-  file.services['demo-annuaire'] = { ...file.services['demo-annuaire'], icon: 'ph:books-duotone', color: 'teal' }
-  await writeFile(filePath, JSON.stringify(file))
-  await utimes(filePath, new Date(), new Date(Date.now() + 5000))
-
-  const result = await store.resolve([service('demo-annuaire', 'Annuaire renamed'), service('demo-wifi', 'Wifi')])
-  assert.deepEqual(result['demo-annuaire'], { icon: 'ph:books-duotone', color: 'teal' })
-  assert.equal(result['demo-wifi'].icon, 'wifi')
-  assert.equal((await readStoreFile(dir)).services['demo-annuaire'].title, 'Annuaire')
-}))
-
-test('a brand logo replaces a stored concept but not a pinned icon', () => withTempDir(async (dir) => {
-  const store = createAppIconStore({ universityId: 'univ-test', dataDir: dir, logger: silentLogger })
-  await store.resolve([service('demo-moodle', 'Moodle'), service('pinned-moodle', 'Moodle')])
-  const filePath = path.join(dir, 'app-icons', 'univ-test.json')
-  const file = await readStoreFile(dir)
-  // Picked as a course before Moodle had its logo, and an admin pin.
-  file.services['demo-moodle'] = { ...file.services['demo-moodle'], icon: 'course', color: 'pink' }
-  file.services['pinned-moodle'] = { ...file.services['pinned-moodle'], icon: 'mdi:school', color: 'teal' }
-  await writeFile(filePath, JSON.stringify(file))
-  await utimes(filePath, new Date(), new Date(Date.now() + 5000))
-
-  const result = await store.resolve([service('demo-moodle', 'Moodle'), service('pinned-moodle', 'Moodle')])
-  assert.deepEqual(result['demo-moodle'], { icon: 'moodle', color: 'pink' })
-  assert.deepEqual(result['pinned-moodle'], { icon: 'mdi:school', color: 'teal' })
-}))
-
-test('deleting an entry from the file lets the server pick it again', () => withTempDir(async (dir) => {
-  const store = createAppIconStore({ universityId: 'univ-test', dataDir: dir, logger: silentLogger })
-  await store.resolve([service('demo-moodle', 'Moodle'), service('demo-annuaire', 'Annuaire')])
-  const filePath = path.join(dir, 'app-icons', 'univ-test.json')
-  const file = await readStoreFile(dir)
-  delete file.services['demo-moodle']
-  file.services['demo-annuaire'].color = 'not-a-colour'
-  await writeFile(filePath, JSON.stringify(file))
-  await utimes(filePath, new Date(), new Date(Date.now() + 5000))
-
-  const result = await store.resolve([service('demo-moodle', 'Moodle'), service('demo-annuaire', 'Annuaire')])
-  assert.equal(result['demo-moodle'].icon, 'moodle')
-  // Invalid entries are dropped on load and re-picked.
-  assert.ok(APP_ICON_HUES.includes(result['demo-annuaire'].color))
-  assert.ok((await readStoreFile(dir)).services['demo-moodle'])
-}))
-
-test('remember: false answers without writing', () => withTempDir(async (dir) => {
-  const store = createAppIconStore({ universityId: 'univ-test', dataDir: dir, logger: silentLogger })
-  await store.resolve([service('kept', 'Messagerie')])
-  const result = await store.resolve([service('kept', 'Other'), service('transient', 'Wifi')], { remember: false })
-
-  assert.equal(result.transient.icon, 'wifi')
-  assert.equal(result.kept.icon, 'mail')
-  assert.deepEqual(Object.keys((await readStoreFile(dir)).services), ['kept'])
-}))
-
-test('concurrent first visits agree on the same picks', () => withTempDir(async (dir) => {
-  const store = createAppIconStore({ universityId: 'univ-test', dataDir: dir, logger: silentLogger })
-  const services = Array.from({ length: 10 }, (_, index) => service(`svc-${index}`, `Service ${index}`))
-  const [a, b] = await Promise.all([store.resolve(services), store.resolve([...services].reverse())])
-  assert.deepEqual(a, b)
-}))
-
-test('an unwritable directory degrades to memory, deterministically', { skip: process.getuid?.() === 0 }, () => withTempDir(async (dir) => {
-  await chmod(dir, 0o500)
-  const services = [service('demo-moodle', 'Moodle'), service('demo-messagerie', 'Messagerie')]
-  const store = createAppIconStore({ universityId: 'univ-test', dataDir: dir, logger: silentLogger })
-  const first = await store.resolve(services)
-
-  assert.equal(store.persistent, false)
-  assert.equal(first['demo-moodle'].icon, 'moodle')
-  assert.deepEqual(await store.resolve(services), first)
-  // Another process in the same situation picks the same tiles.
-  const other = createAppIconStore({ universityId: 'univ-test', dataDir: dir, logger: silentLogger })
-  assert.deepEqual(await other.resolve(services), first)
-}))
-
-test('a corrupt file is left alone and the store keeps working in memory', () => withTempDir(async (dir) => {
-  const filePath = path.join(dir, 'app-icons', 'univ-test.json')
-  await createAppIconStore({ universityId: 'univ-test', dataDir: dir, logger: silentLogger })
-    .resolve([service('seed', 'Seed')])
-  await writeFile(filePath, '{ broken')
-
-  const store = createAppIconStore({ universityId: 'univ-test', dataDir: dir, logger: silentLogger })
-  const result = await store.resolve([service('demo-moodle', 'Moodle')])
-  assert.equal(result['demo-moodle'].icon, 'moodle')
-  assert.equal(store.persistent, false)
-  assert.equal(await readFile(filePath, 'utf8'), '{ broken')
-}))
-
-test('past MAX_STORED_SERVICES, new services are answered but not stored', () => withTempDir(async (dir) => {
-  const store = createAppIconStore({ universityId: 'univ-test', dataDir: dir, logger: silentLogger })
-  for (let start = 0; start < MAX_STORED_SERVICES; start += MAX_REQUEST_SERVICES) {
-    const count = Math.min(MAX_REQUEST_SERVICES, MAX_STORED_SERVICES - start)
-    await store.resolve(Array.from({ length: count }, (_, index) => service(`s${start + index}`, 'Service')))
-  }
-
-  const result = await store.resolve([service('one-too-many', 'Wifi')])
-  assert.equal(result['one-too-many'].icon, 'wifi')
-  const file = await readStoreFile(dir)
-  assert.equal(Object.keys(file.services).length, MAX_STORED_SERVICES)
-  assert.equal(file.services['one-too-many'], undefined)
-}))
-
 // --- Route -----------------------------------------------------------------------
 
-test('POST /__ent_auth/app-icons needs a session and stores only demo services for demo sessions', () => withTempDir(async (dir) => {
-  const config = await loadServerConfig('univ-exemple')
-  const app = createEntAuthApp(config, {
-    analytics: {},
-    appIcons: { dataDir: dir },
-    session: { secret: 'a'.repeat(44), production: false },
-  })
-  const server = app.listen(0)
-  const base = `http://127.0.0.1:${server.address().port}`
+// --- The gateway's copy ----------------------------------------------------------
+// The gateway (back/crates/tafac-gateway, own/icons.rs) answers this route
+// for the sessions it holds, from a copy of these lists that
+// scripts/gateway-data.mjs writes, and holds itself to the fixture below.
+// Both fail here when a list or a pick changes and the script wasn't run
+// again (node scripts/gateway-data.mjs).
 
-  try {
-    const post = (pathname, body, cookie = '') => fetch(`${base}${pathname}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', ...(cookie ? { Cookie: cookie } : {}) },
-      body: JSON.stringify(body),
-    })
-
-    const anonymous = await post('/__ent_auth/app-icons', { services: [] })
-    assert.equal(anonymous.status, 401)
-
-    const login = await post('/__ent_auth/login', { username: 'demo@tafac.fr', password: 'tafac-demo' })
-    assert.equal(login.status, 200)
-    const cookie = login.headers.getSetCookie().map((value) => value.split(';')[0]).join('; ')
-
-    const invalid = await post('/__ent_auth/app-icons', { services: 'nope' }, cookie)
-    assert.equal(invalid.status, 400)
-
-    const response = await post('/__ent_auth/app-icons', {
-      services: [
-        // The server uses its own title for demo services.
-        { id: 'demo-moodle', title: 'Sport' },
-        { id: 'made-up', title: 'Wifi' },
-      ],
-    }, cookie)
-    assert.equal(response.status, 200)
-    const payload = await response.json()
-    assert.equal(payload.ok, true)
-    // univ-exemple draws phosphor-duotone icons on soft tiles.
-    assert.deepEqual(payload.palette, APP_ICON_COLOR_MODES.soft)
-    // Moodle gets its own logo (a brand: same mark in every style).
-    assert.equal(payload.icons['demo-moodle'].icon, 'devicon-plain:moodle')
-    assert.equal(payload.icons['made-up'].icon, 'ph:wifi-high-duotone')
-
-    const file = await readStoreFile(dir, 'univ-exemple')
-    assert.deepEqual(Object.keys(file.services), ['demo-moodle'])
-    // The file keeps the concept: switching style later restyles the tile.
-    assert.equal(file.services['demo-moodle'].icon, 'moodle')
-    assert.equal(file.services['demo-moodle'].title, 'Moodle')
-  } finally {
-    await new Promise((resolve) => server.close(resolve))
-    await app.locals.analytics.shutdown?.()
+// A fold table's code points, those this Node's Unicode knows: a newer
+// Node's table may name marks an older one hasn't heard of.
+function foldedByCode(fold) {
+  const assigned = /\p{Assigned}/u
+  const byCode = new Map()
+  for (const [first, last, folded] of fold) {
+    for (let code = first; code <= last; code += 1) {
+      if (assigned.test(String.fromCodePoint(code))) byCode.set(code, folded)
+    }
   }
-}))
+  return byCode
+}
+
+test('the gateway picks from the lists the JS has', async () => {
+  const written = JSON.parse(await readFile(outputPath('back/crates/tafac-gateway/src/own/icons.json'), 'utf8'))
+  const made = await buildIconData()
+  assert.deepEqual({ ...written, fold: null }, { ...made, fold: null })
+  assert.deepEqual(foldedByCode(written.fold), foldedByCode(made.fold))
+})
+
+// The day a store wrote down, in the files of the fixture's routes.
+function withoutToday(fixture) {
+  const routes = fixture.routes.map((route) => ({
+    ...route,
+    requests: route.requests.map((request) => ({ ...request, file: request.file?.replaceAll(`"assignedAt": "${fixture.today}"`, '"assignedAt": "today"') ?? null })),
+  }))
+  return { ...fixture, today: null, routes }
+}
+
+test('the JS picks what the fixture the gateway holds to says', async () => {
+  const written = JSON.parse(await readFile(outputPath('tests/fixtures/app-icon-picks.json'), 'utf8'))
+  assert.deepEqual(withoutToday(written), withoutToday(await buildIconFixture()))
+})

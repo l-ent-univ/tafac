@@ -2,8 +2,10 @@
 
 The iOS app is the desktop app's code (`src-tauri`, `docs/DESKTOP.md`) built
 for a phone: the same page, in its phone layout, with the server running on
-the phone. The login and every request to the university go from the phone
-straight to the university: credentials never pass through tafac.fr.
+the phone, inside the app: the gateway (`back/crates/tafac-gateway`, Rust,
+tafac.fr's own). No Node, no JavaScript but the page's. The login and every
+request to the university go from the phone straight to the university:
+credentials never pass through tafac.fr.
 
 It runs in the simulator, and was installed and started on a phone once
 (« Checked », below).
@@ -16,11 +18,13 @@ web view (tafac://localhost/)        src-tauri/src/ios.rs
    ▼
 bridge (Rust), as on the desktop     src-tauri/src/bridge.rs
    │  session cookie (jar.rs), kept login (signin.rs)
-   ▼  Unix socket in the app's own folder, no TCP port
-server.js, unchanged                 desktop/ios.mjs
-   │  inside the app's process, on Node 18  src-tauri/src/node.rs
+   ├─ the page's API: the gateway, in the app's own process
+   │    signs in, holds the session, answers every route
+   │    through tonAPI                    back/crates/tafac-gateway
+   ├─ anything else: the page and its built files, from the app's
+   │    resources (dist/), as tafac.fr's server sends them
    ▼
-the university (CAS, ADE, webmail…)
+the university (CAS, portal, Moodle, ScoDoc, ADE, webmail…)
 ```
 
 What is shared with the desktop app: the bridge, the cookie jar, the kept
@@ -30,50 +34,62 @@ desktop's (what `main.rs` was), `ios.rs` the phone's. What else the desktop
 adds around the page is not built for iOS: menu bar, updater, saved
 passwords, window state.
 
-## Node inside the app
+## No Node
 
-An iOS app can't start another program, so there is no Node process beside
-it. Node runs in the app's own process, on a thread
-(`src-tauri/src/node.rs`): [nodejs-mobile](https://github.com/nodejs-mobile/nodejs-mobile)'s
-`NodeMobile.xcframework`, linked and embedded by the Xcode project
-(`src-tauri/gen/apple/project.yml`).
+Until 27 November 2026 the app ran Node inside itself: nodejs-mobile's
+Node 18 (no JIT, no ICU), on a thread of the app's process, with a copy of
+`server.js` rewritten for it and a compatibility layer (`fetch`, `Intl`…),
+behind a Unix socket in the app's folder. The gateway now answers every
+route of the page's API, and the page's files too: that Node, its framework
+(55 MB on a phone), the server's copy, `scripts/ios-prepare.mjs` and
+`desktop/ios.mjs`/`iosRuntime.mjs` are gone. What the server did there and
+where it is now (`back/README.md`, « The apps »):
 
-It is the only Node there is for iOS, and it is **Node 18.20.4, without a
-JIT** (iOS forbids one) **and without ICU**. The server is written for Node
-24. So `scripts/ios-prepare.mjs` makes a copy of the server for it
-(`desktop-build/ios/server/`, the app's `server/` resource):
+| What Node did | Now |
+|---|---|
+| the page's API | the gateway (`Gateway::answer`), as on tafac.fr |
+| the page and its files (`dist/`) | the gateway's `Site` (`own/site.rs`), from `dist/` among the app's resources (`tauri.ios.conf.json`) |
+| the list of universities, with the remote settings | the gateway (`own/universities.rs`, `own/settings/remote.rs`) |
+| the anonymous statistics | the gateway (`own/analytics.rs`), sent from the phone to PostHog |
+| the applications' icons (`DATA_DIR`) | the gateway (`own/icons.rs`), in the same folder (`server/` of the app's data) |
+| the phone's time zone (`TAFAC_TIME_ZONE`), for its `Intl` | nothing: Rust needs none |
 
-- **Each module rewritten** where it is, in Node 18's syntax, the TypeScript
-  ones as JavaScript (esbuild). The layout is kept: the server finds
-  `dist/` and each university's folder from its modules' own addresses.
-- **Each npm package as one file** (express, cookie-parser, sanitize-html,
-  posthog-node): no `node_modules` to install, and a package written for a
-  newer Node still loads.
-- **`\p{…}` in a regex** (letters, marks, control characters) doesn't compile
-  without ICU: each is written out as the characters it stands for
-  (regexpu-core). Only regexes written as such: one built from a string at
-  run time would still throw (the script warns when it sees one).
-- **`desktop/iosRuntime.mjs`**, loaded before `server.js`, puts back what
-  that Node lacks:
+## tonAPI
 
-  | | |
-  |---|---|
-  | `fetch`, `Headers`, `Request`, `Response`, `FormData` | Node's own read HTTP with WebAssembly, which needs a JIT: touching one throws. Replaced by the same API over `node:http`/`node:https` (node-fetch), bodies as web streams, one connection kept per host |
-  | `Intl` | absent. Dates and numbers from `@formatjs`, French and English, every time zone. The phone's time zone comes from the app (`TAFAC_TIME_ZONE`) |
-  | `String.prototype.normalize` | a no-op without ICU: unorm's |
-  | `String.prototype.localeCompare` | compares code units without ICU: letters, then accents, then case |
-  | `crypto` (the global) | behind a flag in Node 18 |
+The gateway (`back/crates/tafac-gateway`, `back/README.md`) is the app's
+server, the same code as tafac.fr's: tonAPI's providers ask the
+university, in the app's own process.
 
-**This is the fragile part.** The server's code is the same, but it runs on
-another HTTP client and other `Intl` code than on tafac.fr and in the
-desktop app. A server change that uses something Node 18 lacks (a newer
-method, `Intl.Collator`, a `\p{…}` built at run time…) works everywhere
-except here, and only shows when the app runs. No test covers it yet.
+- **Every route of the page's API**, for every university the app lists
+  (`routes.rs`: Rennes, Rennes 2, the Sorbonne Nouvelle): the sign-in at
+  the CAS (its second factor too), the session and its cookie, the session
+  check, the account, the portal's applications, Moodle's deadlines, the
+  grades, the planning, the mail, the launch relay, Moodle's view, the
+  photo, the school certificate, the sign-out; for nobody signed in, what
+  Node said; a path that is no route, a 404.
+- **The demo account** is not the gateway's: the page serves it by itself,
+  with no session (`src/demoServer.js`, `docs/DESKTOP.md`).
+- **One session**, in one cookie the bridge's jar holds.
+- **Asked as the app starts**: the session check is the page's first
+  question, and it can only ask once the page has started. The app asks
+  the portal as it starts instead (`bridge::start_ahead`), so the answer is
+  there when the page asks.
+- **Nothing to ship**: tonAPI's settings for each university are in the
+  crate (taken from tonAPI's own repository as it builds). tonAPI is a git
+  dependency at one commit, fetched from its public repository with no
+  account or token.
 
-**The socket**: an app's data folder on iOS is longer than a Unix socket's
-path may be (~104 bytes). The app works from its data folder
-(`set_current_dir`) and the socket is `s.sock` there; Node, in the same
-process, means the same folder.
+Measured on a real Rennes account, iPhone 17 simulator, debug build, when
+the gateway answered the session check and the account only and Node the
+rest, on sessions Node made (`TAFAC_NO_TONAPI=1`, gone with Node, was the
+same build with every route left to Node). Not measured since:
+
+| Cold launch | `/__ent_auth/session` | `/__ent_auth/account` |
+|---|---|---|
+| Node, the portal's session alive | 89 to 306 ms | 11 to 37 ms |
+| tonAPI, the portal's session alive | 0 to 3 ms | 0 to 1 ms |
+| Node, the portal's session lapsed | 497 to 1069 ms | 16 to 34 ms |
+| tonAPI's turn, the portal's session lapsed | 402 to 807 ms, Node's | 11 to 18 ms |
 
 ## The window
 
@@ -304,6 +320,10 @@ Moodle page pins to its bottom stays above the bar).
   app, print).
 - A link to Moodle anywhere in the app (a deadline, its tile, a link in a
   mail) opens in « Moodle », as on the desktop.
+- **Not for the demo account.** The view opens on what the server says of
+  the session's university, and the demo has no session: its « Moodle » is
+  a link to Moodle's own address (`src/navItems.js`), which opens over the
+  app as any web address does.
 
 ## Links
 
@@ -357,17 +377,17 @@ Keychain too (`secret.rs`).
 ## Remote settings
 
 An update takes the App Store's review. Meanwhile the app reads a small
-signed file from tafac.fr, patches over its universities' settings: a
-feature switched off, an address that moved within the university's own
-domains. Data only, never code, never a new domain: `docs/REMOTE_SETTINGS.md`.
+signed file from tafac.fr, patches over its universities' settings for the
+page: a feature switched off, a setting of the page's. Data only, never
+code, never a new domain: `docs/REMOTE_SETTINGS.md`.
 
 ## Commands
 
 | | |
 |---|---|
-| `npm run ios:dev -- "iPhone 17" --no-dev-server` | Builds the page and the server's copy (`ios:prepare`, before Tauri starts: Tauri copies the app's resources as it starts), then the app, and opens it in that simulator |
+| `npm run ios:dev -- "iPhone 17" --no-dev-server` | Builds the page (`npm run build`, before Tauri starts: Tauri copies the app's resources, `dist/` among them, as it starts), then the app, and opens it in that simulator |
 | `npm run ios:build -- --export-method debugging` | The app for a phone, a release build signed for development (team `P8XRQT7Z4K` in `tauri.ios.conf.json`, an Apple Development certificate in the keychain): `src-tauri/gen/apple/build/arm64/Tafac.ipa`. Onto a phone plugged in and unlocked: `xcrun devicectl device install app --device <its id, from devicectl list devices> <the .ipa>` |
-| `npm run ios:prepare` | `desktop-build/ios/server/` and `desktop-build/ios/NodeMobile.xcframework` (downloaded once, checksum checked). `-- --skip-build` keeps `dist/` |
+| `npx tauri ios build --debug --target aarch64-sim` | A debug build for the simulator, without opening it (`npm run build` first): `src-tauri/gen/apple/build/arm64-sim/Tafac.app`, installed with `xcrun simctl install booted <it>` |
 
 Needs Xcode, Rust with the iOS targets (`rustup target add aarch64-apple-ios
 aarch64-apple-ios-sim`) and `rustup component add llvm-tools` (the Swift
@@ -375,27 +395,34 @@ plugins' symbols, in a release build), and what `tauri ios init` asks for
 (Homebrew's xcodegen, libimobiledevice, cocoapods).
 
 The Xcode project (`src-tauri/gen/apple`) is in the repository:
-`project.yml` holds what was added by hand (the Node framework, French).
+`project.yml` holds what was added by hand (French, the plugins' files).
 After a change there: `xcodegen generate` in that folder.
 
-**In the simulator**, without rebuilding the app, after a change to the page
-or the server:
+**In the simulator**, without rebuilding the app, after a change to the
+page:
 
 ```sh
-npm run build && npm run ios:prepare -- --skip-build
+npm run build
 APP=$(xcrun simctl get_app_container booted fr.tafac.ios app)
-rsync -a --delete desktop-build/ios/server/ "$APP/assets/server/"
+rsync -a --delete dist/ "$APP/assets/dist/"
 xcrun simctl terminate booted fr.tafac.ios; xcrun simctl launch booted fr.tafac.ios
 ```
 
-The app's log (Node's output too):
+A change to the gateway or the app's Rust is a new build.
+
+The app's log:
 `xcrun simctl spawn booted log show --last 1m --predicate 'subsystem == "fr.tafac.ios"'`.
-`SIMCTL_CHILD_TAFAC_LOG_REQUESTS=1` logs each request of the page's to the
-server, with its answer's status, time and size (debug builds).
+`SIMCTL_CHILD_TAFAC_LOG_REQUESTS=1` logs each request of the page's, with
+its answer's status, time and size, and `tonapi` after the ones the
+gateway answered (debug builds).
 `SIMCTL_CHILD_TAFAC_START_PATH=/rennes` before `simctl launch` opens on that
 page, and `SIMCTL_CHILD_TAFAC_PRESS_TAB=moodle,planning` presses those tabs
 one after the other, a few seconds apart, by the way a finger does (debug
 builds: nothing taps a simulator from a script).
+
+**Signed in without tapping**: there is no socket to sign in over any more
+(the app answers its own scheme only). The page's own sign-in, typed, or a
+UI test's (« Not done yet », Taps).
 
 ## Releases
 
@@ -425,8 +452,8 @@ there gets it once Apple has processed it (some minutes), with no review.
   (`src-tauri/gen/apple`): no alpha channel in the icons; the encryption
   declaration (`ITSAppUsesNonExemptEncryption: false`: HTTPS only); a
   privacy manifest (`tafac-desktop_iOS/PrivacyInfo.xcprivacy`: no tracking,
-  the anonymous statistics, and the three system APIs Node and Rust use
-  that need a reason). `project.yml` is the project's source: after a
+  the anonymous statistics, and the system APIs the app's binary uses that
+  need a reason). `project.yml` is the project's source: after a
   change there, `xcodegen generate` in that folder.
 - **In App Store Connect, by hand, once**: the app (`fr.tafac.ios`), the
   internal testers' group, and the App Privacy answers, which must say the
@@ -442,7 +469,18 @@ there gets it once Apple has processed it (some minutes), with no review.
 
 ## Checked
 
-In the iPhone 17 simulator (iOS 27), debug build:
+Without Node (27 November 2026), in a new iPhone 18 Pro simulator (iOS
+27), debug build (`npx tauri ios build --debug --target aarch64-sim`): the
+app starts with no Node in it (no NodeMobile framework, nothing loaded but
+the app's own binary and the system's), the page and its files come from
+`dist/` in the app's resources, the sign-in screen lists the universities
+(Rennes, Rennes 2), and the session check and the list are the gateway's
+(`tonapi` in the log). The first request (`/login`) came about 5 s after
+the process started, in a simulator booted for it a moment before. Nothing
+signed in, nothing tapped.
+
+Before that, with Node inside the app, in the iPhone 17 simulator (iOS
+27), debug build:
 
 - the app starts, Node starts in it (about half a second) and serves the
   page; the university picker and the demo account's dashboard show in the
@@ -542,10 +580,17 @@ shows, signing in, the Keychain keeping the login.
 
 ## Not done yet
 
-- **A phone**: beyond starting (above), the Keychain (release builds only)
-  and what iOS does to a suspended app's socket are untested.
-- **A real account**: no real login was made in the app. Grades, planning,
-  mail and the launch relay ran on the demo account or not at all.
+- **A phone**: beyond starting (above, with Node), the Keychain (release
+  builds only) is untested, and the app without Node wasn't run on one.
+- **A real account**: with Node, one was signed in over the app's socket,
+  in the simulator: the dashboard's requests all answer. Without Node, none
+  in the iOS app yet. Not seen: the screens themselves, the login typed in
+  the app, a phone.
+- **tonAPI**: the sign-in made in the app, the session it makes and the
+  sign-out were not run on a phone or in the simulator (the bridge's tests
+  run them on a made-up campus, on a Mac). On a phone nothing was measured.
+  A release build's size without Node wasn't measured on iOS (the desktop
+  app's, for a Mac: 40 MB, its binary 12 MB, `docs/DESKTOP.md`).
 - **Taps**: a UI test taps the simulator as a finger does (it was written
   for the glass, « Checked », and isn't in the repository: a test target
   with `XCUIApplication(bundleIdentifier: "fr.tafac.ios")`, run with
@@ -593,17 +638,24 @@ shows, signing in, the Keychain keeping the login.
   Fichiers », AirDrop, or the sheet closed; a file of the app's downloaded
   as it is, where the page didn't make a blob of it first (an app route
   answering with a file WebKit can't show), which may fail as on macOS.
+- **The demo account, since the page serves it** (`src/demoServer.js`):
+  not run in the app. What « Checked » says of the demo account was seen
+  when the server answered it; its « Moodle » was the view then, and is a
+  link now.
 - **Moodle, signed in**: only Moodle's sign-in page was seen (the demo
-  account). The relay's sign-in (Rennes' goes through a page that posts
-  itself), Tafac's look on Moodle's own pages, a file's share sheet, a new
-  sign-in when Moodle's session runs out: unverified.
+  account, when it opened the view). The relay's sign-in (Rennes' goes
+  through a page that posts itself), Tafac's look on Moodle's own pages, a
+  file's share sheet, a new sign-in when Moodle's session runs out:
+  unverified.
 - **Saved passwords** (the system's sheet for tafac.fr): the desktop's code
   is AppKit's.
 - **Updates**: the App Store's. Remote settings mend what settings can
   (above); nothing locks an old version out (`minimum`).
-- **Size**: Node is 55 MB on a phone, the page's files 27 MB.
+- **Size**: the page's files are 27 MB; Node (55 MB on a phone) is gone. A
+  debug build for the simulator is 162 MB, its unoptimized binary 134 MB.
 - **The icon** is the web app's 512 px picture, enlarged (its alpha
   channel taken off for the App Store); it still reads « l'ent ».
 - **CI**: the TestFlight workflow has never run (« Releases »); nothing
   builds the iOS app on a pull request.
-- **Android**: nodejs-mobile has it; nothing here was written for it.
+- **Android**: Tauri builds for it, and nothing in the gateway is iOS's;
+  nothing here was written for it.

@@ -535,8 +535,8 @@ async fn install_now(app: &AppHandle) {
 
     let result = spawn_blocking(move || install_package(&update, &path)).await.unwrap_or(Err(Failure::Install));
     match result {
-        // RunEvent::Exit (main.rs) stops the server, then Tauri starts the
-        // app again.
+        // The app quits (RunEvent::Exit, app.rs), then Tauri starts it
+        // again.
         Ok(()) => app.request_restart(),
         Err(failure) => {
             {

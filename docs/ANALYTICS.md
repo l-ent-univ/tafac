@@ -11,14 +11,16 @@ Une fenêtre « Tes données restent à toi » (`src/components/PrivacyModal.jsx
 ## Fonctionnement
 
 ```
-navigateur ──(événements filtrés)──▶ /__ent_auth/analytics (serveur Tafac) ──posthog-node──▶ PostHog (UE)
+navigateur ──(événements filtrés)──▶ /__ent_auth/analytics (serveur Tafac) ──▶ PostHog (UE)
 ```
 
 - **Le navigateur ne parle jamais à PostHog** et ne charge aucun script PostHog. `src/analytics.js` met les événements en lot et les envoie à notre propre serveur, via `navigator.sendBeacon` (ou `fetch` avec `keepalive` en secours).
-- **Le serveur filtre tout** avec une liste blanche stricte (`server/analyticsSchema.js`, seul fichier qui définit ce qui peut partir). Les événements et propriétés inconnus sont supprimés sans erreur. Chaque valeur conservée doit être un enum, un booléen ou un court identifiant `[a-z0-9-]`. Aucun texte libre n'est accepté.
-- **Envoi depuis le serveur** (`server/analytics.js`, `posthog-node`) : PostHog ne voit que l'IP du serveur, jamais celle de l'étudiant. Aucun en-tête `X-Forwarded-For` ni propriété `$ip` n'est transmis, et la GeoIP est désactivée (`disableGeoip`).
+- **Le serveur filtre tout** avec une liste blanche stricte (`back/crates/tafac-gateway/src/own/analytics/schema.rs`, seul fichier qui définit ce qui peut partir). Les événements et propriétés inconnus sont supprimés sans erreur. Chaque valeur conservée doit être un enum, un booléen ou un court identifiant `[a-z0-9-]`. Aucun texte libre n'est accepté.
+- **Envoi depuis le serveur** (la passerelle Rust, `back/crates/tafac-gateway/src/own/analytics.rs` et `own/analytics/posthog.rs`) : PostHog ne voit que l'IP du serveur, jamais celle de l'étudiant. Aucun en-tête `X-Forwarded-For` ni propriété `$ip` n'est transmis, et la GeoIP est désactivée (`$geoip_disable` sur chaque événement).
+- **Le même serveur partout** : sur tafac.fr comme dans les applis de bureau et iOS, c'est la passerelle qui répond à cette route et envoie à PostHog, sans file d'attente : un lot par requête de la page, au plus quelques lots en route à la fois (les suivants sont abandonnés si PostHog ne répond plus). PostHog y voit `$lib: tafac-gateway`.
 - **Pas de profils** : chaque événement porte `$process_person_profile: false`. Il n'y a ni `identify()`, ni autocapture, ni session replay, ni heatmaps.
 - L'endpoint répond toujours `204` (`413` si le corps dépasse 8 Ko), accepte au plus 20 événements par requête et ignore les requêtes cross-site. Les erreurs sont avalées : la mesure d'audience ne peut pas casser l'application.
+- **Rien n'est mesuré dans la démonstration.** Le compte démo est servi par la page elle-même, sans session sur le serveur (`src/demoSession.js`) : le serveur ne pourrait pas distinguer ses événements de ceux d'un visiteur non connecté. Tant que la démo est ouverte, `track()` ne met rien en file, sauf l'entrée dans la démo elle-même (`login_result`, qui dit `demo: true`). L'interrupteur *Statistiques anonymes* reste affiché comme pour un étudiant.
 
 ### Identifiant anonyme quotidien
 
@@ -44,7 +46,7 @@ Contexte ajouté automatiquement à chaque événement :
 | `establishment` | id d'établissement de la config (`iutlan`, `ufrs`…) | établissement mémorisé (grands groupes) |
 | `formation` | identifiant court de la formation (`but-mmi`, `but-info`…, 32 caractères max) | niveau « formation » de la sélection ADE de l'étudiant, converti en slug. Jamais l'année, le TD ni le TP (groupes trop petits) |
 | `university` | id de l'université (`univ-rennes`) | **ajouté par le serveur**, depuis sa config |
-| `demo` | booléen | **ajouté par le serveur** depuis la session (compte démo ou non) |
+| `demo` | booléen | **ajouté par le serveur** aux événements d'une session : toujours `false`, une session n'est jamais celle du compte démo (servi par la page, voir plus haut). Gardé pour les requêtes PostHog qui filtrent dessus. Seul `login_result` porte le sien, envoyé par la page |
 
 | Événement | Quand | Propriétés propres |
 | --- | --- | --- |
@@ -52,7 +54,7 @@ Contexte ajouté automatiquement à chaque événement :
 | `widget_loaded` | une fois par widget et par affichage, quand le premier chargement aboutit (cache ou réseau). Les rafraîchissements en arrière-plan ne sont pas envoyés. | `widget` : `greeting`, `nextClass`, `latestGrade`, `mail`, `deadlines`, `assiduity` · `status` : `ok`, `empty`, `error` · `duration_bucket` : `<500ms`, `<1s`, `<3s`, `<10s`, `10s+` · `error_kind` (si `error`) : `http_4xx`, `http_5xx`, `network`, `timeout`, `other` |
 | `app_opened` | ouverture d'une application | `app` : identifiant technique de l'application (fname du portail ou id de service local, normalisé `[a-z0-9-]{1,64}`, ex. `lent-iutlan-notes9`) · `source` : `grid`, `favorites`, `sidebar`, `tabbar`, `home_icon` (l'icône de Moodle dans l'en-tête de « Accueil », sur téléphone et tablette) · `in_app` (tuiles) : booléen, l'application des notes a ouvert « Mes notes » au lieu de ScoDoc, ou celle de l'emploi du temps la page Planning au lieu du service |
 | `setting_changed` | changement d'un réglage dans Mon compte | `setting` : `widget_visibility`, `app_descriptions`, `custom_background`, `profile_photo` (photo de profil choisie ou retirée, jamais l’image), `wallpaper`, `wallpaper_choice` (fond d’écran choisi dans Réglages › Apparence : quel dossier, photo du jour ou photo fixe, jamais laquelle), `theme`, `analytics`, `mail_signature` (signature des mails activée ou non, depuis Réglages › Messagerie ou le commutateur du composeur), `mail_signature_kind` (laquelle : voir `value`), `assiduity_tab` (« Assiduité » à la place de Moodle dans la barre d’onglets du téléphone, Réglages › Apparence) · `value` : `on`, `off` (`auto`, `light`, `dark` pour `theme` ; `auto`, `partage`, `custom` pour `mail_signature_kind` ; `university_daily`, `university_photo`, `tafac_daily`, `tafac_photo`, `custom` pour `wallpaper_choice`, jamais le texte de la signature) · `widget` (pour `widget_visibility`) : mêmes valeurs que ci-dessus. La désactivation des statistiques n'est **jamais** envoyée. |
-| `login_result` | après la réponse du serveur de connexion | `result` : `success`, `failure` · `demo` : booléen |
+| `login_result` | après la réponse du serveur de connexion, ou l'entrée dans la démo (faite par la page, sans le serveur) | `result` : `success`, `failure` · `demo` : booléen |
 | `pwa_update_applied` | application d'une mise à jour de la PWA | — |
 | `settings_imported` | arrivée depuis l'ancienne adresse l'ent avec un lien de transfert des réglages (une fois par arrivée, souvent avant la connexion) | `has_settings` : booléen, au moins un réglage a été repris |
 | `page_viewed` | une fois par arrivée sur « Mes notes », sur le Planning, sur la Messagerie ou sur « Assiduité » (pas à chaque rendu) | `page` : `grades`, `planning`, `mail`, `assiduity` · `source` : `nav` (barre latérale), `tabbar` (barre d'onglets mobile), `tile` (tuile de l'application des notes, de l'emploi du temps ou du webmail), `dashboard_card` (carte « Dernière note », « Prochain cours », « Mails récents » ou « Assiduité »), `sidebar_card` (« Dernière note » de la barre latérale, pour `grades` seulement), `launch_card` (carte d'annonce de « Mes notes », du Planning ou de la Messagerie, sur le tableau de bord), `home_icon` (l'icône de la page dans l'en-tête de « Accueil », sur téléphone et tablette), `grades` (pour `mail` seulement : « Écrire au sujet de cette note »), `planning` (pour `mail` seulement : « Écrire au sujet de ce cours »), `assiduity` (pour `mail` seulement : « Justifier » depuis « Assiduité »), `history` (précédent, suivant, rechargement), `other` · `view` (pour `planning` seulement) : la vue à l'ouverture, `day`, `two_days` (téléphone), `week` (grand écran), `list`. `device` dit s'il s'agit des vues du téléphone ou du grand écran (`desktop`, ≥ 1024 px). |
@@ -107,7 +109,7 @@ Identifiant ENT, e-mail, nom, prénom, numéro étudiant, id ou cookie de sessio
 | `ANALYTICS_EXCLUDED_USERS` | Identifiants ENT, séparés par `,`, dont le serveur ignore les événements (les développeurs de l'instance) : rien n'est envoyé pour eux, ni événement ni marqueur. | — |
 | `POSTHOG_IN_DEV` | `1` pour que le serveur de dev (`npm run dev`) envoie aussi à PostHog. Sans elle, le dev n'envoie rien, même avec une clé dans `.env.local` : les essais, souvent faits avec un vrai compte, ne comptent pas. | coupé |
 
-En production (`node server.js`), elles sont lues dans l'environnement. En dev (`npm run dev`), elles peuvent aussi venir de `.env` / `.env.local`, et PostHog n'est utilisé qu'avec `POSTHOG_IN_DEV=1`. Au `SIGTERM`/`SIGINT`, le serveur vide la file PostHog avant de quitter.
+En production, elles sont lues dans l'environnement du serveur (l'image Docker, `deploy/example.env`). En dev (`npm run dev`), elles peuvent aussi venir de `.env` / `.env.local`, que Vite passe à la passerelle, et PostHog n'est utilisé qu'avec `POSTHOG_IN_DEV=1`. Rien n'attend dans le serveur : à son arrêt, aucun événement n'est perdu en file.
 
 ### Réglages à faire dans le projet PostHog
 
@@ -122,4 +124,4 @@ L'exemption repose aussi sur la configuration du projet. L'opérateur de l'insta
 
 ## Ajouter un événement
 
-À n'ajouter que pour un vrai besoin produit. Déclarez l'événement et ses propriétés (enums de préférence) dans `server/analyticsSchema.js`, appelez `track('nom', { … })` côté client, puis documentez-le ici. Tout ce qui n'est pas déclaré dans le schéma est supprimé par le serveur.
+À n'ajouter que pour un vrai besoin produit. Déclarez l'événement et ses propriétés (enums de préférence) dans `back/crates/tafac-gateway/src/own/analytics/schema.rs`, avec un test, appelez `track('nom', { … })` côté client, puis documentez-le ici. Tout ce qui n'est pas déclaré dans le schéma est supprimé par le serveur.

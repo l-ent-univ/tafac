@@ -6,7 +6,7 @@ import { startOfWeek } from './planningDates.js'
 // at once when the student asks (the note's "Réessayer").
 export const RETRY_AFTER_MS = 30 * 1000
 
-// Whether a week is to be asked of /ade/upcoming now, from what is known of
+// Whether a week is to be asked of the planning now, from what is known of
 // it (`entry`: none yet, or { status, events, failedAt }). `force`: again
 // even when it answered (a refresh); `retry`: a failed one without waiting.
 export function shouldAskWeek(entry, { force = false, retry = false, now = Date.now() } = {}) {

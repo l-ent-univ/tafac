@@ -40,8 +40,8 @@ Le dépôt fournit trois configurations :
 | Dossier | Usage |
 | --- | --- |
 | `universities/univ-rennes/` | Intégration finie : ENT uPortal, CAS, planning ADE, ScoDoc de l’IUT de Lannion, Moodle/FOAD, messagerie Partage et MonDossierWeb. |
-| `universities/univ-exemple/` | Université fictive pour tester le choix d’université et la démonstration. Ses adresses ne désignent aucun service réel. Elle est masquée dans la liste en production, mais reste accessible par `/exemple` si elle est servie. |
-| `universities/example-minimal/` | Point de départ pour une nouvelle intégration. Exclu de la liste des universités servies par défaut. |
+| `universities/univ-rennes-2/` | Portail Drupal, CAS, planning TEMPO, Moodle Cursus, messagerie Zimbra et MonDossierWeb. Pas encore de notes. |
+| `universities/univ-sorbonne-nouvelle/` | Portail iSorbonne, CAS, planning ADE, Moodle iCampus et MonDossierWeb. Masquée dans la liste en production, mais accessible par `/sorbonne-nouvelle` si elle est servie. |
 
 La disponibilité dépend de l’université, de l’établissement, du compte et des services en amont. Dans la configuration Rennes actuelle, les widgets de notes et de prochain cours sont activés pour l’IUT de Lannion. La présence d’un établissement dans les règles de détection ne signifie pas que toutes les intégrations y sont disponibles.
 
@@ -51,7 +51,7 @@ L’authentification implémentée repose sur un portail **uPortal et un formula
 
 > Une partie du code a été générée avec l’aide d’outils d’intelligence artificielle générative, mais systématiquement relue et vérifiée
 
-Utiliser **Node.js 24** et npm pour suivre l’environnement de la CI et de l’image Docker.
+Utiliser **Node.js 24** et npm pour suivre l’environnement de la CI et de l’image Docker, et **Rust** (`cargo`) pour le serveur, la passerelle de `back/`.
 
 ```sh
 git clone https://github.com/l-ent-univ/tafac.git
@@ -60,7 +60,7 @@ npm ci
 npm run dev
 ```
 
-Ouvrir l’adresse indiquée par Vite, généralement `http://localhost:5173`. Le serveur de développement inclut le backend Express : il n’y a pas de second serveur à lancer. Aucun compte universitaire ni secret n’est nécessaire pour essayer la démonstration.
+Ouvrir l’adresse indiquée par Vite, généralement `http://localhost:5173`. Le serveur de développement lance aussi le serveur de Tafac, la passerelle Rust de `back/` (`cargo run`, sur le port 3100), et lui passe l’API de la page (`/__ent_auth`, `/__ent_proxy`) : il n’y a pas de second serveur à lancer. Son premier démarrage la compile, quelques minutes. Aucun compte universitaire ni secret n’est nécessaire pour essayer la démonstration.
 
 ### Essayer la démonstration
 
@@ -73,6 +73,8 @@ Utiliser l’accès démo de la page de connexion, ou saisir :
 
 Les données universitaires de démonstration sont fictives. Ce mode permet de parcourir l’application sans se connecter à un ENT réel ; il ne valide pas le fonctionnement des intégrations universitaires.
 
+La démonstration est servie par la page elle-même, sans le serveur : l’identifiant et le mot de passe de démonstration sont reconnus dans le navigateur et ne sont envoyés nulle part, il n’y a pas de cookie de session, et chaque écran reçoit ses données d’exemple de `src/demoServer.js` (qui répond à la place du serveur, route par route) et de `src/demoAccount.js`. La connexion à la démo est gardée dans le navigateur (`src/demoSession.js`), les mails écrits dans la démo le temps de l’onglet (`src/demoMail.js`).
+
 ### Choisir les universités servies
 
 Sans variable `UNIVERSITY`, le serveur propose les universités configurées. Pour travailler sur Rennes uniquement :
@@ -84,10 +86,10 @@ UNIVERSITY=univ-rennes npm run dev
 Pour sélectionner explicitement plusieurs configurations :
 
 ```sh
-MULTI_UNIVERSITY=1 UNIVERSITIES=univ-rennes,univ-exemple npm run dev
+MULTI_UNIVERSITY=1 UNIVERSITIES=univ-rennes,univ-rennes-2 npm run dev
 ```
 
-Les liens `/rennes`, `/rennes2` et `/exemple` ouvrent la page d’accueil de l’université correspondante, si celle-ci est servie, d’où son bouton mène à sa connexion. Ces pages sont pré-rendues pour les moteurs de recherche et listées dans le sitemap (sauf les universités `devOnly`).
+Les liens `/rennes`, `/rennes2` et `/sorbonne-nouvelle` ouvrent la page d’accueil de l’université correspondante, si celle-ci est servie, d’où son bouton mène à sa connexion. Ces pages sont pré-rendues pour les moteurs de recherche et listées dans le sitemap (sauf les universités `devOnly`).
 
 **Un seul build frontend contient les configurations clientes de toutes les universités.** Le navigateur télécharge celle qui lui est attribuée au démarrage. Il n’est pas nécessaire de construire un `dist/` par université ; `build:all` est actuellement un alias de `build`.
 
@@ -95,33 +97,32 @@ Les liens `/rennes`, `/rennes2` et `/exemple` ouvrent la page d’accueil de l�
 
 | Commande | Rôle |
 | --- | --- |
-| `npm run dev` | Vite avec rechargement à chaud et backend intégré. |
+| `npm run dev` | Vite avec rechargement à chaud, et la passerelle de `back/` lancée derrière lui. |
 | `npm run lint` | Vérification ESLint. |
-| `npm run typecheck` | Vérification des types des modules TypeScript du serveur (`server/**/*.ts`), sans compilation. |
+| `npm run typecheck` | Vérification des types des modules TypeScript des scripts et des tests, sans compilation. |
 | `npm test` | Tests avec le runner natif de Node.js. Certains ouvrent des serveurs HTTP locaux temporaires. |
 | `npm run build` | Compilation de l’interface et génération du service worker dans `dist/`. |
 | `npm run build:all` | Même compilation que `npm run build`. |
 | `npm run preview` | Prévisualisation locale du build avec le backend ; cookies en mode développement. |
-| `npm start` | Serveur de production Express ; nécessite un build et `SESSION_SECRET`. |
 
 ## Architecture
 
-L’interface utilise **React 19**, **Vite 7**, **Tailwind CSS 4** et **Iconify**. Le backend repose sur **Express 5**, les API natives de Node.js et des adaptateurs pour les services universitaires. Le code applicatif est écrit en JavaScript avec des modules ES ; les nouveaux modules du serveur sont en TypeScript, que Node.js exécute tel quel (les types sont retirés au chargement, rien n’est compilé).
+L’interface utilise **React 19**, **Vite 7**, **Tailwind CSS 4** et **Iconify**, en JavaScript avec des modules ES. Le serveur est la passerelle Rust de `back/` (`back/README.md`), qui demande aux services de l’université par [tonAPI](https://github.com/l-ent-univ/tonAPI) ; la même passerelle tourne dans les applis de bureau et iOS.
 
 ```text
 Navigateur : React / PWA
     │
     ├── /__ent_auth/*    Connexion, session et services intégrés
-    └── /__ent_proxy/*   Requêtes de la page vers le portail ENT (liste fermée)
+    └── /__ent_proxy/*   Photo du compte et anciens liens vers le portail ENT (liste fermée)
               │
-       Serveur Express
+       Passerelle Rust (back/)
               │
-       Sélection de l’université
+       tonAPI, selon l’université
               │
        CAS · uPortal · ADE · ScoDoc · Moodle · Zimbra · MonDossierWeb
 ```
 
-Au démarrage, le navigateur consulte `/__ent_auth/universities`, puis charge le `client.js` adapté avant d’importer l’application. Côté serveur, chaque université dispose de son propre backend configuré. Une requête authentifiée est routée vers l’université inscrite dans sa session ; le formulaire de connexion peut en sélectionner une nouvelle.
+Au démarrage, le navigateur consulte `/__ent_auth/universities`, puis charge le `client.js` adapté avant d’importer l’application. Côté serveur, chaque université a ses réglages dans tonAPI. Une requête authentifiée est servie pour l’université inscrite dans sa session ; le formulaire de connexion peut en sélectionner une nouvelle.
 
 | Fichier ou dossier | Responsabilité |
 | --- | --- |
@@ -132,18 +133,8 @@ Au démarrage, le navigateur consulte `/__ent_auth/universities`, puis charge le
 | `src/gradesReport.js`, `src/gradeSimulation.js` | Lecture des relevés, calculs et projections de notes. |
 | `src/planning*.js`, `src/usePlanning*.js` | Dates, vues, chargement et export du planning. |
 | `src/profileStorage.js`, `src/universityStorage.js` | Préférences locales et séparation des réglages entre universités. |
-| `server.js` | Entrée de production : API, fichiers compilés et page HTML avec métadonnées. |
-| `server/universitiesApp.js` | Registre public et routage des requêtes entre universités. |
-| `server/entProxy/` | Relais vers le portail ENT : session exigée, requêtes connues de la page seulement, réponses rendues inertes. |
-| `server/cookieJar/` | Cookies d’une session auprès des services universitaires, rangés et renvoyés comme le ferait un navigateur. |
-| `server/casLogin/`, `server/loginRateLimit/` | Contrôle de la destination du mot de passe (le CAS uniquement) et limites des tentatives de connexion. |
-| `server/securityHeaders/` | En-têtes de sécurité du serveur de production et politique de contenu (CSP) de la page. |
-| `server/launchRelay/`, `server/routeErrors/` | Relais de lancement (requêtes venues d’un autre site, tickets CAS) et réponses d’erreur sans détail interne en production. |
-| `server/entAuthApp.js` | Connexion CAS, sessions, proxy ENT et intégrations des services. |
-| `server/sessionCookie.js` | Chiffrement, durée de vie et rotation des cookies de session. |
-| `planningPortalApi.js` | Adaptateur du portail planning REST, utilisé pour Rennes. |
-| `planningRpc.js`, `adeApi.js`, `adeUpcomingResolver.js` | Adaptateurs planning GWT et ADE mobile, résolution des cours à venir. |
-| `server/appIcons.js` | Attribution et persistance des icônes des applications. |
+| `back/crates/tafac-gateway/` | Le serveur : connexion CAS, sessions, toutes les routes de l’API de la page (`routes.rs`), relais de lancement, messagerie, fichiers compilés et page HTML avec métadonnées. |
+| `src/appIconPicks.js` | Règles du choix des icônes des applications, partagées avec la passerelle (`scripts/gateway-data.mjs`). |
 | `universities/` | Configuration, identité et ressources de chaque université. |
 | `tests/` | Tests des calculs, adaptateurs, sessions, routage, exports et comportements de l’interface. |
 | `deploy/`, `Dockerfile` | Image de production et déploiement avec Caddy. |
@@ -154,19 +145,20 @@ Au démarrage, le navigateur consulte `/__ent_auth/universities`, puis charge le
 | --- | --- |
 | `UNIVERSITY` | Université unique, ou université par défaut en mode multiple. Valeur de repli : `univ-rennes`. |
 | `MULTI_UNIVERSITY` | `1` pour le choix entre universités, `0` pour une seule. Sans valeur explicite, le mode multiple est activé si `UNIVERSITY` n’est pas définie. L’image Docker impose `1` par défaut. |
-| `UNIVERSITIES` | Liste d’identifiants séparés par des virgules en mode multiple. Par défaut, tous les dossiers sauf ceux commençant par `example`. L’université par défaut est également incluse. |
-| `PORT` | Port du serveur de production, `3000` par défaut. |
+| `UNIVERSITIES` | Liste d’identifiants séparés par des virgules en mode multiple. Par défaut, tous les dossiers de `universities/`. L’université par défaut est également incluse. |
+| `TAFAC_GATEWAY_LISTEN` | Adresse et port du serveur : `0.0.0.0:3000` dans l’image Docker, `127.0.0.1:3100` sinon. |
+| `TAFAC_GATEWAY_DIST` | Dossier du build de la page (`dist/`) servi par le serveur. |
 | `SESSION_SECRET` | Secret servant à dériver la clé de chiffrement des sessions. Obligatoire en production, au moins 32 octets. |
 | `SESSION_SECRET_PREVIOUS` | Anciens secrets, séparés par des virgules, acceptés pendant une rotation. |
 | `DATA_DIR` | Dossier des icônes persistantes : `./data` par défaut, `/app/data` dans Docker. |
-| `TRUST_PROXY` | Proxys autorisés à transmettre l’adresse du client à Express, notamment pour limiter les tentatives de connexion. Par défaut : réseaux locaux et privés. |
+| `TRUST_PROXY` | Proxys autorisés à transmettre l’adresse du client au serveur, notamment pour limiter les tentatives de connexion. Par défaut : réseaux locaux et privés. |
 | `POSTHOG_PROJECT_KEY` | Active les événements PostHog côté serveur. Absent : PostHog désactivé. |
 | `POSTHOG_HOST` | Destination PostHog, `https://eu.i.posthog.com` par défaut. |
 | `POSTHOG_IN_DEV` | `1` pour autoriser PostHog dans le serveur Vite, avec une clé configurée. |
 | `ANALYTICS_EXCLUDED_USERS` | Identifiants ENT dont les événements PostHog sont ignorés, séparés par des virgules. |
 | `BUILD_HASH` | Référence de commit affichée dans « À propos », fournie au moment du build si Git n’est pas disponible. |
 
-Passer `UNIVERSITY`, `MULTI_UNIVERSITY` et `UNIVERSITIES` dans l’environnement du processus. Le serveur Vite lit aussi les variables de session, de statistiques et `DATA_DIR` dans `.env` / `.env.local`. En production, `npm start` ne charge pas automatiquement de fichier `.env` ; Docker Compose le transmet au conteneur, ou Node peut le charger explicitement avec `node --env-file=.env server.js`.
+Passer `UNIVERSITY`, `MULTI_UNIVERSITY` et `UNIVERSITIES` dans l’environnement du processus. Le serveur Vite lit aussi les variables de session, de statistiques et `DATA_DIR` dans `.env` / `.env.local`. En production, le serveur ne lit aucun fichier `.env` ; Docker Compose le transmet au conteneur.
 
 Les anciens noms `MULTI_TENANT` et `TENANTS` restent acceptés. Le fichier `.env.example` à la racine contient encore des commentaires sur l’ancien fonctionnement par builds et sous-domaines : pour le déploiement actuel, utiliser [`deploy/example.env`](deploy/example.env) et les variables ci-dessus.
 
@@ -196,7 +188,7 @@ D’autres fonctionnalités font appel à des services externes : GitHub pour le
 
 ## Auto-hébergement
 
-Le dépôt fournit une image Docker réunissant le frontend et le serveur Express, ainsi qu’un déploiement Caddy pour HTTPS. L’image conserve son nom historique (l'ent) :
+Le dépôt fournit une image Docker réunissant la page et son serveur, la passerelle Rust de `back/`, ainsi qu’un déploiement Caddy pour HTTPS. L’image conserve son nom historique (l'ent) :
 
 ```text
 ghcr.io/l-ent-univ/l-ent:latest
@@ -228,23 +220,22 @@ docker compose logs -f lent
 
 Le déploiement monte un volume pour les icônes et des volumes pour Caddy. **HTTPS est nécessaire en production**, notamment pour le cookie de session sécurisé. Pour les mises à jour, le choix d’une version fixe, un autre reverse proxy ou la gestion des icônes, consulter [`docs/SELF_HOSTING.md`](docs/SELF_HOSTING.md).
 
-Hors Docker, compiler avec `npm ci` puis `npm run build`, fournir les variables d’environnement et lancer `npm start` derrière un reverse proxy HTTPS. Le serveur utilise aussi les sources du dépôt et ses dépendances de production ; conserver seulement `dist/` est insuffisant.
+Hors Docker, construire la page (`npm ci` puis `npm run build`) et le serveur (`cargo build --release -p tafac-gateway` dans `back/`), puis lancer `back/target/release/tafac-gateway` avec `SESSION_SECRET`, `TAFAC_GATEWAY_DIST=dist` et `TAFAC_GATEWAY_LISTEN`, derrière un reverse proxy HTTPS ([`docs/SELF_HOSTING.md`](docs/SELF_HOSTING.md)). Le binaire et `dist/` suffisent.
 
 ## Ajouter une université
 
-Créer un nouveau dossier à partir du modèle minimal, avec un identifiant encore inutilisé :
+Créer un nouveau dossier à partir d’une université existante, par exemple Rennes 2, avec un identifiant encore inutilisé :
 
 ```sh
-cp -R universities/example-minimal universities/univ-mon-campus
+cp -R universities/univ-rennes-2 universities/univ-mon-campus
 ```
 
-Adapter les trois fichiers de configuration :
+Adapter ses deux fichiers de configuration, puis ses réglages côté serveur (tonAPI et la passerelle : [`docs/ADDING_A_UNIVERSITY.md`](docs/ADDING_A_UNIVERSITY.md)) :
 
 | Fichier | Contenu |
 | --- | --- |
-| `shared.js` | Identifiant, noms, slug, textes publics et fonctionnalités. Données pures, lisibles par Node et le navigateur. |
+| `shared.js` | Identifiant, noms, slug, textes publics et fonctionnalités. Données pures, lisibles par la page et les scripts. |
 | `client.js` | Identité visuelle, images, liens, établissements et configuration de l’interface. Tout son contenu peut être envoyé au navigateur. |
-| `server.js` | Origines des services, paramètres de connexion et adaptateurs côté serveur. |
 
 Ajouter un logo dans `assets/`, renseigner les origines CAS/uPortal et n’activer que les intégrations configurées, puis lancer :
 

@@ -6,7 +6,7 @@ import universityConfig from '@university'
 import { toAppSlug, track } from '../analytics'
 import { fetchAppIcons, getCachedAppIcons } from '../appIcons'
 import { scoreAppSearch, searchApps } from '../appSearch'
-import { DEMO_MAIL_APP_FNAME, DEMO_PLANNING_APP_FNAME } from '../demoAccount'
+import { DEMO_MAIL_APP_FNAME, DEMO_PLANNING_APP_FNAME, DEMO_SESSION_MODE } from '../demoAccount'
 import { getGradesOrigin, opensGradesPageInApp } from '../gradesPortalApp'
 import { getPlanningOrigin, opensPlanningPageInApp } from '../planningPortalApp'
 import { getMailOrigins, opensMailPageInApp } from '../mailPortalApp'
@@ -18,20 +18,8 @@ import MailAttachDrawer, { ATTACH_CARD_CLASS, AttachDrawerNote } from './MailAtt
 import SmoothSurface from './SmoothSurface'
 import { Skeleton } from 'skullet/react'
 import { useSkeletonsForced } from '../skeletonSamples'
-import {
-  ENT_AUTH_PREFIX,
-  ENT_ORIGIN,
-  buildEntProxyHref,
-  collectFavoritePortlets,
-  collectPortletsFromLayout,
-  collectServiceSections,
-  extractLaunchLink,
-  getPortalBootstrap,
-  getPortletFragment,
-  mergePortlets,
-  requestEnt,
-  serverFetch,
-} from '../entApi'
+import { ENT_AUTH_PREFIX, ENT_ORIGIN, getApps, serverFetch } from '../entApi'
+import { getApplicationKey, orderApplications, resolveFavoriteKeys, toApplications } from '../portalApps'
 
 const DEFAULT_ERROR_MESSAGE = 'Impossible de charger les applications pour le moment'
 const CLOSED_CONTEXT_MENU = { open: false, x: 0, y: 0, application: null, source: 'favorite' }
@@ -41,50 +29,6 @@ const SIDEBAR_FAVORITES_LIMIT = 3
 // The « Accueil » page's « Applications »: after the favourites, up to this
 // many other apps of the list, as many of them as fit on the row.
 const HOME_EXTRA_APPS = 12
-
-function isRecord(value) {
-  return Boolean(value) && typeof value === 'object' && !Array.isArray(value)
-}
-
-function getFirstText(...values) {
-  for (const value of values) {
-    if (typeof value === 'string') {
-      const trimmedValue = value.trim()
-      if (trimmedValue) {
-        return trimmedValue
-      }
-    }
-  }
-
-  return ''
-}
-
-function getPortletKey(item = {}) {
-  return item.fname || item.nodeId || item.ID || `${item.title ?? item.name ?? 'unknown'}-${item.url ?? ''}`
-}
-
-function getLookupCandidates(item = {}) {
-  return Array.from(new Set(
-    [
-      getPortletKey(item),
-      item.fname,
-      item.ID,
-      item.nodeId,
-      item.chanID,
-      item.title,
-      item.name,
-      item.url,
-      item.widgetURL,
-    ]
-      .filter((value) => value !== undefined && value !== null)
-      .map((value) => String(value).trim())
-      .filter(Boolean),
-  ))
-}
-
-function getApplicationKey(application = {}) {
-  return application.fname || application.id
-}
 
 // Anonymous analytics: which application was opened, and from where. Only
 // the portal/app identifier (slugged) is sent — never its title or URL.
@@ -98,8 +42,9 @@ function trackApplicationOpened(application, source, { inApp = false } = {}) {
 }
 
 const FAVORITES_ORDER_KEY = 'l-ent:favorites-order'
-// Last order of the full app list. Starring an app on the portal moves it
-// into the favorites section, which loses its place: this remembers it.
+// Last order of the full app list. A portal moves an app starred there out
+// of its list, which loses its place: this remembers it (portalApps.js:
+// orderApplications).
 const APPS_ORDER_KEY = 'l-ent:apps-order'
 
 function loadAppsOrder() {
@@ -117,52 +62,6 @@ function saveAppsOrder(applications) {
   } catch {
     // Storage unavailable
   }
-}
-
-// Puts each app only found in the favorites section among the other apps,
-// as if it weren't a favorite: where it sat last time (right after the
-// closest app that preceded it and is still listed), or, never seen outside
-// the favorites, at its alphabetical place among the others. Never in a pile
-// at the end.
-function placeInUsualOrder(regularApps, favoriteOnlyApps, rememberedKeys) {
-  const rememberedIndex = new Map(rememberedKeys.map((key, index) => [key, index]))
-  const result = [...regularApps]
-  const unknown = []
-  const known = []
-
-  for (const app of favoriteOnlyApps) {
-    const index = rememberedIndex.get(getApplicationKey(app))
-    if (index === undefined) {
-      unknown.push(app)
-    } else {
-      known.push([index, app])
-    }
-  }
-
-  known.sort(([left], [right]) => left - right)
-  for (const [index, app] of known) {
-    let insertAt = 0
-    for (let previous = index - 1; previous >= 0; previous -= 1) {
-      const position = result.findIndex((listed) => getApplicationKey(listed) === rememberedKeys[previous])
-      if (position !== -1) {
-        insertAt = position + 1
-        break
-      }
-    }
-    result.splice(insertAt, 0, app)
-  }
-
-  unknown.sort((left, right) => compareTitles(left.title, right.title))
-  for (const app of unknown) {
-    const position = result.findIndex((listed) => compareTitles(listed.title, app.title) > 0)
-    result.splice(position === -1 ? result.length : position, 0, app)
-  }
-
-  return result
-}
-
-function compareTitles(left = '', right = '') {
-  return String(left).localeCompare(String(right), 'fr', { sensitivity: 'base' })
 }
 
 // A stored list of application keys, whatever the storage holds: a list of
@@ -218,32 +117,33 @@ function saveLocalPins(pins) {
   }
 }
 
-// A portal that can't store favourites (services.localFavorites: Drupal at
-// Rennes 2) keeps them in this browser instead: the keys of the starred apps,
-// in the order they were starred. The row then works as with the ENT's
-// favourites (star, exit animation, drag order), only without the portal.
-const LOCAL_FAVORITES = universityConfig.services?.localFavorites === true
+// The favourites stay in this browser, whatever the portal: the keys of the
+// starred apps, in the order they were starred. They start, once, from the
+// apps the student starred on the portal (portalApps.js:
+// resolveFavoriteKeys). The demo account's are kept apart: a look at the
+// demo never touches the student's own.
 const LOCAL_FAVORITES_KEY = 'l-ent:local-favorites'
+const DEMO_FAVORITES_KEY = 'l-ent:local-favorites:demo'
 
-function loadLocalFavorites() {
+// null: the browser never held any (not the same as none).
+function loadLocalFavorites(storageKey) {
   try {
-    const stored = JSON.parse(localStorage.getItem(LOCAL_FAVORITES_KEY) || 'null')
-    return Array.isArray(stored) ? stored.filter((key) => typeof key === 'string') : []
+    const stored = JSON.parse(localStorage.getItem(storageKey) || 'null')
+    return Array.isArray(stored) ? stored.filter((key) => typeof key === 'string') : null
   } catch {
-    return []
+    return null
   }
 }
 
-function saveLocalFavorites(keys) {
+function saveLocalFavorites(storageKey, keys) {
   try {
-    localStorage.setItem(LOCAL_FAVORITES_KEY, JSON.stringify(keys))
+    localStorage.setItem(storageKey, JSON.stringify(keys))
   } catch {
     // Storage unavailable
   }
 }
 
-// The favourites section built from the stored keys, as
-// normalizeBootstrapSections builds it from the portal. Apps the portal no
+// The favourites section built from the stored keys. Apps the portal no
 // longer lists are left out.
 function buildLocalFavoriteSections(services, keys) {
   const servicesByKey = new Map(services.map((service) => [getApplicationKey(service), service]))
@@ -257,30 +157,10 @@ function buildLocalFavoriteSections(services, keys) {
   }
 }
 
+// A shortcut of the university's config, as opposed to an app the portal
+// lists: starred in its own list (LOCAL_PINS_KEY).
 function isLocalService(application) {
-  return !application?.portalNodeId
-}
-
-function getPortalNodeId(entry, metadata = {}) {
-  return getFirstText(
-    entry?.ID,
-    entry?.nodeId,
-    metadata?.ID,
-    metadata?.nodeId,
-  )
-}
-
-function toNavigableHref(value) {
-  const href = getFirstText(value)
-  if (!href || href.startsWith('#') || href.toLowerCase().startsWith('javascript:')) {
-    return ''
-  }
-
-  if (/^[a-z][a-z\d+.-]*:/i.test(href)) {
-    return href
-  }
-
-  return buildEntProxyHref(href)
+  return !application?.listed
 }
 
 const LETTER_COLORS = [
@@ -363,229 +243,7 @@ const AppIcon = memo(function AppIcon({ title, assignment = null, isLaunching = 
   )
 })
 
-function normalizeTarget(entry, metadata = {}) {
-  const target = getFirstText(
-    entry?.parameters?.target,
-    metadata?.parameters?.target,
-    entry?.target,
-    metadata?.target,
-  )
-
-  if (target) {
-    return target
-  }
-
-  return String(entry?.parameters?.stopImmediately ?? metadata?.parameters?.stopImmediately) === 'true'
-    ? '_blank'
-    : ''
-}
-
-function buildPortletLookup(layoutData, layoutDocData) {
-  const mergedPortlets = mergePortlets(
-    collectPortletsFromLayout(layoutData),
-    Array.isArray(layoutDocData) ? layoutDocData : [],
-  )
-
-  const lookup = new Map()
-
-  for (const item of mergedPortlets) {
-    for (const candidate of getLookupCandidates(item)) {
-      if (!lookup.has(candidate)) {
-        lookup.set(candidate, item)
-      }
-    }
-  }
-
-  return lookup
-}
-
-function findPortletMetadata(item, lookup) {
-  for (const candidate of getLookupCandidates(item)) {
-    const match = lookup.get(candidate)
-    if (match) {
-      return match
-    }
-  }
-
-  return null
-}
-
 const TITLE_OVERRIDES = universityConfig.services?.titleOverrides ?? {}
-
-function normalizeServiceEntry(entry, metadata = {}, extra = {}) {
-  const portalTitle = getFirstText(
-    entry?.title,
-    entry?.name,
-    metadata?.title,
-    metadata?.name,
-    entry?.fname,
-    metadata?.fname,
-  )
-  // NFC: the portal may send accents decomposed ("e" + combining accent).
-  const title = TITLE_OVERRIDES[portalTitle.normalize('NFC').toLowerCase()] ?? portalTitle
-
-  const href = toNavigableHref(
-    getFirstText(
-      entry?.parameters?.launchUrl,
-      metadata?.parameters?.launchUrl,
-      entry?.widgetURL,
-      metadata?.widgetURL,
-      entry?.parameters?.url,
-      metadata?.parameters?.url,
-      entry?.url,
-      metadata?.url,
-      entry?.alternativeMaximizedLink,
-      metadata?.alternativeMaximizedLink,
-    ),
-  )
-
-  if (!title || !href) {
-    return null
-  }
-
-  return {
-    id: getPortletKey(entry),
-    fname: getFirstText(entry?.fname, metadata?.fname),
-    portalNodeId: getFirstText(extra.portalNodeId, getPortalNodeId(entry, metadata)),
-    title,
-    description: getFirstText(
-      entry?.description,
-      metadata?.description,
-      entry?.parameters?.description,
-      metadata?.parameters?.description,
-      metadata?.summary,
-      metadata?.parameters?.subtitle,
-    ),
-    href,
-    target: normalizeTarget(entry, metadata),
-    removeFavoriteTarget: extra.removeFavoriteTarget ?? null,
-  }
-}
-
-function dedupeApplications(applications) {
-  const seenKeys = new Set()
-
-  return applications.filter((application) => {
-    const uniqueKey = `${application.id}-${application.href}`
-
-    if (seenKeys.has(uniqueKey)) {
-      return false
-    }
-
-    seenKeys.add(uniqueKey)
-    return true
-  })
-}
-
-function isFavoritesLikeLabel(value = '') {
-  const normalizedValue = String(value).trim().toLowerCase()
-  return normalizedValue.includes('favori')
-    || normalizedValue.includes('favorite')
-    || normalizedValue.includes('bookmark')
-}
-
-function hasFavoriteCollections(layoutData) {
-  const layout = layoutData?.layout
-
-  return Array.isArray(layout?.favorites)
-    || Array.isArray(layout?.favoriteGroups)
-    || Array.isArray(layout?.navigation?.favorites)
-    || Array.isArray(layout?.navigation?.favoriteGroups)
-    || typeof layout?.globals?.hasFavorites === 'string'
-}
-
-function normalizeFavoriteSections(bootstrap) {
-  const layoutData = bootstrap?.layout?.data
-  if (!isRecord(layoutData)) {
-    return {
-      available: false,
-      count: 0,
-      sections: [],
-    }
-  }
-
-  const portletLookup = buildPortletLookup(layoutData, bootstrap?.layoutDoc?.data)
-  const serviceTabs = collectServiceSections(layoutData)
-  let folderFavoriteApplications = []
-
-  for (const tab of serviceTabs) {
-    const favoriteSectionIndex = tab.sections.findIndex((section) => isFavoritesLikeLabel(section.title))
-    if (favoriteSectionIndex === -1) {
-      continue
-    }
-
-    const favoriteSection = tab.sections[favoriteSectionIndex]
-    const nextSection = tab.sections[favoriteSectionIndex + 1] ?? null
-    const firstNextService = nextSection?.services?.[0] ?? null
-    const firstNextMetadata = firstNextService ? findPortletMetadata(firstNextService, portletLookup) : null
-    const removeFavoriteTarget = nextSection
-      ? {
-          wrapperId: getFirstText(nextSection.id),
-          nextElementId: getPortalNodeId(firstNextService, firstNextMetadata),
-        }
-      : null
-
-    folderFavoriteApplications = dedupeApplications(
-      favoriteSection.services
-        .map((favoritePortlet) => {
-          const metadata = findPortletMetadata(favoritePortlet, portletLookup)
-          return normalizeServiceEntry(favoritePortlet, metadata, {
-            portalNodeId: getPortalNodeId(favoritePortlet, metadata),
-            removeFavoriteTarget,
-          })
-        })
-        .filter(Boolean),
-    )
-
-    if (folderFavoriteApplications.length > 0) {
-      break
-    }
-  }
-
-  const directFavoriteApplications = dedupeApplications(
-    collectFavoritePortlets(layoutData)
-      .map((favoritePortlet) => (
-        normalizeServiceEntry(
-          favoritePortlet,
-          findPortletMetadata(favoritePortlet, portletLookup),
-          {
-            portalNodeId: getPortalNodeId(
-              favoritePortlet,
-              findPortletMetadata(favoritePortlet, portletLookup),
-            ),
-          },
-        )
-      ))
-      .filter(Boolean),
-  )
-  const applications = folderFavoriteApplications.length > 0
-    ? folderFavoriteApplications
-    : directFavoriteApplications
-
-  return {
-    available: hasFavoriteCollections(layoutData)
-      || serviceTabs.some((tab) => tab.sections.some((section) => isFavoritesLikeLabel(section.title))),
-    count: applications.length,
-    sections: applications.length > 0
-      ? [{
-          id: 'ent-favorites',
-          title: 'Favoris',
-          subtitle: '',
-          applications,
-        }]
-      : [],
-  }
-}
-
-function normalizeBootstrapSections(bootstrap) {
-  const favoriteSource = normalizeFavoriteSections(bootstrap)
-  return {
-    source: favoriteSource.available ? 'ent-favorites' : 'none',
-    rawCount: favoriteSource.count,
-    sections: favoriteSource.sections,
-  }
-}
-
 const APP_CATEGORIES = universityConfig.services?.categories ?? []
 const SHOW_CATEGORY_FILTERS = universityConfig.features?.serviceCategories === true
 const getAppIcon = universityConfig.services?.getAppIcon ?? (() => null)
@@ -605,53 +263,17 @@ function isUnavailableGradeApplication(application = {}) {
   return typeof isUnavailable === 'function' ? Boolean(isUnavailable(application)) : false
 }
 
-function normalizeAllServices(bootstrap, rememberedOrder = []) {
-  const layoutData = bootstrap?.layout?.data
-  if (!isRecord(layoutData)) {
-    return []
-  }
+// Whether a tile opens through the launch relay, which signs the student in
+// to the application with the session (services.launchRelay): a portal whose
+// applications sit behind the CAS. Elsewhere a tile is a plain link.
+const LAUNCH_RELAY = universityConfig.services?.launchRelay === true
 
-  const portletLookup = buildPortletLookup(layoutData, bootstrap?.layoutDoc?.data)
-  const serviceTabs = collectServiceSections(layoutData)
-  const regularApps = []
-  const favoriteOnlyApps = []
-  const seenKeys = new Set()
-  // The portal lists its favorites section first, which would pull every
-  // favorite to the top of the full list. Read it last instead: favorites
-  // listed elsewhere keep that place, and those only in the favorites
-  // section get their remembered one (placeInUsualOrder).
-  const sections = serviceTabs.flatMap((tab) => tab.sections)
-  const orderedSections = [
-    ...sections.filter((section) => !isFavoritesLikeLabel(section.title)),
-    ...sections.filter((section) => isFavoritesLikeLabel(section.title)),
-  ]
-
-  for (const section of orderedSections) {
-    const target = isFavoritesLikeLabel(section.title) ? favoriteOnlyApps : regularApps
-    for (const service of section.services) {
-      const metadata = findPortletMetadata(service, portletLookup)
-      const app = normalizeServiceEntry(service, metadata, {
-        portalNodeId: getPortalNodeId(service, metadata),
-      })
-
-      if (!app || isUnavailableGradeApplication(app)) {
-        continue
-      }
-
-      const category = getAppCategory(app.title)
-      if (category) {
-        app.category = category
-      }
-
-      const key = `${getApplicationKey(app)}-${app.href}`
-      if (!seenKeys.has(key)) {
-        seenKeys.add(key)
-        target.push(app)
-      }
-    }
-  }
-
-  return placeInUsualOrder(regularApps, favoriteOnlyApps, rememberedOrder)
+// What makes the server's list this university's tiles (portalApps.js).
+const APPLICATION_OPTIONS = {
+  titleOverrides: TITLE_OVERRIDES,
+  getCategory: getAppCategory,
+  isUnavailable: isUnavailableGradeApplication,
+  launchRelay: LAUNCH_RELAY,
 }
 
 function getErrorMessage(error) {
@@ -662,26 +284,6 @@ function getErrorMessage(error) {
   }
 
   return message
-}
-
-function getBootstrapErrorMessage(bootstrap) {
-  const failedResponse = [bootstrap?.layout, bootstrap?.layoutDoc, bootstrap?.marketplace]
-    .find((response) => response?.ok === false)
-
-  if (!failedResponse) {
-    return DEFAULT_ERROR_MESSAGE
-  }
-
-  if (failedResponse.status === 401 || failedResponse.status === 403) {
-    return 'Impossible de charger les applications pour le moment'
-  }
-
-  return getErrorMessage(
-    failedResponse.error
-      || (typeof failedResponse.data === 'object' ? failedResponse.data?.error : '')
-      || failedResponse.text
-      || DEFAULT_ERROR_MESSAGE,
-  )
 }
 
 function getFavoriteApplications(sections) {
@@ -704,65 +306,6 @@ function getFavoriteApplications(sections) {
   return favorites
 }
 
-function buildAddFavoriteRequestPath(application, lastFavorite) {
-  const sourceId = getFirstText(application.portalNodeId)
-  const previousNodeId = getFirstText(lastFavorite?.portalNodeId) || ''
-
-  if (!sourceId) {
-    return ''
-  }
-
-  const params = new URLSearchParams({
-    action: 'movePortletAjax',
-    sourceId,
-    previousNodeId,
-    nextNodeId: '',
-  })
-
-  return `/api/layout?${params.toString()}`
-}
-
-function buildRemoveFavoriteRequestPath(application) {
-  const sourceId = getFirstText(application.portalNodeId)
-  const wrapperId = getFirstText(application.removeFavoriteTarget?.wrapperId)
-  const nextElementId = getFirstText(application.removeFavoriteTarget?.nextElementId)
-
-  if (!sourceId) {
-    return ''
-  }
-
-  if (nextElementId) {
-    const params = new URLSearchParams({
-      action: 'movePortletAjax',
-      sourceId,
-      previousNodeId: '',
-      nextNodeId: nextElementId,
-    })
-    return `/api/layout?${params.toString()}`
-  }
-
-  if (wrapperId) {
-    const params = new URLSearchParams({
-      action: 'moveElement',
-      sourceID: sourceId,
-      elementID: wrapperId,
-      method: 'appendAfter',
-    })
-    return `/api/layout?${params.toString()}`
-  }
-
-  return ''
-}
-
-function removeApplicationFromSections(sections, applicationKey) {
-  return sections
-    .map((section) => ({
-      ...section,
-      applications: section.applications.filter((application) => getApplicationKey(application) !== applicationKey),
-    }))
-    .filter((section) => section.applications.length > 0)
-}
-
 function getUrlHostname(value) {
   try {
     return new URL(value).hostname
@@ -775,6 +318,12 @@ const CAS_HOST = universityConfig.origins?.cas ? new URL(universityConfig.origin
 
 function isCasHost(hostname) {
   return Boolean(CAS_HOST) && hostname === CAS_HOST
+}
+
+const PORTAL_HOST = getUrlHostname(ENT_ORIGIN)
+
+function isPortalHost(hostname) {
+  return Boolean(PORTAL_HOST) && hostname === PORTAL_HOST
 }
 
 function chainTouchesCas(chain = []) {
@@ -790,12 +339,10 @@ function shouldUseServerLaunchForTarget(href, launchDebug = null) {
     return false
   }
 
-  if (href.startsWith('/__ent_proxy')) {
-    return true
-  }
-
+  // A page of the portal's own (an application the portal gives no other
+  // address for): it wants the portal's session.
   const hrefHost = getUrlHostname(href)
-  if (isCasHost(hrefHost)) {
+  if (isPortalHost(hrefHost) || isCasHost(hrefHost)) {
     return true
   }
 
@@ -810,55 +357,6 @@ function shouldUseServerLaunchForTarget(href, launchDebug = null) {
 
   return /[?&]ticket=ST-/i.test(String(launchDebug.finalUrl ?? ''))
 }
-
-async function resolveLaunchTarget(application) {
-  if (!application?.fname) {
-    return {
-      href: application?.href,
-      target: application?.target,
-    }
-  }
-
-  const fragmentResponse = await getPortletFragment({}, application.fname)
-  const launchLink = extractLaunchLink(fragmentResponse?.text ?? '')
-
-  return {
-    href: toNavigableHref(launchLink.href) || application.href,
-    target: getFirstText(launchLink.target, application.target),
-  }
-}
-
-// `knownTargets` are reused as-is, so a refresh only fetches the fragments of
-// applications it has never seen.
-async function resolveLaunchTargets(applications, knownTargets = {}) {
-  const uniqueApplications = []
-  const seenKeys = new Set()
-
-  for (const application of applications) {
-    const applicationKey = getApplicationKey(application)
-
-    if (!application?.fname || seenKeys.has(applicationKey) || knownTargets[applicationKey]) {
-      continue
-    }
-
-    seenKeys.add(applicationKey)
-    uniqueApplications.push([applicationKey, application])
-  }
-
-  const resolvedEntries = await Promise.all(uniqueApplications.map(async ([applicationKey, application]) => {
-    try {
-      return [applicationKey, await resolveLaunchTarget(application)]
-    } catch {
-      return [applicationKey, {
-        href: application.href,
-        target: application.target,
-      }]
-    }
-  }))
-
-  return { ...knownTargets, ...Object.fromEntries(resolvedEntries) }
-}
-
 
 function isPlainLeftClick(event) {
   return event.button === 0
@@ -875,15 +373,9 @@ function navigateToApplication({ href, target }, preparedWindow = null, options 
     return
   }
 
-  let launchHref = href
-  if (useServerLaunch) {
-    if (href.startsWith('/__ent_proxy')) {
-      const realUrl = ENT_ORIGIN + href.replace(/^\/__ent_proxy/, '')
-      launchHref = `/__ent_auth/launch?url=${encodeURIComponent(realUrl)}`
-    } else if (/^https?:\/\//i.test(href)) {
-      launchHref = `/__ent_auth/launch?url=${encodeURIComponent(href)}`
-    }
-  }
+  const launchHref = useServerLaunch && /^https?:\/\//i.test(href)
+    ? `/__ent_auth/launch?url=${encodeURIComponent(href)}`
+    : href
 
   if (target === '_blank') {
     if (preparedWindow && !preparedWindow.closed) {
@@ -1012,15 +504,9 @@ function AvailableApplications({
     error: '',
   })
   const [reloadKey, setReloadKey] = useState(0)
-  const [launchTargets, setLaunchTargets] = useState({})
   const [launchBehaviors, setLaunchBehaviors] = useState({})
   const [launchingKeys, setLaunchingKeys] = useState({})
   const [exitingFavoriteKeys, setExitingFavoriteKeys] = useState({})
-  // Favorite changes show up right away; the ENT request runs behind them and
-  // is rolled back if it fails. Added apps wait here until a portal refresh
-  // lists them, removed ones stay hidden until it stops listing them.
-  const [pendingFavoriteAdds, setPendingFavoriteAdds] = useState({})
-  const [pendingFavoriteRemovals, setPendingFavoriteRemovals] = useState({})
   const [favoriteActionState, setFavoriteActionState] = useState({
     removingKey: '',
     error: '',
@@ -1034,13 +520,11 @@ function AvailableApplications({
   const [searchQuery, setSearchQuery] = useState('')
   const [selectedCategory, setSelectedCategory] = useState(null)
   const [isDragging, setIsDragging] = useState(false)
-  const launchRequestsRef = useRef(new Map())
   const launchBehaviorRequestsRef = useRef(new Map())
   const removalTimeoutsRef = useRef(new Map())
-  // Removals asked for while the add is still unconfirmed: the remove request
-  // needs the layout ids only the refreshed portal gives.
-  const deferredRemovalsRef = useRef(new Set())
-  const launchTargetsRef = useRef({})
+  // Where the favourites of the account signed in are kept: the student's
+  // own, or the demo account's.
+  const favoritesKeyRef = useRef(LOCAL_FAVORITES_KEY)
   const isMountedRef = useRef(true)
   const dragRef = useRef({ index: -1, didDrag: false })
   const favoritesRowRef = useRef(null)
@@ -1094,15 +578,11 @@ function AvailableApplications({
   const favoriteApplications = useMemo(() => {
     const entFavorites = entFavoriteApplications
       .filter((application) => !isUnavailableGradeApplication(application))
-    const entKeys = new Set(entFavorites.map(getApplicationKey))
-    const addedFavorites = Object.values(pendingFavoriteAdds)
-      .filter((application) => !entKeys.has(getApplicationKey(application)))
     const pinnedLocalServices = allServices.filter(
       (service) => isLocalService(service) && localPins.includes(getApplicationKey(service)),
     )
-    return [...entFavorites, ...addedFavorites, ...pinnedLocalServices]
-      .filter((application) => !pendingFavoriteRemovals[getApplicationKey(application)])
-  }, [entFavoriteApplications, pendingFavoriteAdds, pendingFavoriteRemovals, allServices, localPins])
+    return [...entFavorites, ...pinnedLocalServices]
+  }, [entFavoriteApplications, allServices, localPins])
   const visibleServices = useMemo(() => {
     const pinnedLocalKeys = new Set(localPins)
     return allServices.filter(
@@ -1178,37 +658,7 @@ function AvailableApplications({
     setOrderedFavorites(applyStoredOrder(favoriteApplications))
   }, [favoriteApplications])
 
-  // Once the portal reflects a change, the optimistic entry is no longer needed.
-  // A removal deferred until its add was confirmed goes out now.
   useEffect(() => {
-    const entByKey = new Map(entFavoriteApplications.map((application) => [getApplicationKey(application), application]))
-    setPendingFavoriteAdds((current) => {
-      const keys = Object.keys(current).filter((key) => entByKey.has(key))
-      if (keys.length === 0) return current
-      const next = { ...current }
-      for (const key of keys) delete next[key]
-      return next
-    })
-    setPendingFavoriteRemovals((current) => {
-      const keys = Object.keys(current).filter((key) => !entByKey.has(key) && !deferredRemovalsRef.current.has(key))
-      if (keys.length === 0) return current
-      const next = { ...current }
-      for (const key of keys) delete next[key]
-      return next
-    })
-    for (const key of [...deferredRemovalsRef.current]) {
-      const confirmed = entByKey.get(key)
-      if (confirmed) {
-        deferredRemovalsRef.current.delete(key)
-        void sendFavoriteRemoval(confirmed)
-      }
-    }
-    // sendFavoriteRemoval only uses setters and refs.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [entFavoriteApplications])
-
-  useEffect(() => {
-    const launchRequests = launchRequestsRef.current
     const launchBehaviorRequests = launchBehaviorRequestsRef.current
     const removalTimeouts = removalTimeoutsRef.current
     // Set again on mount: StrictMode runs this cleanup once in development,
@@ -1217,7 +667,6 @@ function AvailableApplications({
 
     return () => {
       isMountedRef.current = false
-      launchRequests.clear()
       launchBehaviorRequests.clear()
       for (const timeoutId of removalTimeouts.values()) {
         window.clearTimeout(timeoutId)
@@ -1248,84 +697,67 @@ function AvailableApplications({
   useEffect(() => {
     let isCancelled = false
 
+    // The list as the server gave it, shown.
+    function showApplications(answer) {
+      const services = orderApplications(toApplications(answer.apps, APPLICATION_OPTIONS), loadAppsOrder())
+      saveAppsOrder(services)
+
+      // The favourites: the browser's, started once from the portal's.
+      const favoritesKey = answer.sessionMode === DEMO_SESSION_MODE ? DEMO_FAVORITES_KEY : LOCAL_FAVORITES_KEY
+      favoritesKeyRef.current = favoritesKey
+      const favorites = resolveFavoriteKeys(loadLocalFavorites(favoritesKey), services)
+      if (favorites.seeded) {
+        saveLocalFavorites(favoritesKey, favorites.keys)
+      }
+      const sections = buildLocalFavoriteSections(services, favorites.keys)
+
+      // Establishment shortcuts go first. When the portal already lists one
+      // (same host), promote the portal entry instead of duplicating it.
+      const extraServices = universityConfig.establishments?.byId?.[establishment]?.extraServices ?? []
+      const pinnedServices = extraServices.map((extraService) => {
+        const extraHost = getUrlHostname(extraService.href)
+        const portalIndex = extraHost ? services.findIndex((service) => getUrlHostname(service.href) === extraHost) : -1
+        return portalIndex !== -1 ? services.splice(portalIndex, 1)[0] : extraService
+      })
+      services.unshift(...pinnedServices)
+
+      // Tile icons come in the background: the grid never waits for them.
+      void fetchAppIcons(services).then((assignments) => {
+        // Shared by the whole university, so still right after a refresh.
+        if (assignments) {
+          setAppIcons(assignments)
+        }
+      })
+
+      setAllServices(services)
+      setFavoriteActionState((current) => ({ ...current, error: '' }))
+      setViewState({
+        status: sections.sections.length > 0 ? 'ready' : 'empty',
+        source: sections.source,
+        rawCount: sections.rawCount,
+        sections: sections.sections,
+        error: '',
+      })
+    }
+
     async function hydrateApplications() {
       try {
-        const bootstrap = await getPortalBootstrap()
+        const answer = await getApps()
         if (isCancelled) {
           return
         }
-
-        const services = normalizeAllServices(bootstrap, loadAppsOrder())
-        const sections = LOCAL_FAVORITES
-          ? buildLocalFavoriteSections(services, loadLocalFavorites())
-          : normalizeBootstrapSections(bootstrap)
-        saveAppsOrder(services)
-
-        // Tile icons come in the background: the grid never waits for them.
-        void fetchAppIcons([
-          ...getFavoriteApplications(sections.sections),
-          ...services,
-          ...(universityConfig.establishments?.byId?.[establishment]?.extraServices ?? []),
-        ]).then((assignments) => {
-          // Shared by the whole university, so still right after a refresh.
-          if (assignments) {
-            setAppIcons(assignments)
-          }
-        })
-
-        const nextLaunchTargets = await resolveLaunchTargets([
-          ...getFavoriteApplications(sections.sections),
-          ...services,
-        ].filter((application) => !isUnavailableGradeApplication(application)), launchTargetsRef.current)
-        if (isCancelled) {
-          return
+        if (!Array.isArray(answer?.apps)) {
+          throw new Error(DEFAULT_ERROR_MESSAGE)
         }
+        showApplications(answer)
 
-        // Establishment shortcuts go first. When the portal already lists one
-        // (same resolved host), promote the portal entry instead of duplicating it.
-        const getServiceHost = (service) => getUrlHostname(nextLaunchTargets[getApplicationKey(service)]?.href || service.href)
-        const extraServices = universityConfig.establishments?.byId?.[establishment]?.extraServices ?? []
-        const pinnedServices = extraServices.map((extraService) => {
-          const extraHost = getUrlHostname(extraService.href)
-          const portalIndex = extraHost ? services.findIndex((service) => getServiceHost(service) === extraHost) : -1
-          if (portalIndex !== -1) {
-            return services.splice(portalIndex, 1)[0]
+        // An old list the server gave while it asks the portal again: the
+        // one that comes replaces it; without one, the old list stays.
+        if (answer.refreshing) {
+          const fresh = await getApps({ fresh: true }).catch(() => null)
+          if (!isCancelled && Array.isArray(fresh?.apps)) {
+            showApplications(fresh)
           }
-          return {
-            ...extraService,
-            href: toNavigableHref(extraService.href),
-          }
-        })
-        services.unshift(...pinnedServices)
-
-        launchTargetsRef.current = nextLaunchTargets
-        setLaunchTargets(nextLaunchTargets)
-        setAllServices(services)
-
-        if (sections.sections.length > 0) {
-          setFavoriteActionState((current) => ({ ...current, error: '' }))
-          setViewState({
-            status: 'ready',
-            source: sections.source,
-            rawCount: sections.rawCount,
-            sections: sections.sections,
-            error: '',
-          })
-          return
-        }
-
-        const hasSuccessfulResponse = [bootstrap.layout, bootstrap.layoutDoc, bootstrap.marketplace]
-          .some((response) => response?.ok)
-
-        setViewState({
-          status: hasSuccessfulResponse ? 'empty' : 'error',
-          source: sections.source,
-          rawCount: sections.rawCount,
-          sections: [],
-          error: hasSuccessfulResponse ? '' : getBootstrapErrorMessage(bootstrap),
-        })
-        if (hasSuccessfulResponse) {
-          setFavoriteActionState((current) => ({ ...current, error: '' }))
         }
       } catch (error) {
         if (isCancelled) {
@@ -1349,46 +781,9 @@ function AvailableApplications({
     }
   }, [reloadKey, establishment])
 
-  async function resolveApplicationLaunch(application) {
-    const launchKey = getApplicationKey(application)
-    const cachedLaunch = launchTargets[launchKey]
-    if (!application.fname || cachedLaunch) {
-      return cachedLaunch ?? {
-        href: application.href,
-        target: application.target,
-      }
-    }
-
-    const existingRequest = launchRequestsRef.current.get(launchKey)
-    if (existingRequest) {
-      return existingRequest
-    }
-
-    const request = resolveLaunchTarget(application)
-      .then((resolvedLaunch) => {
-        if (isMountedRef.current) {
-          setLaunchTargets((current) => (
-            current[launchKey]
-              ? current
-              : { ...current, [launchKey]: resolvedLaunch }
-          ))
-        }
-
-        return resolvedLaunch
-      })
-      .catch(() => ({
-        href: application.href,
-        target: application.target,
-      }))
-      .finally(() => {
-        launchRequestsRef.current.delete(launchKey)
-      })
-
-    launchRequestsRef.current.set(launchKey, request)
-    return request
-  }
-
-  async function resolveApplicationLaunchBehavior(application, launch = null) {
+  // Whether an application opens through the launch relay: the server says,
+  // from where the application's address leads (the CAS or not).
+  async function resolveApplicationLaunchBehavior(application) {
     const launchKey = getApplicationKey(application)
     const cachedBehavior = launchBehaviors[launchKey]
     if (typeof cachedBehavior === 'boolean') {
@@ -1400,8 +795,7 @@ function AvailableApplications({
       return existingRequest
     }
 
-    const resolvedLaunch = launch ?? await resolveApplicationLaunch(application)
-    const href = resolvedLaunch?.href || application?.href || ''
+    const href = application?.href || ''
     if (!/^https?:\/\//i.test(href)) {
       const fallbackBehavior = shouldUseServerLaunchForTarget(href, null)
 
@@ -1446,14 +840,6 @@ function AvailableApplications({
 
     launchBehaviorRequestsRef.current.set(launchKey, request)
     return request
-  }
-
-  function warmApplicationLaunch(application) {
-    if (!application.fname) {
-      return
-    }
-
-    void resolveApplicationLaunch(application)
   }
 
   function clearLaunchingState(launchKey) {
@@ -1587,7 +973,7 @@ function AvailableApplications({
   async function launchApplicationFromAction(application, options = {}) {
     const launchKey = getApplicationKey(application)
     const { targetOverride = null, preparedWindow = null } = options
-    const resolvedLaunch = launchTargets[launchKey]
+    const launch = { href: application.href, target: targetOverride || application.target }
 
     if (launchingKeys[launchKey]) {
       if (preparedWindow && !preparedWindow.closed) {
@@ -1599,16 +985,12 @@ function AvailableApplications({
     setLaunchingKeys((current) => ({ ...current, [launchKey]: true }))
 
     try {
-      const nextLaunch = resolvedLaunch ?? await resolveApplicationLaunch(application)
       const shouldUseServerLaunch = canUseServerLaunch
-        ? await resolveApplicationLaunchBehavior(application, nextLaunch)
+        ? await resolveApplicationLaunchBehavior(application)
         : false
-      const effectiveLaunch = targetOverride
-        ? { ...nextLaunch, target: targetOverride }
-        : nextLaunch
 
       clearLaunchingState(launchKey)
-      navigateToApplication(effectiveLaunch, preparedWindow, {
+      navigateToApplication(launch, preparedWindow, {
         useServerLaunch: shouldUseServerLaunch,
       })
     } catch {
@@ -1616,10 +998,7 @@ function AvailableApplications({
       if (preparedWindow && !preparedWindow.closed) {
         preparedWindow.close()
       }
-      navigateToApplication({
-        href: resolvedLaunch?.href || application.href,
-        target: targetOverride || resolvedLaunch?.target || application.target,
-      }, null, {
+      navigateToApplication(launch, null, {
         useServerLaunch: false,
       })
     } finally {
@@ -1653,9 +1032,7 @@ function AvailableApplications({
     setFavoriteActionState((current) => ({ ...current, error: '' }))
 
     try {
-      const nextLaunch = await resolveApplicationLaunch(application)
-      const href = nextLaunch?.href || application?.href || ''
-      await copyTextToClipboard(href)
+      await copyTextToClipboard(application?.href || '')
       closeContextMenu()
     } catch (error) {
       setFavoriteActionState((current) => ({
@@ -1676,65 +1053,22 @@ function AvailableApplications({
     })
   }
 
-  function postFavoriteLayoutChange(requestPath) {
-    return requestEnt(requestPath, {
-      method: 'POST',
-      headers: {
-        Accept: 'application/json, text/javascript, */*; q=0.01',
-        Origin: ENT_ORIGIN,
-        'X-Requested-With': 'XMLHttpRequest',
-      },
-    })
-  }
-
-  function cancelFavoriteRemoval(applicationKey) {
+  // A favourite on its way out stays after all.
+  function cancelFavoriteExit(applicationKey) {
     window.clearTimeout(removalTimeoutsRef.current.get(applicationKey))
     removalTimeoutsRef.current.delete(applicationKey)
-    deferredRemovalsRef.current.delete(applicationKey)
     setPendingFavorite(setExitingFavoriteKeys, applicationKey, null)
-    setPendingFavorite(setPendingFavoriteRemovals, applicationKey, null)
   }
 
-  // Sends the remove request for a favorite already leaving the row, and puts
-  // it back if the ENT refuses. `exitAnimation` lets the tile finish animating
-  // before a fast reply drops it from the list.
-  async function sendFavoriteRemoval(application, exitAnimation = Promise.resolve()) {
-    const applicationKey = getApplicationKey(application)
-
-    try {
-      if (LOCAL_FAVORITES) {
-        saveLocalFavorites(loadLocalFavorites().filter((key) => key !== applicationKey))
-      } else {
-        const requestPath = buildRemoveFavoriteRequestPath(application)
-        if (!requestPath) {
-          throw new Error('Impossible de retirer ce favori pour le moment')
-        }
-        const response = await postFavoriteLayoutChange(requestPath)
-        if (!response.ok) {
-          throw new Error(
-            (typeof response.data === 'object' ? response.data?.error : '')
-            || response.text
-            || 'Impossible de retirer ce favori pour le moment',
-          )
-        }
-      }
-      await exitAnimation
-      if (!isMountedRef.current) return
-      setViewState((current) => {
-        const nextSections = removeApplicationFromSections(current.sections, applicationKey)
-        return {
-          ...current,
-          rawCount: Math.max(0, current.rawCount - 1),
-          sections: nextSections,
-          status: nextSections.length > 0 ? 'ready' : 'empty',
-        }
-      })
-      setReloadKey((current) => current + 1)
-    } catch (error) {
-      if (!isMountedRef.current) return
-      cancelFavoriteRemoval(applicationKey)
-      setFavoriteActionState({ removingKey: '', error: getErrorMessage(error) })
-    }
+  // The favourites as the browser holds them now, shown.
+  function showStoredFavorites() {
+    const local = buildLocalFavoriteSections(allServices, loadLocalFavorites(favoritesKeyRef.current) ?? [])
+    setViewState((current) => ({
+      ...current,
+      ...local,
+      status: local.sections.length > 0 ? 'ready' : 'empty',
+      error: '',
+    }))
   }
 
   function handleUnfavorite(application) {
@@ -1751,30 +1085,22 @@ function AvailableApplications({
     }
 
     setFavoriteActionState({ removingKey: '', error: '' })
+    const storageKey = favoritesKeyRef.current
+    saveLocalFavorites(storageKey, (loadLocalFavorites(storageKey) ?? []).filter((key) => key !== applicationKey))
     // The star empties right away; the tile plays its exit animation, then
-    // leaves the row.
+    // leaves the row (unless it was starred again meanwhile: the favourites
+    // shown are the stored ones, as they are then).
     setExitingFavoriteKeys((current) => ({ ...current, [applicationKey]: true }))
     window.clearTimeout(removalTimeoutsRef.current.get(applicationKey))
     removalTimeoutsRef.current.set(applicationKey, window.setTimeout(() => {
       removalTimeoutsRef.current.delete(applicationKey)
       if (!isMountedRef.current) return
-      setPendingFavorite(setPendingFavoriteRemovals, applicationKey, true)
       setPendingFavorite(setExitingFavoriteKeys, applicationKey, null)
+      showStoredFavorites()
     }, FAVORITE_REMOVAL_ANIMATION_MS))
-
-    const isConfirmed = entFavoriteApplications.some((favorite) => getApplicationKey(favorite) === applicationKey)
-    if (!isConfirmed) {
-      deferredRemovalsRef.current.add(applicationKey)
-      return
-    }
-
-    void sendFavoriteRemoval(
-      application,
-      new Promise((resolve) => window.setTimeout(resolve, FAVORITE_REMOVAL_ANIMATION_MS)),
-    )
   }
 
-  async function handleAddFavorite(application) {
+  function handleAddFavorite(application) {
     const applicationKey = getApplicationKey(application)
     closeContextMenu()
 
@@ -1788,67 +1114,19 @@ function AvailableApplications({
       return
     }
 
-    // Undo of a removal that hasn't gone out yet: just show it again.
-    if (deferredRemovalsRef.current.has(applicationKey)) {
-      cancelFavoriteRemoval(applicationKey)
-      return
-    }
-
-    // Stored in this browser: the favourite is confirmed at once.
-    if (LOCAL_FAVORITES) {
-      setFavoriteActionState({ removingKey: '', error: '' })
-      cancelFavoriteRemoval(applicationKey)
-      const keys = loadLocalFavorites()
-      const nextKeys = keys.includes(applicationKey) ? keys : [...keys, applicationKey]
-      saveLocalFavorites(nextKeys)
-      const local = buildLocalFavoriteSections(allServices, nextKeys)
-      setViewState((current) => ({
-        ...current,
-        ...local,
-        status: local.sections.length > 0 ? 'ready' : 'empty',
-        error: '',
-      }))
-      return
-    }
-
-    const lastEntFavorite = orderedFavorites.filter((f) => !isLocalService(f)).pop()
-    const requestPath = buildAddFavoriteRequestPath(application, lastEntFavorite)
-
-    if (!requestPath) {
-      setFavoriteActionState({
-        removingKey: '',
-        error: "Impossible d'ajouter ce favori pour le moment",
-      })
-      return
-    }
-
     setFavoriteActionState({ removingKey: '', error: '' })
-    cancelFavoriteRemoval(applicationKey)
-    setPendingFavorite(setPendingFavoriteAdds, applicationKey, application)
-
-    try {
-      const response = await postFavoriteLayoutChange(requestPath)
-      if (!response.ok) {
-        throw new Error("Impossible d'ajouter ce favori pour le moment")
-      }
-      if (!isMountedRef.current) return
-      setReloadKey((current) => current + 1)
-    } catch (error) {
-      if (!isMountedRef.current) return
-      cancelFavoriteRemoval(applicationKey)
-      setPendingFavorite(setPendingFavoriteAdds, applicationKey, null)
-      setFavoriteActionState({ removingKey: '', error: getErrorMessage(error) })
-    }
+    cancelFavoriteExit(applicationKey)
+    const storageKey = favoritesKeyRef.current
+    const keys = loadLocalFavorites(storageKey) ?? []
+    saveLocalFavorites(storageKey, keys.includes(applicationKey) ? keys : [...keys, applicationKey])
+    showStoredFavorites()
   }
 
-  // The grade service's app while the student has « Mes notes ». Checks the
-  // resolved launch link too: the portal's own entry for ScoDoc only links
-  // to the ENT.
+  // The grade service's app while the student has « Mes notes ».
   function opensGradesPage(application) {
     return opensGradesPageInApp(application, {
       ...GRADES_PORTAL_OPTIONS,
       hasGradesPage: Boolean(onOpenGradesPage),
-      resolvedHref: launchTargets[getApplicationKey(application)]?.href,
       base: window.location.href,
     })
   }
@@ -1859,7 +1137,6 @@ function AvailableApplications({
     return opensPlanningPageInApp(application, {
       ...PLANNING_PORTAL_OPTIONS,
       hasPlanningPage: Boolean(onOpenPlanningPage),
-      resolvedHref: launchTargets[getApplicationKey(application)]?.href,
       base: window.location.href,
     })
   }
@@ -1869,7 +1146,6 @@ function AvailableApplications({
     return opensMailPageInApp(application, {
       ...MAIL_PORTAL_OPTIONS,
       hasMailPage: Boolean(onOpenMailPage),
-      resolvedHref: launchTargets[getApplicationKey(application)]?.href,
       base: window.location.href,
     })
   }
@@ -1879,7 +1155,6 @@ function AvailableApplications({
     return opensMoodlePageInApp(application, {
       ...MOODLE_PORTAL_OPTIONS,
       hasMoodlePage: Boolean(onOpenMoodlePage),
-      resolvedHref: launchTargets[getApplicationKey(application)]?.href,
       base: window.location.href,
     })
   }
@@ -1919,15 +1194,14 @@ function AvailableApplications({
       return
     }
 
-    if (!application.fname) {
+    // A plain link: the browser opens it.
+    if (!application.relay) {
       return
     }
 
     event.preventDefault()
 
-    const launchKey = getApplicationKey(application)
-    const resolvedLaunch = launchTargets[launchKey]
-    const preparedWindow = (resolvedLaunch?.target ?? application.target) === '_blank'
+    const preparedWindow = application.target === '_blank'
       ? window.open('about:blank', '_blank')
       : null
 
@@ -1952,11 +1226,10 @@ function AvailableApplications({
   // drawer (`inDrawer`: the star always shows, the arrows move through).
   const renderServiceCard = (service, index, { inDrawer = false } = {}) => {
     const applicationKey = getApplicationKey(service)
-    const resolvedLaunch = launchTargets[applicationKey]
-    const href = resolvedLaunch?.href || service.href
+    const href = service.href
     const inAppPage = getInAppPage(service)
     const opensInApp = Boolean(inAppPage)
-    const target = opensInApp ? '' : resolvedLaunch?.target || service.target
+    const target = opensInApp ? '' : service.target
     const isBusy = favoriteActionState.removingKey === applicationKey
     const isLaunching = Boolean(launchingKeys[applicationKey])
     const isContextOpen = contextMenuState.open && getApplicationKey(contextMenuState.application ?? {}) === applicationKey
@@ -1973,8 +1246,6 @@ function AvailableApplications({
         rel={target === '_blank' || opensInApp ? 'noreferrer' : undefined}
         aria-description={opensInApp ? IN_APP_PAGE_DESCRIPTIONS[inAppPage] : undefined}
         aria-busy={isBusy || isLaunching}
-        onMouseEnter={() => warmApplicationLaunch(service)}
-        onFocus={() => warmApplicationLaunch(service)}
         onContextMenu={(event) => handleFavoriteContextMenu(event, service, 'all')}
         onClick={(event) => void handleApplicationClick(event, service, 'grid')}
       >
@@ -2031,9 +1302,8 @@ function AvailableApplications({
         : orderedFavorites
     // « Accueil »'s row isn't the favourites alone: without any (status
     // 'empty', the list loaded), it still has the first apps and « Toutes
-    // les applications », the way to every app. A portal whose favourites
-    // stay in the browser (services.localFavorites: Rennes 2, Sorbonne
-    // Nouvelle) starts with none.
+    // les applications », the way to every app. A student who starred
+    // nothing on the portal starts with none.
     const homeHasApps = home && (viewState.status === 'ready' || viewState.status === 'empty') && visibleServices.length > 0
     const showRow = home ? viewState.status === 'ready' || homeHasApps : shouldShowFavoriteRow
     const titleId = home ? 'home-apps-title' : 'favorites-strip-title'
@@ -2121,14 +1391,13 @@ function AvailableApplications({
             <div className={`${favoriteListClassName} ${isDragging && !home ? 'is-dragging' : ''}`} ref={home ? homeAppsRowRef : favoritesRowRef}>
               {displayedFavorites.map((application, index) => {
                 const applicationKey = getApplicationKey(application)
-                const resolvedLaunch = launchTargets[applicationKey]
-                const href = resolvedLaunch?.href || application.href
+                const href = application.href
                 // In-app tiles drop `target` (a new tab a plain click doesn't
                 // open; a modified click still does, natively, hence `rel`) and
                 // say where they lead instead.
                 const inAppPage = getInAppPage(application)
                 const opensInApp = Boolean(inAppPage)
-                const target = opensInApp ? '' : resolvedLaunch?.target || application.target
+                const target = opensInApp ? '' : application.target
                 const isLaunching = Boolean(launchingKeys[applicationKey])
                 const isRemovingFavorite = favoriteActionState.removingKey === applicationKey
                 const isExitingFavorite = Boolean(exitingFavoriteKeys[applicationKey])
@@ -2152,8 +1421,6 @@ function AvailableApplications({
                     onDragOver={home ? undefined : (event) => handleDragOver(event, index)}
                     onDragEnd={home ? undefined : handleDragEnd}
                     onClickCapture={handleClickCapture}
-                    onMouseEnter={() => warmApplicationLaunch(application)}
-                    onFocus={() => warmApplicationLaunch(application)}
                     onContextMenu={(event) => handleFavoriteContextMenu(event, application, favoritesByKey.has(applicationKey) ? 'favorite' : 'all')}
                     onClick={(event) => void handleApplicationClick(event, application, favoritesByKey.has(applicationKey) ? 'favorites' : 'grid')}
                   >

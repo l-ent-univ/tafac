@@ -2,10 +2,11 @@
 
 A way to mend an app in the students' hands without a new version of it.
 
-The apps run the server on the student's device (`docs/DESKTOP.md`,
-`docs/IOS.md`). What breaks there waits for an update of the app: on iOS,
-for the App Store's review. So an app also reads a small signed file from
-tafac.fr: **patches over its universities' settings, data only**.
+The apps run the server on the student's device, inside the app (the
+gateway, `docs/DESKTOP.md`, `docs/IOS.md`). What breaks there waits for an
+update of the app: on iOS, for the App Store's review. So an app also reads
+a small signed file from tafac.fr: **patches over its universities'
+settings, data only**.
 
 Both apps read it, iOS and desktop. tafac.fr itself and a self-hosted
 server don't: they run their own settings.
@@ -14,20 +15,30 @@ server don't: they run their own settings.
 
 It can:
 
-- **switch a feature off** (`features`), for the server and the page: the
-  planning, the mail, Moodle's deadlines… as if the university didn't have
-  it;
-- **follow an address that moved**, or change any other setting of a
-  university's `server.js` and `client.js` (a path, a caption, a limit).
+- **switch a feature off** (`features`) in the page: the planning, the
+  mail, Moodle's deadlines… as if the university didn't have it;
+- **change a setting of the page's** (a university's `client.js`: a
+  caption, a limit, a link).
 
-It can't, whoever signed it (`server/remoteSettings/guard.ts`):
+It no longer can follow an address that moved, or change anything else of
+how the university is asked. That was a university's `server.js`, which
+the apps' own Node read; since the apps have no Node (27 November 2026)
+the university is asked by the gateway through tonAPI, whose settings are
+built into the app. A `server` part is still checked like the rest (a
+patch that names an address outside the university's domains is refused
+whole), and changes nothing. A university's service that moved takes a new
+version of the app, with tonAPI's settings mended.
+
+It can't, whoever signed it (`back/crates/tafac-gateway/src/own/settings/guard.rs`):
 
 - **send anything to a new domain.** Every address a patch names must be
-  one of the university's own, as the app ships them: the hosts of the
-  addresses in its settings, and the domains it lists
-  (`launch.allowedDomains`, the sign-in chains' `signInDomains`). The CAS can
-  move to `sso2.univ-rennes.fr`; it can't move to another domain. That takes
-  a new version of the app;
+  one of the university's own, as the app ships them: the hosts the app
+  asks the university at (tonAPI's settings) and Tafac's own lists of its
+  domains (the launch relay's, the sign-in chains'; the gateway's
+  `launch/targets.rs`, held to `launch.allowedDomains` and the
+  `signInDomains` of the university's settings). An address under
+  `univ-rennes.fr` passes; one of another domain doesn't. That takes a new
+  version of the app;
 - name a file of the device (a mail's logo is read from one), or change
   which university the settings are;
 - add code. Logic that changed at a university (a new step in its sign-in)
@@ -62,8 +73,8 @@ the app's log; the others still apply.
 | `university` | The university's id (`universities/<id>/`) |
 | `apps` | Optional: the apps it is for (`ios`, `desktop`). All without it |
 | `minVersion`, `maxVersion` | Optional: the app's versions it is for, both included. A patch for a bug of 0.27 says `"maxVersion": "0.27.2"`, so the version that mends it for good doesn't take it |
-| `features` | Switches, laid over the `features` of both the server's and the page's settings |
-| `server` | Laid over `universities/<id>/server.js` |
+| `features` | Switches, laid over the `features` of the page's settings |
+| `server` | Checked, and laid over nothing: it was laid over the universities' `server.js`, which went with Node |
 | `client` | Laid over `universities/<id>/client.js`, in the page |
 
 Objects are merged key by key; anything else (a text, a number, a list,
@@ -89,7 +100,10 @@ the apps that have it.
 3. Put both on tafac.fr, where `APP_SETTINGS_FILE` points
    (`settings.json`; its signature is read at the same path plus `.sig`).
    The server sends them as they are (`GET /app/settings.json`,
-   `/app/settings.json.sig`), read again at each request: no restart.
+   `/app/settings.json.sig`), read again at each request: no restart. On
+   tafac.fr that is its gateway
+   (`back/crates/tafac-gateway/src/own/settings.rs`), which reads
+   `APP_SETTINGS_FILE`.
 
 tafac.fr holds no key: whoever got into it could not make a file the apps
 take. The signature is the private key's, which is on the maintainer's
@@ -116,8 +130,9 @@ for no update: a patch for a release is none of its business.
 
 ## When an app takes it
 
-- **As it starts.** The universities' settings are read once, when the
-  server starts: the file in force is the one there then.
+- **As it starts.** The page's settings are laid over once, as the app
+  starts: the file in force is the one there then (the list of
+  universities, which carries them, waits for that start).
 - **The file is asked for at each start**, and every hour while the app
   runs. When tafac.fr last answered more than 6 hours ago, the start waits
   for the answer, 1.5 seconds at most; otherwise it starts with the file it
@@ -125,8 +140,8 @@ for no update: a patch for a release is none of its business.
 - So a patch reaches a student at their next start of the app, or the one
   after when they had opened it within the last 6 hours.
 - **On a Mac that can be long**: closing the window doesn't quit the app
-  (`docs/DESKTOP.md`), and its server keeps the settings it started with
-  until the app is quit (⌘Q) and opened again. The desktop app also updates
+  (`docs/DESKTOP.md`), and it keeps the settings it started with until it
+  is quit (⌘Q) and opened again. The desktop app also updates
   itself within the hour, which mends more than a patch can.
 - **It never gets in the way.** No answer (offline, tafac.fr down), a file
   that doesn't read, a bad signature, an older file: the app goes on with
@@ -137,18 +152,18 @@ for no update: a patch for a release is none of its business.
 
 | | |
 |---|---|
-| `server/remoteSettings/` | `minisign.ts` (the signature), `document.ts` (the file), `guard.ts` (what a patch may not do), `index.ts` (asking, keeping, applying; tafac.fr's routes) |
-| `src/remoteSettings.js` | Laying one set of settings over another, for the server and the page |
-| `server/universitiesApp.js` | Each university's settings pass through it as the server starts; the page's part goes out with `/__ent_auth/universities` |
+| `back/crates/tafac-gateway/src/own/settings/` | The apps' side, in the gateway: `minisign.rs` (the signature), `document.rs` (the file), `guard.rs` (what a patch may not do), `remote.rs` (asking, keeping, laying over the page's settings); `settings.rs`, tafac.fr's routes |
+| `back/crates/tafac-gateway/src/own/universities.rs` | The page's part goes out with `/__ent_auth/universities` (`settings`) |
 | `src/universityBoot.js` | The page lays its part over `client.js` |
-| `src-tauri/src/remote_settings.rs` | Each app says which app it is, where the file is and whose signature it takes (`TAFAC_APP`, `TAFAC_APP_VERSION`, `REMOTE_SETTINGS_*`), to its server: `sidecar.rs` on the desktop, `node.rs` on iOS |
-| `tests/remoteSettings.test.ts` | With files signed by a key made for the tests |
+| `src-tauri/src/remote_settings.rs` | Each app says which app it is, its version, where the file is and whose signature it takes, and starts the reading as it starts |
+| `src/remoteSettings.js` | The keys a patch may never change (`FORBIDDEN_KEYS`), shared with the page |
+| `tests/fixtures/remoteSettings.js` | Signed files and their public key, made when Node read them: the gateway's tests read them (`own/settings.rs`) |
 
 ## Not done yet
 
-- **The desktop app takes a patch only when it starts**: its server could
-  be started again when a newer file comes (it is a process of its own),
-  which iOS can't do.
+- **An app takes a patch only when it starts**: the gateway could lay a
+  newer file over the page's settings as it comes, and the page read them
+  again.
 - **A minimum version** for iOS, as the desktop's `minimum`: nothing tells
   a student their version can no longer sign in.
 - **No notice in the page** that a newer file waits for the next start.

@@ -1,12 +1,10 @@
-// The apps' remote settings (server/remoteSettings/,
-// docs/REMOTE_SETTINGS.md): patches over the universities' settings, from a
-// small signed file on tafac.fr. The server on the device reads and checks
-// it; the app only tells it, through its environment, which app this is,
-// where the file is and whose signature it takes: the updates' public key
-// (tauri.conf.json), which is in the app, not on the device.
-//
-// The same for both apps: the desktop's server is a process of its own
-// (sidecar.rs), the phone's runs inside the app (node.rs).
+// The apps' remote settings (docs/REMOTE_SETTINGS.md): patches over the
+// universities' settings, from a small signed file on tafac.fr. The gateway
+// in the app asks for it, checks it, keeps it and lays it over the page's
+// settings (tafac_gateway::own::RemoteSettings); the app only says which
+// app this is, where the file is and whose signature it takes: the
+// updates' public key (tauri.conf.json), which is in the app, not on the
+// device. The same for both apps.
 //
 // As the updates (updater.rs): a packaged build made here (0.0.0) asks for
 // nothing, a patch for a release being none of its business; and a debug
@@ -16,6 +14,7 @@
 
 use std::path::Path;
 
+use tafac_gateway::own::{RemoteSettings, RemoteSource};
 use tauri::AppHandle;
 
 const URL: &str = "https://tafac.fr/app/settings.json";
@@ -34,9 +33,9 @@ pub struct Build<'a> {
     pub key_override: Option<String>,
 }
 
-// What the server's environment gets.
-pub fn variables(build: Build, data_dir: &Path) -> Vec<(&'static str, String)> {
-    let mut variables = vec![("TAFAC_APP", build.app.to_string()), ("TAFAC_APP_VERSION", build.version.to_string())];
+// Where the file is and whose signature it takes, for this build; None:
+// nothing is asked.
+pub fn source(build: Build, data_dir: &Path) -> Option<RemoteSource> {
     let (url, key) = if build.debug {
         (build.url_override, build.key_override.or(build.key.map(str::to_string)))
     } else if build.version == LOCAL_VERSION {
@@ -44,15 +43,14 @@ pub fn variables(build: Build, data_dir: &Path) -> Vec<(&'static str, String)> {
     } else {
         (Some(URL.to_string()), build.key.map(str::to_string))
     };
-    if let (Some(url), Some(key)) = (url, key) {
-        variables.push(("REMOTE_SETTINGS_URL", url));
-        variables.push(("REMOTE_SETTINGS_PUBKEY", key));
-        variables.push(("REMOTE_SETTINGS_FILE", data_dir.join("remote-settings.json").to_string_lossy().into_owned()));
-    }
-    variables
+    let (url, public_key) = (url?, key?);
+    Some(RemoteSource { url, public_key, file: data_dir.join("remote-settings.json"), app: build.app.to_string(), version: build.version.to_string() })
 }
 
-pub fn environment(app: &AppHandle, name: &str, data_dir: &Path) -> Vec<(&'static str, String)> {
+// The remote settings of this app (`name`: ios, desktop). The app runs
+// them on a task of its own as it starts (RemoteSettings::run): the list of
+// universities waits for their start, a second and a half at most.
+pub fn for_this_app(app: &AppHandle, name: &str, data_dir: &Path) -> RemoteSettings {
     let version = app.package_info().version.to_string();
     let key = app
         .config()
@@ -69,7 +67,10 @@ pub fn environment(app: &AppHandle, name: &str, data_dir: &Path) -> Vec<(&'stati
         url_override: std::env::var("TAFAC_SETTINGS_URL").ok(),
         key_override: std::env::var("TAFAC_SETTINGS_PUBKEY").ok(),
     };
-    variables(build, data_dir)
+    let remote_settings = RemoteSettings::new(source(build, data_dir));
+    let running = remote_settings.clone();
+    tauri::async_runtime::spawn(async move { running.run().await });
+    remote_settings
 }
 
 #[cfg(test)]
@@ -80,52 +81,45 @@ mod tests {
         Build { app: "desktop", version, key: Some("the updates' key"), debug, url_override: None, key_override: None }
     }
 
-    fn value(variables: &[(&'static str, String)], name: &str) -> Option<String> {
-        variables.iter().find(|(variable, _)| *variable == name).map(|(_, value)| value.clone())
-    }
-
     #[test]
     fn a_release_reads_tafac_frs_file_with_the_updates_key() {
-        let variables = variables(build("0.27.0", false), Path::new("/data"));
-        assert_eq!(value(&variables, "TAFAC_APP").as_deref(), Some("desktop"));
-        assert_eq!(value(&variables, "TAFAC_APP_VERSION").as_deref(), Some("0.27.0"));
-        assert_eq!(value(&variables, "REMOTE_SETTINGS_URL").as_deref(), Some(URL));
-        assert_eq!(value(&variables, "REMOTE_SETTINGS_PUBKEY").as_deref(), Some("the updates' key"));
-        assert_eq!(value(&variables, "REMOTE_SETTINGS_FILE").as_deref(), Some("/data/remote-settings.json"));
+        let source = source(build("0.27.0", false), Path::new("/data")).unwrap();
+        assert_eq!(source.app, "desktop");
+        assert_eq!(source.version, "0.27.0");
+        assert_eq!(source.url, URL);
+        assert_eq!(source.public_key, "the updates' key");
+        assert_eq!(source.file, Path::new("/data/remote-settings.json"));
     }
 
     #[test]
     fn a_release_takes_no_address_or_key_from_its_environment() {
         let asked = Build { url_override: Some("http://127.0.0.1:8787/settings.json".into()), key_override: Some("another key".into()), ..build("0.27.0", false) };
-        let variables = variables(asked, Path::new("/data"));
-        assert_eq!(value(&variables, "REMOTE_SETTINGS_URL").as_deref(), Some(URL));
-        assert_eq!(value(&variables, "REMOTE_SETTINGS_PUBKEY").as_deref(), Some("the updates' key"));
+        let source = source(asked, Path::new("/data")).unwrap();
+        assert_eq!(source.url, URL);
+        assert_eq!(source.public_key, "the updates' key");
     }
 
     #[test]
     fn a_build_made_here_asks_for_nothing() {
-        let variables = variables(build("0.0.0", false), Path::new("/data"));
-        assert_eq!(value(&variables, "TAFAC_APP_VERSION").as_deref(), Some("0.0.0"));
-        assert_eq!(value(&variables, "REMOTE_SETTINGS_URL"), None);
-        assert_eq!(value(&variables, "REMOTE_SETTINGS_PUBKEY"), None);
+        assert!(source(build("0.0.0", false), Path::new("/data")).is_none());
     }
 
     #[test]
     fn a_debug_build_asks_only_where_it_is_told() {
-        assert_eq!(value(&variables(build("0.0.0", true), Path::new("/data")), "REMOTE_SETTINGS_URL"), None);
+        assert!(source(build("0.0.0", true), Path::new("/data")).is_none());
 
         let told = Build { url_override: Some("http://127.0.0.1:8787/settings.json".into()), ..build("0.0.0", true) };
-        let variables_told = variables(told, Path::new("/data"));
-        assert_eq!(value(&variables_told, "REMOTE_SETTINGS_URL").as_deref(), Some("http://127.0.0.1:8787/settings.json"));
-        assert_eq!(value(&variables_told, "REMOTE_SETTINGS_PUBKEY").as_deref(), Some("the updates' key"));
+        let source_told = source(told, Path::new("/data")).unwrap();
+        assert_eq!(source_told.url, "http://127.0.0.1:8787/settings.json");
+        assert_eq!(source_told.public_key, "the updates' key");
 
         let test_key = Build { url_override: Some("http://127.0.0.1:8787/settings.json".into()), key_override: Some("a test key".into()), ..build("0.0.0", true) };
-        assert_eq!(value(&variables(test_key, Path::new("/data")), "REMOTE_SETTINGS_PUBKEY").as_deref(), Some("a test key"));
+        assert_eq!(source(test_key, Path::new("/data")).unwrap().public_key, "a test key");
     }
 
     #[test]
     fn without_a_key_nothing_is_asked() {
         let keyless = Build { key: None, ..build("0.27.0", false) };
-        assert_eq!(value(&variables(keyless, Path::new("/data")), "REMOTE_SETTINGS_URL"), None);
+        assert!(source(keyless, Path::new("/data")).is_none());
     }
 }

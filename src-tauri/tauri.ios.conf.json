@@ -7,7 +7,7 @@
   },
   "bundle": {
     "resources": {
-      "../desktop-build/ios/server/": "server/"
+      "../dist/": "dist/"
     },
     "iOS": {
       "minimumSystemVersion": "15.0",

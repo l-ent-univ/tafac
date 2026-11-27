@@ -12,7 +12,6 @@ import {
 } from '../src/courseMail.js'
 import { MAX_INLINE_IMAGES, inlineImageCids } from '../src/mailInlineImages.js'
 import { toPlanningEvent } from '../src/planningEvents.js'
-import { composerHtmlToText, normalizeComposePayload } from '../server/mailSend.js'
 
 // Local times, as the Planning reads them (whatever the machine's zone).
 const at = (day, hours, minutes = 0) => new Date(2026, 10, day, hours, minutes).getTime()
@@ -81,33 +80,6 @@ test('a class\'s mail text: greeting, the line about it, a line to write on, the
   const plain = buildCourseMailHtml(tempo, rows).html
   assert.match(plain, /au sujet du cours d’Anglais TD du mercredi 4 novembre à 10 h 15\./)
   assert.doesNotMatch(plain, /<img/)
-})
-
-test('a class\'s mail as sent: the box as lines, the image as its alt', () => {
-  const rows = buildCourseSummaryRows(ade)
-  const image = { cid: 'tafac-img-0123abcd-4567@tafac.fr', alt: courseImageAlt(ade), width: 400, height: 220 }
-  const { html } = buildCourseMailHtml(ade, rows, image)
-  const parsed = normalizeComposePayload(
-    { to: [{ email: 'thomas.lemoine@univ-rennes.fr' }], html: `${html}<div data-mail-signature=""></div>`, sendUid: 'uid-00000001', inlineImages: [{ cid: image.cid, source: 'upload', aid: 'aid-1', width: 400, height: 220 }] },
-    { isValidMessageId: () => true, isValidUploadId: () => true },
-  )
-  assert.equal(composerHtmlToText(parsed.value.html, { signatureText: '-- \nCamille' }), [
-    'Bonjour,',
-    '',
-    'Je vous écris au sujet du cours de R5.12 Développement back-end du mardi 3 novembre à 14 h.',
-    '',
-    'Cours : R5.12 Développement back-end',
-    'Date : Mardi 3 novembre 2026',
-    'Horaire : 14:00 – 16:00 (2h00)',
-    'Salle : A08 - Info 2',
-    'Enseignant : M. Lemoine',
-    'Groupe : MMI3 TP1',
-    '',
-    '[Image : Cours de R5.12 Développement back-end du mardi 3 novembre]',
-    '',
-    '-- ',
-    'Camille',
-  ].join('\n'))
 })
 
 test('a class picked in « Un cours… »: its box and image, the box alone past the shared cap', () => {

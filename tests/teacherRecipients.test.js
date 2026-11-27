@@ -1,6 +1,5 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { searchDemoMailContacts } from '../server/mailAutocomplete.js'
 import {
   isStudentAddress,
   lookupTeacherRecipients,
@@ -106,27 +105,6 @@ test('À is filled only with one sure match for one teacher', () => {
 })
 
 // The demo's address book, as the route answers it.
-const demoSearch = async (query) => ({ status: 'ok', suggestions: searchDemoMailContacts(query) })
-
-test('the demo planning\'s teachers resolve in the demo address book', async () => {
-  assert.deepEqual((await lookupTeacherRecipients('M. Lemoine', { search: demoSearch })).prefill, [{ name: 'Thomas Lemoine', email: 'thomas.lemoine@univ-rennes.fr' }])
-  // Mme Martin: the student Hugo Martin left out, Claire Martin found.
-  assert.deepEqual((await lookupTeacherRecipients('Mme Martin', { search: demoSearch })).prefill.map((entry) => entry.email), ['claire.martin@univ-rennes.fr'])
-  // Two Le Fur: offered, À left alone.
-  const furs = await lookupTeacherRecipients('Mme Le Fur', { search: demoSearch })
-  assert.deepEqual(furs.prefill, [])
-  assert.deepEqual(furs.suggestions[0].matches.map((entry) => entry.email), ['anne.le-fur@univ-rennes.fr', 'yann.le-fur@univ-rennes.fr'])
-  // The demo's shared class.
-  const shared = await lookupTeacherRecipients('Mme Le Fur - M. Lemoine', { search: demoSearch })
-  assert.deepEqual(shared.prefill, [])
-  assert.deepEqual(shared.suggestions.map((entry) => [entry.name, entry.matches.length]), [['Mme Le Fur', 2], ['M. Lemoine', 1]])
-  assert.equal(shared.canAddAll, false)
-  for (const name of ['M. Le Goff', 'Mme Kerjean', 'Mme Riou', 'M. Guillou']) {
-    assert.equal((await lookupTeacherRecipients(name, { search: demoSearch })).prefill.length, 1, name)
-  }
-  assert.deepEqual(await lookupTeacherRecipients('M. Inconnu', { search: demoSearch }), { prefill: [], suggestions: [], canAddAll: false })
-})
-
 test('the lookup: queries in turn, a failure as none found, nothing asked without a name', async () => {
   const asked = []
   const search = async (query) => {

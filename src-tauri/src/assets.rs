@@ -1,18 +1,18 @@
 // The page's built files (/assets/…: scripts, styles, fonts, pictures, the
-// small videos of the animated icons), kept in memory once the server gave
-// them, and answered from there.
+// small videos of the animated icons), kept in memory once the site (the
+// build the app carries, bridge.rs) gave them, and answered from there.
 //
 // WebKit keeps nothing of what comes from the app's own scheme between two
 // uses, and reads a video a few bytes at a time (a Range request for each
 // box of the file, again each time the video starts): the home page's six
-// animated icons were some sixty requests a second, each one a round trip
-// to the server. On a phone, where the server runs without a JIT, the
-// icons took a second to show at each return to the page, and everything
-// else waited behind them.
+// animated icons were some sixty requests a second, each one a file read
+// again (a round trip to the app's Node, when there was one: on a phone,
+// without a JIT, the icons took a second to show at each return to the
+// page, and everything else waited behind them).
 //
 // Vite names these files after their content (name-hash.ext): a name never
 // means another file while the app runs, so nothing is ever stale. The
-// server is still asked for each file once, whole, and its answer's headers
+// site is still asked for each file once, whole, and its answer's headers
 // are kept with it: it stays the one that says what a file is.
 
 use std::collections::HashMap;
@@ -38,7 +38,7 @@ pub struct File {
 pub struct Assets {
     files: Mutex<HashMap<String, Arc<File>>>,
     // One file fetched at a time: sixty requests for a file not there yet
-    // ask the server for it once.
+    // ask the site for it once.
     pub fetching: tokio::sync::Mutex<()>,
 }
 

@@ -202,6 +202,9 @@ export default {
   },
 
   services: {
+    // The portal's applications sit behind the CAS: a tile opens through
+    // the launch relay, which signs the student in to it.
+    launchRelay: true,
     // No getAppIcon: tiles use the automatic icons (server/appIcons.js,
     // style set in server.js).
     // Lowercased ENT title → title shown in l'ent.

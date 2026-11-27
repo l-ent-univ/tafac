@@ -1,27 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import {
-  MAIL_PAGE_SOURCES,
-  createSearchReporter,
-  describeMailLoad,
-  describeSend,
-  getAttachmentsBucket,
-  toComposeKind,
-  toFolderKind,
-  toMailPageSource,
-  toMailVia,
-  toRemoveAction,
-} from '../src/mailAnalytics.js'
-import { sanitizeAnalyticsEvent } from '../server/analyticsSchema.js'
-
-test('arrival sources: the known ones, anything else is other', () => {
-  for (const source of MAIL_PAGE_SOURCES) assert.equal(toMailPageSource(source), source)
-  assert.equal(toMailPageSource('sidebar_card'), 'other')
-  assert.equal(toMailPageSource(undefined), 'other')
-  for (const source of MAIL_PAGE_SOURCES) {
-    assert.ok(sanitizeAnalyticsEvent({ event: 'page_viewed', properties: { page: 'mail', source } }, { hasSession: true }))
-  }
-})
+import { MAIL_PAGE_SOURCES, createSearchReporter, describeMailLoad, getAttachmentsBucket, toComposeKind, toFolderKind, toMailVia, toRemoveAction } from '../src/mailAnalytics.js'
 
 test('the first list: loading reports nothing, then ok, empty, error or session_expired', () => {
   assert.equal(describeMailLoad({ status: 'loading' }), null)
@@ -53,23 +32,6 @@ test('folders, composers and actions are named by enum, never by what they hold'
 
 test('files are counted in buckets', () => {
   assert.deepEqual([0, 1, 2, 3, 4, 9, undefined].map(getAttachmentsBucket), ['0', '1', '2-3', '2-3', '4+', '4+', '0'])
-})
-
-test('a send is described by its outcome, buckets and a boolean', () => {
-  const snapshot = {
-    state: {
-      subject: 'Secret',
-      attachments: [{ status: 'ready', name: 'cv.pdf' }, { status: 'ready', name: 'lettre.pdf' }, { status: 'error', name: 'x.zip' }],
-      inlineImages: [{ key: 'a' }],
-    },
-  }
-  assert.deepEqual(describeSend('sent', snapshot, { status: 'ok' }), { result: 'ok', attachments: '2-3', inline_images: true })
-  assert.equal(describeSend('sent', snapshot, { status: 'ok', partial: true }).result, 'partial')
-  assert.equal(describeSend('failed', snapshot, { status: 'error' }).result, 'error')
-  assert.equal(describeSend('undone', snapshot).result, 'undone')
-  assert.deepEqual(describeSend('sent', { state: {} }, { status: 'ok' }), { result: 'ok', attachments: '0', inline_images: false })
-  const sent = sanitizeAnalyticsEvent({ event: 'mail_action', properties: { action: 'sent', ...describeSend('sent', snapshot, { status: 'ok' }) } }, { hasSession: true })
-  assert.deepEqual(sent.properties, { action: 'sent', result: 'ok', attachments: '2-3', inline_images: true })
 })
 
 test('a search is reported once per burst of typing, with its last scope', () => {

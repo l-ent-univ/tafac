@@ -49,6 +49,16 @@ jobs:
       - run: npm test
       - run: npm run build
 
+  gateway:
+    name: Server tests (the gateway, back/)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      # The same Rust as the image (Dockerfile) and tonAPI.
+      - run: rustup toolchain install 1.98.1 --profile minimal
+      - run: cargo +1.98.1 test --locked
+        working-directory: back
+
   docker-build:
     name: Docker build (no push)
     if: github.event_name == 'pull_request'
@@ -65,7 +75,7 @@ jobs:
 
   release:
     name: GitHub release
-    needs: check
+    needs: [check, gateway]
     if: github.event_name == 'push' && github.ref == 'refs/heads/main' && !contains(github.event.head_commit.message, '[skip release]')
     runs-on: ubuntu-latest
     permissions:
@@ -201,7 +211,7 @@ jobs:
             docker image rm "$IMAGE@$DIGEST" > /dev/null
           done
           # The two platforms' frontends are the same files, the pre-rendered
-          # pages aside: server.js reads .prerender into the pages it sends,
+          # pages aside: the server reads .prerender into the pages it sends,
           # never serves it as a file (left out of the manifest too).
           diff -r -x .prerender dist-amd64 dist-arm64
           (cd dist-amd64 && find . -type f ! -path './.prerender/*' ! -name robots.txt | sed 's|^\./||' | LC_ALL=C sort | xargs -d '\n' sha256sum) > dist-manifest.sha256

@@ -8,7 +8,6 @@ import {
   toPlanningPageSource,
   toPlanningView,
 } from '../src/planningAnalytics.js'
-import { sanitizeAnalyticsEvent } from '../server/analyticsSchema.js'
 
 // Timers the test advances by hand.
 function createClock() {
@@ -41,16 +40,6 @@ test('page sources outside the list count as other', () => {
   assert.equal(toPlanningPageSource('launch_card'), 'launch_card')
   assert.equal(toPlanningPageSource('sidebar'), 'other')
   assert.equal(toPlanningPageSource(undefined), 'other')
-})
-
-test('every planning source and view gets through the server allowlist', () => {
-  for (const source of PLANNING_PAGE_SOURCES) {
-    for (const id of ['day', 'twoDays', 'week', 'list']) {
-      const view = toPlanningView(id)
-      const kept = sanitizeAnalyticsEvent({ event: 'page_viewed', properties: { page: 'planning', source, view } }, { hasSession: true })
-      assert.deepEqual(kept?.properties, { page: 'planning', source, view })
-    }
-  }
 })
 
 test('views are named for the analytics, unknown ones dropped', () => {

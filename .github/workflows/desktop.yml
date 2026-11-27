@@ -100,8 +100,7 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          # Each on its own processor: the Node the app ships and the server's
-          # packages are per architecture (scripts/desktop-prepare.mjs).
+          # Each on its own processor: the app's binary is per architecture.
           - name: Apple Silicon
             runner: macos-15
             platform: darwin-aarch64
@@ -163,14 +162,14 @@ jobs:
           printf '%s' "$APPLE_PROVISIONING_PROFILE" | base64 --decode > src-tauri/embedded.provisionprofile
 
       # tauri.bundle.conf.json runs `npm run desktop:prepare` first (the
-      # frontend, the server's files, the Node binary). The app only: the
-      # update's archive and the disk image are made further down, once the
-      # app is signed as it ships. No notarization key here: Tauri would
+      # page's build, which the app carries, and the disk image's
+      # background). The app only: the update's archive and the disk image
+      # are made further down, once the app is signed as it ships. No notarization key here: Tauri would
       # notarize what desktop-sign.mjs then signs again.
       - name: Build and sign the app
         env:
           APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
-          # Anonymous statistics (src-tauri/src/sidecar.rs): PostHog's public
+          # Anonymous statistics (src-tauri/src/bridge.rs): PostHog's public
           # project key, as tafac.fr's. Unset, the app sends nothing.
           TAFAC_POSTHOG_PROJECT_KEY: ${{ secrets.POSTHOG_PROJECT_KEY }}
         run: |

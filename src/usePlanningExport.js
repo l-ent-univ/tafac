@@ -5,7 +5,7 @@ import { mergeEvents, toPlanningEvent } from './planningEvents'
 import { ICS_FILE_NAME, ICS_MIME_TYPE, buildIcsCalendar } from './planningIcs'
 import { fetchUpcomingEvents } from './upcomingClasses'
 
-// The most days /ade/upcoming gives in one request (the server's cap).
+// The days exported: the next two months.
 const EXPORT_DAYS = 60
 // A notice (nothing to export, or it failed) stays this long.
 const NOTICE_MS = 4000

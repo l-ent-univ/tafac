@@ -52,8 +52,8 @@ function getTabSizeClasses(count) {
 // explains itself in a bubble instead of a hover tooltip.
 // In the iOS app the bar is the system's (src/iosTabBar.js): same tabs, same
 // presses, and the page only keeps the bar's place and the bubble.
-function MobileTabBar({ establishment, gradesSupported = true, activePage = 'home', showAssiduity = false, onNavigatePage }) {
-  const shortcuts = pickShortcuts(getMobileTabItems(establishment, { gradesSupported }), showAssiduity)
+function MobileTabBar({ establishment, gradesSupported = true, demoAccount = false, activePage = 'home', showAssiduity = false, onNavigatePage }) {
+  const shortcuts = pickShortcuts(getMobileTabItems(establishment, { gradesSupported, demo: demoAccount }), showAssiduity)
   const items = [HOME_TAB, ...shortcuts].map((item) => (
     item.page ? { ...item, selected: item.page === activePage } : item
   ))

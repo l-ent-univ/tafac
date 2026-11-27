@@ -1,0 +1,42 @@
+{
+  "about": "A session cookie as server/sessionCookie.js writes it, with made-up values. Read back by the server (tests/sessionCookie.test.js) and by the gateway (back/crates/tafac-gateway/src/session/cookie.rs): a change of format fails both.",
+  "secret": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+  "cookie": "v1.BnurO5IMzNBc6ZVT.me_gDOmWtRNTTdZ5Y-gUMZ_TQEXcyzAtsIYN_Gs9lZuM1mvT8ldZHKCihlglYrTd86yaeIWp6pq4z3U3cT_0nLXL0M1Y58-LJBTwzxCQn6K2WThhvg7b0UEAu_JeJDgPeJEgvpLx1zQLj6UOoKcWGMqmLekOHk3TqjNGe1p9nokYqVmLvvZBFr6H-htuDY4qJabaKP2VmhoVud5IxNScumy31eq87Nhvk_mGrfnEtpoBngNz-iO7SIaKmL242q-z-bEmp7eMprzG5nBGf4Bic9LbiJnorncYPm3SWTvr1UKIe_mBUiSlUd3ALDB5am4OXR1PWBvnGUFw0pR1DK5up-CzUlIw1tFS5kQbMp_GWokNJ4bQRQXiR7Kg1-YHqiIW8VFZxQb02_63FVI-AxIx5lEVFpKZywdSIERH8erLrmQQP7h-4EI4m-6w8A.Qpo5QNJ1IzTPz95L9ZBYxA",
+  "payload": {
+    "id": "3f2a9c1e-7b64-4d0f-9a51-2c8e6d7f0b13",
+    "uni": "univ-rennes-2",
+    "user": "jdoe",
+    "mode": null,
+    "demoState": null,
+    "createdAt": 1790000000000,
+    "jar": [
+      [
+        "TGC",
+        "TGT-made-up-ticket",
+        "cas.exemple.test",
+        "/cas",
+        1,
+        1,
+        null
+      ],
+      [
+        "JSESSIONID",
+        "made-up-portal-session",
+        "ent.exemple.test",
+        "/",
+        1,
+        1,
+        null
+      ],
+      [
+        "lang",
+        "fr",
+        "exemple.test",
+        "/",
+        0,
+        0,
+        1795000000000
+      ]
+    ]
+  }
+}

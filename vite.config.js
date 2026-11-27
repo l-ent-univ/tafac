@@ -1,4 +1,5 @@
-import { execSync } from 'node:child_process'
+import { execSync, spawn } from 'node:child_process'
+import { randomBytes } from 'node:crypto'
 import { readFileSync } from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -6,49 +7,120 @@ import tailwindcss from '@tailwindcss/vite'
 import react from '@vitejs/plugin-react'
 import { VitePWA } from 'vite-plugin-pwa'
 import { defineConfig, loadEnv } from 'vite'
-import { readAnalyticsConfig } from './server/analytics.js'
-import { resolveDataDir } from './server/appIcons.js'
-import { fillBrandingPlaceholders, fillPublicOrigin } from './server/appShell.js'
-import { createUniversitiesApp } from './server/universitiesApp.js'
+import { fillBrandingPlaceholders, fillPublicOrigin } from './universities/appShell.js'
 import { branding as neutralBranding } from './universities/neutral.js'
-import { listServedUniversityIds, loadSharedConfig, resolveMultiUniversity, resolveUniversityId } from './universities/index.js'
+import { loadSharedConfig, resolveMultiUniversity, resolveUniversityId } from './universities/index.js'
 
 // Every university, like tafac.fr, unless UNIVERSITY picks one (and
 // MULTI_UNIVERSITY isn't set): see universities/index.js. The build is the
 // same either way; this only decides what the dev and preview servers serve.
 const multiUniversity = resolveMultiUniversity()
 const universityId = resolveUniversityId()
-// The page's SEO text on the dev and preview servers, as server.js fills it.
+// The page's SEO text on the dev and preview servers, as the gateway fills it.
 const pageBranding = multiUniversity ? neutralBranding : (await loadSharedConfig(universityId)).branding
 
-// Dev/preview backend: the same Express app the production server mounts
-// (server/universitiesApp.js). Unmatched requests fall through to Vite.
-// POSTHOG_*, ANALYTICS_*, SESSION_SECRET* and DATA_DIR may come from the shell
-// or from .env / .env.local (shell wins). Without SESSION_SECRET the backend
-// uses a random per-process key: sessions then don't survive a dev-server
-// restart. Without DATA_DIR, automatic app icons are remembered in ./data.
-// No PostHog from the dev server unless POSTHOG_IN_DEV=1: what's tried here,
-// often with a real account, stays out of the real numbers.
-async function mountEntAuthApp(server) {
-  const env = loadEnv(server.config.mode, server.config.envDir || process.cwd(), ['POSTHOG_', 'ANALYTICS_', 'SESSION_SECRET', 'DATA_DIR'])
-  const universitiesApp = await createUniversitiesApp({
-    universityIds: multiUniversity ? listServedUniversityIds() : [universityId],
-    defaultUniversityId: universityId,
-    multi: multiUniversity,
-    // Plain http://localhost: no Secure flag, no __Host- prefix.
-    production: false,
-    session: {
-      secret: env.SESSION_SECRET,
-      previousSecrets: env.SESSION_SECRET_PREVIOUS,
-    },
-    analytics: env.POSTHOG_IN_DEV === '1' ? readAnalyticsConfig(env) : { projectKey: null },
-    appIcons: { dataDir: resolveDataDir(env) },
-  })
+// Dev/preview backend: the gateway (back/crates/tafac-gateway), the same as
+// tafac.fr's, built here with `cargo build` then started, and asked through
+// Vite's proxy
+// (/__ent_auth, /__ent_proxy: `server.proxy` below). Vite stays the server
+// the page is opened at, with its hot reload; the gateway answers the API.
+// Its first start builds it (a few minutes); the page's API answers once it
+// listens.
+//
+// SESSION_SECRET*, DATA_DIR, POSTHOG_*, ANALYTICS_* and UNIVERSITY,
+// MULTI_UNIVERSITY, UNIVERSITIES may come from the shell or from .env /
+// .env.local (shell wins). Without SESSION_SECRET a random key is made for
+// this start: sessions then don't survive a restart. Without DATA_DIR,
+// automatic app icons are remembered in ./data. No statistics from the dev
+// server unless POSTHOG_IN_DEV=1: what's tried here, often with a real
+// account, stays out of the real numbers.
+//
+// TAFAC_DEV_GATEWAY_PORT: where it listens (default 3100). TAFAC_DEV_GATEWAY=off:
+// none is started, one already running on that port is asked (its own
+// terminal, its own log).
+const gatewayPort = Number(process.env.TAFAC_DEV_GATEWAY_PORT) || 3100
+const gatewayAddress = `http://127.0.0.1:${gatewayPort}`
 
-  server.middlewares.use(universitiesApp)
-  server.httpServer?.once('close', () => {
-    void universitiesApp.locals.shutdown()
+function startGateway(server) {
+  if (process.env.TAFAC_DEV_GATEWAY === 'off') return
+  const root = server.config.root
+  const env = loadEnv(server.config.mode, server.config.envDir || root, ['POSTHOG_', 'ANALYTICS_', 'SESSION_SECRET', 'DATA_DIR', 'UNIVERSITY', 'MULTI_UNIVERSITY', 'UNIVERSITIES'])
+  let secret = env.SESSION_SECRET
+  if (!secret) {
+    secret = randomBytes(32).toString('hex')
+    server.config.logger.info('[tafac] no SESSION_SECRET: a key for this start only, sessions end with it')
+  }
+  const statistics = env.POSTHOG_IN_DEV === '1'
+  // A restart of Vite (its config changed) starts the gateway again: once the
+  // one before has let its port go.
+  const previous = globalThis.tafacDevGateway
+  const launch = () => {
+    globalThis.tafacDevGateway = runGateway(server, root, env, secret, statistics)
+  }
+  if (previous && !previous.done) {
+    previous.once('exit', launch)
+    previous.kill()
+  } else {
+    launch()
+  }
+}
+
+// Built first, then the binary started itself (not through `cargo run`,
+// whose child would outlive it): stopped with Vite, however Vite stops.
+function runGateway(server, root, env, secret, statistics) {
+  const logger = server.config.logger
+  const manifest = path.join(root, 'back', 'Cargo.toml')
+  // `done`: nothing of it runs any more (its build or itself ended).
+  const handle = { done: false, process: null, stopped: false }
+  const stop = () => {
+    handle.stopped = true
+    build.kill()
+    handle.process?.kill()
+  }
+  handle.kill = stop
+  handle.once = (event, listener) => {
+    const running = handle.process ?? build
+    running.once(event, listener)
+  }
+  const build = spawn('cargo', ['build', '-q', '-p', 'tafac-gateway', '--manifest-path', manifest], { cwd: root, stdio: 'inherit' })
+  build.on('error', (error) => {
+    logger.error(`[tafac] the gateway wasn't built (${error.message}): is Rust's cargo installed?`)
   })
+  build.on('exit', (code) => {
+    if (handle.stopped || code !== 0) handle.done = true
+    if (handle.stopped) return
+    if (code !== 0) {
+      logger.error('[tafac] the gateway wasn\'t built: the page\'s API won\'t answer')
+      return
+    }
+    const child = spawn(path.join(root, 'back', 'target', 'debug', 'tafac-gateway'), [], {
+      cwd: root,
+      stdio: 'inherit',
+      env: {
+        ...process.env,
+        ...env,
+        SESSION_SECRET: secret,
+        TAFAC_GATEWAY_DEV: '1',
+        TAFAC_GATEWAY_LISTEN: `127.0.0.1:${gatewayPort}`,
+        TAFAC_GATEWAY_NODE: '',
+        POSTHOG_PROJECT_KEY: statistics ? env.POSTHOG_PROJECT_KEY ?? '' : '',
+        DATA_DIR: env.DATA_DIR || path.join(root, 'data'),
+      },
+    })
+    handle.process = child
+    child.on('exit', () => {
+      handle.done = true
+    })
+  })
+  server.httpServer?.once('close', stop)
+  process.once('exit', stop)
+  for (const signal of ['SIGINT', 'SIGTERM', 'SIGHUP']) {
+    process.once(signal, () => {
+      stop()
+      process.exit(signal === 'SIGINT' ? 130 : 143)
+    })
+  }
+  return handle
 }
 
 // Dev only: the branch checked out right now, next to "dev" in the footer
@@ -72,10 +144,10 @@ const entDevAuthPlugin = {
   name: 'ent-dev-auth',
   configureServer(server) {
     serveGitBranch(server)
-    return mountEntAuthApp(server)
+    startGateway(server)
   },
-  async configurePreviewServer(server) {
-    await mountEntAuthApp(server)
+  configurePreviewServer(server) {
+    startGateway(server)
 
     // The built page with its placeholders filled, as server.js sends it.
     const distDir = path.resolve(server.config.root, server.config.build.outDir)
@@ -92,7 +164,8 @@ const entDevAuthPlugin = {
     })
   },
   // index.html's %LENT_*% placeholders and __PUBLIC_ORIGIN__ stay in the
-  // build, for the server to fill as it sends the page (server/appShell.js);
+  // build, for the server to fill as it sends the page (the gateway's
+  // own/page.rs; universities/appShell.js here);
   // the dev server fills them here and leaves the links relative.
   transformIndexHtml(html, context) {
     return context?.server ? fillPublicOrigin(fillBrandingPlaceholders(html, pageBranding), '') : html
@@ -162,7 +235,7 @@ export default defineConfig(({ isSsrBuild }) => ({
       includeAssets: ['icon.png', 'apple-touch-icon.png'],
       workbox: {
         // /desktop/: the desktop app's manifest and installers
-        // (server/desktopUpdate), never the page.
+        // (the gateway's own/desktop_update), never the page.
         navigateFallbackDenylist: [/^\/__ent_auth/, /^\/__ent_proxy/, /^\/desktop\//],
       },
       // One build for every university: the installed app is Tafac's.
@@ -203,10 +276,14 @@ export default defineConfig(({ isSsrBuild }) => ({
     // localhost and IP addresses, plus the tunnel (dev.tafac.fr): another host
     // name is another site reaching this server through a DNS it controls.
     allowedHosts: ['.tafac.fr'],
-    // /__ent_proxy is handled by the shared entAuthApp middleware above.
-    // The desktop app's manifest and installers are tafac.fr's
-    // (server/desktopUpdate): the website's « Tafac pour Mac » button.
+    // The page's API: the gateway started above, the request's own Host
+    // kept (the university a request without a session is for, the mail's
+    // links to the page's own host). The preview server takes the same.
+    // The desktop app's manifest and installers are tafac.fr's: the
+    // website's « Tafac pour Mac » button.
     proxy: {
+      '/__ent_auth': { target: gatewayAddress },
+      '/__ent_proxy': { target: gatewayAddress },
       '/desktop/': { target: 'https://tafac.fr', changeOrigin: true },
     },
   },

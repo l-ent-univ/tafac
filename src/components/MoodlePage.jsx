@@ -24,9 +24,10 @@ import { r } from '../register'
 // expired, the app signs out (App's onSessionExpired).
 //
 // `target`: a page of Moodle's to open on (a deadline's activity), taken
-// once (`onTargetHandled`). `signsInOnMoodle`: show Moodle's own sign-in page instead (the demo
-// account has no session to renew). `onHistoryChange`: whether Moodle can go
-// back and forward, for the menu bar (null off the page).
+// once (`onTargetHandled`). `onHistoryChange`: whether Moodle can go back
+// and forward, for the menu bar (null off the page). Never the demo
+// account's page: it has no session for the app to open Moodle with, and
+// its « Moodle » is a link (src/navItems.js).
 
 const RETRY_STATE_MS = 1000
 // A cover that came or went without the page's tree changing (a transition).
@@ -50,7 +51,7 @@ function ToolbarButton({ icon, label, onClick, disabled = false }) {
   )
 }
 
-function MoodlePage({ target = null, onTargetHandled = () => {}, signsInOnMoodle = false, onHistoryChange = null }) {
+function MoodlePage({ target = null, onTargetHandled = () => {}, onHistoryChange = null }) {
   const slotRef = useRef(null)
   const [view, setView] = useState(INITIAL_MOODLE_STATE)
   // The app refused to make the view (no window, no Moodle for the session).
@@ -136,7 +137,7 @@ function MoodlePage({ target = null, onTargetHandled = () => {}, signsInOnMoodle
 
   // On screen once Moodle is there, and while nothing of the page's is over
   // the slot; where the slot is, as it moves.
-  const wanted = !refused && (view.phase === 'ready' || (view.phase === 'signin' && signsInOnMoodle))
+  const wanted = !refused && view.phase === 'ready'
   useEffect(() => {
     const slot = slotRef.current
     if (!slot || !wanted) return undefined
@@ -219,7 +220,7 @@ function MoodlePage({ target = null, onTargetHandled = () => {}, signsInOnMoodle
   // down): unavailable, as a page that didn't load. 'expired': the app
   // signs out, nothing to show meanwhile.
   const isExpired = view.phase === 'expired'
-  const isFailed = !isExpired && (refused || view.phase === 'failed' || (view.phase === 'signin' && !signsInOnMoodle))
+  const isFailed = !isExpired && (refused || view.phase === 'failed' || view.phase === 'signin')
   // There is one view: another window of the app took it.
   const isElsewhere = !refused && view.phase === 'elsewhere'
   const isOpening = !refused && ['opening', 'none', 'gone'].includes(view.phase)

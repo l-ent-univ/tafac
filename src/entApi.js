@@ -1,20 +1,23 @@
+import { noteBackendAnswer } from './dev/backendTrace.js'
 import universityConfig from '@university'
 import { GRADES_UNAVAILABLE_MESSAGE } from './gradeFeatureState'
 import { evaluationTypeLabel, listGradesSemesters, summarizeAverage } from './gradesReport'
 import { readDistributionCounts } from './evaluationDistribution'
-import { pickAdeGroupForAlias } from './adeGroupMatch'
+import { findTpUnderYear, pickAdeGroupForAlias } from './adeGroupMatch'
+import { adeTreeRoot, buildDirectory, findTreePath, focusAdeTree, followedGroups } from './planningTree'
 import { buildParcoursTpAliases } from './scodocParcoursGroups'
-import { getLoadedUniversityId, getUniversityRequestHeaders } from './universityRuntime'
+import { getDefaultUniversityId, getLoadedUniversityId, getUniversityRequestHeaders } from './universityRuntime'
 import { buildUploadDisposition, normalizeAttachmentType, readAttachmentLimits, sanitizeAttachmentName } from './mailAttachments'
 import { isValidAddress, sanitizeDisplayName } from './mailCompose'
 import { readMailSignatures } from './mailSignatureChoice'
 import { r } from './register.js'
 import { createSessionSignal, logoutHeaders } from './sessionSignal'
 import { isNativeApp } from './desktopApp'
+import { DEMO_ACCOUNT, DEMO_SESSION_MODE, isDemoCredentials } from './demoAccount'
+import { answerDemoRequest, isDemoSignedIn, signInToDemo, signOutOfDemo, uploadDemoFile } from './demoRuntime'
 
 // Null on the neutral page (no university picked yet).
 export const ENT_ORIGIN = universityConfig.origins.ent
-const ENT_HOST = ENT_ORIGIN ? new URL(ENT_ORIGIN).hostname : ''
 const APP_BASE_URL = (() => {
   const rawBaseUrl = String(import.meta.env?.BASE_URL || '/').trim()
 
@@ -25,7 +28,6 @@ const APP_BASE_URL = (() => {
   return rawBaseUrl.endsWith('/') ? rawBaseUrl.slice(0, -1) : rawBaseUrl
 })()
 
-export const ENT_PROXY_PREFIX = `${APP_BASE_URL}/__ent_proxy`
 export const ENT_AUTH_PREFIX = `${APP_BASE_URL}/__ent_auth`
 export const DEFAULT_REFERER = `${ENT_ORIGIN}${universityConfig.auth?.portalEntryPath ?? '/'}`
 // Public entry point of the grade service (ScoDoc/Notes9), opened through the
@@ -35,15 +37,7 @@ const GRADES_SERVICE_URL = universityConfig.grades?.serviceUrl ?? null
 export const GRADES_LAUNCH_HREF = GRADES_SERVICE_URL
   ? `${ENT_AUTH_PREFIX}/launch?url=${encodeURIComponent(GRADES_SERVICE_URL)}`
   : null
-const DEFAULT_ACCEPT = 'application/json, text/html;q=0.9, text/plain;q=0.8, */*;q=0.5'
-const DEMO_SESSION_MODE = 'demo'
 const RECENT_LOGIN_SESSION_KEY = 'l-ent:recent-login-at'
-let currentSessionMode = null
-
-function setCurrentSessionMode(nextMode) {
-  currentSessionMode = nextMode === DEMO_SESSION_MODE ? DEMO_SESSION_MODE : null
-}
-
 // Whether the session is still valid, as the server's answers say
 // (src/sessionSignal.js).
 const sessionSignal = createSessionSignal()
@@ -52,11 +46,38 @@ export const onSessionExpired = sessionSignal.subscribe
 // The server said so to the desktop app (its Moodle view's 'expired').
 export const reportSessionExpired = () => sessionSignal.expire()
 
+// Whether the page shows the demo account, as its last session check said.
+let showsDemo = false
+
 // fetch() for this app's server, its answer checked for the session (also
-// for src/appIcons.js and the applications' launch preview).
+// for src/appIcons.js and the applications' launch preview). The demo
+// account's requests are answered by the page itself (src/demoRuntime.js):
+// nothing of it is sent.
 export async function serverFetch(url, init) {
+  if (!isDemoSignedIn()) {
+    // The demo the page shows is over without a sign-out here (its thirty
+    // days ran out): said as a session that expired, as the cookie's end
+    // was, rather than left with a server that knows nobody.
+    if (showsDemo) {
+      showsDemo = false
+      signOutOfDemo()
+      sessionSignal.expire()
+    }
+    return sendToServer(url, init)
+  }
+  const startedAt = import.meta.env.DEV ? performance.now() : 0
+  const response = await answerDemoRequest(url, init)
+  if (import.meta.env.DEV) noteBackendAnswer(url, response, performance.now() - startedAt, 'page')
+  return response
+}
+
+async function sendToServer(url, init) {
   const sentUnder = sessionSignal.current
+  const startedAt = import.meta.env.DEV ? performance.now() : 0
   const response = await fetch(url, init)
+  // Development: which side answered (the Rust gateway or the Node server),
+  // for src/dev/BackendMarks.jsx.
+  if (import.meta.env.DEV) noteBackendAnswer(url, response, performance.now() - startedAt)
   sessionSignal.note(sentUnder, (name) => response.headers.get(name))
   return response
 }
@@ -94,69 +115,6 @@ export function getRecentEntLoginAgeMs() {
 
 export function isRecentEntLogin(windowMs) {
   return getRecentEntLoginAgeMs() <= Math.max(0, Number(windowMs) || 0)
-}
-
-function normalizeProxyPath(input) {
-  if (!input) {
-    return '/'
-  }
-
-  if (input.startsWith(ENT_ORIGIN)) {
-    const url = new URL(input)
-    return `${url.pathname}${url.search}`
-  }
-
-  if (input.startsWith('http://') || input.startsWith('https://')) {
-    throw new Error(`Only ${ENT_HOST} URLs are supported by the local proxy.`)
-  }
-
-  return input.startsWith('/') ? input : `/${input}`
-}
-
-export function buildEntProxyHref(input) {
-  return `${ENT_PROXY_PREFIX}${normalizeProxyPath(input)}`
-}
-
-function normalizeExtraHeaders(extraHeaders = {}) {
-  const headers = {}
-
-  for (const [name, value] of Object.entries(extraHeaders)) {
-    if (value === undefined || value === null || value === '') {
-      continue
-    }
-
-    const lowerName = name.toLowerCase()
-    if (lowerName === 'cookie' || lowerName === 'referer') {
-      continue
-    }
-
-    headers[name] = String(value)
-  }
-
-  return headers
-}
-
-function buildFetchHeaders(auth = {}, extraHeaders = {}) {
-  const headers = new Headers()
-  const mergedExtraHeaders = normalizeExtraHeaders({
-    Accept: DEFAULT_ACCEPT,
-    ...(auth.extraHeaders ?? {}),
-    ...extraHeaders,
-  })
-
-  if (auth.cookie?.trim()) {
-    headers.set('x-ent-cookie', auth.cookie.trim())
-  }
-
-  if (auth.referer?.trim()) {
-    headers.set('x-ent-referer', auth.referer.trim())
-  }
-
-  if (Object.keys(mergedExtraHeaders).length > 0) {
-    headers.set('x-ent-extra-headers', JSON.stringify(mergedExtraHeaders))
-  }
-
-  return headers
 }
 
 async function parseResponse(response) {
@@ -213,8 +171,10 @@ async function parseJsonPayload(response) {
   }
 
   if (!response.ok) {
-    const errorMessage = typeof data === 'object' && data?.error
-      ? data.error
+    // `error`: the server's words; `detail`: tonAPI's, on a refusal of its
+    // own (a problem: the planning's routes).
+    const errorMessage = typeof data === 'object' && (data?.error || data?.detail)
+      ? data.error || data.detail
       : typeof data === 'string' && data
         ? data
         : `Request failed with status ${response.status}.`
@@ -240,56 +200,64 @@ async function parseJsonPayload(response) {
   return data
 }
 
-export async function requestEnt(path, options = {}) {
-  const {
-    auth = {},
-    method = 'GET',
-    body = '',
-    headers = {},
-  } = options
-  const normalizedPath = normalizeProxyPath(path)
-  const upperMethod = method.toUpperCase()
-  const hasBody = body !== '' && body !== undefined && body !== null && !['GET', 'HEAD'].includes(upperMethod)
-
-  if (currentSessionMode === DEMO_SESSION_MODE) {
-    const response = await serverFetch(
-      `${ENT_AUTH_PREFIX}/demo/request?path=${encodeURIComponent(normalizedPath)}`,
-      {
-        method: upperMethod,
-        credentials: 'same-origin',
-        headers: hasBody ? headers : undefined,
-        body: hasBody ? body : undefined,
-      },
-    )
-
-    return parseResponse(response)
-  }
-
-  const response = await serverFetch(`${ENT_PROXY_PREFIX}${normalizedPath}`, {
-    method: upperMethod,
+// One of the page's own routes, asked as it is (the debug menu's request):
+// a path under /__ent_auth, with or without its prefix.
+export async function requestApi(path) {
+  const route = String(path ?? '').trim()
+  const target = route.startsWith('/__ent_auth') ? `${APP_BASE_URL}${route}` : `${ENT_AUTH_PREFIX}${route.startsWith('/') ? route : `/${route}`}`
+  const response = await serverFetch(target, {
     credentials: 'same-origin',
-    headers: buildFetchHeaders(auth, headers),
-    body: hasBody ? body : undefined,
+    headers: getUniversityRequestHeaders(),
   })
 
   return parseResponse(response)
 }
 
+// Whether the server measures its audience, as its last answer said: the
+// demo's sign-in keeps it (src/demoSession.js).
+let serverMeasuresAudience = false
+
 export async function getAuthSession() {
+  // The check itself says who is signed in now: the demo, or what the
+  // server knows.
+  showsDemo = false
   const response = await serverFetch(`${ENT_AUTH_PREFIX}/session`, {
     credentials: 'same-origin',
     headers: getUniversityRequestHeaders(),
   })
 
   const payload = await parseJsonPayload(response)
-  setCurrentSessionMode(payload?.authenticated ? payload?.sessionMode : null)
   sessionSignal.mark(Boolean(payload?.authenticated))
+  showsDemo = payload?.sessionMode === DEMO_SESSION_MODE
+  if (!showsDemo) serverMeasuresAudience = payload?.analyticsEnabled === true
 
   if (!payload?.authenticated) {
     clearRecentLoginMarker()
   }
 
   return payload
+}
+
+// How long the demo's sign-in waits for the server to end a session left
+// open (endServerSession).
+const DEMO_SIGN_IN_PATIENCE_MS = 3000
+
+// One sign-in at a time: a session still open in this browser (another
+// tab's) ends when the demo starts, as a new login's cookie replaced the
+// one before, and the desktop app forgets the login it kept
+// (src-tauri/src/signin.rs). The server is told nothing of the demo;
+// without an answer, the demo starts all the same.
+async function endServerSession() {
+  try {
+    await fetch(`${ENT_AUTH_PREFIX}/logout`, {
+      method: 'POST',
+      credentials: 'same-origin',
+      headers: logoutHeaders({ desktop: isNativeApp() }),
+      signal: AbortSignal.timeout(DEMO_SIGN_IN_PATIENCE_MS),
+    })
+  } catch {
+    // No server, or a slow one.
+  }
 }
 
 // `otp`: the one-time code, once the server asked for it ('mfa_required').
@@ -302,7 +270,21 @@ export async function loginToEnt({ username, password, otp, sendCode }) {
   // Signed out, the server routes the login to the university picked on the
   // login page (none on the neutral page: the default one).
   const university = getLoadedUniversityId()
-  const response = await serverFetch(`${ENT_AUTH_PREFIX}/login`, {
+
+  // The demo account never reaches a university, nor a server: its login is
+  // checked here and sent nowhere, and the page signs in to it by itself
+  // (src/demoRuntime.js), for the university it runs for.
+  const demoUniversity = university ?? getDefaultUniversityId()
+  if (universityConfig.features?.demo !== false && demoUniversity && isDemoCredentials(username, password)) {
+    await endServerSession()
+    signInToDemo({ university: demoUniversity, analyticsEnabled: serverMeasuresAudience })
+    sessionSignal.restart(true)
+    setRecentLoginMarker()
+    return { authenticated: true, user: DEMO_ACCOUNT.preferred_username, sessionMode: DEMO_SESSION_MODE, university: demoUniversity }
+  }
+
+  // A login is the server's to answer, whatever another tab is signed in to.
+  const response = await sendToServer(`${ENT_AUTH_PREFIX}/login`, {
     method: 'POST',
     credentials: 'same-origin',
     headers: {
@@ -313,10 +295,11 @@ export async function loginToEnt({ username, password, otp, sendCode }) {
   })
 
   const payload = await parseJsonPayload(response)
-  setCurrentSessionMode(payload?.authenticated ? payload?.sessionMode : null)
   sessionSignal.restart(Boolean(payload?.authenticated))
 
   if (payload?.authenticated) {
+    // Signed in for real: the demo ends, in every tab.
+    signOutOfDemo()
     setRecentLoginMarker()
   } else {
     clearRecentLoginMarker()
@@ -336,6 +319,14 @@ export async function logoutFromEnt({ expired = false } = {}) {
   localStorage.removeItem(ADE_TIMETABLE_CACHE_KEY)
   clearRecentLoginMarker()
 
+  // The demo's sign-in is the page's: ended here, with what the visitor did
+  // in it (src/demoRuntime.js).
+  if (isDemoSignedIn()) {
+    showsDemo = false
+    signOutOfDemo()
+    return { authenticated: false }
+  }
+
   const response = await serverFetch(`${ENT_AUTH_PREFIX}/logout`, {
     method: 'POST',
     credentials: 'same-origin',
@@ -343,44 +334,34 @@ export async function logoutFromEnt({ expired = false } = {}) {
   })
 
   const payload = await parseJsonPayload(response)
-  setCurrentSessionMode(null)
   return payload
 }
 
-export function getPortalBootstrap(auth) {
-  return Promise.allSettled([
-    getLayout(auth),
-    getLayoutDoc(auth),
-    getMarketplaceEntries(auth),
-  ]).then(([layout, layoutDoc, marketplace]) => ({
-    layout: unwrapSettledResult(layout),
-    layoutDoc: unwrapSettledResult(layoutDoc),
-    marketplace: unwrapSettledResult(marketplace),
-  }))
+// The home page's answers (the applications, Moodle's deadlines, the
+// grades) take the university several seconds each. The server keeps the
+// last one it got for the student and, past its freshness, gives it at
+// once, marked with this header, while it asks the university again
+// (back/crates/tafac-gateway, gateway/behind.rs). The page shows that old
+// answer and asks once more with `?fresh=1`: that request waits for the
+// answer that comes. Nothing of it rests in the browser.
+const REFRESHING_HEADER = 'X-Tafac-Refreshing'
+const FRESH_QUERY = '?fresh=1'
+
+function isOldAnswer(response) {
+  return response.headers.get(REFRESHING_HEADER) === '1'
 }
 
-function unwrapSettledResult(result) {
-  if (result.status === 'fulfilled') {
-    return result.value
-  }
-
-  return {
-    ok: false,
-    status: 0,
-    statusText: 'client-error',
-    contentType: 'text/plain',
-    text: result.reason instanceof Error ? result.reason.message : String(result.reason),
-    data: null,
-    error: result.reason instanceof Error ? result.reason.message : String(result.reason),
-  }
-}
-
-export async function getPlanning() {
-  const response = await serverFetch(`${ENT_AUTH_PREFIX}/planning`, {
+// The applications the portal lists for the student, one list whatever the
+// portal: { authenticated, sessionMode, apps: [{ id, title, description,
+// url, iconUrl, category, favorite }] } (src/portalApps.js makes the tiles).
+// `refreshing` on an old list: ask again with `fresh` for the one that comes.
+export async function getApps({ fresh = false } = {}) {
+  const response = await serverFetch(`${ENT_AUTH_PREFIX}/apps${fresh ? FRESH_QUERY : ''}`, {
     credentials: 'same-origin',
   })
 
-  return parseJsonPayload(response)
+  const payload = await parseJsonPayload(response)
+  return isOldAnswer(response) && payload && typeof payload === 'object' ? { ...payload, refreshing: true } : payload
 }
 
 // Recent inbox messages for the "Mails récents" widget and the mail page.
@@ -790,6 +771,8 @@ export async function getMailDraft(id) {
 // 'rate', 'retry' — the webmail session was renewed, try once more —,
 // 'expired', 'failed').
 export function uploadMailAttachment(file, { name, onProgress } = {}) {
+  if (isDemoSignedIn()) return uploadDemoAttachment(file, { name, onProgress })
+
   const xhr = new XMLHttpRequest()
   const sentUnder = sessionSignal.current
   let settled = false
@@ -818,30 +801,7 @@ export function uploadMailAttachment(file, { name, onProgress } = {}) {
       } catch {
         payload = null
       }
-      const status = xhr.status
-      const attachment = payload?.attachment
-      if (status === 200 && typeof attachment?.aid === 'string' && attachment.aid) {
-        finish({
-          status: 'ok',
-          attachment: {
-            aid: attachment.aid,
-            name: sanitizeAttachmentName(attachment.name ?? name ?? file.name),
-            size: Number.isSafeInteger(attachment.size) ? attachment.size : file.size,
-            contentType: normalizeAttachmentType(attachment.contentType ?? file.type),
-          },
-        })
-        return
-      }
-      if (isSessionRefused({ status })) {
-        finish({ status: 'error', code: 'expired' })
-        return
-      }
-      const code = status === 413 ? 'too-large'
-        : status === 429 ? 'rate'
-          : payload?.error === 'mail_upload_retry' ? 'retry'
-            : 'failed'
-      const retryAfter = Number(xhr.getResponseHeader('Retry-After')) || null
-      finish({ status: 'error', code, retryAfter, maxBytes: Number.isSafeInteger(payload?.maxBytes) ? payload.maxBytes : null })
+      finish(readUploadAnswer(xhr.status, payload, { file, name, retryAfter: Number(xhr.getResponseHeader('Retry-After')) || null }))
     })
     xhr.send(file)
   })
@@ -849,6 +809,47 @@ export function uploadMailAttachment(file, { name, onProgress } = {}) {
     promise,
     abort: () => {
       if (!settled) xhr.abort()
+    },
+  }
+}
+
+// The upload route's answer, as uploadMailAttachment gives it.
+function readUploadAnswer(status, payload, { file, name, retryAfter = null }) {
+  const attachment = payload?.attachment
+  if (status === 200 && typeof attachment?.aid === 'string' && attachment.aid) {
+    return {
+      status: 'ok',
+      attachment: {
+        aid: attachment.aid,
+        name: sanitizeAttachmentName(attachment.name ?? name ?? file.name),
+        size: Number.isSafeInteger(attachment.size) ? attachment.size : file.size,
+        contentType: normalizeAttachmentType(attachment.contentType ?? file.type),
+      },
+    }
+  }
+  if (isSessionRefused({ status })) {
+    return { status: 'error', code: 'expired' }
+  }
+  const code = status === 413 ? 'too-large'
+    : status === 429 ? 'rate'
+      : payload?.error === 'mail_upload_retry' ? 'retry'
+        : 'failed'
+  return { status: 'error', code, retryAfter, maxBytes: Number.isSafeInteger(payload?.maxBytes) ? payload.maxBytes : null }
+}
+
+// The demo account's file: read by the page and kept or dropped there
+// (src/demoServer.js), nothing sent, the same answers.
+function uploadDemoAttachment(file, { name, onProgress }) {
+  let aborted = false
+  const promise = uploadDemoFile(file, { name }).then(({ status, body }) => {
+    if (aborted) return { status: 'aborted' }
+    if (status === 200) onProgress?.(file.size, file.size)
+    return readUploadAnswer(status, body, { file, name })
+  }, () => ({ status: 'error', code: 'failed' }))
+  return {
+    promise,
+    abort: () => {
+      aborted = true
     },
   }
 }
@@ -910,7 +911,9 @@ const GRADES_CACHE_KEY = 'l-ent:grades-cache'
 //   404 { ok: false, disabled: true, feature: 'moodleDeadlines' }
 //   500 { error }
 // Normalized here to { status: 'ok' | 'disabled' | 'unauthenticated' | 'error', ... }.
-export async function getMoodleDeadlines() {
+// `refreshing` on an old list (above): ask again with `fresh` for the one
+// that comes.
+export async function getMoodleDeadlines({ fresh = false } = {}) {
   const empty = { moodleHref: null, items: [] }
 
   if (!universityConfig.features?.moodleDeadlines) {
@@ -918,7 +921,7 @@ export async function getMoodleDeadlines() {
   }
 
   try {
-    const response = await serverFetch(`${ENT_AUTH_PREFIX}/moodle/deadlines`, {
+    const response = await serverFetch(`${ENT_AUTH_PREFIX}/moodle/deadlines${fresh ? FRESH_QUERY : ''}`, {
       credentials: 'same-origin',
     })
     const payload = await response.json().catch(() => null)
@@ -939,6 +942,7 @@ export async function getMoodleDeadlines() {
       status: 'ok',
       moodleHref: payload.deadlines.moodleHref ?? null,
       items: Array.isArray(payload.deadlines.items) ? payload.deadlines.items : [],
+      ...(isOldAnswer(response) ? { refreshing: true } : {}),
     }
   } catch (error) {
     return {
@@ -985,9 +989,11 @@ export function getGrades({ force = false } = {}) {
     return gradesInflight
   }
 
-  gradesInflight = requestGrades()
-    .then((data) => {
+  // Asked again past the cache: past the server's old answer too.
+  gradesInflight = requestGrades({ fresh: force })
+    .then(({ data, old }) => {
       gradesMemory = isUsableGradesAnswer(data) ? { at: Date.now(), data } : null
+      if (old) void refreshGrades()
       return data
     })
     .finally(() => {
@@ -996,29 +1002,49 @@ export function getGrades({ force = false } = {}) {
   return gradesInflight
 }
 
-async function requestGrades() {
+// The answer, and whether it is an old one the server gave while it asks
+// ScoDoc again (`old`, above).
+async function requestGrades({ fresh = false } = {}) {
   if (!universityConfig.features?.grades) {
-    return {
-      authenticated: false,
-      grades: null,
-      disabled: true,
-    }
+    return { data: { authenticated: false, grades: null, disabled: true }, old: false }
   }
 
   try {
-    const response = await serverFetch(`${ENT_AUTH_PREFIX}/grades`, {
+    const response = await serverFetch(`${ENT_AUTH_PREFIX}/grades${fresh ? FRESH_QUERY : ''}`, {
       credentials: 'same-origin',
     })
 
-    return await parseJsonPayload(response)
+    return { data: await parseJsonPayload(response), old: isOldAnswer(response) }
   } catch (error) {
     return {
-      authenticated: false,
-      grades: null,
-      error: error instanceof Error ? error.message : String(error),
-      errorKind: getRequestErrorKind(error),
+      data: {
+        authenticated: false,
+        grades: null,
+        error: error instanceof Error ? error.message : String(error),
+        errorKind: getRequestErrorKind(error),
+      },
+      old: false,
     }
   }
+}
+
+const gradesRefreshListeners = new Set()
+
+// `listener(data)`: the grades that came after an old answer was shown.
+// Returns what stops it.
+export function onGradesRefreshed(listener) {
+  gradesRefreshListeners.add(listener)
+  return () => gradesRefreshListeners.delete(listener)
+}
+
+// The server gave the report it kept and asks ScoDoc meanwhile: the report
+// that comes replaces it, for whoever shows grades. Without one (ScoDoc
+// down, signed out since), what is shown stays.
+async function refreshGrades() {
+  const { data } = await requestGrades({ fresh: true })
+  if (!isUsableGradesAnswer(data)) return
+  gradesMemory = { at: Date.now(), data }
+  for (const listener of gradesRefreshListeners) listener(data)
 }
 
 export async function getStudentProfilePictureMeta() {
@@ -1042,7 +1068,9 @@ export function openGradesService() {
     return
   }
 
-  window.open(GRADES_LAUNCH_HREF, '_blank', 'noopener,noreferrer')
+  // The demo account has no session for the launch relay to sign in with:
+  // the service's own address.
+  window.open(isDemoSignedIn() ? GRADES_SERVICE_URL : GRADES_LAUNCH_HREF, '_blank', 'noopener,noreferrer')
 }
 
 async function requestSemesterGrades(semesterId) {
@@ -1660,189 +1688,175 @@ export function listGradedEvaluations(data) {
 }
 
 // ============================================================================
-// ADE Schedule API
+// The planning (tonAPI's model)
 // ============================================================================
+//
+// The planning is answered by the Rust gateway with tonAPI's own answers, as
+// tonAPI's server gives them on its /v1 routes of the same names (back/:
+// gateway/planning.rs): { data, meta }, and a refusal as a problem
+// ({ code, title, detail, link }, `error.code` here).
+//
+//   GET timetable?from=&to=&resources=   tonAPI's Course list
+//   GET timetable/tree?kind=             its ResourceNode tree, `selected`
+//                                        on the groups the student follows
+//   GET timetable/resources?kind=&q=     its TimetableResource list
+//
+// What the page makes of them is its own: the group picker's tree and the
+// rooms and staff (src/planningTree.js), a class as the page shows it
+// (src/planningEvents.js: classOfCourse).
 
+// The on-device timetable the planning's routes kept before (/ade/timetable),
+// still cleared for the devices that have one.
 const ADE_TIMETABLE_CACHE_KEY = 'l-ent:ade-timetable-cache'
-const ADE_TIMETABLE_CACHE_TTL_MS = 15 * 60 * 1000
 
-export async function getAdeStatus() {
-  const response = await serverFetch(`${ENT_AUTH_PREFIX}/ade/status`, {
-    credentials: 'same-origin',
-  })
-
-  return parseJsonPayload(response)
-}
-
-// `fallback`: the group standing in for the account's own when it has none
-// (findAdeGroupForScodoc).
-export async function getAdeTree(etabsVets = '', { fallback = '' } = {}) {
+function planningQuery(params) {
   const query = new URLSearchParams()
-  if (etabsVets) query.set('etabsVets', etabsVets)
-  if (fallback) query.set('fallback', fallback)
-  const params = query.size ? `?${query}` : ''
-  const response = await serverFetch(`${ENT_AUTH_PREFIX}/ade/tree${params}`, {
-    credentials: 'same-origin',
-  })
-
-  return parseJsonPayload(response)
-}
-
-// « Salles et personnels »: the ADE tree's rooms and staff
-// ({ groups, items }, planningPortalApi.js's buildPortalDirectory).
-export async function getAdeDirectory() {
-  const response = await serverFetch(`${ENT_AUTH_PREFIX}/ade/directory`, {
-    credentials: 'same-origin',
-  })
-
-  return parseJsonPayload(response)
-}
-
-export async function searchAde(query) {
-  if (!query?.trim()) {
-    return { results: [] }
+  for (const [key, value] of Object.entries(params)) {
+    const written = Array.isArray(value) ? value.join(',') : value
+    if (written != null && written !== '') query.set(key, String(written))
   }
-
-  const response = await serverFetch(
-    `${ENT_AUTH_PREFIX}/ade/search?q=${encodeURIComponent(query.trim())}`,
-    { credentials: 'same-origin' },
-  )
-
-  return parseJsonPayload(response)
+  return query.size ? `?${query}` : ''
 }
 
-function buildAdeQueryString({ date, ...extra } = {}) {
-  const params = new URLSearchParams()
-
-  if (date) {
-    params.set('date', date)
-  }
-
-  for (const [key, value] of Object.entries(extra)) {
-    if (value != null) {
-      params.set(key, String(value))
-    }
-  }
-
-  return params.toString()
-}
-
-export async function getAdeCalendarMetadata({ date, ...extra } = {}) {
-  const qs = buildAdeQueryString({ date, ...extra })
-  const response = await serverFetch(
-    `${ENT_AUTH_PREFIX}/ade/calendar${qs ? `?${qs}` : ''}`,
-    { credentials: 'same-origin' },
-  )
-
-  return parseJsonPayload(response)
-}
-
-export async function getAdeUpcoming({
-  date,
-  lookaheadDays = 21,
-  selection = null,
-  preferPlanning = false,
-  signal,
-} = {}) {
-  const response = await serverFetch(`${ENT_AUTH_PREFIX}/ade/upcoming`, {
-    method: 'POST',
+async function getPlanningAnswer(path, params = {}, { signal } = {}) {
+  const response = await serverFetch(`${ENT_AUTH_PREFIX}/${path}${planningQuery(params)}`, {
     credentials: 'same-origin',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      date,
-      lookaheadDays,
-      selection,
-      preferPlanning,
-    }),
     signal,
   })
-
   return parseJsonPayload(response)
 }
 
-export async function getAdeTimetable({
-  date,
-  force = false,
-  persist = true,
-  signal,
-  ...extra
-} = {}) {
-  const requestKey = buildAdeQueryString({ date, ...extra })
-
-  if (!force) {
-    try {
-      const raw = localStorage.getItem(ADE_TIMETABLE_CACHE_KEY)
-      if (raw) {
-        const cached = JSON.parse(raw)
-        if (cached?.data && Date.now() - cached.cachedAt < ADE_TIMETABLE_CACHE_TTL_MS) {
-          if (cached.requestKey === requestKey) {
-            return cached.data
-          }
-
-          // Legacy cache entries were keyed only by date.
-          if (!cached.requestKey && !requestKey && (!date || cached.date === date)) {
-            return cached.data
-          }
-        }
-      }
-    } catch {
-      // ignore corrupt cache
-    }
-  }
-
-  const qs = requestKey
-
-  const response = await serverFetch(
-    `${ENT_AUTH_PREFIX}/ade/timetable${qs ? `?${qs}` : ''}`,
-    {
-      credentials: 'same-origin',
-      signal,
-    },
-  )
-
-  const data = await parseJsonPayload(response)
-
-  if (persist && data.authenticated && data.timetable) {
-    try {
-      localStorage.setItem(
-        ADE_TIMETABLE_CACHE_KEY,
-        JSON.stringify({
-          data,
-          date: date || new Date().toISOString().split('T')[0],
-          requestKey,
-          cachedAt: Date.now(),
-        }),
-      )
-    } catch {
-      // storage full
-    }
-  }
-
-  return data
+// The classes of `from` to `to` (both included, YYYY-MM-DD): the student's
+// own, or those of `resources` (ids of the tree: groups, a room, a teacher).
+// → { data: Course[], meta }.
+export function getTimetable({ from, to, resources = [], signal } = {}) {
+  return getPlanningAnswer('timetable', { from, to, resources }, { signal })
 }
 
+// The tree of the university's resources of `kinds` ('group', 'teacher',
+// 'room'; all without any). → { data: ResourceNode[], meta }.
+export function getTimetableTree({ kinds = [] } = {}) {
+  return getPlanningAnswer('timetable/tree', { kind: kinds })
+}
+
+// The resources whose name has the words of `q`, each with its path.
+// → { data: TimetableResource[], meta }.
+export function getTimetableResources({ kinds = [], q = '', limit } = {}) {
+  return getPlanningAnswer('timetable/resources', { kind: kinds, q: q.trim(), limit })
+}
+
+// The trees asked this visit, by kind (the groups' a few hundred KB at
+// Rennes, its rooms' and staff's more): asked once, each, for the account.
+const planningTrees = new Map()
+
+function loadTree(kind) {
+  if (!planningTrees.has(kind)) {
+    const promise = getTimetableTree({ kinds: [kind] }).then((answer) => (Array.isArray(answer?.data) ? answer.data : []))
+    promise.catch(() => planningTrees.delete(kind))
+    planningTrees.set(kind, promise)
+  }
+  return planningTrees.get(kind)
+}
+
+// A personal timetable (planning.personal: TEMPO) has no group to pick: the
+// student's own, « Mon emploi du temps », which the page adopts as its group.
+// Its id has no digit, so it is never asked as a resource.
+const PERSONAL_PLANNING_SELECTION = Object.freeze({
+  resourceId: 'personal',
+  label: 'Mon emploi du temps',
+  parentResourceId: null,
+  parentLabel: null,
+  contextLabel: 'Mon emploi du temps',
+  programResourceId: null,
+  programLabel: null,
+  yearResourceId: null,
+  yearLabel: null,
+  tdResourceId: null,
+  tdLabel: null,
+  tpResourceId: null,
+  tpLabel: null,
+})
+
+// The groups' tree as the group picker reads it (App.jsx), focused on
+// `etabsVets` (a node of it), or on the student's own group; `fallback`:
+// the group standing in for the student's own when they follow none
+// (findAdeGroupForScodoc). → { authenticated, tree }.
+export async function getAdeTree(etabsVets = '', { fallback = '' } = {}) {
+  if (universityConfig.planning?.personal === true) {
+    return {
+      authenticated: true,
+      tree: { root: adeTreeRoot([]), currentPathIds: [], selectionPathIds: [], selectionSchema: 'planning-personal', defaultSelection: { ...PERSONAL_PLANNING_SELECTION } },
+    }
+  }
+  const groups = await loadTree('group')
+  const tree = focusAdeTree(adeTreeRoot(groups), {
+    requestedResourceId: etabsVets,
+    fallbackResourceId: fallback,
+    ownResources: followedGroups(groups),
+  })
+  return { authenticated: true, tree }
+}
+
+// ScoDoc's TP group under a year of the groups' tree (`yearResourceId`),
+// with its TD: adeGroupMatch's findTpUnderYear. → { tp, td } | null.
+export async function findScodocTpInYear(yearResourceId, tpAliases, options = {}) {
+  const year = findTreePath(adeTreeRoot(await loadTree('group')), yearResourceId)?.at(-1)
+  return year ? findTpUnderYear(year, tpAliases, options) : null
+}
+
+// « Salles et personnels »: the rooms, staff and groups of the tree, those
+// of `kinds` ('room', 'person', 'group'), as { groups, items }
+// (src/planningTree.js's buildDirectory). `supported`: false where the
+// planning service has no tree to give.
+const DIRECTORY_TREE_KINDS = { room: 'room', person: 'teacher', group: 'group' }
+
+export async function getAdeDirectory(kinds = Object.keys(DIRECTORY_TREE_KINDS)) {
+  try {
+    const trees = await Promise.all(kinds.map((kind) => DIRECTORY_TREE_KINDS[kind]).filter(Boolean).map(loadTree))
+    return { authenticated: true, supported: true, directory: buildDirectory(trees.flat()) }
+  } catch (error) {
+    if (['not_implemented', 'service_absent'].includes(error?.code)) {
+      return { authenticated: true, supported: false, directory: null }
+    }
+    throw error
+  }
+}
+
+// The student groups whose name has `query`, as the planning's search gives
+// them ({ id, name, path }: the path from « Ressources », dot-separated):
+// the groups' tree searched here, a hundred at most.
+export async function searchAde(query) {
+  const needle = String(query ?? '').replace(/\s+/g, ' ').trim().toLocaleLowerCase('fr')
+  if (!needle) {
+    return { results: [] }
+  }
+  const results = []
+  const walk = (node) => {
+    if (results.length >= 100) return
+    if (node.children.length === 0 && node.name.toLocaleLowerCase('fr').includes(needle)) {
+      results.push({ id: node.id, name: node.name, path: node.path, family: 'trainee' })
+    }
+    node.children.forEach(walk)
+  }
+  walk(adeTreeRoot(await loadTree('group')))
+  return { results }
+}
+
+// The legacy on-device timetable, kept by the planning's routes before
+// (signed out, or the student's group changed).
 export function clearAdeTimetableCache() {
   localStorage.removeItem(ADE_TIMETABLE_CACHE_KEY)
 }
 
-export async function getAdeAlerts(etabsVets = '') {
-  const params = etabsVets ? `?etabsVets=${encodeURIComponent(etabsVets)}` : ''
-  const response = await serverFetch(`${ENT_AUTH_PREFIX}/ade/alerts${params}`, {
-    credentials: 'same-origin',
-  })
-
-  return parseJsonPayload(response)
+// The trees asked this visit: another student's are not theirs (signed out,
+// or the signed-in student changed).
+export function forgetPlanningTrees() {
+  planningTrees.clear()
 }
 
 // ============================================================================
 // ENT Portal API
 // ============================================================================
-
-export function getLayout(auth) {
-  return requestEnt('/api/v4-3/dlm/layout.json', { auth })
-}
 
 export async function getAccountInfo() {
   const response = await serverFetch(`${ENT_AUTH_PREFIX}/account`, {
@@ -1850,263 +1864,4 @@ export async function getAccountInfo() {
   })
 
   return parseJsonPayload(response)
-}
-
-export function getLayoutDoc(auth, tab) {
-  const suffix = tab ? `?tab=${encodeURIComponent(tab)}` : ''
-  return requestEnt(`/api/layoutDoc${suffix}`, { auth })
-}
-
-export function getMarketplaceEntries(auth) {
-  return requestEnt('/api/marketplace/entries.json', { auth })
-}
-
-export function getPortletMetadata(auth, fname) {
-  return requestEnt(`/api/portlet/${encodeURIComponent(fname)}.json`, { auth })
-}
-
-export function getPortletFragment(auth, fname) {
-  return requestEnt(`/api/v4-3/portlet/${encodeURIComponent(fname)}.html`, {
-    auth,
-    headers: {
-      Accept: 'text/html, application/xhtml+xml;q=0.9, */*;q=0.8',
-    },
-  })
-}
-
-export function collectTabs(layoutResponse) {
-  return layoutResponse?.layout?.navigation?.tabs ?? []
-}
-
-function walkLayoutPortlets(node, collector) {
-  if (!node) {
-    return
-  }
-
-  if (Array.isArray(node)) {
-    for (const item of node) {
-      walkLayoutPortlets(item, collector)
-    }
-    return
-  }
-
-  if (typeof node !== 'object') {
-    return
-  }
-
-  if (node._objectType === 'portlet' || node.fname || node.title || node.url) {
-    collector.push(node)
-  }
-
-  for (const key of ['content', 'folders', 'tabs', 'regions', 'favorites', 'favoriteGroups']) {
-    if (key in node) {
-      walkLayoutPortlets(node[key], collector)
-    }
-  }
-}
-
-export function collectPortletsFromLayout(layoutResponse) {
-  const collector = []
-
-  if (layoutResponse?.layout?.navigation) {
-    walkLayoutPortlets(layoutResponse.layout.navigation.tabs, collector)
-  }
-
-  if (layoutResponse?.layout?.regions) {
-    walkLayoutPortlets(layoutResponse.layout.regions, collector)
-  }
-
-  return collector
-}
-
-function isFavoritePortletCandidate(node) {
-  return Boolean(
-    node?._objectType === 'portlet'
-    || node?.fname
-    || node?.url
-    || node?.widgetURL
-    || node?.chanID
-    || node?.portletName
-    || node?.parameters?.launchUrl
-  )
-}
-
-function walkFavoritePortlets(node, collector, visited = new Set()) {
-  if (!node) {
-    return
-  }
-
-  if (Array.isArray(node)) {
-    for (const item of node) {
-      walkFavoritePortlets(item, collector, visited)
-    }
-    return
-  }
-
-  if (typeof node !== 'object') {
-    return
-  }
-
-  if (visited.has(node)) {
-    return
-  }
-
-  visited.add(node)
-
-  if (isFavoritePortletCandidate(node)) {
-    collector.push(node)
-  }
-
-  for (const nestedValue of Object.values(node)) {
-    if (nestedValue && (typeof nestedValue === 'object' || Array.isArray(nestedValue))) {
-      walkFavoritePortlets(nestedValue, collector, visited)
-    }
-  }
-}
-
-export function collectFavoritePortlets(layoutResponse) {
-  const collector = []
-  const layout = layoutResponse?.layout
-
-  walkFavoritePortlets(layout?.favorites, collector)
-  walkFavoritePortlets(layout?.favoriteGroups, collector)
-  walkFavoritePortlets(layout?.navigation?.favorites, collector)
-  walkFavoritePortlets(layout?.navigation?.favoriteGroups, collector)
-
-  return collector
-}
-
-export function mergePortlets(...sources) {
-  const merged = new Map()
-
-  for (const source of sources) {
-    for (const item of source ?? []) {
-      if (!item) {
-        continue
-      }
-
-      const key = item.fname || item.nodeId || item.ID || `${item.title ?? 'unknown'}-${item.url ?? ''}`
-      const current = merged.get(key) ?? {}
-      merged.set(key, { ...current, ...item })
-    }
-  }
-
-  return Array.from(merged.values()).sort((left, right) => {
-    const leftTitle = left.title ?? left.name ?? left.fname ?? ''
-    const rightTitle = right.title ?? right.name ?? right.fname ?? ''
-    return leftTitle.localeCompare(rightTitle, 'fr')
-  })
-}
-
-export function extractFragmentSignals(fragment = '') {
-  const links = new Set()
-  const scripts = new Set()
-  const formActions = new Set()
-  const apiHints = new Set()
-
-  for (const match of fragment.matchAll(/href=["']([^"']+)["']/gi)) {
-    links.add(match[1])
-  }
-
-  for (const match of fragment.matchAll(/src=["']([^"']+)["']/gi)) {
-    scripts.add(match[1])
-  }
-
-  for (const match of fragment.matchAll(/action=["']([^"']+)["']/gi)) {
-    formActions.add(match[1])
-  }
-
-  for (const match of fragment.matchAll(/(\/(?:api|f|p|Login)[^"'\\\s<>]*)/g)) {
-    apiHints.add(match[1])
-  }
-
-  return {
-    links: Array.from(links),
-    scripts: Array.from(scripts),
-    formActions: Array.from(formActions),
-    apiHints: Array.from(apiHints),
-  }
-}
-
-function collectPortletsInNode(node, collector) {
-  if (!node) {
-    return
-  }
-
-  if (Array.isArray(node)) {
-    for (const item of node) {
-      collectPortletsInNode(item, collector)
-    }
-    return
-  }
-
-  if (typeof node !== 'object') {
-    return
-  }
-
-  if (node._objectType === 'portlet') {
-    collector.push(node)
-  }
-
-  if (Array.isArray(node.content)) {
-    collectPortletsInNode(node.content, collector)
-  }
-}
-
-function isLauncherPortlet(portlet) {
-  return portlet?.portletName === 'app-launcher'
-    || String(portlet?.typeID) === '2'
-    || portlet?.parameters?.target === '_blank'
-    || portlet?.parameters?.stopImmediately === 'true'
-}
-
-export function collectServiceSections(layoutData) {
-  const tabs = collectTabs(layoutData)
-
-  return tabs
-    .map((tab) => {
-      const folders = Array.isArray(tab.content) ? tab.content.filter((item) => item?._objectType === 'folder') : []
-      const sections = folders
-        .map((folder) => {
-          const services = []
-          collectPortletsInNode(folder.content ?? [], services)
-
-          return {
-            id: folder.ID,
-            title: folder.name,
-            services: services.filter(isLauncherPortlet),
-          }
-        })
-        .filter((section) => section.services.length > 0)
-
-      return {
-        id: tab.ID,
-        title: tab.name,
-        externalId: tab.externalId,
-        sections,
-      }
-    })
-    .filter((tab) => tab.sections.length > 0)
-}
-
-export function extractLaunchLink(fragment = '') {
-  if (typeof DOMParser !== 'undefined') {
-    const document = new DOMParser().parseFromString(fragment, 'text/html')
-    const link = document.querySelector('a[href]')
-
-    if (link) {
-      return {
-        href: link.getAttribute('href') ?? '',
-        text: link.textContent?.replace(/\s+/g, ' ').trim() ?? '',
-        target: link.getAttribute('target') ?? '',
-      }
-    }
-  }
-
-  const hrefMatch = fragment.match(/href=["']([^"']+)["']/i)
-  return {
-    href: hrefMatch?.[1] ?? '',
-    text: '',
-    target: '',
-  }
 }

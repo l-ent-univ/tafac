@@ -1,6 +1,5 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { buildPortalDirectory } from '../planningPortalApi.js'
 import {
   cleanFolderName,
   entryPlace,
@@ -15,9 +14,22 @@ import {
   siteEntries,
   siteLabelFromSelection,
 } from '../src/planningDirectory.js'
+import { buildDirectory } from '../src/planningTree.js'
 
 const leaf = (id, name) => ({ id, name, children: [] })
 const folder = (id, name, children) => ({ id, name, children })
+
+// The ADE portal's tree as it was (Ressources › Etudiants, Enseignants,
+// Salles), given as tonAPI gives it: one tree per kind, each node a folder
+// or not (src/planningTree.js reads it so).
+const KINDS = { '-1': 'group', '-2': 'teacher', '-3': 'room' }
+function asTonApi(node, kind) {
+  const children = node.children.map((child) => asTonApi(child, kind))
+  return { id: node.id, name: node.name, kind, folder: children.length > 0, children }
+}
+function buildPortalDirectory(root) {
+  return buildDirectory(root.children.filter((top) => KINDS[top.id]).flatMap((top) => top.children.map((node) => asTonApi(node, KINDS[top.id]))))
+}
 
 // The shape of the Rennes ADE portal's tree (normalizePortalTreePayload).
 const ROOT = folder('-100', 'Ressources', [
@@ -37,7 +49,6 @@ const ROOT = folder('-100', 'Ressources', [
       folder('703', 'Vacataires', [folder('704', 'BUT INFO-COM', [leaf('7201', 'CHAGNOUX Marie')])]),
     ]),
     folder('710', '.Chercheurs - laboratoires', [folder('711', 'IRISA UMR 6074', [leaf('7301', 'MARTIN Philippe')])]),
-    folder('portal-category-4', 'portal-category-4', [leaf('7401', 'DUPONT Leonard')]),
   ]),
   folder('-3', 'Salles', [
     folder('800', '19-Lannion IUT - Institut Universitaire de Technologie de Lannion', [
@@ -74,8 +85,6 @@ test('the directory lists the rooms, staff and student groups, their folders as 
   )
   // Placeholder rooms are left out, with all their folder holds.
   assert.ok(!ids.includes('8501') && !ids.includes('8502'))
-  // A synthetic folder name is left out of the path.
-  assert.deepEqual(directory.groups[directory.items.find(([id]) => id === '7401')[2]], { kind: 'person', path: [] })
 })
 
 test('an entry knows its kind and folders', () => {
@@ -89,6 +98,10 @@ test('folder names lose ADE sort prefixes', () => {
   assert.equal(cleanFolderName('19-Lannion IUT - Institut'), 'Lannion IUT - Institut')
   assert.equal(cleanFolderName('.Chercheurs - laboratoires'), 'Chercheurs - laboratoires')
   assert.equal(cleanFolderName('Bâtiment 05 - INFO'), 'Bâtiment 05 - INFO')
+  // TEMPO's (Rennes 2): a sort number, a count of rooms.
+  assert.equal(cleanFolderName('02 - SALLES DE COURS (226)'), 'SALLES DE COURS')
+  assert.equal(cleanFolderName('06 - LIEUX EXTERNES'), 'LIEUX EXTERNES')
+  assert.equal(cleanFolderName('BUT INFO-COM'), 'BUT INFO-COM')
 })
 
 test('a room shows its seats apart', () => {
@@ -96,6 +109,14 @@ test('a room shows its seats apart', () => {
   assert.equal(roomCapacity('B27 - 115 [46p]'), 46)
   assert.equal(roomCapacity('B05 - 107'), null)
   assert.equal(roomLabel('B09B - Amphi TA (009) [142P]'), 'B09B - Amphi TA (009)')
+  // TEMPO's (Rennes 2).
+  assert.equal(roomCapacity('A1 Amphi (M. Oussekine) - 133 pl.'), 133)
+  assert.equal(roomLabel('A1 Amphi (M. Oussekine) - 133 pl.'), 'A1 Amphi (M. Oussekine)')
+  assert.equal(roomCapacity('B009 (44 pl.+1)'), 44)
+  assert.equal(roomLabel('B009 (44 pl.+1)'), 'B009')
+  assert.equal(roomCapacity('E402 (24 PC+1)'), 24)
+  assert.equal(roomLabel('E402 (24 PC+1)'), 'E402')
+  assert.equal(roomLabel('HALL L'), 'HALL L')
 })
 
 test('the site comes from the group’s context', () => {
@@ -120,6 +141,23 @@ test('the site’s rooms are in sections by building, their type on the row', ()
   ])
   const people = sectionEntries(siteEntries(entries, 'person', 'IUT Lannion'), 'person')
   assert.deepEqual(people.map(({ title }) => title), ['Permanents · Info Com', 'Vacataires · BUT INFO-COM'])
+})
+
+test('a tree that isn\'t by site is in sections from its first folder', () => {
+  const tempo = prepareDirectory({
+    groups: [
+      { kind: 'room', path: ['01 - AMPHITHEATRES (25)'] },
+      { kind: 'room', path: ['02 - SALLES DE COURS (226)', 'SALLES MUTUALISEES (168)', '1 - SALLES DE COURS (21)'] },
+      { kind: 'room', path: ['06 - LIEUX EXTERNES', 'CAMPUS SANTE', 'AMPHITHEATRES'] },
+    ],
+    items: [['6', 'A1 Amphi (M. Oussekine) - 133 pl.', 0], ['1503', 'B019 Amphi - 92 pl.', 0], ['2204', 'B009 (44 pl.+1)', 1], ['9', 'AMPHI A Bât 2', 2]],
+  })
+  const sections = sectionEntries(tempo, 'room', { bySite: false })
+  // Every folder of TEMPO's in lower case, the room's name as it is.
+  assert.deepEqual(sections.map(({ title }) => title), ['Amphitheatres', 'Lieux externes', 'Salles de cours'])
+  assert.deepEqual(sections[1].entries.map(({ name, detail }) => `${name} | ${detail}`), ['AMPHI A Bât 2 | Campus sante · Amphitheatres'])
+  assert.deepEqual(sections[2].entries.map(({ name, detail }) => `${name} | ${detail}`), ['B009 (44 pl.+1) | Salles mutualisees · Salles de cours'])
+  assert.deepEqual(sections[0].entries.map(({ id }) => id), ['6', '1503'])
 })
 
 test('a search matches every word, names first, the site first', () => {

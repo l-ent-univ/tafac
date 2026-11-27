@@ -1,7 +1,7 @@
 import { Icon } from '@iconify/react'
 import Tooltip from './Tooltip'
 import { NEW_MARK_DIRECTORY, useNewMark } from '../useNewMark'
-import { HAS_PLANNING_DIRECTORY } from '../usePlanningDirectory'
+import { DIRECTORY_TITLE, HAS_PLANNING_DIRECTORY } from '../usePlanningDirectory'
 
 // The header's « Salles et personnels »: a segment of the header's button
 // group (.button-group, PlanningHeader), its name in a tooltip on a wide
@@ -20,7 +20,7 @@ function PlanningDirectoryButton({ open = false, onOpen = null, className = '' }
         markSeen()
         onOpen?.()
       }}
-      aria-label="Salles et personnels"
+      aria-label={DIRECTORY_TITLE}
       aria-expanded={open}
       className={`button-group-item group ${className}`}
     >
@@ -31,7 +31,7 @@ function PlanningDirectoryButton({ open = false, onOpen = null, className = '' }
           <span className="sr-only">, nouveau</span>
         </>
       ) : null}
-      <Tooltip title="Salles et personnels" side="bottom-end" className="max-4xl:hidden" />
+      <Tooltip title={DIRECTORY_TITLE} side="bottom-end" className="max-4xl:hidden" />
     </button>
   )
 }

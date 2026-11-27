@@ -303,6 +303,7 @@ function Sidebar({
   showUniversityLogo = true,
   logoSource = 'establishment',
   gradesSupported = true,
+  demoAccount = false,
   activePage = 'home',
   onNavigatePage,
   onOpenLatestGrade = null,
@@ -365,7 +366,7 @@ function Sidebar({
     if (peekPendingRef.current !== true) schedulePeek(true, SIDEBAR_PEEK_DELAY_MS)
   }
 
-  const navItems = buildNavItems(establishment, { gradesSupported })
+  const navItems = buildNavItems(establishment, { gradesSupported, demo: demoAccount })
   const { unseenIds } = useChangelog()
 
   const handleNavigate = useCallback((item) => {

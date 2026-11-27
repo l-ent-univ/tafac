@@ -13,7 +13,6 @@ import {
 import { buildGradesReport } from '../src/gradesReport.js'
 import { draftInlineImageItems, inlineImageCids, inlineImageReferences, isInlineImageHref } from '../src/mailInlineImages.js'
 import { buildComposePayload } from '../src/mailSendPayload.js'
-import { composerHtmlToText, normalizeComposePayload } from '../server/mailSend.js'
 
 const payload = buildDemoGradesPayload()
 const report = buildGradesReport(payload['relevé'], { config: payload.config })
@@ -67,31 +66,6 @@ test('a grade\'s mail: the editor\'s HTML, escaped, the caret\'s line, the summa
   // Without an image: the rest as it is.
   assert.doesNotMatch(buildGradeMailHtml({ code: 'R5.01', title: 'Web' }, { description: 'TP' }, rows).html, /<img/)
   assert.equal(gradeImageAlt(module, evaluation), `Note de ${evaluation.description} (R5.11)`)
-})
-
-test('the mail\'s text version: the summary as lines, the image as its alt', () => {
-  const rows = buildGradeSummaryRows({ code: 'R5.01', title: 'Web', kind: 'resource' }, { description: 'TP', coef: 2, grade: { kind: 'number', value: 12 }, promo: {} })
-  const image = { cid: 'tafac-img-0123abcd-4567@tafac.fr', alt: 'Note de TP (R5.01)', width: 520, height: 300 }
-  const { html } = buildGradeMailHtml({ code: 'R5.01', title: 'Web' }, { description: 'TP' }, rows, image)
-  const parsed = normalizeComposePayload(
-    { to: [{ email: 'prof@univ.fr' }], html: `${html}<div data-mail-signature=""></div>`, sendUid: 'uid-00000001', inlineImages: [{ cid: image.cid, source: 'upload', aid: 'aid-1', width: 520, height: 300 }] },
-    { isValidMessageId: () => true, isValidUploadId: () => true },
-  )
-  assert.equal(composerHtmlToText(parsed.value.html, { signatureText: '-- \nCamille' }), [
-    'Bonjour,',
-    '',
-    'Je vous écris au sujet de ma note de TP en Web.',
-    '',
-    'Évaluation : TP',
-    'Ressource : R5.01 – Web',
-    'Note : 12/20',
-    'Coefficient : 2',
-    '',
-    '[Image : Note de TP (R5.01)]',
-    '',
-    '-- ',
-    'Camille',
-  ].join('\n'))
 })
 
 test('the subject\'s teacher: one valid address named for it, never a guess', () => {

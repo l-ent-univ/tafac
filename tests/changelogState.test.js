@@ -23,9 +23,9 @@ import {
 } from '../src/changelogState.js'
 
 // Two universities shaped like universityConfig: Rennes has everything,
-// the example has mail off and grades greyed out.
+// the other has mail off and grades greyed out.
 const RENNES = { id: 'univ-rennes', features: { mail: true, moodle: true, grades: true, schoolCertificate: true, weather: { enabled: true } } }
-const EXEMPLE = { id: 'univ-exemple', features: { mail: false, moodle: false, grades: 'disabled', weather: { enabled: false } } }
+const OTHER = { id: 'univ-autre', features: { mail: false, moodle: false, grades: 'disabled', weather: { enabled: false } } }
 
 const GLOBAL = { id: 'global', date: '2026-10-01', title: 'Partout', body: '…' }
 const RENNES_ONLY = { id: 'rennes', date: '2026-10-05', title: 'Rennes', body: '…', universities: ['univ-rennes'] }
@@ -53,34 +53,34 @@ test('features count as on only when true or an enabled object', () => {
 
 test('an entry without targeting applies everywhere', () => {
   assert.equal(isEntryApplicable(GLOBAL, RENNES), true)
-  assert.equal(isEntryApplicable(GLOBAL, EXEMPLE), true)
+  assert.equal(isEntryApplicable(GLOBAL, OTHER), true)
   assert.equal(isEntryApplicable(GLOBAL, {}), true)
 })
 
 test('a university-scoped entry is hidden on other universities', () => {
   assert.equal(isEntryApplicable(RENNES_ONLY, RENNES), true)
-  assert.equal(isEntryApplicable(RENNES_ONLY, EXEMPLE), false)
+  assert.equal(isEntryApplicable(RENNES_ONLY, OTHER), false)
 })
 
 test('a feature-scoped entry needs every feature on', () => {
   assert.equal(isEntryApplicable(NEEDS_MAIL, RENNES), true)
-  assert.equal(isEntryApplicable(NEEDS_MAIL, EXEMPLE), false)
-  assert.equal(isEntryApplicable({ ...GLOBAL, features: ['grades'] }, EXEMPLE), false, "grades: 'disabled' is off")
+  assert.equal(isEntryApplicable(NEEDS_MAIL, OTHER), false)
+  assert.equal(isEntryApplicable({ ...GLOBAL, features: ['grades'] }, OTHER), false, "grades: 'disabled' is off")
   assert.equal(isEntryApplicable({ ...GLOBAL, features: ['mail', 'moodle'] }, { features: { mail: true } }), false)
   assert.equal(isEntryApplicable({ ...GLOBAL, features: ['weather'] }, RENNES), true)
 })
 
 test('universities and features together must both match', () => {
-  const entry = { ...GLOBAL, universities: ['univ-exemple'], features: ['mail'] }
+  const entry = { ...GLOBAL, universities: ['univ-autre'], features: ['mail'] }
   assert.equal(isEntryApplicable(entry, RENNES), false)
-  assert.equal(isEntryApplicable(entry, EXEMPLE), false)
-  assert.equal(isEntryApplicable(entry, { ...EXEMPLE, features: { mail: true } }), true)
+  assert.equal(isEntryApplicable(entry, OTHER), false)
+  assert.equal(isEntryApplicable(entry, { ...OTHER, features: { mail: true } }), true)
 })
 
 test('applicable entries come newest first, same-day ones in file order', () => {
   const entries = [GLOBAL, NEEDS_MAIL, RENNES_ONLY, NEW_GLOBAL]
   assert.deepEqual(getApplicableEntries(entries, RENNES).map((entry) => entry.id), ['new-global', 'mail', 'rennes', 'global'])
-  assert.deepEqual(getApplicableEntries(entries, EXEMPLE).map((entry) => entry.id), ['new-global', 'global'])
+  assert.deepEqual(getApplicableEntries(entries, OTHER).map((entry) => entry.id), ['new-global', 'global'])
 })
 
 test('first visit: no pill, and every current entry is stored as seen', () => {
@@ -112,15 +112,15 @@ test('an entry added later on an already seen day still counts as unseen', () =>
 })
 
 test('the pill ignores entries that don’t apply here', () => {
-  // A device at univ-exemple that has seen the global entry: new
+  // A device at univ-autre that has seen the global entry: new
   // Rennes-only and mail-only entries must not light its pill up.
   const rawSeen = JSON.stringify({ ids: ['global'] })
   const freshRennes = { ...RENNES_ONLY, id: 'rennes-2', date: '2026-11-01' }
   const freshMail = { ...NEEDS_MAIL, id: 'mail-2', date: '2026-11-01' }
   const all = [freshRennes, freshMail, ...ENTRIES]
 
-  const exemple = resolveChangelogVisit({ entries: getApplicableEntries(all, EXEMPLE), allEntries: all, rawSeen })
-  assert.deepEqual(exemple.unseenIds, [])
+  const other = resolveChangelogVisit({ entries: getApplicableEntries(all, OTHER), allEntries: all, rawSeen })
+  assert.deepEqual(other.unseenIds, [])
 
   const rennes = resolveChangelogVisit({ entries: getApplicableEntries(all, RENNES), allEntries: all, rawSeen })
   assert.deepEqual(rennes.unseenIds, ['rennes-2', 'mail-2', 'rennes', 'mail'])
@@ -129,9 +129,9 @@ test('the pill ignores entries that don’t apply here', () => {
 test('opening the list marks everything seen and keeps earlier ids', () => {
   const all = [NEW_GLOBAL, ...ENTRIES]
   const rawSeen = JSON.stringify({ ids: ['global', 'rennes'] })
-  const next = markAllSeen({ entries: getApplicableEntries(all, EXEMPLE), allEntries: all, rawSeen })
+  const next = markAllSeen({ entries: getApplicableEntries(all, OTHER), allEntries: all, rawSeen })
   assert.deepEqual([...parseSeenValue(next)].sort(), ['global', 'new-global', 'rennes'])
-  assert.deepEqual(resolveChangelogVisit({ entries: getApplicableEntries(all, EXEMPLE), rawSeen: next }).unseenIds, [])
+  assert.deepEqual(resolveChangelogVisit({ entries: getApplicableEntries(all, OTHER), rawSeen: next }).unseenIds, [])
 })
 
 test('ids of removed entries are dropped from storage', () => {
@@ -194,7 +194,7 @@ test('the shipped changelog is well formed', () => {
 test('the seed entries follow each university’s features', () => {
   const ids = (university) => getApplicableEntries(CHANGELOG, university).map((entry) => entry.id)
   const rennes = { id: 'univ-rennes', features: { ade: true, planning: true, moodle: true, grades: true, mail: true, moodleDeadlines: true, schoolCertificate: true } }
-  const exemple = { id: 'univ-exemple', features: { ade: true, planning: true, moodle: false, grades: 'disabled', mail: false, moodleDeadlines: false } }
+  const other = { id: 'univ-autre', features: { ade: true, planning: true, moodle: false, grades: 'disabled', mail: false, moodleDeadlines: false } }
 
   const needAudience = CHANGELOG.filter((entry) => entry.audience).map((entry) => entry.id)
   assert.deepEqual(needAudience, ['salles-et-personnels', 'assiduite', 'messagerie', 'planning', 'simulateur-fluide', 'mes-notes'])
@@ -204,27 +204,27 @@ test('the seed entries follow each university’s features', () => {
   // « Assiduité » comes with « Mes notes »: its students only.
   assert.ok(!ids(rennes).includes('assiduite'))
   assert.ok(getApplicableEntries(CHANGELOG, rennes, ['grades-page']).some((entry) => entry.id === 'assiduite'))
-  assert.ok(!ids(exemple).includes('assiduite'))
+  assert.ok(!ids(other).includes('assiduite'))
   // « Salles et personnels »: the Planning's students, at Rennes (the ADE portal's tree).
   assert.ok(!ids(rennes).includes('salles-et-personnels'))
   assert.ok(getApplicableEntries(CHANGELOG, rennes, ['planning-page']).some((entry) => entry.id === 'salles-et-personnels'))
-  assert.ok(!getApplicableEntries(CHANGELOG, exemple, ['planning-page']).some((entry) => entry.id === 'salles-et-personnels'))
+  assert.ok(!getApplicableEntries(CHANGELOG, other, ['planning-page']).some((entry) => entry.id === 'salles-et-personnels'))
   assert.equal(getApplicableEntries(CHANGELOG, rennes, ['grades-page', 'planning-page', 'mail-page']).length, CHANGELOG.length)
-  assert.ok(!ids(exemple).includes('mes-notes'))
-  assert.ok(!ids(exemple).includes('certificat-de-scolarite'))
-  assert.ok(!ids(exemple).includes('raccourcis-messagerie-moodle'))
-  assert.ok(!ids(exemple).includes('accueil-compact-telephone'))
-  assert.ok(ids(exemple).includes('applications'))
+  assert.ok(!ids(other).includes('mes-notes'))
+  assert.ok(!ids(other).includes('certificat-de-scolarite'))
+  assert.ok(!ids(other).includes('raccourcis-messagerie-moodle'))
+  assert.ok(!ids(other).includes('accueil-compact-telephone'))
+  assert.ok(ids(other).includes('applications'))
   // « Couleurs »: in everyone's Réglages, whatever the university.
   assert.ok(ids(rennes).includes('couleurs'))
-  assert.ok(ids(exemple).includes('couleurs'))
+  assert.ok(ids(other).includes('couleurs'))
 })
 
 test('an entry with an audience only reaches students who have all of it', () => {
   const GRADES = { ...GLOBAL, id: 'notes', universities: ['univ-rennes'], audience: ['grades-page'] }
   assert.equal(isEntryApplicable(GRADES, RENNES), false, 'audience unknown yet: hidden')
   assert.equal(isEntryApplicable(GRADES, RENNES, ['grades-page']), true)
-  assert.equal(isEntryApplicable(GRADES, EXEMPLE, ['grades-page']), false, 'still per university')
+  assert.equal(isEntryApplicable(GRADES, OTHER, ['grades-page']), false, 'still per university')
   assert.deepEqual(getApplicableEntries([GLOBAL, GRADES], RENNES).map((entry) => entry.id), [GLOBAL.id])
 })
 
@@ -264,15 +264,15 @@ test('the Planning’s launch only reaches students with the page', () => {
   const planning = CHANGELOG.find((entry) => entry.id === 'planning')
   assert.equal(isEntryApplicable(planning, RENNES_FULL), false, 'audience unknown yet (not signed in): hidden')
   assert.equal(isEntryApplicable(planning, RENNES_FULL, ['planning-page']), true, 'no « Mes notes » needed')
-  assert.equal(isEntryApplicable(planning, { id: 'univ-exemple', features: { planning: true, grades: 'disabled' } }, ['planning-page']), true)
-  assert.equal(isEntryApplicable(planning, { id: 'example-minimal', features: { planning: false } }, ['planning-page']), false, 'no planning feature: never')
+  assert.equal(isEntryApplicable(planning, { id: 'univ-autre', features: { planning: true, grades: 'disabled' } }, ['planning-page']), true)
+  assert.equal(isEntryApplicable(planning, { id: 'univ-autre', features: { planning: false } }, ['planning-page']), false, 'no planning feature: never')
 })
 
 test('the Messagerie’s launch only reaches students with the mail page', () => {
   const mail = CHANGELOG.find((entry) => entry.id === 'messagerie')
   assert.equal(isEntryApplicable(mail, RENNES_FULL), false, 'audience unknown yet (not signed in): hidden')
   assert.equal(isEntryApplicable(mail, RENNES_FULL, ['mail-page']), true)
-  assert.equal(isEntryApplicable(mail, { id: 'example-minimal', features: { mail: false } }, ['mail-page']), false, 'no mail feature: never')
+  assert.equal(isEntryApplicable(mail, { id: 'univ-autre', features: { mail: false } }, ['mail-page']), false, 'no mail feature: never')
   assert.equal(isEntryApplicable(mail, RENNES_FULL, ['planning-page']), false, 'another page’s audience is not enough')
 })
 

@@ -25,10 +25,13 @@ export default defineConfig([
     rules: {
       'no-unused-vars': ['error', { varsIgnorePattern: '^[A-Z_]' }],
       'react-hooks/set-state-in-effect': 'off',
+      // markBackend (src/dev/backendTrace.js) gives back the component it is
+      // given: an export through it is still a component's.
+      'react-refresh/only-export-components': ['error', { allowConstantExport: true, customHOCs: ['markBackend'] }],
     },
   },
   {
-    files: ['*.js', 'server/**/*.js', 'universities/index.js', 'universities/*/server.js'],
+    files: ['*.js', 'universities/index.js'],
     languageOptions: {
       globals: {
         ...globals.browser,

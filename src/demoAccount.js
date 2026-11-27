@@ -255,7 +255,6 @@ const DEMO_APPLICATIONS = Object.freeze([
 ])
 
 const DEMO_APPLICATIONS_BY_ID = new Map(DEMO_APPLICATIONS.map((application) => [application.id, application]))
-const DEMO_APPLICATIONS_BY_FNAME = new Map(DEMO_APPLICATIONS.map((application) => [application.fname, application]))
 
 const DEMO_TREE_ROOT = Object.freeze({
   id: '-100',
@@ -381,13 +380,6 @@ const DEMO_DIRECTORY_ITEMS = Object.freeze([
 ])
 const DEMO_DIRECTORY_BY_ID = new Map(DEMO_DIRECTORY_ITEMS.map((item) => [item.id, item]))
 
-export function buildDemoAdeDirectoryPayload() {
-  return {
-    groups: cloneDemoValue(DEMO_DIRECTORY_GROUPS),
-    items: DEMO_DIRECTORY_ITEMS.map(({ id, name, group }) => [id, name, group]),
-  }
-}
-
 // A directory entry's classes among the demo week's (its room, or its
 // teacher among those ADE joins with « - »; a group has the whole week).
 function matchesDemoDirectoryEntry(event, entry) {
@@ -428,220 +420,24 @@ export const DEMO_ACCOUNT = Object.freeze({
   picture: createDemoAvatarDataUri('CM'),
 })
 
-function normalizeDemoFavoriteIds(value) {
-  if (!Array.isArray(value)) {
-    return [...DEMO_DEFAULT_FAVORITE_IDS]
-  }
-
-  return value
-    .map((id) => String(id ?? '').trim())
-    .filter((id, index, ids) => id && ids.indexOf(id) === index && DEMO_APPLICATIONS_BY_ID.has(id))
-}
-
 export function isDemoCredentials(username, password) {
   return String(username ?? '').trim().toLowerCase() === DEMO_CREDENTIALS.username.toLowerCase()
     && String(password ?? '') === DEMO_CREDENTIALS.password
 }
 
-export function createInitialDemoState() {
-  return {
-    favoritePortletIds: [...DEMO_DEFAULT_FAVORITE_IDS],
-  }
-}
-
-export function normalizeDemoState(value) {
-  return {
-    favoritePortletIds: normalizeDemoFavoriteIds(value?.favoritePortletIds),
-  }
-}
-
-function getDemoApplicationPortlets(ids = []) {
-  return ids
-    .map((id) => DEMO_APPLICATIONS_BY_ID.get(id))
-    .filter(Boolean)
-    .map((application) => ({
-      _objectType: 'portlet',
-      ID: application.id,
-      nodeId: application.id,
-      chanID: application.id,
-      fname: application.fname,
-      title: application.title,
-      name: application.title,
-      description: application.description,
-      portletName: 'app-launcher',
-      typeID: '2',
-      parameters: {
-        launchUrl: application.href,
-        description: application.description,
-        target: application.target,
-        stopImmediately: application.target === '_blank' ? 'true' : 'false',
-      },
-      widgetURL: application.href,
-      url: application.href,
-      target: application.target,
-    }))
-}
-
-export function buildDemoLayoutData(demoStateInput) {
-  const demoState = normalizeDemoState(demoStateInput)
-  const favoritePortlets = getDemoApplicationPortlets(demoState.favoritePortletIds)
-  const allPortlets = getDemoApplicationPortlets(DEMO_APPLICATIONS.map((application) => application.id))
-
-  return {
-    authenticated: 'true',
-    user: DEMO_ACCOUNT.preferred_username,
-    layout: {
-      globals: {
-        hasFavorites: 'true',
-      },
-      navigation: {
-        tabs: [
-          {
-            ID: 'demo-tab-services',
-            name: 'Services',
-            content: [
-              {
-                _objectType: 'folder',
-                ID: 'demo-folder-favorites',
-                name: 'Favoris',
-                content: favoritePortlets,
-              },
-              {
-                _objectType: 'folder',
-                ID: 'demo-folder-services',
-                name: 'Toutes les applications',
-                content: allPortlets,
-              },
-            ],
-          },
-        ],
-        favorites: favoritePortlets,
-      },
-      favorites: favoritePortlets,
-    },
-  }
-}
-
-export function buildDemoLayoutDocData() {
+// The demo's applications as the page reads them (GET /__ent_auth/apps:
+// tonAPI's model). `id` is the key a favourite is kept by; the ones starred
+// from the start say so, as a portal does for a real account.
+export function buildDemoApps() {
   return DEMO_APPLICATIONS.map((application) => ({
-    ID: application.id,
-    nodeId: application.id,
-    fname: application.fname,
+    id: application.fname,
     title: application.title,
-    name: application.title,
     description: application.description,
-    portletName: 'app-launcher',
-    typeID: '2',
-    parameters: {
-      launchUrl: application.href,
-      description: application.description,
-      target: application.target,
-      stopImmediately: application.target === '_blank' ? 'true' : 'false',
-    },
-    widgetURL: application.href,
     url: application.href,
-    target: application.target,
+    iconUrl: null,
+    category: null,
+    favorite: DEMO_DEFAULT_FAVORITE_IDS.includes(application.id),
   }))
-}
-
-export function buildDemoMarketplaceEntries() {
-  return []
-}
-
-export function buildDemoPortletFragment(fname) {
-  const application = DEMO_APPLICATIONS_BY_FNAME.get(String(fname ?? '').trim())
-  if (!application) {
-    return null
-  }
-
-  return `<div class="demo-portlet-fragment"><a href="${escapeHtml(application.href)}" target="${escapeHtml(application.target)}" rel="noreferrer">${escapeHtml(application.title)}</a></div>`
-}
-
-export function buildDemoPortletMetadata(fname) {
-  const application = DEMO_APPLICATIONS_BY_FNAME.get(String(fname ?? '').trim())
-  if (!application) {
-    return null
-  }
-
-  return {
-    ID: application.id,
-    nodeId: application.id,
-    fname: application.fname,
-    title: application.title,
-    name: application.title,
-    description: application.description,
-    portletName: 'app-launcher',
-    typeID: '2',
-    parameters: {
-      launchUrl: application.href,
-      description: application.description,
-      target: application.target,
-      stopImmediately: application.target === '_blank' ? 'true' : 'false',
-    },
-    widgetURL: application.href,
-    url: application.href,
-    target: application.target,
-  }
-}
-
-function insertAfter(list, targetValue, nextValue) {
-  const nextList = [...list]
-  const targetIndex = nextList.indexOf(targetValue)
-
-  if (targetIndex !== -1) {
-    return nextList
-  }
-
-  if (nextValue && nextList.includes(nextValue)) {
-    nextList.splice(nextList.indexOf(nextValue), 0, targetValue)
-    return nextList
-  }
-
-  nextList.push(targetValue)
-  return nextList
-}
-
-export function applyDemoLayoutMutation(requestPath, demoStateInput) {
-  const demoState = normalizeDemoState(demoStateInput)
-  const requestUrl = new URL(String(requestPath ?? '/api/layout'), 'https://demo.l-ent.local')
-
-  if (requestUrl.pathname !== '/api/layout') {
-    return {
-      handled: false,
-      demoState,
-    }
-  }
-
-  const sourceId = String(
-    requestUrl.searchParams.get('sourceId')
-      || requestUrl.searchParams.get('sourceID')
-      || '',
-  ).trim()
-
-  if (!DEMO_APPLICATIONS_BY_ID.has(sourceId)) {
-    return {
-      handled: true,
-      demoState,
-    }
-  }
-
-  const favoritePortletIds = demoState.favoritePortletIds.includes(sourceId)
-    ? demoState.favoritePortletIds.filter((id) => id !== sourceId)
-    : insertAfter(
-      demoState.favoritePortletIds,
-      sourceId,
-      String(requestUrl.searchParams.get('nextNodeId') || '').trim(),
-    )
-
-  return {
-    handled: true,
-    demoState: normalizeDemoState({ favoritePortletIds }),
-    payload: {
-      ok: true,
-      action: requestUrl.searchParams.get('action') || 'toggleFavorite',
-      favoritePortletIds,
-    },
-  }
 }
 
 function findDemoTreeNodeById(node, targetId) {
@@ -681,55 +477,6 @@ function findDemoTreePathIds(node, targetId, currentPath = []) {
   }
 
   return null
-}
-
-function collectDemoTreeNodes(node, collector) {
-  if (!node) {
-    return
-  }
-
-  collector.push(node)
-
-  for (const child of node.children ?? []) {
-    collectDemoTreeNodes(child, collector)
-  }
-}
-
-export function buildDemoAdeTreePayload(requestedResourceId = '') {
-  const normalizedRequestedResourceId = String(requestedResourceId ?? '').trim()
-  const hasRequestedResource = normalizedRequestedResourceId && findDemoTreeNodeById(DEMO_TREE_ROOT, normalizedRequestedResourceId)
-  const focusResourceId = hasRequestedResource ? normalizedRequestedResourceId : DEMO_DEFAULT_TREE_PATH[DEMO_DEFAULT_TREE_PATH.length - 1]
-  const currentPathIds = findDemoTreePathIds(DEMO_TREE_ROOT, focusResourceId) ?? [...DEMO_DEFAULT_TREE_PATH]
-
-  return {
-    source: 'demo',
-    root: cloneDemoValue(DEMO_TREE_ROOT),
-    currentResourceId: currentPathIds[currentPathIds.length - 1] ?? null,
-    focusResourceId,
-    currentPathIds,
-  }
-}
-
-export function searchDemoAdeTree(query) {
-  const normalizedQuery = String(query ?? '').trim().toLowerCase()
-  if (!normalizedQuery) {
-    return []
-  }
-
-  const nodes = []
-  collectDemoTreeNodes(DEMO_TREE_ROOT, nodes)
-
-  return nodes
-    .filter((node) => {
-      const haystack = [node.name, node.path, node.id].join(' | ').toLowerCase()
-      return haystack.includes(normalizedQuery) && String(node.id) !== '-100'
-    })
-    .map((node) => ({
-      id: String(node.id),
-      name: node.name,
-      path: node.path,
-      childrenCount: Array.isArray(node.children) ? node.children.length : 0,
-    }))
 }
 
 function parseDateOnly(dateString) {
@@ -847,51 +594,6 @@ export function buildDemoTimetablePayload({ date, resourceId } = {}) {
   }
 }
 
-export function buildDemoPlanningPayload({ date, resourceId } = {}) {
-  const timetable = buildDemoTimetablePayload({ date, resourceId })
-  return {
-    events: timetable.events,
-    weekLabel: timetable.weekLabel,
-    dayLabels: timetable.dayLabels,
-    resolvedWeek: timetable.resolvedWeek,
-    outOfRange: timetable.outOfRange,
-  }
-}
-
-export function buildDemoCalendarPayload({ date, resourceId } = {}) {
-  const anchorDate = parseDateOnly(date || formatDateOnly(new Date()))
-  const weekStart = startOfWeek(anchorDate)
-  const resolvedSelection = normalizeSelectionFromResource(resourceId)
-  const weeks = Array.from({ length: 6 }, (_, index) => {
-    const currentWeekStart = addDays(weekStart, index * 7)
-    const currentWeekEnd = addDays(currentWeekStart, 6)
-
-    return {
-      index,
-      label: buildWeekLabel(currentWeekStart),
-      start: formatDateOnly(currentWeekStart),
-      end: formatDateOnly(currentWeekEnd),
-      current: index === 0,
-    }
-  })
-
-  return {
-    source: 'demo',
-    resourceId: resolvedSelection.resourceId,
-    currentResourceId: resolvedSelection.resourceId,
-    requestedResourceId: String(resourceId ?? '').trim() || resolvedSelection.resourceId,
-    targetDate: formatDateOnly(anchorDate),
-    targetDateMatched: true,
-    outOfRange: false,
-    matchedWeek: weeks[0],
-    currentWeek: weeks[0],
-    firstWeek: weeks[0],
-    lastWeek: weeks[weeks.length - 1],
-    weekCount: weeks.length,
-    weeks,
-  }
-}
-
 export function buildDemoUpcomingPayload({ date, lookaheadDays = 14, selection = null } = {}) {
   const requestedDate = parseDateOnly(date || formatDateOnly(new Date()))
   const selectionLabel = getSelectionLabel(selection)
@@ -926,13 +628,98 @@ export function buildDemoUpcomingPayload({ date, lookaheadDays = 14, selection =
   }
 }
 
-export function buildDemoAlertsPayload() {
+// The demo's planning as tonAPI gives a real one (src/demoServer.js's
+// /timetable routes): its courses, and its tree of groups, teachers and
+// rooms, `selected` on the student's own group.
+
+// The student's group when no other is asked: TP 3 (DEMO_DEFAULT_TREE_PATH).
+const DEMO_OWN_GROUP_ID = DEMO_DEFAULT_TREE_PATH[DEMO_DEFAULT_TREE_PATH.length - 1]
+
+// The courses of `from` to `to` (both included, YYYY-MM-DD): the demo week's,
+// every week, for the group, room or teacher of `resources` (a tree's ids),
+// the student's own group without any. An id the demo doesn't know gives
+// none.
+export function buildDemoCourses({ from, to, resources = [] } = {}) {
+  const first = parseDateOnly(from)
+  const last = addDays(parseDateOnly(to || from), 1)
+  const asked = resources.length > 0 ? resources.map(String) : [DEMO_OWN_GROUP_ID]
+  const group = asked.map((id) => findDemoTreeNodeById(DEMO_TREE_ROOT, id)).find((node) => node && node.id !== '-100')
+  const entry = asked.map((id) => DEMO_DIRECTORY_BY_ID.get(id)).find((item) => item && (item.location || item.teacher))
+  if (!group && !entry) return []
+  const label = group?.name ?? 'TP 3'
+
+  const courses = []
+  for (let monday = startOfWeek(first); monday < last; monday = addDays(monday, 7)) {
+    for (const event of buildDemoEventsForWeek(monday, label)) {
+      const start = new Date(event.start)
+      if (start < first || start >= last) continue
+      if (!group && !matchesDemoDirectoryEntry(event, entry)) continue
+      courses.push({
+        id: event.id,
+        title: event.title,
+        kind: null,
+        start: event.start,
+        end: event.end,
+        rooms: [event.location],
+        teachers: String(event.teacher ?? '').split(' - ').map((name) => name.trim()).filter(Boolean),
+        groups: event.groups,
+        description: null,
+        color: null,
+        activityId: null,
+        link: null,
+      })
+    }
+  }
+  return courses.sort((left, right) => left.start.localeCompare(right.start))
+}
+
+function demoTreeNode(node) {
+  const children = (node.children ?? []).map(demoTreeNode)
+  return {
+    id: String(node.id),
+    name: node.name,
+    kind: 'group',
+    folder: children.length > 0,
+    children,
+    ...(String(node.id) === DEMO_OWN_GROUP_ID ? { selected: true } : {}),
+  }
+}
+
+// The rooms and teachers of « Salles et personnels », under their folders.
+function demoDirectoryTree(kind) {
+  const roots = []
+  const folderIds = new Map()
+  const folderOf = (path) => {
+    let level = roots
+    let folder = null
+    path.forEach((name, depth) => {
+      const key = path.slice(0, depth + 1).join('\u0000')
+      if (!folderIds.has(key)) {
+        const node = { id: `demo-folder-${kind}-${folderIds.size + 1}`, name, kind, folder: true, children: [] }
+        folderIds.set(key, node)
+        level.push(node)
+      }
+      folder = folderIds.get(key)
+      level = folder.children
+    })
+    return folder
+  }
+  const directoryKind = kind === 'teacher' ? 'person' : kind
+  for (const item of DEMO_DIRECTORY_ITEMS) {
+    const group = DEMO_DIRECTORY_GROUPS[item.group]
+    if (group?.kind !== directoryKind) continue
+    folderOf(group.path).children.push({ id: item.id, name: item.name, kind, folder: false, children: [] })
+  }
+  return roots
+}
+
+// The tree of `kinds` ('group', 'teacher', 'room'; all without any).
+export function buildDemoTimetableTree(kinds = []) {
+  const wanted = (kind) => kinds.length === 0 || kinds.includes(kind)
   return [
-    {
-      level: 'info',
-      title: 'Mode démo',
-      message: 'Certaines applications ouvrent des pages publiques pour illustrer le parcours.',
-    },
+    ...(wanted('group') ? DEMO_TREE_ROOT.children.map(demoTreeNode) : []),
+    ...(wanted('teacher') ? demoDirectoryTree('teacher') : []),
+    ...(wanted('room') ? demoDirectoryTree('room') : []),
   ]
 }
 
@@ -991,7 +778,7 @@ const DEMO_MAIL_MESSAGES = Object.freeze([
 
 // Demo sessions open the same demo webmail as the "Messagerie" app tile,
 // never the real university webmail.
-const DEMO_WEBMAIL_HREF = DEMO_APPLICATIONS.find((application) => application.id === 'demo-mail')?.href ?? null
+export const DEMO_WEBMAIL_HREF = DEMO_APPLICATIONS.find((application) => application.id === 'demo-mail')?.href ?? null
 
 export function buildDemoMailPayload({ now = Date.now(), webmailHref = DEMO_WEBMAIL_HREF } = {}) {
   const messages = DEMO_MAIL_MESSAGES.map(({ minutesAgo, ...message }) => ({

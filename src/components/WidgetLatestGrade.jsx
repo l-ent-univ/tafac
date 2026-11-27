@@ -1,3 +1,4 @@
+import { markBackend } from '../dev/backendTrace.js'
 import { useEffect, useMemo, useState } from 'react'
 import { useWidgetLoadReport } from '../analytics'
 import { GRADES_LAUNCH_HREF, getLatestGrade, getRequestErrorKind, openGradesService } from '../entApi'
@@ -226,4 +227,5 @@ function WidgetLatestGrade({ visible = false, user = null, onOpenGrade = null, p
   return <LiveWidgetLatestGrade visible={visible} user={user} onOpenGrade={onOpenGrade} preview={preview} />
 }
 
-export default WidgetLatestGrade
+// Development: outlined by who answered its route (src/dev/backendTrace.js).
+export default markBackend(WidgetLatestGrade, ['/__ent_auth/grades', '/__ent_auth/grades/semester/:id'])

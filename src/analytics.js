@@ -13,6 +13,7 @@ import { toFormationSlug } from './formationSlug'
 import { createNavigationReporter } from './planningAnalytics'
 import { isDesktopApp, isIosApp } from './desktopApp'
 import { getDesktopUpdate, subscribeDesktopUpdate } from './desktopUpdate'
+import { readDemoSession } from './demoSession'
 
 const ANALYTICS_ENDPOINT = `${ENT_AUTH_PREFIX}/analytics`
 const FLUSH_DELAY_MS = 2000
@@ -133,7 +134,8 @@ function getAppVersion() {
   return typeof version === 'string' && /^\d+\.\d+\.\d+$/.test(version) && version !== '0.0.0' ? version : null
 }
 
-// Coarse context only. `university` and `demo` are added by the server.
+// Coarse context only. `university` is added by the server, and `demo`
+// (false: a session is never the demo's, see track below).
 function getContext() {
   const lang = String(navigator.language || '').slice(0, 2).toLowerCase()
   const appVersion = getAppVersion()
@@ -187,8 +189,15 @@ export function flushAnalytics() {
   if (queue.length > 0) flushAnalytics()
 }
 
+// Nothing is measured in the demo: its sign-in is the page's own
+// (src/demoSession.js), so the server couldn't tell its events from a
+// visitor's who isn't signed in. Only the sign-in itself is counted
+// (login_result, which says `demo`).
+const SENT_IN_DEMO = new Set(['login_result'])
+
 export function track(event, properties = {}) {
   if (!isActive()) return
+  if (!SENT_IN_DEMO.has(event) && readDemoSession()) return
 
   queue.push({ event, properties })
   if (queue.length >= MAX_BATCH_SIZE) {

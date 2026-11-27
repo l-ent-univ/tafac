@@ -1,0 +1,6 @@
+[
+  { "id": "portal-tool-emploi-du-temps", "title": "EDT", "description": "Mon emploi du temps", "url": "https://edt.exemple.test/", "iconUrl": null, "category": "Bureau", "favorite": false },
+  { "id": "portal-tool-imprimer", "title": "Imprimer", "description": null, "url": "{origin}/numerique/impression#accordion-1", "iconUrl": null, "category": "Bureau", "favorite": false },
+  { "id": "portal-tool-disques", "title": "Mes disques \"M\"", "description": "Recharger mon cr'dit", "url": "https://fichiers.exemple.test/login.php?url=x&app=gollem", "iconUrl": null, "category": "Enseignement & ressources", "favorite": false },
+  { "id": "portal-tool-cours", "title": "Cours en ligne", "description": null, "url": "https://cours.exemple.test/login/index.php?authCAS=CAS", "iconUrl": null, "category": "Enseignement & ressources", "favorite": false }
+]

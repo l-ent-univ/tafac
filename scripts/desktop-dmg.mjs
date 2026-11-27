@@ -8,9 +8,8 @@
 //
 // Made here, from the app as it stands after the signed build
 // (scripts/desktop-sign.mjs) and its notarization: Tauri's own disk image
-// is made before both, around a Node macOS refuses to run. Same recipe as
-// Tauri's (create-dmg): a writable image, laid out by Finder, then
-// compressed.
+// is made before both. Same recipe as Tauri's (create-dmg): a writable
+// image, laid out by Finder, then compressed.
 //
 // The background is src-tauri/dmg/background.png (660×400) and
 // background@2x.png (1320×800), joined into background.tiff

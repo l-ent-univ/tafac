@@ -1,3 +1,4 @@
+import { markBackend } from '../dev/backendTrace.js'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Icon } from '@iconify/react'
 import { Skeleton } from 'skullet/react'
@@ -222,15 +223,17 @@ function WidgetDeadlines({ visible = false, preview = null, icon = null, large =
   const [listRef] = useFitListItems()
   useWidgetLoadReport('deadlines', preview ? null : getLoadOutcome(state))
 
-  const loadDeadlines = useCallback(async ({ background = false } = {}) => {
+  const loadDeadlines = useCallback(async ({ background = false, fresh = false } = {}) => {
     if (loadingRef.current) return
     loadingRef.current = true
     if (!background) {
       setState((current) => ({ ...current, status: 'loading' }))
     }
 
+    let old = false
     try {
-      const result = await getMoodleDeadlines()
+      const result = await getMoodleDeadlines({ fresh })
+      old = result.refreshing === true
       lastLoadAtRef.current = Date.now()
       setNow(new Date())
       if (result.moodleHref) {
@@ -241,6 +244,11 @@ function WidgetDeadlines({ visible = false, preview = null, icon = null, large =
       setState((current) => (background && result.status === 'error' && current.status === 'ok' ? current : result))
     } finally {
       loadingRef.current = false
+    }
+    // An old list the server gave while it asks Moodle again: shown, and
+    // the one that comes replaces it (src/entApi.js).
+    if (old && !fresh) {
+      void loadDeadlines({ background: true, fresh: true })
     }
   }, [])
 
@@ -367,4 +375,5 @@ function WidgetDeadlines({ visible = false, preview = null, icon = null, large =
   )
 }
 
-export default WidgetDeadlines
+// Development: outlined by who answered its route (src/dev/backendTrace.js).
+export default markBackend(WidgetDeadlines, ['/__ent_auth/moodle/deadlines'])
