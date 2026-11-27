@@ -29,7 +29,7 @@ use std::path::Path;
 use std::time::Instant;
 
 use bytes::Bytes;
-use http::header::{CONTENT_TYPE, HOST, IF_MODIFIED_SINCE, IF_NONE_MATCH, IF_RANGE, RANGE, SET_COOKIE};
+use http::header::{CONTENT_LENGTH, CONTENT_TYPE, HOST, IF_MODIFIED_SINCE, IF_NONE_MATCH, IF_RANGE, RANGE, SET_COOKIE, TRANSFER_ENCODING};
 use http::{HeaderMap, HeaderValue, Method};
 
 use tafac_gateway::own::universities::Served;
@@ -149,10 +149,19 @@ pub async fn forward(bridge: &Bridge, request: http::Request<Vec<u8>>) -> http::
 
 async fn answer(bridge: &Bridge, request: http::Request<Vec<u8>>) -> http::Response<Vec<u8>> {
     let (parts, body) = request.into_parts();
+    let mut headers = parts.headers;
+    // The WebView hands a request's body over whole, without saying its
+    // length: a browser sends `Content-Length` on the wire, and the
+    // gateway reads a JSON body only when one is said (as express.json
+    // did). Without it, every mail action, the composer's send and draft
+    // and an upload were refused as having no body.
+    if !matches!(parts.method, Method::GET | Method::HEAD) && !headers.contains_key(CONTENT_LENGTH) && !headers.contains_key(TRANSFER_ENCODING) {
+        headers.insert(CONTENT_LENGTH, HeaderValue::from(body.len()));
+    }
     let outgoing = Outgoing {
         path: parts.uri.path_and_query().map(|value| value.as_str()).unwrap_or("/").to_string(),
         method: parts.method,
-        headers: parts.headers,
+        headers,
         body: Bytes::from(body),
     };
     let path = parts.uri.path();
@@ -372,6 +381,26 @@ mod tests {
             .body(body.into_bytes())
             .unwrap();
         block_on(forward(bridge, request))
+    }
+
+    // A mail action as the WebView hands it over: its JSON body whole, no
+    // `Content-Length`. The gateway reads it all the same (the length said
+    // here), and the webmail is asked.
+    #[test]
+    fn a_mail_action_with_a_body_the_webview_gave_no_length_is_read() {
+        let campus = campus();
+        let bridge = bridge(&campus, &campus.alive());
+        let request = http::Request::builder()
+            .method("POST")
+            .uri("tafac://localhost/__ent_auth/mail/action")
+            .header("content-type", "application/json")
+            .body(br#"{"ids":["300"],"action":"read"}"#.to_vec())
+            .unwrap();
+        assert!(!request.headers().contains_key(CONTENT_LENGTH));
+        let response = block_on(forward(&bridge, request));
+        assert_eq!(response.status(), 200, "{}", String::from_utf8_lossy(response.body()));
+        assert!(by_tonapi(&response));
+        assert_eq!(campus.posted_to("/service/soap/MsgActionRequest"), 1);
     }
 
     fn by_tonapi(response: &http::Response<Vec<u8>>) -> bool {
