@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { fillBrandingPlaceholders, fillPagePath, fillPublicOrigin } from '../server/appShell.js'
+import { fillBrandingPlaceholders, fillPagePath, fillPublicOrigin } from '../universities/appShell.js'
 import { branding as neutralBranding } from '../universities/neutral.js'
 import {
   listServedUniversityIds,

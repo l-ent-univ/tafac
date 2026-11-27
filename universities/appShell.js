@@ -1,7 +1,7 @@
 // index.html carries %LENT_*% placeholders (title, description, link
 // previews, structured data) and __PUBLIC_ORIGIN__. The build keeps them: one
 // build serves every university, and the server fills them as it sends the
-// page (server.js), with the neutral Tafac text when it serves every
+// page (back/: own/page.rs), with the neutral Tafac text when it serves every
 // university or the university's own when it serves one. The dev and preview
 // servers fill them the same way (vite.config.js).
 

@@ -470,22 +470,23 @@ without Node it doesn't start. The applications' icons are kept in
 
 ## To see it work
 
-In front of the development server, with the page saying who answered what:
+The development server starts it: `npm run dev` runs Vite (the page, its hot
+reload) and, with `cargo run`, the gateway behind it on :3100; Vite's proxy
+sends it `/__ent_auth` and `/__ent_proxy` (vite.config.js). Its first start
+builds it, a few minutes.
 
 ```sh
-export SESSION_SECRET="$(openssl rand -hex 32)"
-npm run dev -- --port 5173 --strictPort                       # the page and Node
-cd back && TAFAC_GATEWAY_DEV=1 TAFAC_GATEWAY_NODE=127.0.0.1:5173 \
-  TAFAC_LOG_REQUESTS=1 cargo run -p tafac-gateway             # the gateway, on :3100
+npm run dev                                                   # the page on :5173, the gateway on :3100
+TAFAC_DEV_GATEWAY_PORT=3107 npm run dev -- --port 5177        # a second one beside it
+TAFAC_DEV_GATEWAY=off npm run dev                             # ask a gateway already running on :3100
 ```
 
-Open http://127.0.0.1:3100 and sign in there: the gateway makes the session.
+Open http://localhost:5173 and sign in there: the gateway makes the session.
 In development the page outlines each widget and page by who answered its
 route (orange: the gateway, through tonAPI; green: Node) and lists every
 route asked, with its time (`src/dev/BackendMarks.jsx`). The gateway's own
 log says each moved route that failed, and why; the page gets the reason
-too, as from the development server. The statistics are off there, as the
-development server's are, unless the gateway is started with
-`POSTHOG_IN_DEV=1` and `POSTHOG_PROJECT_KEY` as that server is (the gateway
-reads its environment only, not `.env.local`; `POSTHOG_HOST` and
-`ANALYTICS_EXCLUDED_USERS` too, which it then sends with).
+too, as from the development server. The statistics are off there unless
+`POSTHOG_IN_DEV=1` and `POSTHOG_PROJECT_KEY` are given (the shell, or
+`.env.local`: Vite hands the gateway what it reads there, `POSTHOG_HOST` and
+`ANALYTICS_EXCLUDED_USERS` too).

@@ -19,7 +19,7 @@ import { branding as neutralBranding } from '../universities/neutral.js'
 export const DIRECTORY_FILE = fileURLToPath(new URL('../universities/directory.json', import.meta.url))
 
 // What the page's shell is filled with as the server sends it
-// (server/appShell.js: fillBrandingPlaceholders): the page's name and its
+// (universities/appShell.js: fillBrandingPlaceholders): the page's name and its
 // text for search engines and link previews.
 function pageText(branding = {}) {
   return {

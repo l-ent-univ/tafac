@@ -51,7 +51,7 @@ L’authentification implémentée repose sur un portail **uPortal et un formula
 
 > Une partie du code a été générée avec l’aide d’outils d’intelligence artificielle générative, mais systématiquement relue et vérifiée
 
-Utiliser **Node.js 24** et npm pour suivre l’environnement de la CI et de l’image Docker.
+Utiliser **Node.js 24** et npm pour suivre l’environnement de la CI et de l’image Docker, et **Rust** (`cargo`) pour le serveur, la passerelle de `back/`.
 
 ```sh
 git clone https://github.com/l-ent-univ/tafac.git
@@ -60,7 +60,7 @@ npm ci
 npm run dev
 ```
 
-Ouvrir l’adresse indiquée par Vite, généralement `http://localhost:5173`. Le serveur de développement inclut le backend Express : il n’y a pas de second serveur à lancer. Aucun compte universitaire ni secret n’est nécessaire pour essayer la démonstration.
+Ouvrir l’adresse indiquée par Vite, généralement `http://localhost:5173`. Le serveur de développement lance aussi le serveur de Tafac, la passerelle Rust de `back/` (`cargo run`, sur le port 3100), et lui passe l’API de la page (`/__ent_auth`, `/__ent_proxy`) : il n’y a pas de second serveur à lancer. Son premier démarrage la compile, quelques minutes. Aucun compte universitaire ni secret n’est nécessaire pour essayer la démonstration.
 
 ### Essayer la démonstration
 
@@ -97,7 +97,7 @@ Les liens `/rennes`, `/rennes2` et `/sorbonne-nouvelle` ouvrent la page d’accu
 
 | Commande | Rôle |
 | --- | --- |
-| `npm run dev` | Vite avec rechargement à chaud et backend intégré. |
+| `npm run dev` | Vite avec rechargement à chaud, et la passerelle de `back/` lancée derrière lui. |
 | `npm run lint` | Vérification ESLint. |
 | `npm run typecheck` | Vérification des types des modules TypeScript du serveur (`server/**/*.ts`), sans compilation. |
 | `npm test` | Tests avec le runner natif de Node.js. Certains ouvrent des serveurs HTTP locaux temporaires. |
