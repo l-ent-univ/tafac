@@ -248,7 +248,11 @@ crates/tafac-gateway/
   server keeps sessions. What tonAPI gets from the services while it answers
   (Moodle's session, ScoDoc's, a portal session of its own, the student's
   component) is held in this process with the session's id (`session/memory.rs`), not in the cookie:
-  two requests at once would each write it, and it has 4 kB.
+  two requests at once would each write it, and it has 4 kB. A process that
+  starts again (the apps at each launch, the server at each update) looks
+  for the component again at the first question that needs it, one look at
+  a time, and keeps it only once the university said (`tonapi/mod.rs`): a
+  look that failed is tried again at the next question.
 - **The cookie is the one Node wrote.** Same format, same `SESSION_SECRET`
   (and `SESSION_SECRET_PREVIOUS`, the older secrets still read during a
   rotation: a cookie of one of them goes back sealed with the current one).

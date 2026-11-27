@@ -46,6 +46,7 @@
 use std::future::Future;
 
 use http::header::CONTENT_TYPE;
+use tonapi_core::EstablishmentSource;
 use tonapi_providers::{Context, OtpTransport};
 use tonapi_session::SessionData;
 
@@ -297,7 +298,12 @@ impl Gateway {
         let in_the_cookie: Vec<_> = ticket.iter().chain(&others).map(handed::stored_cookie).collect();
         let memory = self.memory.of(&session.id, memory::student(&session.university, &session.user).as_deref());
         memory.keep(&Snapshot::default(), &signed_in, &in_the_cookie);
-        memory.detected(signed_in.establishment.clone());
+        // The component tonAPI found; none found (the student is of no
+        // component's, or the planning didn't answer then) is looked for
+        // again at the first question that needs it (tonapi/mod.rs).
+        if signed_in.establishment.as_ref().is_some_and(|pick| pick.source != EstablishmentSource::Default) {
+            memory.detected(signed_in.establishment.clone());
+        }
         memory.keep_profile(&profile);
         self.attempts.signed_in(who);
         let answer = said::signed_in(&session.user, &session.university, (&self.cookie_name, &cookie));

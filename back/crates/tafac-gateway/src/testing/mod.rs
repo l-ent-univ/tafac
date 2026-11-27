@@ -114,6 +114,10 @@ struct State {
     webmail_sessions: AtomicU32,
     // Each SOAP request the webmail answered: its name and its body.
     soap_requests: Mutex<Vec<(String, serde_json::Value)>>,
+    // ADE's portal: the student's group is another component's; it answers
+    // nothing but an error.
+    ade_other_group: AtomicBool,
+    ade_down: AtomicBool,
 }
 
 // Moodle's state: the session it knows (a number: it forgets the one before
@@ -719,6 +723,9 @@ fn campus_answer(received: &Received<'_>, port: &str, state: &State) -> Answer {
     if path.starts_with("/tempo/") {
         return tempo_answer(path, cookies, port, state);
     }
+    if path.starts_with("/ade/") {
+        return ade_answer(received, port, state);
+    }
     if path.starts_with("/wayf/") || path.starts_with("/idp/") {
         return federation_answer(received, port);
     }
@@ -780,6 +787,38 @@ fn tempo_answer(path: &str, cookies: &str, port: &str, state: &State) -> Answer 
         "/tempo/rooms" if signed_in => Answer::of("200 OK", "text/html; charset=utf-8", TEMPO_ROOMS.to_string()),
         "/tempo/rooms" => to_the_cas(),
         _ => Answer::of("404 Not Found", "application/json", r#"{"title":"Not Found"}"#.to_string()),
+    }
+}
+
+// ADE's portal (component_settings): its session opened for a ticket of
+// the CAS's, a short SSO token, then its API's token (ssologin), the
+// student's selection and the tree of resources, where the selected group
+// is under `IUT Campus` (or under another component's folder).
+fn ade_answer(received: &Received<'_>, port: &str, state: &State) -> Answer {
+    const SESSION: &str = "JSESSIONID=ade-open";
+    let Received { path, cookies, .. } = *received;
+    let signed_in = cookies.split("; ").any(|cookie| cookie == SESSION);
+    let root = format!("http://127.0.0.1:{port}/ade/");
+    let json = |value: serde_json::Value| Answer::of("200 OK", "application/json", value.to_string());
+    if state.ade_down.load(Ordering::SeqCst) {
+        return Answer::of("503 Service Unavailable", "text/html; charset=utf-8", "<html>Maintenance</html>".to_string());
+    }
+    let group = if state.ade_other_group.load(Ordering::SeqCst) { 41 } else { 31 };
+    match path.split('?').next().unwrap_or_default() {
+        "/ade/" if query_of(path, "ticket").as_deref() == Some("ST-campus") => Answer::redirect(&root).with(format!("set-cookie: {SESSION}; Path=/ade")),
+        "/ade/" if signed_in => Answer::of("200 OK", "text/html; charset=utf-8", "<html><body>ADE</body></html>".to_string()),
+        "/ade/" => Answer::redirect(&format!("http://localhost:{port}/cas/login?service={}", percent_encoded(&root))),
+        "/ade/sso/accessToken" if signed_in => json(serde_json::json!({ "token": "sso-campus" })),
+        "/ade/sso/accessToken" => json(serde_json::json!({ "errMsg": "no session" })),
+        "/ade/RestApi/portal/ssologin" => {
+            json(serde_json::json!({ "data": { "authData": { "projectId": 1, "accessToken": "api-campus", "refreshToken": "refresh-campus", "profile": "student", "resources": [] } } }))
+        }
+        "/ade/RestApi/portal/projects/1/user/properties/name/PortalResourcesAllSelection" => json(serde_json::json!({ "data": group.to_string() })),
+        "/ade/RestApi/portal/projects/1/resourcestree" => json(serde_json::json!({ "data": { "category": [{ "category": "trainee", "branch": [
+            { "id": 30, "name": "IUT Campus", "branch": [{ "id": 31, "name": "TP 1" }] },
+            { "id": 40, "name": "Faculty of Law", "branch": [{ "id": 41, "name": "TD 3" }] },
+        ] }] } })),
+        _ => Answer::of("404 Not Found", "application/json", "{}".to_string()),
     }
 }
 
@@ -932,6 +971,55 @@ impl Campus {
     // As the apps' bridge has it: every university served, no Node behind.
     pub fn gateway(&self) -> Gateway {
         Gateway::for_tests(vec![self.settings()], SECRET, COOKIE_NAME).without_node()
+    }
+
+    // The campus as a university of components, as Rennes is: the grades
+    // are the IUT's alone (ScoDoc), the other components have none, and the
+    // planning is an ADE portal (/ade/), whose tree says which component
+    // the student's group is in (`IUT Campus`).
+    pub fn component_settings(&self) -> ResolvedUniversity {
+        let mut settings = self.settings();
+        settings.university.services.grades = None;
+        settings.university.services.absences = None;
+        settings.university.services.timetable =
+            Some(toml::from_str(&format!("provider = \"ade-portal-rest\"\nbase-url = \"http://127.0.0.1:{}/ade/\"", self.port)).unwrap());
+        let others: tonapi_config::EstablishmentFile = toml::from_str("id = \"others\"\nname = \"Other components\"\ndefault = true").unwrap();
+        let iut: tonapi_config::EstablishmentFile = toml::from_str(&format!(
+            r#"
+            id = "iut"
+            name = "IUT of the campus"
+            [[affiliation.rules]]
+            signal = "ade-group-path"
+            contains = "IUT Campus"
+            weight = 3
+            [services.grades]
+            provider = "scodoc-gateway"
+            base-url = "http://127.0.0.1:{port}/scodoc/"
+            [services.absences]
+            provider = "scodoc-gateway"
+            base-url = "http://127.0.0.1:{port}/scodoc/"
+            "#,
+            port = self.port
+        ))
+        .unwrap();
+        settings.establishments = [("others".to_string(), others), ("iut".to_string(), iut)].into_iter().collect();
+        settings
+    }
+
+    // The gateway of that campus, as the apps' bridge has it.
+    pub fn component_gateway(&self) -> Gateway {
+        Gateway::for_tests(vec![self.component_settings()], SECRET, COOKIE_NAME).without_node()
+    }
+
+    // ADE's selection lists no group of the IUT's: the student is one of
+    // another component's.
+    pub fn ade_lists_another_group(&self, another: bool) {
+        self.state.ade_other_group.store(another, Ordering::SeqCst);
+    }
+
+    // ADE answers nothing but an error.
+    pub fn ade_is_down(&self, down: bool) {
+        self.state.ade_down.store(down, Ordering::SeqCst);
     }
 
     // As tafac.fr's server has it in front of Node: told what is served
