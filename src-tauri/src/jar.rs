@@ -37,7 +37,49 @@ fn now() -> i64 {
         .unwrap_or(0)
 }
 
+// A session saved by a version older than this one is dropped once, as the
+// app starts (the version that saved the jar is written beside it,
+// `cookies.version`). 0.31.0, the first without Node, kept a restored
+// session without the component its sign-in found (the IUT de Lannion), and
+// its grades then said there were none: dropped, the app signs in again by
+// itself with the kept login (signin.rs), and the sign-in finds it again.
+// Raise it only to sign every app out once more.
+const SESSIONS_KEPT_FROM: (u64, u64, u64) = (0, 31, 1);
+
+// "x.y.z" as numbers; None for anything else.
+fn version_of(text: &str) -> Option<(u64, u64, u64)> {
+    let mut parts = text.trim().split('.').map(|part| part.parse::<u64>().ok());
+    match (parts.next(), parts.next(), parts.next(), parts.next()) {
+        (Some(Some(major)), Some(Some(minor)), Some(Some(patch)), None) => Some((major, minor, patch)),
+        _ => None,
+    }
+}
+
 impl CookieJar {
+    // The jar, for the app at `version`: a session an older app saved
+    // (before SESSIONS_KEPT_FROM, or with no version said: every install
+    // until 0.31.1) is dropped once. A development build (0.0.0) drops
+    // nothing.
+    pub fn load_for(path: PathBuf, version: &str) -> Self {
+        let marker = path.with_extension("version");
+        let saved_by = std::fs::read_to_string(&marker).ok().and_then(|text| version_of(&text));
+        let jar = Self::load(path);
+        let running = version_of(version);
+        let from_before = saved_by.is_none_or(|saved| saved < SESSIONS_KEPT_FROM);
+        if running.is_some_and(|running| running >= SESSIONS_KEPT_FROM) && from_before {
+            let mut cookies = jar.cookies.lock().unwrap();
+            if !cookies.is_empty() {
+                cookies.clear();
+                jar.save(&cookies);
+                eprintln!("[tafac] session: signed out once, kept by an older version of the app");
+            }
+        }
+        if let Err(error) = write_private(&marker, version.as_bytes()) {
+            eprintln!("[tafac] the jar's version not saved: {error}");
+        }
+        jar
+    }
+
     pub fn load(path: PathBuf) -> Self {
         let cookies = std::fs::read(&path)
             .ok()
@@ -103,4 +145,65 @@ pub fn write_private(path: &PathBuf, bytes: &[u8]) -> std::io::Result<()> {
     }
     use std::io::Write;
     options.open(path)?.write_all(bytes)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // A jar saved in a folder of its own, holding a lasting session cookie,
+    // its version file as given (None: none, as every install before 0.31.1).
+    fn saved(name: &str, saved_by: Option<&str>) -> PathBuf {
+        let dir = std::env::temp_dir().join(format!("tafac-jar-{name}-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let path = dir.join("cookies.json");
+        CookieJar::load(path.clone()).store(["__Host-lent_session=v1.kept; Max-Age=2592000; Path=/"].into_iter());
+        if let Some(version) = saved_by {
+            std::fs::write(path.with_extension("version"), version).unwrap();
+        }
+        path
+    }
+
+    fn session(jar: &CookieJar) -> Option<String> {
+        jar.get("__Host-lent_session")
+    }
+
+    #[test]
+    fn a_session_an_older_app_kept_is_dropped_once() {
+        for (name, saved_by) in [("none", None), ("old", Some("0.31.0"))] {
+            let path = saved(name, saved_by);
+            let jar = CookieJar::load_for(path.clone(), "0.31.1");
+            assert_eq!(session(&jar), None, "{name}");
+            // Dropped on disk too, and not again: the version is written.
+            assert_eq!(session(&CookieJar::load(path.clone())), None, "{name}");
+            assert_eq!(std::fs::read_to_string(path.with_extension("version")).unwrap(), "0.31.1");
+            jar.store(["__Host-lent_session=v1.new; Max-Age=2592000; Path=/"].into_iter());
+            assert_eq!(session(&CookieJar::load_for(path.clone(), "0.31.2")).as_deref(), Some("v1.new"), "{name}");
+            let _ = std::fs::remove_dir_all(path.parent().unwrap());
+        }
+    }
+
+    #[test]
+    fn a_session_this_app_kept_stays() {
+        let path = saved("same", Some("0.31.1"));
+        assert_eq!(session(&CookieJar::load_for(path.clone(), "0.32.0")).as_deref(), Some("v1.kept"));
+        let _ = std::fs::remove_dir_all(path.parent().unwrap());
+    }
+
+    #[test]
+    fn a_development_build_drops_nothing() {
+        let path = saved("dev", None);
+        assert_eq!(session(&CookieJar::load_for(path.clone(), "0.0.0")).as_deref(), Some("v1.kept"));
+        let _ = std::fs::remove_dir_all(path.parent().unwrap());
+    }
+
+    #[test]
+    fn versions_are_read_as_numbers() {
+        assert!(version_of("0.31.1") > version_of("0.9.9"));
+        assert_eq!(version_of(" 0.31.1\n"), Some((0, 31, 1)));
+        for not_one in ["", "0.31", "0.31.1.2", "v0.31.1", "0.31.x"] {
+            assert_eq!(version_of(not_one), None, "{not_one}");
+        }
+    }
 }

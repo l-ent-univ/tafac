@@ -120,7 +120,7 @@ pub fn run() {
             let bridge = Arc::new(bridge::Bridge::new(
                 bridge::gateway(&secret, &data_dir, remote_settings),
                 bridge::site(&app.path().resource_dir()?),
-                jar::CookieJar::load(data_dir.join("cookies.json")),
+                jar::CookieJar::load_for(data_dir.join("cookies.json"), &app.package_info().version.to_string()),
                 signin::SignIn::for_this_build(),
             ));
             app.manage(bridge.clone());
