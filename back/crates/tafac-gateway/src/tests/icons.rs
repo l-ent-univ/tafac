@@ -62,7 +62,7 @@ fn the_icons_are_nodes_for_the_sessions_the_gateway_doesnt_hold_and_without_the_
     let headers = json_headers();
     let gateway = campus.gateway().with_icons_in(&data.0);
     let without_ticket = campus.cookie(serde_json::json!({ "jar": [] }), &[]);
-    let elsewhere = campus.cookie(serde_json::json!({ "uni": "univ-exemple" }), &[]);
+    let elsewhere = campus.cookie(serde_json::json!({ "uni": "univ-rennes-2" }), &[]);
     let demo = campus.cookie(serde_json::json!({ "mode": "demo" }), &[]);
     for cookie in [None, Some(without_ticket), Some(elsewhere), Some(demo), Some("not-a-cookie".to_string())] {
         assert!(block_on(gateway.answer(&asked(&POST, ICONS, &headers, BODY), || cookie.clone(), never)).is_none(), "{cookie:?}");

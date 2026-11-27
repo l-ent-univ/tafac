@@ -249,37 +249,37 @@ mod tests {
     fn a_university_without_domains_of_its_own_allows_its_hosts_only() {
         let targets = Targets::of(&settings(
             r#"
-            id = "univ-exemple"
-            name = "Université d'exemple"
+            id = "univ-test"
+            name = "Université de test"
             [sso]
             kind = "cas"
-            base-url = "https://cas.univ-exemple.example/cas/"
+            base-url = "https://cas.exemple.test/cas/"
             [portal]
             kind = "uportal5"
-            base-url = "https://ent.univ-exemple.example/"
+            base-url = "https://ent.exemple.test/"
             [services.timetable]
             provider = "ade-portal-rest"
-            base-url = "https://planning.univ-exemple.example/portal/"
+            base-url = "https://planning.exemple.test/portal/"
             [services.grades]
             provider = "link"
-            url = "https://notes.univ-exemple.example/"
+            url = "https://notes.exemple.test/"
             "#,
         ));
-        assert!(targets.allowed("https://ent.univ-exemple.example/x").is_some());
-        assert!(targets.allowed("https://planning.univ-exemple.example/direct/myplanning.jsp").is_some());
-        assert!(targets.allowed("https://notes.univ-exemple.example/").is_some());
-        assert!(targets.allowed("https://other.univ-exemple.example/").is_none());
+        assert!(targets.allowed("https://ent.exemple.test/x").is_some());
+        assert!(targets.allowed("https://planning.exemple.test/direct/myplanning.jsp").is_some());
+        assert!(targets.allowed("https://notes.exemple.test/").is_some());
+        assert!(targets.allowed("https://other.exemple.test/").is_none());
         assert!(targets.allowed("https://services-numeriques.univ-rennes.fr/").is_none());
         // The same hosts in clear: the ticket would travel unencrypted.
-        assert!(targets.allowed("http://ent.univ-exemple.example/").is_none());
+        assert!(targets.allowed("http://ent.exemple.test/").is_none());
     }
 
     #[test]
     fn a_host_the_settings_give_over_http_is_asked_over_http() {
         let targets = Targets::of(&settings(
             r#"
-            id = "univ-exemple"
-            name = "Université d'exemple"
+            id = "univ-test"
+            name = "Université de test"
             [sso]
             kind = "cas"
             base-url = "https://cas.exemple.test/cas/"
@@ -328,6 +328,6 @@ mod tests {
             assert_eq!(listed("mail", "signInDomains"), own.mail_sign_in, "{university}: mail.signInDomains");
             assert_eq!(listed("moodle", "signInDomains"), own.moodle_sign_in, "{university}: moodle.signInDomains");
         }
-        assert!(own("univ-exemple").launch.is_empty());
+        assert!(own("univ-nowhere").launch.is_empty());
     }
 }

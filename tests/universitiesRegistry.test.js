@@ -22,10 +22,9 @@ test('resolveMultiUniversity: the flag decides, else a set UNIVERSITY means one'
   assert.equal(resolveMultiUniversity({ MULTI_TENANT: '1', MULTI_UNIVERSITY: '0' }), false)
 })
 
-test('listServedUniversityIds: the list, else every non-example university', () => {
-  assert.deepEqual(listServedUniversityIds('univ-exemple, univ-rennes,univ-exemple'), ['univ-exemple', 'univ-rennes'])
-  assert.deepEqual(listServedUniversityIds(''), listUniversityIds().filter((id) => !id.startsWith('example')))
-  assert.ok(!listServedUniversityIds('').includes('example-minimal'))
+test('listServedUniversityIds: the list, else every university', () => {
+  assert.deepEqual(listServedUniversityIds('univ-sorbonne-nouvelle, univ-rennes,univ-sorbonne-nouvelle'), ['univ-sorbonne-nouvelle', 'univ-rennes'])
+  assert.deepEqual(listServedUniversityIds(''), listUniversityIds())
   assert.throws(() => listServedUniversityIds('univ-nope'), /Unknown university/)
 })
 
@@ -41,9 +40,9 @@ test('directory entries: slug and dev-only flag from shared.js', async () => {
   assert.deepEqual(await loadUniversityDirectoryEntry('univ-rennes'), {
     id: 'univ-rennes', name: 'Université de Rennes', shortName: 'Rennes', slug: 'rennes', devOnly: false, logoShape: 'wide',
   })
-  const exemple = await loadUniversityDirectoryEntry('univ-exemple')
-  assert.equal(exemple.slug, 'exemple')
-  assert.equal(exemple.devOnly, true)
+  const sorbonne = await loadUniversityDirectoryEntry('univ-sorbonne-nouvelle')
+  assert.equal(sorbonne.slug, 'sorbonne-nouvelle')
+  assert.equal(sorbonne.devOnly, true)
 })
 
 test('the page gets its SEO text and address from the server', () => {

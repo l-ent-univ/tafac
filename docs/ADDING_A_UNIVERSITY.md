@@ -4,28 +4,30 @@
 
 Tafac est conçu pour être forké : toute la configuration propre à une université vit dans un seul dossier, `universities/<id>/`. Le reste du code (frontend React, backend Express) est générique.
 
-Trois exemples sont fournis :
+Trois universités servent de modèle :
 
 - **`universities/univ-rennes/`** — l'implémentation de référence, complète (CAS + ADE + Planning GWT + Moodle + établissements + icônes de services).
-- **`universities/example-minimal/`** — le strict minimum (ENT uPortal + CAS). Bon point de départ : copiez-le, renommez-le, remplissez vos valeurs.
-- **`universities/univ-exemple/`** — université fictive de démonstration : origins factices, mais compte démo (`demo@tafac.fr` / `tafac-demo`) et widgets activés. Sert à tester le flux d'ajout et le choix d'université de bout en bout (listée en dev seulement, `/exemple` partout).
+- **`universities/univ-rennes-2/`** — portail Drupal, planning TEMPO, Moodle par le CAS, messagerie Zimbra, un seul établissement, sans icônes faites main. Bon point de départ : copiez-le, renommez-le, remplacez ses valeurs par les vôtres.
+- **`universities/univ-sorbonne-nouvelle/`** — portail iSorbonne, Planning GWT avec l'emploi du temps personnel, listée en dev seulement (`devOnly`).
+
+Le compte démo (`demo@tafac.fr` / `tafac-demo`) marche pour toute université qui a `features.demo`.
 
 ## Démarrage rapide
 
 ```bash
-cp -r universities/example-minimal universities/univ-exemple
-# éditez universities/univ-exemple/{shared,client,server}.js (id, origins, branding)
-npm run dev                              # toutes les universités : choisissez la vôtre, ou /<slug>
-UNIVERSITY=univ-exemple npm run dev      # la vôtre seule, sans liste
-npm run build                            # un seul build pour toutes les universités
-UNIVERSITY=univ-exemple npm start        # production, votre université seule
+cp -r universities/univ-rennes-2 universities/univ-mon-campus
+# éditez universities/univ-mon-campus/{shared,client,server}.js (id, origins, branding) et assets/
+npm run dev                                 # toutes les universités : choisissez la vôtre, ou /<slug>
+UNIVERSITY=univ-mon-campus npm run dev      # la vôtre seule, sans liste
+npm run build                               # un seul build pour toutes les universités
+UNIVERSITY=univ-mon-campus npm start        # production, votre université seule
 ```
 
 Le build est le même pour toutes les universités : `UNIVERSITY` ne compte qu'à l'exécution. La page charge au démarrage le `client.js` de son université (un fichier par université, téléchargé à la demande).
 
 ### Sur l'instance commune (toutes les universités)
 
-Avec `MULTI_UNIVERSITY=1` (ou sans `UNIVERSITY`), toutes les universités du dossier `universities/` (sauf `example-*`, ou la liste `UNIVERSITIES`) sont servies sur la même adresse. Votre université apparaît dans la liste de la page de connexion avec son nom et son logo, et a sa page `/<slug>` (sa landing, dont le bouton mène à sa connexion). Dans `shared.js` :
+Avec `MULTI_UNIVERSITY=1` (ou sans `UNIVERSITY`), toutes les universités du dossier `universities/` (ou la liste `UNIVERSITIES`) sont servies sur la même adresse. Votre université apparaît dans la liste de la page de connexion avec son nom et son logo, et a sa page `/<slug>` (sa landing, dont le bouton mène à sa connexion). Dans `shared.js` :
 
 ```js
 export const university = {
@@ -194,7 +196,7 @@ appIcons: {
 }
 ```
 
-Chaque mode de couleur a sa variante sombre. Le fichier ne garde que le concept et la teinte : changer de style ou de mode redessine toutes les tuiles sans rien remélanger. Une valeur inconnue empêche le serveur de démarrer (comme un id d'université inconnu). Exemples : Rennes en `carbon` + `pastel`, l'université de démo en `phosphor-duotone` + `soft`.
+Chaque mode de couleur a sa variante sombre. Le fichier ne garde que le concept et la teinte : changer de style ou de mode redessine toutes les tuiles sans rien remélanger. Une valeur inconnue empêche le serveur de démarrer (comme un id d'université inconnu). Exemples : Rennes en `phosphor-duotone` + `soft`, la Sorbonne Nouvelle en `carbon` + `pastel`.
 
 Pour améliorer les choix, ajoutez des mots-clés dans `APP_ICON_RULES` (`src/appIconPicks.js`, que le serveur et la page partagent ; test dans `tests/appIcons.test.js`) ; un nouveau concept doit avoir une icône dans chaque style (`ICONS_BY_CONCEPT`). La passerelle Rust choisit avec une copie de ces listes et du style de chaque université : après une modification, lancez `node scripts/gateway-data.mjs` (les tests échouent tant que ce n'est pas fait). Pour corriger une tuile déjà attribuée, éditez le fichier JSON (voir SELF_HOSTING) ou ajoutez une icône faite main.
 

@@ -84,13 +84,13 @@ mod tests {
 
     #[test]
     fn the_answer_that_ends_the_session_says_so_and_takes_the_cookie() {
-        let check = answer(Some(("univ-exemple", true)), Some(PRODUCTION_COOKIE));
+        let check = answer(Some(("univ-rennes-2", true)), Some(PRODUCTION_COOKIE));
         assert_eq!(check.status(), 200);
         assert_eq!(
             body(&check),
             serde_json::json!({
                 "authenticated": false, "expired": true, "user": null, "sessionMode": null, "sessionSource": null,
-                "degraded": false, "degradedReason": null, "canUseServerLaunch": false, "analyticsEnabled": true, "university": "univ-exemple",
+                "degraded": false, "degradedReason": null, "canUseServerLaunch": false, "analyticsEnabled": true, "university": "univ-rennes-2",
             })
         );
         let other = answer(None, Some(PRODUCTION_COOKIE));
@@ -108,7 +108,7 @@ mod tests {
         assert_eq!(other.headers()["x-tafac-session"], "expired");
         assert!(other.headers().get(SET_COOKIE).is_none());
         // The session check says it in its body, as Node's does.
-        let check = answer(Some(("univ-exemple", false)), None);
+        let check = answer(Some(("univ-rennes-2", false)), None);
         assert_eq!((&body(&check)["expired"], &body(&check)["analyticsEnabled"]), (&true.into(), &false.into()));
         assert!(check.headers().get("x-tafac-session").is_none() && check.headers().get(SET_COOKIE).is_none());
     }

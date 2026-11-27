@@ -7,8 +7,8 @@ const COPY = JSON.parse(readFileSync(new URL('../src/landingCopy.json', import.m
 
 const NEUTRAL = { id: null, neutral: true, features: { demo: true } }
 const RENNES = { id: 'univ-rennes', features: { ade: true, planning: true, grades: true, mail: true, moodleDeadlines: true }, mail: {} }
-// Shaped like univ-exemple: grades greyed out, no mail, no Moodle.
-const EXEMPLE = { id: 'univ-exemple', features: { ade: true, planning: true, grades: 'disabled', mail: false, moodleDeadlines: false } }
+// Grades greyed out, no mail, no Moodle.
+const LIMITED = { id: 'univ-autre', features: { ade: true, planning: true, grades: 'disabled', mail: false, moodleDeadlines: false } }
 // Mail as the webmail's link only (mail.page: false): no Messagerie page.
 const WEBMAIL_ONLY = { id: 'univ-x', features: { ade: true, planning: true, mail: true }, mail: { page: false } }
 
@@ -22,13 +22,13 @@ test('the neutral page shows every page of the app, every item', () => {
 
 test('a university page shows only what it has', () => {
   assert.deepEqual(ids(listShowcaseTabs(RENNES)), ['accueil', 'mes-notes', 'planning', 'messagerie', 'assiduite'])
-  const exemple = listShowcaseTabs(EXEMPLE)
-  assert.deepEqual(ids(exemple), ['accueil', 'planning'])
+  const limited = listShowcaseTabs(LIMITED)
+  assert.deepEqual(ids(limited), ['accueil', 'planning'])
   // Neither the mails' nor the deadlines' card on its home, nor a mail
   // about a class.
-  const home = exemple.find((tab) => tab.id === 'accueil')
+  const home = limited.find((tab) => tab.id === 'accueil')
   assert.deepEqual(home.items, [0, 1, 4])
-  const planning = exemple.find((tab) => tab.id === 'planning')
+  const planning = limited.find((tab) => tab.id === 'planning')
   assert.deepEqual(planning.items, [0, 2, 3])
 })
 
@@ -59,7 +59,7 @@ test('the device section claims only what the university has', () => {
   assert.deepEqual(listDeviceFeatures(NEUTRAL), [0, 1, 2, 3, 4, 5])
   assert.deepEqual(listDeviceFeatures(RENNES), [0, 1, 2, 3, 4, 5])
   // Grades greyed out, no mail, no Moodle.
-  assert.deepEqual(listDeviceFeatures(EXEMPLE), [0, 1, 5])
+  assert.deepEqual(listDeviceFeatures(LIMITED), [0, 1, 5])
   // No Messagerie page: no « Réponds aux mails de la fac ».
   assert.deepEqual(listDeviceFeatures(WEBMAIL_ONLY), [0, 1, 5])
   assert.equal(COPY.features.items.length, DEVICE_FEATURES.length)
@@ -74,7 +74,7 @@ test('the film plays only where every page it shows is there', () => {
   assert.equal(showsFilm(NEUTRAL), true)
   assert.equal(showsFilm(RENNES), true)
   // Grades greyed out, no mail.
-  assert.equal(showsFilm(EXEMPLE), false)
+  assert.equal(showsFilm(LIMITED), false)
   // No Messagerie page.
   assert.equal(showsFilm({ ...RENNES, mail: { page: false } }), false)
   // Rennes 2: no grades yet.

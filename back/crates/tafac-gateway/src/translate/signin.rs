@@ -164,9 +164,9 @@ mod tests {
 
     #[test]
     fn a_sign_in_is_nodes_answer_with_the_sessions_cookie() {
-        let response = signed_in("jdoe", "univ-exemple", (PRODUCTION_COOKIE, "v1.a.b.c"));
+        let response = signed_in("jdoe", "univ-rennes-2", (PRODUCTION_COOKIE, "v1.a.b.c"));
         assert_eq!(response.status(), 200);
-        assert_eq!(body(&response), serde_json::json!({ "authenticated": true, "user": "jdoe", "sessionMode": null, "university": "univ-exemple" }));
+        assert_eq!(body(&response), serde_json::json!({ "authenticated": true, "user": "jdoe", "sessionMode": null, "university": "univ-rennes-2" }));
         assert_eq!(response.headers()[SET_COOKIE], "__Host-lent_session=v1.a.b.c; Max-Age=2592000; Path=/; HttpOnly; Secure; SameSite=Lax");
         assert_eq!(response.headers()[ANSWERED_BY], "tonapi");
         assert_eq!(response.headers()["cache-control"], "no-store");

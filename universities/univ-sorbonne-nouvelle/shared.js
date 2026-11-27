@@ -79,7 +79,7 @@ export const establishmentNames = {
 
 export const gradesCopy = {}
 
-// Look of the automatic icons (server/appIcons.js), see univ-exemple/shared.js.
+// Look of the automatic icons (server/appIcons.js), see univ-rennes/shared.js.
 export const appIcons = {
   style: 'carbon',
   colorMode: 'pastel',

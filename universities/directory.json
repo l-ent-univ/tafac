@@ -10,40 +10,6 @@
   },
   "universities": [
     {
-      "id": "example-minimal",
-      "name": "Mon Université",
-      "shortName": "MonUniv",
-      "slug": "monuniv",
-      "devOnly": false,
-      "logoShape": "wide",
-      "hostnames": [],
-      "logo": "svg",
-      "page": {
-        "appName": "Tafac",
-        "seoTitle": "Tafac | Client alternatif ENT Mon Université",
-        "seoDescription": "Client alternatif non officiel à l'ENT de Mon Université.",
-        "repoUrl": "",
-        "alternateNames": []
-      }
-    },
-    {
-      "id": "univ-exemple",
-      "name": "Université Exemple",
-      "shortName": "Exemple",
-      "slug": "exemple",
-      "devOnly": true,
-      "logoShape": "wide",
-      "hostnames": [],
-      "logo": "png",
-      "page": {
-        "appName": "Tafac",
-        "seoTitle": "Tafac | Client alternatif ENT Université Exemple",
-        "seoDescription": "Instance de démonstration de Tafac pour l'Université Exemple : découvrez le client alternatif d'ENT avec le compte de démo.",
-        "repoUrl": "https://github.com/l-ent-univ/tafac",
-        "alternateNames": []
-      }
-    },
-    {
       "id": "univ-rennes",
       "name": "Université de Rennes",
       "shortName": "Rennes",

@@ -314,7 +314,7 @@ test('without auth.mfa, a CAS that asks for a code is a failed login', () => {
 })
 
 test('auth.mfa is Rennes 1\'s only', async () => {
-  for (const id of ['univ-rennes-2', 'univ-exemple', 'example-minimal']) {
+  for (const id of ['univ-rennes-2', 'univ-sorbonne-nouvelle']) {
     assert.equal((await loadServerConfig(id)).auth.mfa, undefined, id)
   }
 })

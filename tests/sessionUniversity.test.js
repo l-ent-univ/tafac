@@ -55,53 +55,53 @@ function legacyDemoCookie() {
 }
 
 test('getSessionUniversityId: the payload, else the legacy university', () => {
-  assert.equal(getSessionUniversityId({ uni: 'univ-exemple' }, 'univ-rennes'), 'univ-exemple')
+  assert.equal(getSessionUniversityId({ uni: 'univ-rennes-2' }, 'univ-rennes'), 'univ-rennes-2')
   assert.equal(getSessionUniversityId({}, 'univ-rennes'), 'univ-rennes')
   assert.equal(getSessionUniversityId({ uni: '' }, 'univ-rennes'), 'univ-rennes')
   assert.equal(getSessionUniversityId({ uni: 42 }, null), null)
 })
 
 test('a new session carries its university, and says it', async () => {
-  const exemple = await startApp('univ-exemple')
+  const rennes2 = await startApp('univ-rennes-2')
   try {
-    const { payload, value } = await loginDemo(exemple.base)
-    assert.equal(payload.university, 'univ-exemple')
-    assert.equal(codec.decode(value).data.uni, 'univ-exemple')
+    const { payload, value } = await loginDemo(rennes2.base)
+    assert.equal(payload.university, 'univ-rennes-2')
+    assert.equal(codec.decode(value).data.uni, 'univ-rennes-2')
 
-    const session = await getSession(exemple.base, value)
+    const session = await getSession(rennes2.base, value)
     assert.equal(session.authenticated, true)
-    assert.equal(session.university, 'univ-exemple')
+    assert.equal(session.university, 'univ-rennes-2')
   } finally {
-    exemple.close()
+    rennes2.close()
   }
 })
 
 test("another university's app refuses the session", async () => {
-  const exemple = await startApp('univ-exemple')
+  const rennes2 = await startApp('univ-rennes-2')
   const rennes = await startApp('univ-rennes')
   try {
-    const { value } = await loginDemo(exemple.base)
+    const { value } = await loginDemo(rennes2.base)
     const session = await getSession(rennes.base, value)
     assert.equal(session.authenticated, false)
   } finally {
-    exemple.close()
+    rennes2.close()
     rennes.close()
   }
 })
 
 test('a session from before the field belongs to the legacy university', async () => {
   const rennes = await startApp('univ-rennes')
-  const exempleAsLegacyRennes = await startApp('univ-exemple', { legacyUniversityId: 'univ-rennes' })
-  const exempleAsLegacyItself = await startApp('univ-exemple', { legacyUniversityId: () => 'univ-exemple' })
+  const rennes2AsLegacyRennes = await startApp('univ-rennes-2', { legacyUniversityId: 'univ-rennes' })
+  const rennes2AsLegacyItself = await startApp('univ-rennes-2', { legacyUniversityId: () => 'univ-rennes-2' })
   try {
     const value = legacyDemoCookie()
     assert.equal((await getSession(rennes.base, value)).authenticated, true)
-    assert.equal((await getSession(exempleAsLegacyRennes.base, value)).authenticated, false)
-    assert.equal((await getSession(exempleAsLegacyItself.base, value)).authenticated, true)
+    assert.equal((await getSession(rennes2AsLegacyRennes.base, value)).authenticated, false)
+    assert.equal((await getSession(rennes2AsLegacyItself.base, value)).authenticated, true)
   } finally {
     rennes.close()
-    exempleAsLegacyRennes.close()
-    exempleAsLegacyItself.close()
+    rennes2AsLegacyRennes.close()
+    rennes2AsLegacyItself.close()
   }
 })
 

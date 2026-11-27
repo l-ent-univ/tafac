@@ -54,8 +54,8 @@ test('never a Moodle over plain http, nor one a feature flag turned off', () => 
   })
 })
 
-async function withAuthApp(id: string, run: (base: string) => Promise<void>) {
-  const app = createEntAuthApp(await loadServerConfig(id), {
+async function withAuthApp(config: unknown, run: (base: string) => Promise<void>) {
+  const app = createEntAuthApp(config, {
     analytics: {},
     session: { secret: 'b'.repeat(44), production: false },
   })
@@ -79,7 +79,7 @@ async function loginDemo(base: string) {
   return response.headers.getSetCookie().map((cookie) => cookie.split(';')[0]).join('; ')
 }
 
-test('the route answers a signed-in student only', () => withAuthApp('univ-rennes', async (base) => {
+test('the route answers a signed-in student only', async () => withAuthApp(await loadServerConfig('univ-rennes'), async (base) => {
   const signedOut = await fetch(`${base}/__ent_auth/moodle/view`)
   assert.equal(signedOut.status, 404)
 
@@ -91,8 +91,12 @@ test('the route answers a signed-in student only', () => withAuthApp('univ-renne
   assert.equal(policy.home, 'https://foad.univ-rennes.fr/my/')
 }))
 
-test('the route has nothing for a university without Moodle', () => withAuthApp('univ-exemple', async (base) => {
-  const cookie = await loginDemo(base)
-  const response = await fetch(`${base}/__ent_auth/moodle/view`, { headers: { cookie } })
-  assert.equal(response.status, 404)
-}))
+test('the route has nothing for a university without Moodle', async () => {
+  // Rennes, its Moodle turned off.
+  const rennes = await loadServerConfig('univ-rennes')
+  await withAuthApp({ ...rennes, features: { ...rennes.features, moodle: false } }, async (base) => {
+    const cookie = await loginDemo(base)
+    const response = await fetch(`${base}/__ent_auth/moodle/view`, { headers: { cookie } })
+    assert.equal(response.status, 404)
+  })
+})

@@ -50,16 +50,19 @@ test('Rennes: anything else is refused', async () => {
 })
 
 test('a university without extra domains only allows its configured hosts', async () => {
-  const { isAllowed } = createLaunchTargetPolicy(await loadServerConfig('univ-exemple'))
+  // Sorbonne Nouvelle without its launch.allowedDomains.
+  const { launch, ...sorbonne } = await loadServerConfig('univ-sorbonne-nouvelle')
+  assert.deepEqual(launch.allowedDomains, ['sorbonne-nouvelle.fr', 'univ-paris3.fr'])
+  const { isAllowed } = createLaunchTargetPolicy(sorbonne)
 
-  assert.equal(isAllowed('https://ent.univ-exemple.example/x'), true)
-  assert.equal(isAllowed('https://planning.univ-exemple.example/direct/myplanning.jsp'), true)
-  assert.equal(isAllowed('https://other.univ-exemple.example/'), false)
+  assert.equal(isAllowed('https://isorbonne.sorbonne-nouvelle.fr/x'), true)
+  assert.equal(isAllowed('https://planning.sorbonne-nouvelle.fr/direct/myplanning.jsp'), true)
+  assert.equal(isAllowed('https://other.sorbonne-nouvelle.fr/'), false)
   assert.equal(isAllowed('https://services-numeriques.univ-rennes.fr/'), false)
 })
 
 async function withAuthApp(run) {
-  const config = await loadServerConfig('univ-exemple')
+  const config = await loadServerConfig('univ-rennes-2')
   const app = createEntAuthApp(config, {
     analytics: {},
     session: { secret: 'b'.repeat(44), production: false },
@@ -92,7 +95,7 @@ test('the relay sends an unknown target back to the app, signed in or not', () =
   const cookie = await loginDemo(base)
 
   for (const sessionCookie of ['', cookie]) {
-    for (const url of ['https://evil.example/', 'https://ent.univ-exemple.example@evil.example/', 'http://127.0.0.1:1/']) {
+    for (const url of ['https://evil.example/', 'https://etudiants.univ-rennes2.fr@evil.example/', 'http://127.0.0.1:1/']) {
       const response = await launch(base, url, sessionCookie)
       assert.equal(response.status, 302)
       assert.equal(response.headers.get('location'), '/')
@@ -102,7 +105,7 @@ test('the relay sends an unknown target back to the app, signed in or not', () =
 
 test('the relay still opens the university services', () => withAuthApp(async (base) => {
   const cookie = await loginDemo(base)
-  const target = 'https://planning.univ-exemple.example/direct/myplanning.jsp'
+  const target = 'https://tempo.univ-rennes2.fr/'
 
   for (const sessionCookie of ['', cookie]) {
     const response = await launch(base, target, sessionCookie)

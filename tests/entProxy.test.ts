@@ -216,7 +216,7 @@ async function withProxy(
   await new Promise<void>((resolve) => portal.listen(0, '127.0.0.1', resolve))
   const entOrigin = `http://127.0.0.1:${(portal.address() as AddressInfo).port}`
 
-  const config = await loadServerConfig('univ-exemple')
+  const config = await loadServerConfig('univ-rennes')
   const app = createApp(
     { ...config, origins: { ...config.origins, ent: entOrigin, cas: 'http://cas.test' } },
     { analytics: {}, session: { secret: SECRET, production } },

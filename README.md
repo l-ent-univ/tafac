@@ -40,8 +40,8 @@ Le dépôt fournit trois configurations :
 | Dossier | Usage |
 | --- | --- |
 | `universities/univ-rennes/` | Intégration finie : ENT uPortal, CAS, planning ADE, ScoDoc de l’IUT de Lannion, Moodle/FOAD, messagerie Partage et MonDossierWeb. |
-| `universities/univ-exemple/` | Université fictive pour tester le choix d’université et la démonstration. Ses adresses ne désignent aucun service réel. Elle est masquée dans la liste en production, mais reste accessible par `/exemple` si elle est servie. |
-| `universities/example-minimal/` | Point de départ pour une nouvelle intégration. Exclu de la liste des universités servies par défaut. |
+| `universities/univ-rennes-2/` | Portail Drupal, CAS, planning TEMPO, Moodle Cursus, messagerie Zimbra et MonDossierWeb. Pas encore de notes. |
+| `universities/univ-sorbonne-nouvelle/` | Portail iSorbonne, CAS, planning ADE, Moodle iCampus et MonDossierWeb. Masquée dans la liste en production, mais accessible par `/sorbonne-nouvelle` si elle est servie. |
 
 La disponibilité dépend de l’université, de l’établissement, du compte et des services en amont. Dans la configuration Rennes actuelle, les widgets de notes et de prochain cours sont activés pour l’IUT de Lannion. La présence d’un établissement dans les règles de détection ne signifie pas que toutes les intégrations y sont disponibles.
 
@@ -86,10 +86,10 @@ UNIVERSITY=univ-rennes npm run dev
 Pour sélectionner explicitement plusieurs configurations :
 
 ```sh
-MULTI_UNIVERSITY=1 UNIVERSITIES=univ-rennes,univ-exemple npm run dev
+MULTI_UNIVERSITY=1 UNIVERSITIES=univ-rennes,univ-rennes-2 npm run dev
 ```
 
-Les liens `/rennes`, `/rennes2` et `/exemple` ouvrent la page d’accueil de l’université correspondante, si celle-ci est servie, d’où son bouton mène à sa connexion. Ces pages sont pré-rendues pour les moteurs de recherche et listées dans le sitemap (sauf les universités `devOnly`).
+Les liens `/rennes`, `/rennes2` et `/sorbonne-nouvelle` ouvrent la page d’accueil de l’université correspondante, si celle-ci est servie, d’où son bouton mène à sa connexion. Ces pages sont pré-rendues pour les moteurs de recherche et listées dans le sitemap (sauf les universités `devOnly`).
 
 **Un seul build frontend contient les configurations clientes de toutes les universités.** Le navigateur télécharge celle qui lui est attribuée au démarrage. Il n’est pas nécessaire de construire un `dist/` par université ; `build:all` est actuellement un alias de `build`.
 
@@ -156,7 +156,7 @@ Au démarrage, le navigateur consulte `/__ent_auth/universities`, puis charge le
 | --- | --- |
 | `UNIVERSITY` | Université unique, ou université par défaut en mode multiple. Valeur de repli : `univ-rennes`. |
 | `MULTI_UNIVERSITY` | `1` pour le choix entre universités, `0` pour une seule. Sans valeur explicite, le mode multiple est activé si `UNIVERSITY` n’est pas définie. L’image Docker impose `1` par défaut. |
-| `UNIVERSITIES` | Liste d’identifiants séparés par des virgules en mode multiple. Par défaut, tous les dossiers sauf ceux commençant par `example`. L’université par défaut est également incluse. |
+| `UNIVERSITIES` | Liste d’identifiants séparés par des virgules en mode multiple. Par défaut, tous les dossiers de `universities/`. L’université par défaut est également incluse. |
 | `PORT` | Port du serveur de production, `3000` par défaut. |
 | `SESSION_SECRET` | Secret servant à dériver la clé de chiffrement des sessions. Obligatoire en production, au moins 32 octets. |
 | `SESSION_SECRET_PREVIOUS` | Anciens secrets, séparés par des virgules, acceptés pendant une rotation. |
@@ -234,10 +234,10 @@ Hors Docker, compiler avec `npm ci` puis `npm run build`, fournir les variables 
 
 ## Ajouter une université
 
-Créer un nouveau dossier à partir du modèle minimal, avec un identifiant encore inutilisé :
+Créer un nouveau dossier à partir d’une université existante, par exemple Rennes 2, avec un identifiant encore inutilisé :
 
 ```sh
-cp -R universities/example-minimal universities/univ-mon-campus
+cp -R universities/univ-rennes-2 universities/univ-mon-campus
 ```
 
 Adapter les trois fichiers de configuration :

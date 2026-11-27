@@ -64,7 +64,7 @@ const createCodec = createSessionCookieCodec as (options: { secret: string }) =>
 const SECRET = 'a'.repeat(44)
 
 async function withApp(production: boolean, run: (base: string, cookies: { demo: string; student: string }) => Promise<void>) {
-  const config = await loadServerConfig('univ-exemple')
+  const config = await loadServerConfig('univ-rennes')
   const server = createApp(config, { analytics: {}, session: { secret: SECRET, production } }).listen(0)
   const name = production ? '__Host-lent_session' : 'lent_session'
   const data = { uni: config.id, demoState: null, createdAt: Date.now() }
@@ -105,7 +105,7 @@ test('a launch link on another site makes no request with the session', async ()
 
   try {
     await withApp(true, async (base, { student }) => {
-      const config = await loadServerConfig('univ-exemple')
+      const config = await loadServerConfig('univ-rennes')
       const target = `${config.origins.ent}/f/accueil`
       const launch = (site: string) => realFetch(`${base}/__ent_auth/launch?url=${encodeURIComponent(target)}`, {
         headers: { cookie: student, 'sec-fetch-site': site },

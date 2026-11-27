@@ -62,7 +62,7 @@ Pour figer une version, remplacer `latest` par un numéro (`ghcr.io/l-ent-univ/l
 | `SESSION_SECRET` | Secret de session (au moins 32 octets) | **obligatoire** |
 | `MULTI_UNIVERSITY` | `1` : toutes les universités (choix à la connexion) ; `0` : `UNIVERSITY` seule. Ancien nom : `MULTI_TENANT` | `1` dans l'image ; hors Docker, `1` sauf si `UNIVERSITY` est définie |
 | `UNIVERSITY` | L'université servie (`MULTI_UNIVERSITY=0`), sinon celle par défaut : compte démo depuis la page neutre, anciennes adresses inconnues | `univ-rennes` |
-| `UNIVERSITIES` | Universités servies (ids séparés par des virgules). Ancien nom : `TENANTS` | toutes sauf `example-*` |
+| `UNIVERSITIES` | Universités servies (ids séparés par des virgules). Ancien nom : `TENANTS` | toutes |
 | `POSTHOG_PROJECT_KEY` | Mesure d'audience anonyme ([ANALYTICS.md](ANALYTICS.md)) | désactivée |
 | `PORT` | Port interne du conteneur | `3000` |
 | `DATA_DIR` | Dossier des icônes automatiques des applications | `/app/data` dans l'image, `./data` sinon |

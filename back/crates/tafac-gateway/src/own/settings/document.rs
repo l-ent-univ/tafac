@@ -348,7 +348,7 @@ pub(super) mod tests {
         assert!(reports.iter().any(|message| message.contains("patch \"cas-stolen\" refused")), "{reports:?}");
         assert_eq!(reports.last().unwrap(), "Remote settings: univ-rennes: planning-off, cas-moved (serial 2)");
         // Another university's patch is not this one's.
-        assert!(resolved(&document, "univ-exemple", "ios", "0.27.0").0.applied.is_empty());
+        assert!(resolved(&document, "univ-sorbonne-nouvelle", "ios", "0.27.0").0.applied.is_empty());
         // Nothing taken: the settings as shipped.
         assert_eq!(resolve(None, "univ-rennes", &shipped(), "ios", "0.27.0", &|_: &str| {}), ResolvedSettings { server: shipped(), client: None, applied: Vec::new() });
     }

@@ -453,7 +453,7 @@ mod tests {
 
     fn session(cookies: Vec<StoredCookie>, tokens: &[(&str, &str)]) -> SessionData {
         SessionData {
-            university: "univ-exemple".into(),
+            university: "univ-rennes-2".into(),
             username: "jdoe".into(),
             establishment: None,
             cookies,
@@ -550,10 +550,10 @@ mod tests {
     #[test]
     fn the_answers_are_the_students_fresh_then_old_until_they_sign_out() {
         let memory = Memory::default();
-        let jdoe = student("univ-exemple", " jdoe ");
-        assert_eq!(jdoe.as_deref(), Some("univ-exemple\njdoe"));
+        let jdoe = student("univ-rennes-2", " jdoe ");
+        assert_eq!(jdoe.as_deref(), Some("univ-rennes-2\njdoe"));
         // A session that names nobody shares nothing.
-        assert_eq!(student("univ-exemple", " "), None);
+        assert_eq!(student("univ-rennes-2", " "), None);
 
         let morning = memory.of("the-morning", jdoe.as_deref());
         morning.keep_answer_to_give_old("deadlines", 300, b"{}");
@@ -569,7 +569,7 @@ mod tests {
         assert_eq!(afternoon.answer("deadlines"), None);
         assert_eq!(afternoon.kept("grades/semester/12"), None);
         // Another student, or the same login at another university, has none.
-        assert_eq!(memory.of("someone-else", student("univ-exemple", "asmith").as_deref()).kept("deadlines"), None);
+        assert_eq!(memory.of("someone-else", student("univ-rennes-2", "asmith").as_deref()).kept("deadlines"), None);
         assert_eq!(memory.of("elsewhere", student("univ-autre", "jdoe").as_deref()).kept("deadlines"), None);
         // Past a day after it was read, it is given no more.
         afternoon.age_answers(OLD_KEPT);

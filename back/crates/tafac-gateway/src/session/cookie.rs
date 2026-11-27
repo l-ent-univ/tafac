@@ -375,7 +375,7 @@ mod tests {
     fn payload(overrides: serde_json::Value) -> serde_json::Value {
         let mut payload = serde_json::json!({
             "id": "one-session",
-            "uni": "univ-exemple",
+            "uni": "univ-rennes-2",
             "user": "jdoe",
             "mode": null,
             "demoState": null,
@@ -396,7 +396,7 @@ mod tests {
         let fixture = fixture();
         let session = Codec::new(&fixture.secret).read(&fixture.cookie, fixture.created_at + DAY_MS).unwrap();
         assert_eq!(session.id, "3f2a9c1e-7b64-4d0f-9a51-2c8e6d7f0b13");
-        assert_eq!(session.university, "univ-exemple");
+        assert_eq!(session.university, "univ-rennes-2");
         assert_eq!(session.user, "jdoe");
         assert_eq!(format!("{:?}", session.cookies), "[TGC@cas.exemple.test/cas, JSESSIONID@ent.exemple.test/, lang@exemple.test/]");
         let ticket = &session.cookies[0];
@@ -532,10 +532,10 @@ mod tests {
     fn a_session_written_reads_back_with_an_id_of_its_own() {
         let codec = Codec::new(SECRET);
         let cookies = [upstream("TGC", "ticket", "cas.exemple.test", "/cas"), upstream("JSESSIONID", "portal", "ent.exemple.test", "/")];
-        let new = NewSession { university: "univ-exemple", user: "jdoe", ticket: &cookies[..1], others: &cookies[1..], secure: true };
+        let new = NewSession { university: "univ-rennes-2", user: "jdoe", ticket: &cookies[..1], others: &cookies[1..], secure: true };
         let (value, made) = codec.write(&new, NOW).unwrap();
         let read = codec.read(&value, NOW).unwrap();
-        assert_eq!((read.id.as_str(), read.university.as_str(), read.user.as_str()), (made.id.as_str(), "univ-exemple", "jdoe"));
+        assert_eq!((read.id.as_str(), read.university.as_str(), read.user.as_str()), (made.id.as_str(), "univ-rennes-2", "jdoe"));
         assert_eq!(read.cookies, cookies);
         assert_eq!(made.cookies, cookies);
 
@@ -562,7 +562,7 @@ mod tests {
             // The last still fits where the one before it didn't.
             upstream("small", "1", "ent.exemple.test", "/"),
         ];
-        let (value, made) = codec.write(&NewSession { university: "univ-exemple", user: "jdoe", ticket: &ticket, others: &others, secure: true }, NOW).unwrap();
+        let (value, made) = codec.write(&NewSession { university: "univ-rennes-2", user: "jdoe", ticket: &ticket, others: &others, secure: true }, NOW).unwrap();
         assert!(value.len() <= MAX_VALUE_BYTES, "{}", value.len());
         assert_eq!(format!("{:?}", made.cookies), "[TGC@cas.exemple.test/cas, one@ent.exemple.test/, small@ent.exemple.test/]");
         assert_eq!(codec.read(&value, NOW).unwrap().cookies, made.cookies);
@@ -578,7 +578,7 @@ mod tests {
             upstream("JSESSIONID", "made-up-portal-session", "ent.exemple.test", "/"),
             UpstreamCookie { host_only: false, expires_at_ms: Some(1_795_000_000_000), ..upstream("lang", "fr", "exemple.test", "/") },
         ];
-        let new = NewSession { university: "univ-exemple", user: "jdoe", ticket: &cookies[..1], others: &cookies[1..], secure: true };
+        let new = NewSession { university: "univ-rennes-2", user: "jdoe", ticket: &cookies[..1], others: &cookies[1..], secure: true };
         let (payload, kept) = Codec::payload("5d0c8a52-1e3b-4f6a-8c97-0b2d4e6f8a1c", &new, 1_790_000_000_000);
         assert_eq!(kept, cookies);
         assert_eq!(payload, fixture["payload"]);

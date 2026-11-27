@@ -346,9 +346,9 @@ mod tests {
         }
         // One for development servers has no page of its own, yet its
         // address is one of the app's (the picker's link): the bare app.
-        assert_eq!(status("/exemple"), 200);
-        assert_eq!(header(&shells.page(&served, "/exemple", "", true, ""), "vary"), None);
-        for path in ["/nowhere", "/rennes/notes", "/login/x", "/%E0%A4%A", "/example-minimal"] {
+        assert_eq!(status("/sorbonne-nouvelle"), 200);
+        assert_eq!(header(&shells.page(&served, "/sorbonne-nouvelle", "", true, ""), "vary"), None);
+        for path in ["/nowhere", "/rennes/notes", "/login/x", "/%E0%A4%A"] {
             assert_eq!(status(path), 404, "{path}");
         }
         // The file itself: the bare app, out of search engines.

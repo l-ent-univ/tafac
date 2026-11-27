@@ -8,7 +8,7 @@ const codec = createSessionCookieCodec({ secret: SECRET })
 
 async function withUniversitiesApp(options, run) {
   const app = await createUniversitiesApp({
-    universityIds: ['univ-rennes', 'univ-exemple'],
+    universityIds: ['univ-rennes', 'univ-sorbonne-nouvelle'],
     defaultUniversityId: 'univ-rennes',
     production: false,
     session: { secret: SECRET },
@@ -65,7 +65,7 @@ test('the list of universities, public fields only', () => withUniversitiesApp({
   assert.equal(payload.session, null)
   assert.deepEqual(payload.universities.map((entry) => [entry.id, entry.slug, entry.listed]), [
     ['univ-rennes', 'rennes', true],
-    ['univ-exemple', 'exemple', true],
+    ['univ-sorbonne-nouvelle', 'sorbonne-nouvelle', true],
   ])
   assert.deepEqual(Object.keys(payload.universities[0]).sort(), ['id', 'listed', 'logoShape', 'logoUrl', 'name', 'shortName', 'slug'])
 
@@ -81,62 +81,62 @@ test('the list of universities, public fields only', () => withUniversitiesApp({
 
 test('in production, dev-only universities are served but not listed', () => withUniversitiesApp({ listDevOnly: false }, async (base) => {
   const payload = await fetch(`${base}/__ent_auth/universities`).then((response) => response.json())
-  assert.deepEqual(payload.universities.map((entry) => [entry.id, entry.listed]), [['univ-rennes', true], ['univ-exemple', false]])
+  assert.deepEqual(payload.universities.map((entry) => [entry.id, entry.listed]), [['univ-rennes', true], ['univ-sorbonne-nouvelle', false]])
 
-  const { payload: login } = await loginDemo(base, { header: 'univ-exemple' })
-  assert.equal(login.university, 'univ-exemple')
+  const { payload: login } = await loginDemo(base, { header: 'univ-sorbonne-nouvelle' })
+  assert.equal(login.university, 'univ-sorbonne-nouvelle')
 }))
 
 test('signed out: the chosen university, else the default one', () => withUniversitiesApp({}, async (base) => {
   assert.equal((await getSession(base)).university, 'univ-rennes')
-  assert.equal((await getSession(base, { header: 'univ-exemple' })).university, 'univ-exemple')
-  assert.equal((await getSession(base, { header: 'exemple' })).university, 'univ-exemple')
+  assert.equal((await getSession(base, { header: 'univ-sorbonne-nouvelle' })).university, 'univ-sorbonne-nouvelle')
+  assert.equal((await getSession(base, { header: 'sorbonne-nouvelle' })).university, 'univ-sorbonne-nouvelle')
   assert.equal((await getSession(base, { header: 'univ-nope' })).university, 'univ-rennes')
 
   assert.equal((await loginDemo(base)).payload.university, 'univ-rennes')
-  assert.equal((await loginDemo(base, { header: 'univ-exemple' })).payload.university, 'univ-exemple')
-  assert.equal((await loginDemo(base, { university: 'exemple' })).payload.university, 'univ-exemple')
+  assert.equal((await loginDemo(base, { header: 'univ-sorbonne-nouvelle' })).payload.university, 'univ-sorbonne-nouvelle')
+  assert.equal((await loginDemo(base, { university: 'sorbonne-nouvelle' })).payload.university, 'univ-sorbonne-nouvelle')
 }))
 
 test('signed in: the session decides, whatever the header says', () => withUniversitiesApp({}, async (base) => {
-  const { value } = await loginDemo(base, { header: 'univ-exemple' })
-  assert.equal(codec.decode(value).data.uni, 'univ-exemple')
+  const { value } = await loginDemo(base, { header: 'univ-sorbonne-nouvelle' })
+  assert.equal(codec.decode(value).data.uni, 'univ-sorbonne-nouvelle')
 
   const session = await getSession(base, { value, header: 'univ-rennes' })
   assert.equal(session.authenticated, true)
-  assert.equal(session.university, 'univ-exemple')
+  assert.equal(session.university, 'univ-sorbonne-nouvelle')
 
   const payload = await fetch(`${base}/__ent_auth/universities`, {
     headers: { cookie: `${SESSION_COOKIE_NAME}=${value}` },
   }).then((response) => response.json())
-  assert.equal(payload.session, 'univ-exemple')
+  assert.equal(payload.session, 'univ-sorbonne-nouvelle')
 }))
 
 test('a session from before goes to the university of its address', () => withUniversitiesApp({}, async (base) => {
   const value = legacyDemoCookie()
 
-  const onRoot = await getSession(base, { value, header: 'univ-exemple' })
+  const onRoot = await getSession(base, { value, header: 'univ-sorbonne-nouvelle' })
   assert.equal(onRoot.authenticated, true)
   assert.equal(onRoot.university, 'univ-rennes')
 
-  const onOldAddress = await getSession(base, { value, host: 'univexemple.tafac.fr' })
+  const onOldAddress = await getSession(base, { value, host: 'univsorbonnenouvelle.tafac.fr' })
   assert.equal(onOldAddress.authenticated, true)
-  assert.equal(onOldAddress.university, 'univ-exemple')
+  assert.equal(onOldAddress.university, 'univ-sorbonne-nouvelle')
 }))
 
 test('the old per-university addresses still route signed-out requests', () => withUniversitiesApp({}, async (base) => {
-  assert.equal((await getSession(base, { host: 'univexemple.tafac.fr' })).university, 'univ-exemple')
+  assert.equal((await getSession(base, { host: 'univsorbonnenouvelle.tafac.fr' })).university, 'univ-sorbonne-nouvelle')
   assert.equal((await getSession(base, { host: 'univrennes.tafac.fr' })).university, 'univ-rennes')
   assert.equal((await getSession(base, { host: 'tafac.fr' })).university, 'univ-rennes')
 }))
 
-test('single-university mode ignores choices and addresses', () => withUniversitiesApp({ multi: false, defaultUniversityId: 'univ-exemple' }, async (base) => {
+test('single-university mode ignores choices and addresses', () => withUniversitiesApp({ multi: false, defaultUniversityId: 'univ-sorbonne-nouvelle' }, async (base) => {
   const payload = await fetch(`${base}/__ent_auth/universities`).then((response) => response.json())
   assert.equal(payload.mode, 'single')
-  assert.deepEqual(payload.universities.map((entry) => entry.id), ['univ-exemple'])
+  assert.deepEqual(payload.universities.map((entry) => entry.id), ['univ-sorbonne-nouvelle'])
 
-  assert.equal((await getSession(base, { header: 'univ-rennes', host: 'univrennes.tafac.fr' })).university, 'univ-exemple')
-  assert.equal((await loginDemo(base, { university: 'univ-rennes' })).payload.university, 'univ-exemple')
+  assert.equal((await getSession(base, { header: 'univ-rennes', host: 'univrennes.tafac.fr' })).university, 'univ-sorbonne-nouvelle')
+  assert.equal((await loginDemo(base, { university: 'univ-rennes' })).payload.university, 'univ-sorbonne-nouvelle')
 
   // A cookie without a university is this instance's.
   assert.equal((await getSession(base, { value: legacyDemoCookie() })).authenticated, true)
@@ -145,20 +145,27 @@ test('single-university mode ignores choices and addresses', () => withUniversit
 // Where the server runs (server.js, the Vite mount: demoAccount false), the
 // demo account is the page's own (src/demoServer.js).
 test('the demo account is no longer the server\'s: its login is a login like any other, its cookie nobody\'s', () => withUniversitiesApp({ demoAccount: false }, async (base) => {
-  // univ-exemple's CAS is on a .example host: the login fails there without
-  // leaving the machine, as any login would.
-  const login = await fetch(`${base}/__ent_auth/login`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'X-Tafac-University': 'univ-exemple' },
-    body: JSON.stringify({ username: 'demo@tafac.fr', password: 'tafac-demo' }),
-  })
+  // No host but the app's own answers, as for a CAS out of reach: the login
+  // fails without leaving the machine, as any login would.
+  const realFetch = globalThis.fetch
+  globalThis.fetch = (input, init) => (String(input).startsWith('http://127.0.0.1') ? realFetch(input, init) : Promise.reject(new TypeError('fetch failed')))
+  let login
+  try {
+    login = await fetch(`${base}/__ent_auth/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Tafac-University': 'univ-sorbonne-nouvelle' },
+      body: JSON.stringify({ username: 'demo@tafac.fr', password: 'tafac-demo' }),
+    })
+  } finally {
+    globalThis.fetch = realFetch
+  }
   assert.equal(login.status, 401)
   assert.equal(cookieValue(login), null)
   assert.equal((await login.json()).sessionMode, undefined)
 
   // A cookie from before, the demo account's: nobody signed in, at no
   // university.
-  const value = codec.encode({ id: 'from-before', uni: 'univ-exemple', user: 'demo@tafac.fr', mode: 'demo', demoState: { favoritePortletIds: [] }, createdAt: Date.now(), jar: [] })
+  const value = codec.encode({ id: 'from-before', uni: 'univ-sorbonne-nouvelle', user: 'demo@tafac.fr', mode: 'demo', demoState: { favoritePortletIds: [] }, createdAt: Date.now(), jar: [] })
   const headers = { cookie: `${SESSION_COOKIE_NAME}=${value}` }
   const session = await getSession(base, { value })
   assert.deepEqual([session.authenticated, session.sessionMode, session.university], [false, null, 'univ-rennes'])

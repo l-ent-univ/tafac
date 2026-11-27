@@ -381,7 +381,7 @@ test('past MAX_STORED_SERVICES, new services are answered but not stored', () =>
 // --- Route -----------------------------------------------------------------------
 
 test('POST /__ent_auth/app-icons needs a session and stores only demo services for demo sessions', () => withTempDir(async (dir) => {
-  const config = await loadServerConfig('univ-exemple')
+  const config = await loadServerConfig('univ-rennes')
   const app = createEntAuthApp(config, {
     analytics: {},
     appIcons: { dataDir: dir },
@@ -417,13 +417,13 @@ test('POST /__ent_auth/app-icons needs a session and stores only demo services f
     assert.equal(response.status, 200)
     const payload = await response.json()
     assert.equal(payload.ok, true)
-    // univ-exemple draws phosphor-duotone icons on soft tiles.
+    // univ-rennes draws phosphor-duotone icons on soft tiles.
     assert.deepEqual(payload.palette, APP_ICON_COLOR_MODES.soft)
     // Moodle gets its own logo (a brand: same mark in every style).
     assert.equal(payload.icons['demo-moodle'].icon, 'devicon-plain:moodle')
     assert.equal(payload.icons['made-up'].icon, 'ph:wifi-high-duotone')
 
-    const file = await readStoreFile(dir, 'univ-exemple')
+    const file = await readStoreFile(dir, 'univ-rennes')
     assert.deepEqual(Object.keys(file.services), ['demo-moodle'])
     // The file keeps the concept: switching style later restyles the tile.
     assert.equal(file.services['demo-moodle'].icon, 'moodle')

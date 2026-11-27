@@ -19,7 +19,7 @@ test('the password is for the CAS and nowhere else', () => {
   assert.equal(isCredentialTarget('not a url', cas), false)
 })
 
-// A university made up here: fetch is replaced for every host but the app's
+// Rennes's CAS, made up here: fetch is replaced for every host but the app's
 // own. Nothing leaves the machine.
 const realFetch = globalThis.fetch
 const createApp = createEntAuthApp as (config: unknown, options: unknown) => Express
@@ -27,7 +27,7 @@ const createApp = createEntAuthApp as (config: unknown, options: unknown) => Exp
 interface Call { method: string; url: string; body: string }
 
 async function loginAgainst(loginPage: (cas: string) => { url: string; html: string }) {
-  const config = await loadServerConfig('univ-exemple')
+  const config = await loadServerConfig('univ-rennes')
   const cas: string = config.origins.cas
   const calls: Call[] = []
 

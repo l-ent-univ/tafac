@@ -257,6 +257,6 @@ fn both_universities_are_switched_on() {
     }
     let mut headers = HeaderMap::new();
     headers.insert(CONTENT_TYPE, "application/json".parse().unwrap());
-    let body = serde_json::json!({ "username": "jdoe", "password": "a-password", "university": "univ-exemple" }).to_string();
+    let body = serde_json::json!({ "username": "jdoe", "password": "a-password", "university": "univ-nowhere" }).to_string();
     assert!(block_on(gateway.answer(&asked(&POST, LOGIN, &headers, body.as_bytes()), || None, never)).is_none());
 }

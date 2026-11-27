@@ -47,13 +47,12 @@ export async function loadSharedConfig(rawId) {
 }
 
 // Universities one process serves: the UNIVERSITIES list (comma-separated
-// ids; TENANTS is its former name), else every directory except the
-// example-* stubs.
+// ids; TENANTS is its former name), else every directory.
 export function listServedUniversityIds(rawList = process.env.UNIVERSITIES ?? process.env.TENANTS) {
   const list = String(rawList ?? '').split(',').map((id) => id.trim()).filter(Boolean)
   return list.length > 0
     ? [...new Set(list.map((id) => resolveUniversityId(id)))]
-    : listUniversityIds().filter((id) => !id.startsWith('example'))
+    : listUniversityIds()
 }
 
 const TRUE_VALUES = new Set(['1', 'true', 'yes', 'on'])

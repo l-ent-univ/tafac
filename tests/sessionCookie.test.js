@@ -128,7 +128,7 @@ test('a cookie the gateway wrote is a session here', () => {
 
   assert.deepEqual(decoded, { data: fixture.payload, format: 'v1', needsReissue: false })
   assert.equal(isSessionDataExpired(decoded.data, decoded.data.createdAt + 1000), false)
-  assert.equal(getSessionUniversityId(decoded.data), 'univ-exemple')
+  assert.equal(getSessionUniversityId(decoded.data), 'univ-rennes-2')
 
   // The university's cookies, as the server's jar takes them back.
   const jar = new Map(unpackJarCookies(decoded.data.jar))

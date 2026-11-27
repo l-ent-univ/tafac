@@ -37,7 +37,7 @@ const post = (server, url, body) => ask(server, url, { method: 'POST', headers: 
 // ── Route by route ─────────────────────────────────────────────────────────
 
 test('the session, the account and the applications', async () => {
-  const server = createDemoServer({ config: { id: 'univ-exemple', features: FEATURES }, session: () => ({ analyticsEnabled: true }) })
+  const server = createDemoServer({ config: { id: 'univ-rennes-2', features: FEATURES }, session: () => ({ analyticsEnabled: true }) })
   assert.deepEqual(await ask(server, '/__ent_auth/session'), {
     status: 200,
     body: {
@@ -49,7 +49,7 @@ test('the session, the account and the applications', async () => {
       degraded: false,
       degradedReason: null,
       analyticsEnabled: true,
-      university: 'univ-exemple',
+      university: 'univ-rennes-2',
     },
     headers: (await server.answer('/__ent_auth/session')).headers,
   })
@@ -64,7 +64,7 @@ test('the session, the account and the applications', async () => {
 })
 
 test('a service the university doesn\'t have says so, as the server\'s', async () => {
-  const server = createDemoServer({ config: { id: 'example-minimal', features: { demo: true } } })
+  const server = createDemoServer({ config: { id: 'univ-sorbonne-nouvelle', features: { demo: true } } })
   for (const [url, feature] of [
     ['/__ent_auth/grades', 'grades'],
     ['/__ent_auth/grades/semester/1', 'grades'],
@@ -84,7 +84,7 @@ test('a service the university doesn\'t have says so, as the server\'s', async (
 })
 
 test('what isn\'t a route of the demo\'s is answered here all the same, never sent', async () => {
-  const server = createDemoServer({ config: { id: 'univ-exemple', features: FEATURES } })
+  const server = createDemoServer({ config: { id: 'univ-rennes-2', features: FEATURES } })
   assert.deepEqual(await ask(server, '/__ent_auth/nothing').then(({ status, body }) => [status, body]), [404, { error: 'Not found.' }])
   assert.equal((await ask(server, '/__ent_auth/mail/recent', { method: 'DELETE' })).status, 404)
   assert.equal((await ask(server, '/somewhere/else')).status, 404)

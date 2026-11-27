@@ -95,7 +95,7 @@ export const moodleOrigin = 'https://cursus.univ-rennes2.fr'
 
 export const gradesCopy = {}
 
-// Look of the automatic icons (server/appIcons.js), see univ-exemple/shared.js.
+// Look of the automatic icons (server/appIcons.js), see univ-rennes/shared.js.
 export const appIcons = {
   style: 'phosphor-duotone',
   colorMode: 'soft',

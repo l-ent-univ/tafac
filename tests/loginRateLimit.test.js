@@ -3,10 +3,10 @@ import test from 'node:test'
 import { createEntAuthApp } from '../server/entAuthApp.js'
 import { loadServerConfig } from '../universities/index.js'
 
-// univ-exemple's CAS is on a .example host, so every real login fails without
-// leaving the machine and counts as a failure.
+// No host but the app's own answers, as for a CAS out of reach, so every
+// real login fails without leaving the machine and counts as a failure.
 async function withAuthApp(options, run) {
-  const config = await loadServerConfig('univ-exemple')
+  const config = await loadServerConfig('univ-rennes')
   const app = createEntAuthApp(config, {
     analytics: {},
     session: { secret: 'a'.repeat(44), production: false },
@@ -23,9 +23,12 @@ async function withAuthApp(options, run) {
     body: JSON.stringify({ username, password: 'wrong' }),
   })
 
+  const realFetch = globalThis.fetch
+  globalThis.fetch = (input, init) => (String(input).startsWith('http://127.0.0.1') ? realFetch(input, init) : Promise.reject(new TypeError('fetch failed')))
   try {
     await run(login)
   } finally {
+    globalThis.fetch = realFetch
     server.close()
   }
 }

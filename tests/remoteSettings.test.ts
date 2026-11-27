@@ -154,7 +154,7 @@ test('the file on tafac.fr patches the university’s settings', async () => {
     assert.ok(reports.some((message) => message.includes('patch "cas-stolen" refused')))
     assert.equal(SHIPPED.origins.cas, 'https://sso-cas.univ-rennes.fr')
     // Another university's patch is not this one's.
-    assert.deepEqual(remote.resolve('univ-exemple', SHIPPED).applied, [])
+    assert.deepEqual(remote.resolve('univ-sorbonne-nouvelle', SHIPPED).applied, [])
   } finally {
     cleanup()
   }

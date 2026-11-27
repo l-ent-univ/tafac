@@ -326,7 +326,7 @@ fn a_visitors_events_are_the_university_node_sends_the_request_to() {
     assert_eq!(university_of(&one, &posthog_one, &[("x-forwarded-host", "univrennes.exemple.test")]), "univ-rennes-2");
     // A request that names its university (the login page's choice): that
     // one, before its address'.
-    assert_eq!(university_of(&every, &posthog_every, &[("x-forwarded-host", "univexemple.exemple.test"), ("x-tafac-university", "rennes2")]), "univ-rennes-2");
+    assert_eq!(university_of(&every, &posthog_every, &[("x-forwarded-host", "univsorbonnenouvelle.exemple.test"), ("x-tafac-university", "rennes2")]), "univ-rennes-2");
 }
 
 #[test]
@@ -336,7 +336,7 @@ fn a_session_node_doesnt_read_as_one_is_a_visitors() {
     // default one, which finds no session of its own.
     let posthog = posthog(&[]);
     let gateway = gateway_with(&posthog, &[("UNIVERSITIES", "univ-rennes-2")]);
-    assert_eq!(said(post(&gateway, &body, Some(&session("session-1", "univ-exemple", "jdoe")))), 204);
+    assert_eq!(said(post(&gateway, &body, Some(&session("session-1", "univ-sorbonne-nouvelle", "jdoe")))), 204);
     let events = posthog.events();
     assert_eq!(events.len(), 1);
     assert_eq!(events[0]["event"], "login_result");

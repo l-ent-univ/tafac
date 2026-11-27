@@ -72,12 +72,13 @@ test('a good login clears the student\'s own count', () => {
   assert.ok(limiter.recordFailure('203.0.113.1', 'alice'))
 })
 
-// univ-exemple's CAS is on a .example host: a real login fails without
-// leaving the machine, the demo account signs in without any request.
+// No host but the app's own answers, as for a CAS out of reach: a real login
+// fails without leaving the machine, the demo account signs in without any
+// request.
 const createApp = createEntAuthApp as (config: unknown, options: unknown) => Express
 
 async function withAuthApp(run: (login: (username: string, password?: string) => Promise<Response>) => Promise<void>) {
-  const config = await loadServerConfig('univ-exemple')
+  const config = await loadServerConfig('univ-rennes')
   const server = createApp(config, { analytics: {}, session: { secret: 'a'.repeat(44), production: false } }).listen(0)
   const base = `http://127.0.0.1:${(server.address() as AddressInfo).port}`
   const login = (username: string, password = 'wrong') => fetch(`${base}/__ent_auth/login`, {
@@ -86,9 +87,12 @@ async function withAuthApp(run: (login: (username: string, password?: string) =>
     body: JSON.stringify({ username, password }),
   })
 
+  const realFetch = globalThis.fetch
+  globalThis.fetch = ((input: Parameters<typeof fetch>[0], init?: RequestInit) => (String(input).startsWith('http://127.0.0.1') ? realFetch(input, init) : Promise.reject(new TypeError('fetch failed')))) as typeof fetch
   try {
     await run(login)
   } finally {
+    globalThis.fetch = realFetch
     server.close()
   }
 }

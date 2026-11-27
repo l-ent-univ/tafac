@@ -2,7 +2,7 @@
 
 Tafac sert plusieurs universités avec le même code. Ce qui est ajouté pour l'une ne doit ni casser ni changer les autres, sauf intention explicite. Cette liste sert de garde-fou : un agent la relit avant chaque commit fait dans une session Claude Code (hook `PreToolUse` dans `.claude/settings.json`). Elle se complète au fil des cas rencontrés. Elle couvre aussi la parité entre le site et l'appli de bureau (dernière section) : le même CSS sert les deux, avec des variantes.
 
-Universités à vérifier : **toutes celles du dépôt au moment du commit**, pas une liste figée. Chaque dossier de `universities/` est une université (`shared.js`, `client.js`, `server.js`), les `example-*` compris, plus `universities/neutral.js` (la page sans université). Une université ajoutée entre-temps est donc vérifiée comme les autres. Pour chacune, ses particularités se lisent dans sa config : quelles `features` sont actives, quelles clés elle définit ou non, quelles valeurs elle donne aux clés qui choisissent un fournisseur.
+Universités à vérifier : **toutes celles du dépôt au moment du commit**, pas une liste figée. Chaque dossier de `universities/` est une université (`shared.js`, `client.js`, `server.js`), plus `universities/neutral.js` (la page sans université). Une université ajoutée entre-temps est donc vérifiée comme les autres. Pour chacune, ses particularités se lisent dans sa config : quelles `features` sont actives, quelles clés elle définit ou non, quelles valeurs elle donne aux clés qui choisissent un fournisseur.
 
 ## Ce qui bloque un commit
 

@@ -89,14 +89,18 @@ struct Logo {
 
 fn logo_of(id: &str) -> Option<Logo> {
     let (_, extension, bytes) = LOGOS.iter().find(|(university, _, _)| *university == id)?;
-    let content_type = match *extension {
+    let version = Sha256::digest(bytes).iter().take(6).map(|byte| format!("{byte:02x}")).collect();
+    Some(Logo { content_type: logo_type(extension), bytes, version })
+}
+
+// A logo's Content-Type, from its file's extension (one of universities/index.js: LOGO_EXTENSIONS).
+fn logo_type(extension: &str) -> &'static str {
+    match extension {
         "svg" => "image/svg+xml",
         "png" => "image/png",
         "webp" => "image/webp",
         _ => "image/jpeg",
-    };
-    let version = Sha256::digest(bytes).iter().take(6).map(|byte| format!("{byte:02x}")).collect();
-    Some(Logo { content_type, bytes, version })
+    }
 }
 
 // The universities one server serves, as Node is set up.
@@ -126,7 +130,7 @@ impl Served {
     //                     its former name); without it, a set UNIVERSITY
     //                     means that university alone
     //   UNIVERSITIES      the ones served together (TENANTS: its former
-    //                     name); without it, every one but the example-*
+    //                     name); without it, every one
     //
     // `variable`: a variable's value, None when it isn't set (set and
     // empty is set, as for Node's `??`). `list_dev_only`: on a development
@@ -145,7 +149,7 @@ impl Served {
         let listed = variable("UNIVERSITIES").or_else(|| variable("TENANTS")).unwrap_or_default();
         let named: Vec<&str> = listed.split(',').map(str::trim).filter(|id| !id.is_empty()).collect();
         let others = if named.is_empty() {
-            DIRECTORY.iter().map(|entry| entry.id.clone()).filter(|id| !id.starts_with("example")).collect()
+            DIRECTORY.iter().map(|entry| entry.id.clone()).collect()
         } else {
             named.into_iter().map(known).collect::<Result<Vec<_>, _>>()?
         };
@@ -323,10 +327,10 @@ mod tests {
 
     #[test]
     fn the_environment_says_what_is_served_as_it_says_to_node() {
-        // Nothing set: every university but the example-* stubs, Rennes first.
+        // Nothing set: every university, Rennes first.
         let all = served(&[]);
         assert!(all.multi);
-        assert_eq!(all.ids(), ["univ-rennes", "univ-exemple", "univ-rennes-2", "univ-sorbonne-nouvelle"]);
+        assert_eq!(all.ids(), ["univ-rennes", "univ-rennes-2", "univ-sorbonne-nouvelle"]);
         // UNIVERSITY alone: that one, and no other.
         let one = served(&[("UNIVERSITY", " univ-rennes-2 ")]);
         assert_eq!((one.multi, one.ids()), (false, vec!["univ-rennes-2"]));
@@ -337,7 +341,7 @@ mod tests {
         assert_eq!(served(&[("MULTI_TENANT", "off")]).ids(), ["univ-rennes"]);
         // Set and empty is set: MULTI_TENANT isn't read behind it.
         assert!(served(&[("MULTI_UNIVERSITY", ""), ("MULTI_TENANT", "0")]).multi);
-        assert_eq!(served(&[("TENANTS", "univ-exemple")]).ids(), ["univ-rennes", "univ-exemple"]);
+        assert_eq!(served(&[("TENANTS", "univ-sorbonne-nouvelle")]).ids(), ["univ-rennes", "univ-sorbonne-nouvelle"]);
         // An unknown university: Node doesn't start.
         assert!(Served::from_environment(variables(&[("UNIVERSITY", "univ-nowhere")]), false).is_err());
         assert!(Served::from_environment(variables(&[("UNIVERSITIES", "univ-rennes,../etc")]), false).is_err());
@@ -348,14 +352,14 @@ mod tests {
         let all = served(&[]);
         let list = body(&all.list(&headers(&[("host", "UnivRennes2.tafac.fr:443")]), Some("univ-rennes")));
         assert_eq!((&list["mode"], &list["defaultUniversity"], &list["session"], &list["host"]), (&"multi".into(), &"univ-rennes".into(), &"univ-rennes".into(), &"univ-rennes-2".into()));
-        let rennes2 = &list["universities"][2];
+        let rennes2 = &list["universities"][1];
         // Every field of Node's publicEntry, and no other.
         assert_eq!(rennes2.as_object().unwrap().keys().collect::<Vec<_>>(), ["id", "listed", "logoShape", "logoUrl", "name", "shortName", "slug"]);
         assert_eq!((&rennes2["id"], &rennes2["shortName"], &rennes2["slug"], &rennes2["logoShape"], &rennes2["listed"]), (&"univ-rennes-2".into(), &"Rennes 2".into(), &"rennes2".into(), &"square".into(), &true.into()));
         assert!(rennes2["logoUrl"].as_str().unwrap().starts_with("/__ent_auth/universities/univ-rennes-2/logo?v="));
         // One for development servers is served, and not listed.
-        assert_eq!((&list["universities"][1]["id"], &list["universities"][1]["listed"]), (&"univ-exemple".into(), &false.into()));
-        assert_eq!(body(&Served::from_environment(variables(&[]), true).unwrap().list(&HeaderMap::new(), None))["universities"][1]["listed"], true);
+        assert_eq!((&list["universities"][2]["id"], &list["universities"][2]["listed"]), (&"univ-sorbonne-nouvelle".into(), &false.into()));
+        assert_eq!(body(&Served::from_environment(variables(&[]), true).unwrap().list(&HeaderMap::new(), None))["universities"][2]["listed"], true);
 
         // A session at a university that isn't served is nobody's here; one
         // university alone has no address of its own to tell apart.
@@ -374,10 +378,11 @@ mod tests {
         assert_eq!(all.for_nobody(&headers(&[("host", "tafac.fr"), ("x-forwarded-host", "univsorbonnenouvelle.tafac.fr, proxy")])), "univ-sorbonne-nouvelle");
         // The login page's choice: an id, an id without its dashes, a slug.
         for chosen in ["univ-rennes-2", " UnivRennes2 ", "rennes2"] {
-            assert_eq!(all.for_nobody(&headers(&[("host", "univexemple.tafac.fr"), ("x-tafac-university", chosen)])), "univ-rennes-2", "{chosen}");
+            assert_eq!(all.for_nobody(&headers(&[("host", "univsorbonnenouvelle.tafac.fr"), ("x-tafac-university", chosen)])), "univ-rennes-2", "{chosen}");
         }
         // One that isn't served is no choice.
-        assert_eq!(all.for_nobody(&headers(&[("x-tafac-university", "example-minimal")])), "univ-rennes");
+        let some = served(&[("UNIVERSITIES", "univ-rennes-2")]);
+        assert_eq!(some.for_nobody(&headers(&[("x-tafac-university", "univ-sorbonne-nouvelle")])), "univ-rennes");
         // One university alone: that one, whatever is said.
         assert_eq!(served(&[("UNIVERSITY", "univ-rennes")]).for_nobody(&headers(&[("x-tafac-university", "rennes2")])), "univ-rennes");
     }
@@ -388,7 +393,7 @@ mod tests {
         let logo = all.logo("univ-rennes/logo", &HeaderMap::new()).unwrap();
         assert_eq!((logo.status(), &logo.headers()["content-type"], &logo.headers()["cache-control"]), (http::StatusCode::OK, &"image/svg+xml".parse().unwrap(), &"public, max-age=86400".parse().unwrap()));
         assert!(logo.body().starts_with(b"<") && logo.headers()["x-content-type-options"] == "nosniff");
-        assert_eq!(all.logo("univ-exemple/logo", &HeaderMap::new()).unwrap().headers()["content-type"], "image/png");
+        assert_eq!(["svg", "png", "webp", "jpg"].map(logo_type), ["image/svg+xml", "image/png", "image/webp", "image/jpeg"]);
         // The address the list gives is this file's.
         let tag = logo.headers()["etag"].to_str().unwrap().to_string();
         let listed = body(&all.list(&HeaderMap::new(), None))["universities"][0]["logoUrl"].as_str().unwrap().to_string();
@@ -398,7 +403,7 @@ mod tests {
 
         // One that isn't served, or has no logo: nothing. Any other path
         // under the folder is no route of these.
-        assert_eq!(all.logo("example-minimal/logo", &HeaderMap::new()).unwrap().status(), 404);
+        assert_eq!(served(&[("UNIVERSITIES", "univ-rennes-2")]).logo("univ-sorbonne-nouvelle/logo", &HeaderMap::new()).unwrap().status(), 404);
         assert_eq!(all.logo("univ-nowhere/logo", &HeaderMap::new()).unwrap().status(), 404);
         for other in ["univ-rennes", "univ-rennes/logo/x", "/logo", "univ-rennes/photo"] {
             assert!(all.logo(other, &HeaderMap::new()).is_none(), "{other}");

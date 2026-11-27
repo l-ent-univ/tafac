@@ -134,8 +134,8 @@ mod tests {
     fn university(moodle: &str) -> University {
         let file = format!(
             r#"
-            id = "univ-exemple"
-            name = "Université d'exemple"
+            id = "univ-test"
+            name = "Université de test"
             [sso]
             kind = "cas"
             base-url = "https://cas.exemple.test/"

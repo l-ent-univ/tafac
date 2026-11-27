@@ -31,7 +31,7 @@ fn the_list_and_the_logos_are_answered_where_the_server_says_what_it_serves() {
     assert_eq!((list.status(), &list.headers()[ANSWERED_BY], &list.headers()["cache-control"]), (http::StatusCode::OK, &"tonapi".parse().unwrap(), &"no-store".parse().unwrap()));
     let said = body_of(&list);
     assert_eq!((&said["mode"], &said["defaultUniversity"], &said["session"], &said["host"]), (&"multi".into(), &UNIVERSITY.into(), &serde_json::Value::Null, &serde_json::Value::Null));
-    assert_eq!(said["universities"].as_array().unwrap().len(), 4);
+    assert_eq!(said["universities"].as_array().unwrap().len(), 3);
     assert!(said.get("settings").is_none());
 
     // Signed in: the session's university, read from its cookie alone.
@@ -39,8 +39,8 @@ fn the_list_and_the_logos_are_answered_where_the_server_says_what_it_serves() {
     assert_eq!(signed_in["session"], UNIVERSITY);
     // At a university served that the gateway holds no session for: Node
     // names it too.
-    let elsewhere = campus.cookie(serde_json::json!({ "uni": "univ-exemple" }), &[]);
-    assert_eq!(body_of(&get(&gateway, UNIVERSITIES, &NO_HEADERS, Some(&elsewhere)).unwrap())["session"], "univ-exemple");
+    let elsewhere = campus.cookie(serde_json::json!({ "uni": "univ-rennes-2" }), &[]);
+    assert_eq!(body_of(&get(&gateway, UNIVERSITIES, &NO_HEADERS, Some(&elsewhere)).unwrap())["session"], "univ-rennes-2");
 
     let logo = get(&gateway, LOGO, &NO_HEADERS, None).unwrap();
     assert_eq!((logo.status(), &logo.headers()["content-type"]), (http::StatusCode::OK, &"image/svg+xml".parse().unwrap()));
@@ -93,10 +93,10 @@ fn a_session_check_without_a_cookie_is_nobody_at_the_university_asked_for() {
     // The login page's choice, then the address.
     let mut chosen = HeaderMap::new();
     chosen.insert("x-tafac-university", "rennes2".parse().unwrap());
-    chosen.insert("host", "univexemple.tafac.fr".parse().unwrap());
+    chosen.insert("host", "univsorbonnenouvelle.tafac.fr".parse().unwrap());
     assert_eq!(body_of(&get(&gateway, SESSION, &chosen, None).unwrap())["university"], "univ-rennes-2");
     chosen.remove("x-tafac-university");
-    assert_eq!(body_of(&get(&gateway, SESSION, &chosen, None).unwrap())["university"], "univ-exemple");
+    assert_eq!(body_of(&get(&gateway, SESSION, &chosen, None).unwrap())["university"], "univ-sorbonne-nouvelle");
     // Whether the statistics are on is the gateway's own setting.
     let counted = serving(campus.gateway()).with_statistics(Some("phc_key"));
     assert_eq!(body_of(&get(&counted, SESSION, &NO_HEADERS, None).unwrap())["analyticsEnabled"], true);

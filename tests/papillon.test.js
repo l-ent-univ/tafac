@@ -1,9 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import { getPapillonUrl, readPapillonDebugOverride } from '../src/papillon.js'
-import { branding as rennesBranding } from '../universities/univ-rennes/shared.js'
-import { branding as exempleBranding } from '../universities/univ-exemple/shared.js'
-import { branding as minimalBranding } from '../universities/example-minimal/shared.js'
+import { listUniversityIds, loadSharedConfig } from '../universities/index.js'
 
 test('getPapillonUrl returns the link of branding.papillon', () => {
   assert.equal(getPapillonUrl({ papillon: { url: 'https://papillon.bzh' } }), 'https://papillon.bzh')
@@ -22,10 +20,11 @@ test('getPapillonUrl ignores a link that is not https', () => {
   assert.equal(getPapillonUrl({ papillon: { url: 'http://papillon.bzh' } }), null)
 })
 
-test('Papillon is on for the Tafac instances, off for the fork template', () => {
-  assert.equal(getPapillonUrl(rennesBranding), 'https://papillon.bzh')
-  assert.equal(getPapillonUrl(exempleBranding), 'https://papillon.bzh')
-  assert.equal(getPapillonUrl(minimalBranding), null)
+test('Papillon is on for every Tafac instance', async () => {
+  for (const id of listUniversityIds()) {
+    const { branding } = await loadSharedConfig(id)
+    assert.equal(getPapillonUrl(branding), 'https://papillon.bzh', id)
+  }
 })
 
 test('the debug override forces the switch either way', () => {

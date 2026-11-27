@@ -9,7 +9,7 @@ import {
 
 const UNIVERSITIES = [
   { id: 'univ-rennes', slug: 'rennes', listed: true },
-  { id: 'univ-exemple', slug: 'exemple', listed: false },
+  { id: 'univ-sorbonne-nouvelle', slug: 'sorbonne-nouvelle', listed: false },
 ]
 
 const multi = (overrides = {}) => ({
@@ -24,8 +24,8 @@ const multi = (overrides = {}) => ({
 test('readEntryPath: /<slug>, its id, the picker, nothing else', () => {
   assert.deepEqual(readEntryPath('/rennes', UNIVERSITIES), { kind: 'university', id: 'univ-rennes' })
   assert.deepEqual(readEntryPath('/Rennes/', UNIVERSITIES), { kind: 'university', id: 'univ-rennes' })
-  assert.deepEqual(readEntryPath('/exemple', UNIVERSITIES), { kind: 'university', id: 'univ-exemple' })
-  assert.deepEqual(readEntryPath('/univexemple', UNIVERSITIES), { kind: 'university', id: 'univ-exemple' })
+  assert.deepEqual(readEntryPath('/sorbonne-nouvelle', UNIVERSITIES), { kind: 'university', id: 'univ-sorbonne-nouvelle' })
+  assert.deepEqual(readEntryPath('/univsorbonnenouvelle', UNIVERSITIES), { kind: 'university', id: 'univ-sorbonne-nouvelle' })
   assert.deepEqual(readEntryPath('/univ-rennes', UNIVERSITIES), { kind: 'university', id: 'univ-rennes' })
   assert.deepEqual(readEntryPath('/universites', UNIVERSITIES), { kind: 'picker' })
   assert.equal(readEntryPath('/', UNIVERSITIES), null)
@@ -34,17 +34,17 @@ test('readEntryPath: /<slug>, its id, the picker, nothing else', () => {
 })
 
 test('pickBootUniversity: signed in, the session wins', () => {
-  const info = multi({ session: 'univ-exemple', host: 'univ-rennes' })
-  assert.equal(pickBootUniversity({ info, entry: { kind: 'university', id: 'univ-rennes' }, storedChoice: 'univ-rennes' }), 'univ-exemple')
-  assert.equal(pickBootUniversity({ info, entry: { kind: 'picker' } }), 'univ-exemple')
+  const info = multi({ session: 'univ-sorbonne-nouvelle', host: 'univ-rennes' })
+  assert.equal(pickBootUniversity({ info, entry: { kind: 'university', id: 'univ-rennes' }, storedChoice: 'univ-rennes' }), 'univ-sorbonne-nouvelle')
+  assert.equal(pickBootUniversity({ info, entry: { kind: 'picker' } }), 'univ-sorbonne-nouvelle')
 })
 
 test('pickBootUniversity: signed out, the address, then the choice, then the old address', () => {
-  assert.equal(pickBootUniversity({ info: multi(), entry: { kind: 'university', id: 'univ-exemple' }, storedChoice: 'univ-rennes' }), 'univ-exemple')
+  assert.equal(pickBootUniversity({ info: multi(), entry: { kind: 'university', id: 'univ-sorbonne-nouvelle' }, storedChoice: 'univ-rennes' }), 'univ-sorbonne-nouvelle')
   assert.equal(pickBootUniversity({ info: multi(), storedChoice: 'univ-rennes' }), 'univ-rennes')
   assert.equal(pickBootUniversity({ info: multi(), entry: { kind: 'picker' }, storedChoice: 'univ-rennes' }), null)
-  assert.equal(pickBootUniversity({ info: multi({ host: 'univ-exemple' }) }), 'univ-exemple')
-  assert.equal(pickBootUniversity({ info: multi({ host: 'univ-exemple' }), storedChoice: 'univ-rennes' }), 'univ-rennes')
+  assert.equal(pickBootUniversity({ info: multi({ host: 'univ-sorbonne-nouvelle' }) }), 'univ-sorbonne-nouvelle')
+  assert.equal(pickBootUniversity({ info: multi({ host: 'univ-sorbonne-nouvelle' }), storedChoice: 'univ-rennes' }), 'univ-rennes')
 })
 
 test('pickBootUniversity: nothing picked yet is the neutral page', () => {
@@ -54,9 +54,9 @@ test('pickBootUniversity: nothing picked yet is the neutral page', () => {
 })
 
 test('pickBootUniversity: one university on the server is always that one', () => {
-  const info = { mode: 'single', defaultUniversity: 'univ-exemple', universities: [{ id: 'univ-exemple', slug: 'exemple' }] }
-  assert.equal(pickBootUniversity({ info }), 'univ-exemple')
-  assert.equal(pickBootUniversity({ info, entry: { kind: 'picker' }, storedChoice: 'univ-rennes' }), 'univ-exemple')
+  const info = { mode: 'single', defaultUniversity: 'univ-sorbonne-nouvelle', universities: [{ id: 'univ-sorbonne-nouvelle', slug: 'sorbonne-nouvelle' }] }
+  assert.equal(pickBootUniversity({ info }), 'univ-sorbonne-nouvelle')
+  assert.equal(pickBootUniversity({ info, entry: { kind: 'picker' }, storedChoice: 'univ-rennes' }), 'univ-sorbonne-nouvelle')
 })
 
 test('pickBootUniversity: offline, the last one picked', () => {
@@ -92,11 +92,11 @@ test('switchUniversityStorage: another university sets the settings aside, and b
     'l-ent:theme': 'dark',
   })
 
-  assert.equal(switchUniversityStorage('univ-exemple', { legacyUniversityId: 'univ-rennes', storage }), true)
+  assert.equal(switchUniversityStorage('univ-sorbonne-nouvelle', { legacyUniversityId: 'univ-rennes', storage }), true)
   assert.equal(storage.getItem('l-ent:student-tp'), null)
   assert.equal(storage.getItem('l-ent:grades-cache'), null)
   assert.equal(storage.getItem('l-ent:theme'), 'dark')
-  assert.equal(storage.getItem(STORAGE_UNIVERSITY_KEY), 'univ-exemple')
+  assert.equal(storage.getItem(STORAGE_UNIVERSITY_KEY), 'univ-sorbonne-nouvelle')
   assert.deepEqual(JSON.parse(storage.getItem(`${UNIVERSITY_SETTINGS_PREFIX}univ-rennes`)), {
     'l-ent:establishment': 'iutlan',
     'l-ent:student-tp': 'tp-rennes',
@@ -107,12 +107,12 @@ test('switchUniversityStorage: another university sets the settings aside, and b
   assert.equal(storage.getItem('l-ent:student-tp'), 'tp-rennes')
   assert.equal(storage.getItem('l-ent:establishment'), 'iutlan')
   assert.equal(storage.getItem(`${UNIVERSITY_SETTINGS_PREFIX}univ-rennes`), null)
-  assert.deepEqual(JSON.parse(storage.getItem(`${UNIVERSITY_SETTINGS_PREFIX}univ-exemple`)), { 'l-ent:student-tp': 'tp-demo' })
+  assert.deepEqual(JSON.parse(storage.getItem(`${UNIVERSITY_SETTINGS_PREFIX}univ-sorbonne-nouvelle`)), { 'l-ent:student-tp': 'tp-demo' })
 })
 
 test('switchUniversityStorage: no known owner keeps the data', () => {
   const storage = memoryStorage({ 'l-ent:student-tp': 'tp' })
-  assert.equal(switchUniversityStorage('univ-exemple', { storage }), false)
+  assert.equal(switchUniversityStorage('univ-sorbonne-nouvelle', { storage }), false)
   assert.equal(storage.getItem('l-ent:student-tp'), 'tp')
 })
 

@@ -78,8 +78,8 @@ mod tests {
     }
 
     const WITHOUT_MOODLE: &str = r#"
-        id = "univ-exemple"
-        name = "Université d'exemple"
+        id = "univ-test"
+        name = "Université de test"
         [sso]
         kind = "cas"
         base-url = "https://cas.exemple.test/cas/"

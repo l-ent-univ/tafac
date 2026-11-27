@@ -78,9 +78,9 @@ test('what the storage holds is read with care', () => {
 test('without storage, the demo lasts for the page', () => {
   endDemoSession({ storage: blockedStorage })
   assert.equal(readDemoSession({ storage: blockedStorage, now: NOW }), null)
-  startDemoSession({ university: 'univ-exemple' }, { storage: blockedStorage, now: NOW })
-  assert.equal(readDemoSession({ storage: blockedStorage, now: NOW }).university, 'univ-exemple')
-  assert.equal(readDemoSession({ storage: null, now: NOW }).university, 'univ-exemple')
+  startDemoSession({ university: 'univ-rennes-2' }, { storage: blockedStorage, now: NOW })
+  assert.equal(readDemoSession({ storage: blockedStorage, now: NOW }).university, 'univ-rennes-2')
+  assert.equal(readDemoSession({ storage: null, now: NOW }).university, 'univ-rennes-2')
   // A storage that works says what is so, whatever this page remembers.
   assert.equal(readDemoSession({ storage: createStorage(), now: NOW }), null)
   endDemoSession({ storage: blockedStorage })
