@@ -29,7 +29,7 @@ patch that names an address outside the university's domains is refused
 whole), and changes nothing. A university's service that moved takes a new
 version of the app, with tonAPI's settings mended.
 
-It can't, whoever signed it (`server/remoteSettings/guard.ts`):
+It can't, whoever signed it (`back/crates/tafac-gateway/src/own/settings/guard.rs`):
 
 - **send anything to a new domain.** Every address a patch names must be
   one of the university's own, as the app ships them: the hosts the app
@@ -74,7 +74,7 @@ the app's log; the others still apply.
 | `apps` | Optional: the apps it is for (`ios`, `desktop`). All without it |
 | `minVersion`, `maxVersion` | Optional: the app's versions it is for, both included. A patch for a bug of 0.27 says `"maxVersion": "0.27.2"`, so the version that mends it for good doesn't take it |
 | `features` | Switches, laid over the `features` of the page's settings |
-| `server` | Checked, and laid over nothing: `universities/<id>/server.js` was the apps' Node's, gone |
+| `server` | Checked, and laid over nothing: it was laid over the universities' `server.js`, which went with Node |
 | `client` | Laid over `universities/<id>/client.js`, in the page |
 
 Objects are merged key by key; anything else (a text, a number, a list,
@@ -103,7 +103,7 @@ the apps that have it.
    `/app/settings.json.sig`), read again at each request: no restart. On
    tafac.fr that is its gateway
    (`back/crates/tafac-gateway/src/own/settings.rs`), which reads
-   `APP_SETTINGS_FILE` as Node does.
+   `APP_SETTINGS_FILE`.
 
 tafac.fr holds no key: whoever got into it could not make a file the apps
 take. The signature is the private key's, which is on the maintainer's
@@ -156,7 +156,8 @@ for no update: a patch for a release is none of its business.
 | `back/crates/tafac-gateway/src/own/universities.rs` | The page's part goes out with `/__ent_auth/universities` (`settings`) |
 | `src/universityBoot.js` | The page lays its part over `client.js` |
 | `src-tauri/src/remote_settings.rs` | Each app says which app it is, its version, where the file is and whose signature it takes, and starts the reading as it starts |
-| `server/remoteSettings/`, `src/remoteSettings.js`, `server/universitiesApp.js` | Node's own, which the apps ran until they went without Node; the gateway's tests hold its Rust to them, on Node's own signed fixtures (`tests/fixtures/remoteSettings.js`, `tests/remoteSettings.test.ts`) |
+| `src/remoteSettings.js` | The keys a patch may never change (`FORBIDDEN_KEYS`), shared with the page |
+| `tests/fixtures/remoteSettings.js` | Signed files and their public key, made when Node read them: the gateway's tests read them (`own/settings.rs`) |
 
 ## Not done yet
 

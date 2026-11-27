@@ -3,15 +3,14 @@
 Tafac's backend in Rust. It signs the student in, holds the session and
 answers every route of the page's API, through
 [tonAPI](https://github.com/l-ent-univ/tonAPI). The apps run it alone, in
-their own process, with no Node at all (« The apps »). On tafac.fr it can
-run alone too: the Node server (`server.js`, `server/`) is behind it only
-when it is told where Node is (`TAFAC_GATEWAY_NODE`).
+their own process (« The apps »); on tafac.fr it is the server, alone. The
+Node server it replaced is gone (27 November 2026): what this file says of
+Node is what the gateway took over from it, and answers alike.
 
 One Cargo workspace; each crate under `crates/`. Today there is one,
 `tafac-gateway`. The apps call it in-process from their bridge
 (`src-tauri/src/bridge.rs`, the crate's `app` feature); on tafac.fr it is
-the server itself (the `server` feature, the default), alone or in front
-of Node. How it fits with the rest: `docs/DESKTOP.md`, « tonAPI ».
+the server itself (the `server` feature, the default). How it fits with the rest: `docs/DESKTOP.md`, « tonAPI ».
 
 ```sh
 cd back
@@ -30,9 +29,10 @@ the page ──▶ the gateway (Rust) ──▶ tonAPI ──▶ the university
                    │                            (CAS, portal, Moodle, ScoDoc,
                    │                             school records, planning,
                    │                             the webmail)
-                   └┄┄▶ Node, when tafac.fr's server has one behind:
-                        told when a session ends, and what is left
-                        outside the API. The apps have none
+                   └┄┄▶ nothing behind it. TAFAC_GATEWAY_NODE, a leftover
+                        of the move, would still pass on what is left
+                        outside the API and say when a session ends:
+                        unset on tafac.fr, absent from the apps
 ```
 
 - **The gateway** answers `POST /login`, `POST /logout`, `GET /session`,
@@ -66,8 +66,8 @@ the page ──▶ the gateway (Rust) ──▶ tonAPI ──▶ the university
   carry, `own/site.rs`), the page's files, `robots.txt` and Apple's file
   (`own/statics.rs`), and the page itself with its sitemap (`own/page.rs`,
   `own/shell.rs`): the same bytes and the same headers as Node's, its
-  security policy included, held to Node's own answers by fixtures and
-  compared with `server.js` running on a real build.
+  security policy included, held to Node's answers by the fixtures
+  recorded from it (compared with Node on a real build before it went).
   For a session it holds, it answers all of these whatever happens: a
   service down or slow, a parameter to refuse, are said here in the status
   and the words Node's own route has for them (`translate/failed.rs`;
@@ -75,11 +75,11 @@ the page ──▶ the gateway (Rust) ──▶ tonAPI ──▶ the university
   the certificate).
 - **Tafac's own routes** are no university's (`own/`): which universities
   the server serves and their logos (`own/universities.rs`), from
-  `universities/directory.json`, written from the settings Node reads
+  `universities/directory.json`, written from the universities' `shared.js`
   (`scripts/universities-directory.mjs`; a test holds the file to them).
-  The server tells the gateway what it serves from the same environment
-  Node reads (`UNIVERSITY`, `UNIVERSITIES`, `MULTI_UNIVERSITY`); the apps
-  serve every university (`Served::every`, as their Node was started). The
+  The server reads what it serves from its environment (`UNIVERSITY`,
+  `UNIVERSITIES`, `MULTI_UNIVERSITY`, Node's names for them); the apps
+  serve every university (`Served::every`). The
   session check of a request without a cookie is answered here, at the
   university the request is for. In the apps the list also carries what
   their remote settings lay over the page's settings (`settings`,
@@ -117,27 +117,25 @@ the page ──▶ the gateway (Rust) ──▶ tonAPI ──▶ the university
   words (`gateway/portal_proxy.rs`). The account's photo is
   `/__ent_auth/student-pic` (ScoDoc's): the page no longer asks the portal
   for one.
-- **Node**, where it is still behind: on tafac.fr, with
-  `TAFAC_GATEWAY_NODE`, it gets what is left outside the page's API (a
-  POST to `/`, an address where the server has no build); without it, that
-  is Express's own 404 page, and nothing is ever passed on. The apps have
-  no Node (« The apps »).
+- **What is left outside the page's API** (a POST to `/`, an address
+  where the server has no build) gets the 404 page Express gave, and
+  nothing is passed on. Only `TAFAC_GATEWAY_NODE`, a leftover of the move
+  to Rust unset on tafac.fr, would hand it to another server.
   Rennes 2 and the Sorbonne Nouvelle are answered here like Rennes: see
   « Rennes 2 and the Sorbonne Nouvelle ».
 - **The demo account is nobody's here.** The page serves it by itself,
   with no session (`src/demoServer.js`, `src/demoSession.js`): its login
   is never posted, and posted all the same it is a login like any other,
   which the CAS refuses. A session cookie that says `demo` (Node made
-  those when it served the demo) is read as nobody signed in, by the
-  gateway (`session/cookie.rs`) as by Node.
-- **Node is told** when a session ends here (signed out, or found expired:
-  `node.rs`), for what it kept of it, when there is one behind; without
-  one, nobody is. The gateway asks it nothing else: a
+  those when it served the demo) is read as nobody signed in (`session/cookie.rs`).
+- **When a session ends** (signed out, or found expired), its webmail
+  session and its CAS session are ended too. `node.rs` would also tell a
+  server behind (`TAFAC_GATEWAY_NODE`); there is none, so nobody is. A
   sign-in at Rennes is made here, the CAS's second factor included; a
   portal session that lapsed is opened again by tonAPI, with the CAS
   ticket; an error is worded here; and whether the statistics are on
-  (`analyticsEnabled`, in the session check) is read from the setting Node
-  reads, `POSTHOG_PROJECT_KEY`.
+  (`analyticsEnabled`, in the session check) is read from
+  `POSTHOG_PROJECT_KEY`.
 
 ## Where things are
 
@@ -149,9 +147,9 @@ crates/tafac-gateway/
 ├─ build.rs               puts tonAPI's universities (its settings files) in the crate
 └─ src/
    ├─ lib.rs              what the crate is, and its public names
-   ├─ routes.rs           THE TABLE: each route of the page, moved or Node's, and why
+   ├─ routes.rs           THE TABLE: each route of the page, and what answers it
    │
-   ├─ gateway/            a request in, its answer out (None: outside the page's API, or what tafac.fr's server leaves its Node)
+   ├─ gateway/            a request in, its answer out (None: outside the page's API)
    │  ├─ mod.rs           the Gateway: which route, whose session, a route that fails, and a session the university no longer knows
    │  ├─ signin.rs        POST /login and /logout: the session made (tonAPI signs in, one-time code included), and ended
    │  ├─ attempts.rs      the sign-in's limits, the codes sent, and the address a request came from
@@ -182,7 +180,7 @@ crates/tafac-gateway/
    │  └─ page_headers.rs  the page's security headers, for whoever serves the page
    │
    ├─ session/            the student's session
-   │  ├─ cookie.rs        its cookie, read and written, in the format Node reads
+   │  ├─ cookie.rs        its cookie, read and written, in the format Node wrote
    │  ├─ handed.rs        what of it tonAPI is handed, and what a new session's cookie is written with
    │  └─ memory.rs        what it holds in this process: services' sessions, component, sessions ended, and the student's answers kept
    │
@@ -228,7 +226,7 @@ crates/tafac-gateway/
    ├─ universities.rs     tonAPI's settings, and where each university's services are
    ├─ portals.rs          what differs from one portal software to another (uPortal, Drupal, iSorbonne)
    │
-   ├─ proxy.rs            tafac.fr: the HTTP server, alone or in front of Node
+   ├─ proxy.rs            tafac.fr: the HTTP server
    ├─ main.rs             tafac.fr: the binary, and its settings (TAFAC_GATEWAY_NODE: where Node is, if anywhere)
    │
    ├─ testing/            a made-up campus (portal, CAS, Moodle, ScoDoc, school records, a federation) for the tests, here and in the apps,
@@ -251,21 +249,21 @@ crates/tafac-gateway/
   (Moodle's session, ScoDoc's, a portal session of its own, the student's
   component) is held in this process with the session's id (`session/memory.rs`), not in the cookie:
   two requests at once would each write it, and it has 4 kB.
-- **Node reads the same cookie.** Its format is the one Node reads, with
-  the same `SESSION_SECRET` (and `SESSION_SECRET_PREVIOUS`, the older
-  secrets still read during a rotation: a cookie of one of them goes back
-  sealed with the current one, as Node wrote it again); two fixtures hold both sides to it. Node writes
-  it again as it answers its own routes (the portal's cookies it got since):
-  the gateway reads it at each request, as it is then. So a session Node
-  made (one from before the gateway was there) is one like any other.
+- **The cookie is the one Node wrote.** Same format, same `SESSION_SECRET`
+  (and `SESSION_SECRET_PREVIOUS`, the older secrets still read during a
+  rotation: a cookie of one of them goes back sealed with the current one).
+  A session Node made before the switch is one like any other: nobody is
+  signed out by it. A fixture of each (one Node wrote, one the gateway
+  wrote) holds the format (`session/cookie.rs`).
 - **One User-Agent.** The CAS binds its ticket to the User-Agent that signed
-  in. The gateway and Node present themselves under the same one
-  (`node.rs`, `server/upstreamAgent`; `tests/upstreamAgent.test.js`).
-- **Node's lists are not typed again.** The icons' keywords, concepts,
-  hues and each university's look come from `own/icons.json`, which
-  `scripts/gateway-data.mjs` writes from `src/appIconPicks.js`; the same
-  script writes the fixtures the icons and the page's files are held to
-  on both sides (`tests/fixtures/app-icon-picks.json`, `static-files.json`).
+  in. The gateway keeps the one Node presented (`node.rs`), so sessions
+  from before the switch go on: changing it signs everyone out.
+- **The icons' lists are not typed again.** Their keywords, concepts, hues
+  and each university's look come from `own/icons.json`, which
+  `scripts/gateway-data.mjs` writes from `src/appIconPicks.js` and the
+  universities' `shared.js`, with the fixture the picks are held to
+  (`tests/fixtures/app-icon-picks.json`). The page's files are held to
+  what Node served (`tests/fixtures/static-files.json`, kept as it was).
   The Node tests fail when one is out of date.
 - **The page changes one screen at a time.** A moved route is answered
   here in the JSON and the status the page reads today, which are Node's
@@ -341,11 +339,10 @@ a real account.
 
 What is known to differ from Node, at both:
 
-- the account has no `email`. Neither portal says one; Node reads Rennes
-  2's in the webmail (Partage), which hasn't moved. The page shows an empty
-  address in « Mon compte » until it does, or until the account is left to
-  Node for that university;
-- the account has a `sub` (the login), which Node's doesn't; the page
+- the account has no `email`. Neither portal says one; Node read Rennes
+  2's in the webmail (Partage). The page shows an empty address in « Mon
+  compte » until the gateway reads it (TEMPO's `/user/settings` has it);
+- the account has a `sub` (the login), which Node's hadn't; the page
   doesn't read it;
 - an application the portal lists twice (two categories) shows once.
 
@@ -483,7 +480,7 @@ TAFAC_DEV_GATEWAY=off npm run dev                             # ask a gateway al
 
 Open http://localhost:5173 and sign in there: the gateway makes the session.
 In development the page outlines each widget and page by who answered its
-route (orange: the gateway, through tonAPI; green: Node) and lists every
+route (orange: the gateway, through tonAPI) and lists every
 route asked, with its time (`src/dev/BackendMarks.jsx`). The gateway's own
 log says each moved route that failed, and why; the page gets the reason
 too, as from the development server. The statistics are off there unless

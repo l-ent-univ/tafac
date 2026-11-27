@@ -11,13 +11,13 @@ Une fenêtre « Tes données restent à toi » (`src/components/PrivacyModal.jsx
 ## Fonctionnement
 
 ```
-navigateur ──(événements filtrés)──▶ /__ent_auth/analytics (serveur Tafac) ──posthog-node──▶ PostHog (UE)
+navigateur ──(événements filtrés)──▶ /__ent_auth/analytics (serveur Tafac) ──▶ PostHog (UE)
 ```
 
 - **Le navigateur ne parle jamais à PostHog** et ne charge aucun script PostHog. `src/analytics.js` met les événements en lot et les envoie à notre propre serveur, via `navigator.sendBeacon` (ou `fetch` avec `keepalive` en secours).
-- **Le serveur filtre tout** avec une liste blanche stricte (`server/analyticsSchema.js`, seul fichier qui définit ce qui peut partir). Les événements et propriétés inconnus sont supprimés sans erreur. Chaque valeur conservée doit être un enum, un booléen ou un court identifiant `[a-z0-9-]`. Aucun texte libre n'est accepté.
-- **Envoi depuis le serveur** (`server/analytics.js`, `posthog-node`) : PostHog ne voit que l'IP du serveur, jamais celle de l'étudiant. Aucun en-tête `X-Forwarded-For` ni propriété `$ip` n'est transmis, et la GeoIP est désactivée (`disableGeoip`).
-- **Deux serveurs, la même règle** : sur tafac.fr, la passerelle Rust répond à cette route et envoie elle-même à PostHog (`back/crates/tafac-gateway`, `src/own/analytics.rs`), avec la même liste d'événements autorisés (un test la tient à `server/analyticsSchema.js`), sans file d'attente : un lot par requête de la page. PostHog y voit `$lib: tafac-gateway`. Dans les apps, c'est encore `server/analytics.js` et `posthog-node`.
+- **Le serveur filtre tout** avec une liste blanche stricte (`back/crates/tafac-gateway/src/own/analytics/schema.rs`, seul fichier qui définit ce qui peut partir). Les événements et propriétés inconnus sont supprimés sans erreur. Chaque valeur conservée doit être un enum, un booléen ou un court identifiant `[a-z0-9-]`. Aucun texte libre n'est accepté.
+- **Envoi depuis le serveur** (la passerelle Rust, `back/crates/tafac-gateway/src/own/analytics.rs` et `own/analytics/posthog.rs`) : PostHog ne voit que l'IP du serveur, jamais celle de l'étudiant. Aucun en-tête `X-Forwarded-For` ni propriété `$ip` n'est transmis, et la GeoIP est désactivée (`$geoip_disable` sur chaque événement).
+- **Le même serveur partout** : sur tafac.fr comme dans les applis de bureau et iOS, c'est la passerelle qui répond à cette route et envoie à PostHog, sans file d'attente : un lot par requête de la page, au plus quelques lots en route à la fois (les suivants sont abandonnés si PostHog ne répond plus). PostHog y voit `$lib: tafac-gateway`.
 - **Pas de profils** : chaque événement porte `$process_person_profile: false`. Il n'y a ni `identify()`, ni autocapture, ni session replay, ni heatmaps.
 - L'endpoint répond toujours `204` (`413` si le corps dépasse 8 Ko), accepte au plus 20 événements par requête et ignore les requêtes cross-site. Les erreurs sont avalées : la mesure d'audience ne peut pas casser l'application.
 - **Rien n'est mesuré dans la démonstration.** Le compte démo est servi par la page elle-même, sans session sur le serveur (`src/demoSession.js`) : le serveur ne pourrait pas distinguer ses événements de ceux d'un visiteur non connecté. Tant que la démo est ouverte, `track()` ne met rien en file, sauf l'entrée dans la démo elle-même (`login_result`, qui dit `demo: true`). L'interrupteur *Statistiques anonymes* reste affiché comme pour un étudiant.
@@ -109,7 +109,7 @@ Identifiant ENT, e-mail, nom, prénom, numéro étudiant, id ou cookie de sessio
 | `ANALYTICS_EXCLUDED_USERS` | Identifiants ENT, séparés par `,`, dont le serveur ignore les événements (les développeurs de l'instance) : rien n'est envoyé pour eux, ni événement ni marqueur. | — |
 | `POSTHOG_IN_DEV` | `1` pour que le serveur de dev (`npm run dev`) envoie aussi à PostHog. Sans elle, le dev n'envoie rien, même avec une clé dans `.env.local` : les essais, souvent faits avec un vrai compte, ne comptent pas. | coupé |
 
-En production (`node server.js`), elles sont lues dans l'environnement. En dev (`npm run dev`), elles peuvent aussi venir de `.env` / `.env.local`, et PostHog n'est utilisé qu'avec `POSTHOG_IN_DEV=1`. Au `SIGTERM`/`SIGINT`, le serveur vide la file PostHog avant de quitter.
+En production, elles sont lues dans l'environnement du serveur (l'image Docker, `deploy/example.env`). En dev (`npm run dev`), elles peuvent aussi venir de `.env` / `.env.local`, que Vite passe à la passerelle, et PostHog n'est utilisé qu'avec `POSTHOG_IN_DEV=1`. Rien n'attend dans le serveur : à son arrêt, aucun événement n'est perdu en file.
 
 ### Réglages à faire dans le projet PostHog
 
@@ -124,4 +124,4 @@ L'exemption repose aussi sur la configuration du projet. L'opérateur de l'insta
 
 ## Ajouter un événement
 
-À n'ajouter que pour un vrai besoin produit. Déclarez l'événement et ses propriétés (enums de préférence) dans `server/analyticsSchema.js`, appelez `track('nom', { … })` côté client, puis documentez-le ici. Tout ce qui n'est pas déclaré dans le schéma est supprimé par le serveur.
+À n'ajouter que pour un vrai besoin produit. Déclarez l'événement et ses propriétés (enums de préférence) dans `back/crates/tafac-gateway/src/own/analytics/schema.rs`, avec un test, appelez `track('nom', { … })` côté client, puis documentez-le ici. Tout ce qui n'est pas déclaré dans le schéma est supprimé par le serveur.
