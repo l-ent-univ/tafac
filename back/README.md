@@ -25,9 +25,10 @@ access to it.
 ```
 the page ──▶ the gateway (Rust) ──▶ tonAPI ──▶ the university
                    │                            (CAS, portal, Moodle, ScoDoc,
-                   │                             school records, planning)
-                   └──▶ Node ──────────────────▶ the university
-                        the routes that haven't moved,    (mail)
+                   │                             school records, planning,
+                   │                             the webmail)
+                   └──▶ Node
+                        the routes that haven't moved,
                         with the session made above
 ```
 
@@ -45,6 +46,17 @@ the page ──▶ the gateway (Rust) ──▶ tonAPI ──▶ the university
   answers, as tonAPI's server gives them on its `/v1` routes of the same
   names, its refusals as problems (`gateway/planning.rs`). The page makes
   of them what it shows (`src/planningTree.js`, `src/planningEvents.js`).
+  The mail is answered here too, every path under `/__ent_auth/mail` in
+  any case (`gateway/mail/`): the webmail (Zimbra, RENATER Partage at
+  Rennes and Rennes 2) signed in to with the CAS ticket through its SAML
+  chain, once per session, by tonAPI (`tonapi_providers::zimbra::webmail`:
+  each hop and the final origin held to the webmail's sign-in domains,
+  `launch/targets.rs`), then Node's sixteen routes with Node's JSON,
+  statuses and error codes, its checks in Node's order (another site, the
+  body, the feature, the mail's own limits, `mail/`), the part and the
+  upload streamed as they come (`proxy.rs`). A sign-out ends the webmail's
+  session too. Checked against a made-up webmail only (`tests/mail.rs`),
+  not yet on a real account.
   With Node's `DATA_DIR`, it answers the applications' icons too (`POST
   /app-icons`, `own/icons.rs`), from and into Node's own file; and with
   the page's build (`TAFAC_GATEWAY_DIST`, tafac.fr's server only), the
@@ -76,7 +88,7 @@ the page ──▶ the gateway (Rust) ──▶ tonAPI ──▶ the university
   release's manifest followed). The apps ask tafac.fr for them, never their
   bridge: none of it is in the library they embed. Their settings are
   Node's (`APP_SETTINGS_FILE`, `DESKTOP_LATEST_*`), read by `main.rs`.
-- **Node** answers everything else: the mail, the
+- **Node** answers everything else: the
   account's photo (the portal's proxy), the icons, the page and its files
   where the gateway isn't given what they need (the apps: their Node keeps
   them), and every route of the other universities, sign-in and
@@ -310,10 +322,10 @@ What is known to differ from Node, at both:
    password is refused in the CAS's own words. An account the CAS asks a
    one-time code of: Node refuses those today (no `auth.mfa` in its
    settings); see what the gateway does with one.
-2. **Node with that session.** The mail, which stays Node's, works with
-   the cookie the gateway wrote (the planning, TEMPO's, is the gateway's
-   own: `gateway/planning.rs`): Rennes 2's CAS
-   binds its ticket to the User-Agent that signed in. The launch relay is
+2. **Services with that session.** The mail and the planning (TEMPO's)
+   are the gateway's own (`gateway/mail/`, `gateway/planning.rs`), signed
+   in to with the cookie's CAS ticket: Rennes 2's CAS binds its ticket to
+   the User-Agent that signed in. The launch relay is
    the gateway's, for the services under `univ-rennes2.fr`.
 3. **Session check.** `GET /session` is answered here from one request to
    the portal's `/user` page, with the cookie's own portal cookies (the log
