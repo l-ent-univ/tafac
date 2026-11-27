@@ -146,7 +146,8 @@ Au démarrage, le navigateur consulte `/__ent_auth/universities`, puis charge le
 | `UNIVERSITY` | Université unique, ou université par défaut en mode multiple. Valeur de repli : `univ-rennes`. |
 | `MULTI_UNIVERSITY` | `1` pour le choix entre universités, `0` pour une seule. Sans valeur explicite, le mode multiple est activé si `UNIVERSITY` n’est pas définie. L’image Docker impose `1` par défaut. |
 | `UNIVERSITIES` | Liste d’identifiants séparés par des virgules en mode multiple. Par défaut, tous les dossiers de `universities/`. L’université par défaut est également incluse. |
-| `PORT` | Port du serveur de production, `3000` par défaut. |
+| `TAFAC_GATEWAY_LISTEN` | Adresse et port du serveur : `0.0.0.0:3000` dans l’image Docker, `127.0.0.1:3100` sinon. |
+| `TAFAC_GATEWAY_DIST` | Dossier du build de la page (`dist/`) servi par le serveur. |
 | `SESSION_SECRET` | Secret servant à dériver la clé de chiffrement des sessions. Obligatoire en production, au moins 32 octets. |
 | `SESSION_SECRET_PREVIOUS` | Anciens secrets, séparés par des virgules, acceptés pendant une rotation. |
 | `DATA_DIR` | Dossier des icônes persistantes : `./data` par défaut, `/app/data` dans Docker. |
@@ -187,7 +188,7 @@ D’autres fonctionnalités font appel à des services externes : GitHub pour le
 
 ## Auto-hébergement
 
-Le dépôt fournit une image Docker réunissant le frontend et le serveur Express, ainsi qu’un déploiement Caddy pour HTTPS. L’image conserve son nom historique (l'ent) :
+Le dépôt fournit une image Docker réunissant la page et son serveur, la passerelle Rust de `back/`, ainsi qu’un déploiement Caddy pour HTTPS. L’image conserve son nom historique (l'ent) :
 
 ```text
 ghcr.io/l-ent-univ/l-ent:latest
@@ -219,7 +220,7 @@ docker compose logs -f lent
 
 Le déploiement monte un volume pour les icônes et des volumes pour Caddy. **HTTPS est nécessaire en production**, notamment pour le cookie de session sécurisé. Pour les mises à jour, le choix d’une version fixe, un autre reverse proxy ou la gestion des icônes, consulter [`docs/SELF_HOSTING.md`](docs/SELF_HOSTING.md).
 
-Hors Docker, compiler avec `npm ci` puis `npm run build`, fournir les variables d’environnement et lancer `npm start` derrière un reverse proxy HTTPS. Le serveur utilise aussi les sources du dépôt et ses dépendances de production ; conserver seulement `dist/` est insuffisant.
+Hors Docker, construire la page (`npm ci` puis `npm run build`) et le serveur (`cargo build --release -p tafac-gateway` dans `back/`), puis lancer `back/target/release/tafac-gateway` avec `SESSION_SECRET`, `TAFAC_GATEWAY_DIST=dist` et `TAFAC_GATEWAY_LISTEN`, derrière un reverse proxy HTTPS ([`docs/SELF_HOSTING.md`](docs/SELF_HOSTING.md)). Le binaire et `dist/` suffisent.
 
 ## Ajouter une université
 

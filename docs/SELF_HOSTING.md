@@ -10,7 +10,7 @@ ghcr.io/l-ent-univ/l-ent:0.4.1      # version précise
 ghcr.io/l-ent-univ/l-ent:0.4        # dernière 0.4.x
 ```
 
-L'image contient le serveur Express et le frontend, un seul build pour toutes les universités. Par défaut elle les sert toutes, comme tafac.fr (`MULTI_UNIVERSITY=1` : page neutre avec le choix de l'université, puis l'université de la session). Elle écoute sur le port 3000 et tourne avec un utilisateur non root. Elle n'écrit sur le disque que dans `/app/data` (icônes automatiques des applications, voir plus bas), monté en volume par `docker-compose.yml`.
+L'image contient le serveur, la passerelle Rust de `back/` (un seul binaire), et la page, un seul build pour toutes les universités. Par défaut elle les sert toutes, comme tafac.fr (`MULTI_UNIVERSITY=1` : page neutre avec le choix de l'université, puis l'université de la session). Elle écoute sur le port 3000 et tourne avec un utilisateur non root (uid 1000, comme l'image Node d'avant : un volume `/app/data` qu'elle a créé reste accessible). Elle n'écrit sur le disque que dans `/app/data` (icônes automatiques des applications, voir plus bas), monté en volume par `docker-compose.yml`.
 
 ## Prérequis
 
@@ -45,7 +45,7 @@ MULTI_UNIVERSITY=0
 UNIVERSITY=univ-rennes
 ```
 
-Hors Docker, `UNIVERSITY=<id> node server.js` suffit (sans `MULTI_UNIVERSITY`).
+Hors Docker : `npm ci && npm run build` (la page), `cargo build --release -p tafac-gateway` dans `back/` (le serveur), puis `SESSION_SECRET=… TAFAC_GATEWAY_DIST=dist TAFAC_GATEWAY_LISTEN=127.0.0.1:3000 UNIVERSITY=<id> back/target/release/tafac-gateway`, derrière un reverse proxy HTTPS. Le binaire et `dist/` suffisent, rien d'autre du dépôt.
 
 ## Mettre à jour
 
@@ -64,9 +64,11 @@ Pour figer une version, remplacer `latest` par un numéro (`ghcr.io/l-ent-univ/l
 | `UNIVERSITY` | L'université servie (`MULTI_UNIVERSITY=0`), sinon celle par défaut : compte démo depuis la page neutre, anciennes adresses inconnues | `univ-rennes` |
 | `UNIVERSITIES` | Universités servies (ids séparés par des virgules). Ancien nom : `TENANTS` | toutes |
 | `POSTHOG_PROJECT_KEY` | Mesure d'audience anonyme ([ANALYTICS.md](ANALYTICS.md)) | désactivée |
-| `PORT` | Port interne du conteneur | `3000` |
+| `TAFAC_GATEWAY_LISTEN` | Adresse et port d'écoute | `0.0.0.0:3000` dans l'image, `127.0.0.1:3100` sinon |
+| `TAFAC_GATEWAY_DIST` | Le build de la page (`dist/`) | `/app/dist` dans l'image |
+| `SESSION_SECRET_PREVIOUS` | Anciens secrets, séparés par des virgules, encore lus pendant un changement de `SESSION_SECRET` (les sessions restent ouvertes) | aucun |
 | `DATA_DIR` | Dossier des icônes automatiques des applications | `/app/data` dans l'image, `./data` sinon |
-| `TRUST_PROXY` | Proxys dont l'en-tête `X-Forwarded-For` donne l'IP de l'étudiant (valeur `trust proxy` d'Express) | adresses locales et privées (Caddy, réseau Docker) |
+| `TRUST_PROXY` | Proxys dont l'en-tête `X-Forwarded-For` donne l'IP de l'étudiant (`true` : tous, `false` : aucun, un nombre : autant de proxys devant le serveur ; une liste d'adresses, qu'Express acceptait, n'est pas lue : le serveur le dit au démarrage et s'en tient aux réseaux privés) | adresses locales et privées (Caddy, réseau Docker) |
 
 ## Icônes automatiques des applications
 
@@ -90,7 +92,7 @@ docker compose exec lent vi /app/data/app-icons/univ-rennes.json   # ou docker c
 ```
 
 - **Changer une tuile** : remplacer `icon` par un autre concept (`library`, `sport`… : liste dans `src/appIconPicks.js`, dessiné dans le style de l'université) ou par un nom Iconify précis (`ph:basketball`, utilisé tel quel), et/ou `color` par une teinte (`red`, `orange`, `yellow`, `lime`, `green`, `teal`, `cyan`, `sky`, `blue`, `indigo`, `violet`, `fuchsia`, `pink`). Une entrée invalide est ignorée et choisie à nouveau.
-- Le style d'icônes et le mode de couleur se règlent par université dans le code (`appIcons` dans `universities/<id>/server.js`, voir [ADDING_A_UNIVERSITY.md](ADDING_A_UNIVERSITY.md#style-des-icônes-et-couleurs-serverjs--appicons)).
+- Le style d'icônes et le mode de couleur se règlent par université dans le code (`appIcons` dans `universities/<id>/shared.js`, voir [ADDING_A_UNIVERSITY.md](ADDING_A_UNIVERSITY.md#style-des-icônes-et-couleurs-serverjs--appicons)).
 - **Refaire le choix d'un service** : supprimer son entrée. **Tout réinitialiser** : supprimer le fichier.
 - Un fichier JSON illisible n'est jamais écrasé : le serveur passe en mémoire seule jusqu'à ce qu'il soit réparé.
 - Les icônes faites main (`services.getAppIcon`, dans le code de l'université) restent prioritaires.
@@ -103,7 +105,7 @@ Une PWA installée est liée à son domaine : déménager Tafac vers un nouveau 
 
 Le workflow [`.github/workflows/ci.yml`](../.github/workflows/ci.yml) :
 
-- sur chaque pull request : lint, tests, build (un seul pour toutes les universités) et build Docker (sans publication) ;
+- sur chaque pull request : lint, tests, build (un seul pour toutes les universités), tests du serveur (`cargo test` dans `back/`) et build Docker (sans publication) ;
 - sur chaque push sur `main` : la même vérification, puis une release `vX.Y.Z` avec des notes générées depuis les PR, puis l'image Docker.
 
 Le numéro de version suit les messages de commit depuis la dernière release : `feat` incrémente la mineure, `type!:` ou `BREAKING CHANGE` la majeure (la mineure tant qu'on est en 0.x), le reste le correctif. Mettre `[skip release]` dans le message du commit de tête pour ne rien publier.

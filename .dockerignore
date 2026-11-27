@@ -19,3 +19,6 @@ deploy
 SECURITY_REVIEW.md
 # Local server data (DATA_DIR): the image gets a volume instead.
 data
+# Rust builds, and the apps (not in the image).
+**/target
+src-tauri
