@@ -19,7 +19,7 @@
 //       doesn't read. Answered here (translate/failed.rs), in the sentence
 //       the page shows as it is.
 //   200 { authenticated: false, apps: null }: nobody signed in, another
-//       university. Answered here (gateway/nobody.rs; their Node in the apps).
+//       university. Answered here (gateway/nobody.rs).
 
 use tonapi_core::App;
 

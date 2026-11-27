@@ -1,9 +1,10 @@
 // The universities this server serves, and the one a request is for.
 //
 // Node's own (server/universitiesApp.js, universities/index.js), answered
-// here where the server tells the gateway what it serves (`Served`, from
-// the same environment Node reads; the apps don't: there Node keeps these
-// routes, which carry the apps' remote settings):
+// here for the universities the server serves (`Served`, from the same
+// environment Node reads; the apps: every one, Served::every), with, in
+// the apps, what their remote settings lay over the page's settings
+// (`settings`, own/settings/remote.rs):
 //
 //   GET /__ent_auth/universities
 //       200 { mode, defaultUniversity, session, host, universities: [{ id,
@@ -209,6 +210,13 @@ impl Served {
         Self { multi, default: default.to_string(), entries, list_dev_only, by_name, by_host, by_label }
     }
 
+    // Every university, as Node serves them with nothing set (or with
+    // MULTI_UNIVERSITY=1, as the apps' Node was started): Tafac's own text,
+    // the ones for development servers not listed.
+    pub fn every() -> Self {
+        Self::from_environment(|_| None, false).expect("the default university is one of the directory's")
+    }
+
     pub fn ids(&self) -> Vec<&str> {
         self.entries.iter().map(|entry| entry.id.as_str()).collect()
     }
@@ -267,8 +275,10 @@ impl Served {
     }
 
     // GET /__ent_auth/universities. `session`: the university the request
-    // is signed in to, when it is one served here.
-    pub(crate) fn list(&self, headers: &HeaderMap, session: Option<&str>) -> http::Response<Vec<u8>> {
+    // is signed in to, when it is one served here. `settings`: in the apps,
+    // what their remote settings lay over the page's settings, by
+    // university (src/universityBoot.js lays them over client.js).
+    pub(crate) fn list(&self, headers: &HeaderMap, session: Option<&str>, settings: Option<&serde_json::Map<String, serde_json::Value>>) -> http::Response<Vec<u8>> {
         let universities: Vec<serde_json::Value> = self
             .entries
             .iter()
@@ -284,13 +294,16 @@ impl Served {
                 })
             })
             .collect();
-        let body = serde_json::json!({
+        let mut body = serde_json::json!({
             "mode": if self.multi { "multi" } else { "single" },
             "defaultUniversity": self.default,
             "session": session.filter(|id| self.serves(id)),
             "host": self.of_host(headers),
             "universities": universities,
         });
+        if let Some(settings) = settings.filter(|settings| !settings.is_empty()) {
+            body["settings"] = serde_json::Value::Object(settings.clone());
+        }
         json_response(200, serde_json::to_vec(&body).unwrap_or_default())
     }
 
@@ -377,7 +390,7 @@ mod tests {
     #[test]
     fn the_list_is_nodes_with_what_the_request_says_of_itself() {
         let all = served(&[]);
-        let list = body(&all.list(&headers(&[("host", "UnivRennes2.tafac.fr:443")]), Some("univ-rennes")));
+        let list = body(&all.list(&headers(&[("host", "UnivRennes2.tafac.fr:443")]), Some("univ-rennes"), None));
         assert_eq!((&list["mode"], &list["defaultUniversity"], &list["session"], &list["host"]), (&"multi".into(), &"univ-rennes".into(), &"univ-rennes".into(), &"univ-rennes-2".into()));
         let rennes2 = &list["universities"][1];
         // Every field of Node's publicEntry, and no other.
@@ -386,12 +399,12 @@ mod tests {
         assert!(rennes2["logoUrl"].as_str().unwrap().starts_with("/__ent_auth/universities/univ-rennes-2/logo?v="));
         // One for development servers is served, and not listed.
         assert_eq!((&list["universities"][2]["id"], &list["universities"][2]["listed"]), (&"univ-sorbonne-nouvelle".into(), &false.into()));
-        assert_eq!(body(&Served::from_environment(variables(&[]), true).unwrap().list(&HeaderMap::new(), None))["universities"][2]["listed"], true);
+        assert_eq!(body(&Served::from_environment(variables(&[]), true).unwrap().list(&HeaderMap::new(), None, None))["universities"][2]["listed"], true);
 
         // A session at a university that isn't served is nobody's here; one
         // university alone has no address of its own to tell apart.
         let one = served(&[("UNIVERSITY", "univ-rennes")]);
-        let list = body(&one.list(&headers(&[("host", "univrennes2.tafac.fr")]), Some("univ-rennes-2")));
+        let list = body(&one.list(&headers(&[("host", "univrennes2.tafac.fr")]), Some("univ-rennes-2"), None));
         assert_eq!((&list["mode"], &list["session"], &list["host"]), (&"single".into(), &serde_json::Value::Null, &serde_json::Value::Null));
         assert_eq!(list["universities"].as_array().unwrap().len(), 1);
     }
@@ -423,7 +436,7 @@ mod tests {
         assert_eq!(["svg", "png", "webp", "jpg"].map(logo_type), ["image/svg+xml", "image/png", "image/webp", "image/jpeg"]);
         // The address the list gives is this file's.
         let tag = logo.headers()["etag"].to_str().unwrap().to_string();
-        let listed = body(&all.list(&HeaderMap::new(), None))["universities"][0]["logoUrl"].as_str().unwrap().to_string();
+        let listed = body(&all.list(&HeaderMap::new(), None, None))["universities"][0]["logoUrl"].as_str().unwrap().to_string();
         assert_eq!(listed, format!("/__ent_auth/universities/univ-rennes/logo?v={}", tag.trim_matches('"')));
         let again = all.logo("univ-rennes/logo", &headers(&[("if-none-match", &format!("W/{tag}"))])).unwrap();
         assert_eq!((again.status(), again.body().len()), (http::StatusCode::NOT_MODIFIED, 0));

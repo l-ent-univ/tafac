@@ -58,13 +58,17 @@ fn is_bare_host(text: &str) -> bool {
     last.len() >= 2 && last.bytes().all(|byte| byte.is_ascii_alphabetic()) && labels.split('.').all(|label| !label.is_empty() && label.bytes().all(|byte| byte.is_ascii_alphanumeric() || byte == b'-'))
 }
 
-// /domains$/i
+// /domains$/i. Node read a university's own domains from its settings
+// (trusted_domains); the apps read them from tonAPI's (remote.rs), so this
+// and the two below are for the tests that hold the guard to Node's.
+#[cfg(test)]
 fn is_domain_list(key: &str) -> bool {
     key.len() >= 7 && key.as_bytes()[key.len() - 7..].eq_ignore_ascii_case(b"domains")
 }
 
 // Each text in a value, with the key it is under (an array's entries under
 // the array's).
+#[cfg(test)]
 fn strings<'a>(value: &'a Value, key: &'a str, visit: &mut dyn FnMut(&'a str, &'a str)) {
     match value {
         Value::String(text) => visit(text, key),
@@ -75,6 +79,7 @@ fn strings<'a>(value: &'a Value, key: &'a str, visit: &mut dyn FnMut(&'a str, &'
 }
 
 // The university's own domains, from its settings as the app ships them.
+#[cfg(test)]
 pub(super) fn trusted_domains(config: &Value) -> Vec<String> {
     let mut domains: Vec<String> = Vec::new();
     let mut add = |domain: String| {

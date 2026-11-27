@@ -29,10 +29,11 @@
 //       (415), compressed (Node inflated it: refused here, 415), past 100
 //       kB (413), not JSON serde_json reads (400), in the words the mail's
 //       routes give the same refusals.
-//   Still the apps' own Node's: every request when the gateway isn't given
-//       the data directory (their Node keeps its own file, in the app's
-//       data folder), and a university whose look icons.json doesn't have
-//       (none the gateway serves).
+//   Still Node's, where tafac.fr's server has one behind: every request
+//       when the gateway isn't given the data directory (Node keeps its
+//       own file then), and a university whose look icons.json doesn't
+//       have (none the gateway serves). The apps give it theirs: the
+//       folder their own Node kept the file in.
 //
 // The picking is the page's too (src/appIconPicks.js, for the demo
 // account): its lists aren't typed again here. scripts/gateway-data.mjs

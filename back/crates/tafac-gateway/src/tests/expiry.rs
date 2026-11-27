@@ -25,7 +25,7 @@ fn says_expired(response: &http::Response<Vec<u8>>) -> bool {
 #[test]
 fn a_service_route_finds_the_session_over_and_ends_it() {
     let campus = campus();
-    let gateway = campus.gateway();
+    let gateway = campus.server_gateway();
     let node = Node::default();
     let cookie = campus.alive();
     assert!(ask(&gateway, DEADLINES, &cookie).is_some());
@@ -86,7 +86,7 @@ fn whoever_still_shows_the_cookie_is_told_and_the_cookie_isnt_touched_again() {
 #[test]
 fn the_session_check_finds_it_over_and_says_so_as_node_does() {
     let campus = campus();
-    let gateway = campus.gateway().with_statistics(Some("phc_made_up"));
+    let gateway = campus.server_gateway().with_statistics(Some("phc_made_up"));
     let node = Node::default();
     // The portal's session lapsed, and the CAS's with it.
     let cookie = campus.lapsed();
@@ -176,7 +176,7 @@ fn a_service_that_refuses_while_the_cas_knows_the_session_is_the_routes_error() 
 #[test]
 fn two_requests_that_find_it_over_together_end_it_once() {
     let campus = campus();
-    let gateway = campus.gateway();
+    let gateway = campus.server_gateway();
     let node = Node::default();
     let cookie = campus.alive();
     campus.cas_forgets();

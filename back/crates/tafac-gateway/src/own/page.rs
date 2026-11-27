@@ -101,10 +101,12 @@ fn moved(headers: &HeaderMap, head: bool, address: &str) -> Response<Vec<u8>> {
 
 impl Page {
     // The page of the build at `dist`, for the universities `served`. None
-    // without its index.html: the page is Node's then.
-    pub(crate) fn read(dist: &Path, served: Served) -> Option<Self> {
+    // without its index.html: the page is Node's then. `landings`: with the
+    // landings the build wrote for search engines (tafac.fr; not the apps,
+    // own/site.rs).
+    pub(crate) fn read(dist: &Path, served: Served, landings: bool) -> Option<Self> {
         let template = std::fs::read_to_string(dist.join("index.html")).ok()?;
-        let landings = std::fs::read_to_string(dist.join(".prerender").join("landing.json")).ok();
+        let landings = landings.then(|| std::fs::read_to_string(dist.join(".prerender").join("landing.json")).ok()).flatten();
         let shells = Shells::new(&template, landings.as_deref(), &served);
         Some(Self { dist: dist.to_path_buf(), shells, served })
     }

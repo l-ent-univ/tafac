@@ -189,7 +189,7 @@ fn where_the_relay_cant_sign_in_the_browser_goes_to_the_target() {
 #[test]
 fn a_session_the_cas_no_longer_knows_ends_at_the_login_form() {
     let campus = campus();
-    let gateway = campus.gateway();
+    let gateway = campus.server_gateway();
     let node = Node::default();
     let cookie = campus.alive();
     let catalogue = format!("http://127.0.0.1:{}/library/catalogue", campus.port());

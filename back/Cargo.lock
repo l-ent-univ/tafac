@@ -1756,6 +1756,7 @@ dependencies = [
  "futures-util",
  "hkdf",
  "http",
+ "http-body",
  "http-body-util",
  "hyper",
  "hyper-util",

@@ -185,7 +185,7 @@ fn a_university_without_these_services_says_so() {
 fn a_session_the_cas_no_longer_knows_ends_here() {
     for target in [PHOTO, PHOTO_META, STATUS, CERTIFICATE] {
         let campus = campus();
-        let gateway = campus.gateway();
+        let gateway = campus.server_gateway();
         let node = Node::default();
         let cookie = campus.alive();
         campus.cas_forgets();

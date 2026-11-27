@@ -32,16 +32,14 @@
 //
 // The session is the gateway's: it signs the student in, holds what tonAPI
 // got from the university, and says when the session is over. Every route
-// of the page's API is answered here: for a session it holds, its errors
-// too (translate/failed.rs); for nobody, a cookie that isn't read, a
-// session of a university it doesn't serve, as Node answered nobody
-// (nobody.rs); a path that is no route, 404. A Node behind, when there is
-// one, is only told when a session ends (node.rs). None from here is left
-// for the apps' own Node alone (apps_node_answers), until their bridge goes
-// without it: who holds no session of the gateway's (a session of a
-// university it doesn't serve aside), what is no route, /__ent_proxy/*;
-// and what the bridge doesn't set the gateway up for: the list of
-// universities, the statistics, the icons.
+// of the page's API is answered here, wherever it runs: for a session it
+// holds, its errors too (translate/failed.rs); for nobody, a cookie that
+// isn't read, a session of a university it doesn't serve, as Node answered
+// nobody (nobody.rs); a path that is no route, 404. A Node behind, when
+// tafac.fr's server has one, is only told when a session ends (node.rs).
+// None from here is a request outside the page's API, and, on that server
+// only, what is left to its Node: the statistics or the icons where it
+// isn't set up for them (main.rs).
 
 mod attempts;
 mod behind;
@@ -67,7 +65,7 @@ use tonapi_providers::NetSettings;
 
 pub use attempts::TrustedProxies;
 pub(crate) use mail::is_mail_path;
-#[cfg(feature = "server")]
+#[cfg(feature = "app")]
 pub(crate) use nobody::not_found;
 pub use mail::{BoxError, ByteStream, MailBody};
 use behind::Lasting;
@@ -124,19 +122,23 @@ pub struct Gateway {
     // A sign-in has the home page's answers asked at once (behind.rs).
     // Always, but in the tests, which count what a sign-in asks.
     asks_ahead: bool,
-    // The universities this server serves, where it says (`serving`):
-    // Tafac's own routes about them are then answered here
-    // (own/universities.rs), and so is a session check nobody is signed in
-    // for.
-    served: Option<Served>,
+    // The universities this server serves (`serving`; every one, as Node
+    // with nothing set, unless told): Tafac's own routes about them
+    // (own/universities.rs), and the university a request without a
+    // session is for.
+    served: Served,
+    // What the apps' remote settings lay over the page's settings, in the
+    // list of universities (own/settings/remote.rs); None: nothing.
+    #[cfg(feature = "app")]
+    remote_settings: Option<crate::own::RemoteSettings>,
     // The applications' icons, when the gateway has Node's data directory
-    // (own/icons.rs); None: Node answers them.
+    // (own/icons.rs); None: Node answers them, where there is one.
     icons: Option<crate::own::icons::Icons>,
     // The mail's sessions with the webmail, and its limits (gateway/mail/).
     pub(crate) mail_memory: mail::state::MailMemory,
     pub(crate) mail_limits: crate::mail::MailLimits,
-    // Whether a Node is behind, to be told when a session ends: in the apps
-    // (their bridge's server) and on a server given TAFAC_GATEWAY_NODE.
+    // Whether a Node is behind, to be told when a session ends: on a server
+    // given TAFAC_GATEWAY_NODE.
     node_behind: bool,
 }
 
@@ -174,7 +176,9 @@ impl Gateway {
             attempts: attempts::Attempts::default(),
             early: portal::Early::default(),
             asks_ahead: true,
-            served: None,
+            served: Served::every(),
+            #[cfg(feature = "app")]
+            remote_settings: None,
             icons: None,
             mail_memory: mail::state::MailMemory::default(),
             mail_limits: crate::mail::MailLimits::default(),
@@ -182,28 +186,35 @@ impl Gateway {
         }
     }
 
-    // No Node behind (tafac.fr's server without TAFAC_GATEWAY_NODE):
-    // nothing is ever told it.
+    // No Node behind (the apps; tafac.fr's server without
+    // TAFAC_GATEWAY_NODE): nothing is ever told it.
     pub fn without_node(mut self) -> Self {
         self.node_behind = false;
         self
     }
 
     // The applications' icons answered here, from the file Node keeps in
-    // `data_dir` (its DATA_DIR): tafac.fr's server. The apps leave them to
-    // their own Node.
+    // `data_dir` (its DATA_DIR: tafac.fr's server's, the folder the apps'
+    // own Node kept them in).
     pub fn with_icons_in(mut self, data_dir: impl Into<std::path::PathBuf>) -> Self {
         self.icons = Some(crate::own::icons::Icons::new(data_dir));
         self
     }
 
     // What this server serves, as Node is set up (`Served::from_environment`):
-    // the university a request without a session is for. Without it (the
-    // apps), the list of universities stays their Node's, and a request
-    // without a session is for the university the page chose
-    // (nobody.rs).
+    // the university a request without a session is for. Without it, every
+    // university, as the apps' Node served them (MULTI_UNIVERSITY).
     pub fn serving(mut self, served: Served) -> Self {
-        self.served = Some(served);
+        self.served = served;
+        self
+    }
+
+    // The apps' remote settings: what their patches lay over the page's
+    // settings goes in the list of universities, once the app's start is
+    // over (own/settings/remote.rs).
+    #[cfg(feature = "app")]
+    pub fn with_remote_settings(mut self, remote_settings: crate::own::RemoteSettings) -> Self {
+        self.remote_settings = Some(remote_settings);
         self
     }
 
@@ -276,7 +287,7 @@ impl Gateway {
 
     // The answer to a request of the page's API (routes.rs), for anyone.
     // None: not one of the page's API (an address of the site), or a route
-    // the apps' own Node still answers (the top of this file).
+    // tafac.fr's server leaves to its Node (the top of this file).
     //
     // `cookie`: the value of the session cookie as the caller holds it now
     // (asked again before answering: the session may have ended meanwhile).
@@ -340,7 +351,7 @@ impl Gateway {
         }
         // Tafac's own, whoever asks, with a session or without (own/).
         if let Moved::Universities | Moved::UniversityLogo = route {
-            return self.own_universities(route, asked, cookie().as_deref());
+            return Some(self.own_universities(route, asked, cookie().as_deref()).await);
         }
         if route == Moved::Analytics {
             return self.statistics_posted(asked, cookie());
@@ -356,14 +367,11 @@ impl Gateway {
         // No route: Express's 404, whoever asks.
         let semester_unread = route == Moved::GradesSemester && !routes::under(route, asked.path).is_some_and(|id| !id.is_empty() && !id.contains('/'));
         if route == Moved::NotFound || semester_unread {
-            if self.apps_node_answers() {
-                return None;
-            }
             let held = cookie().is_some_and(|value| self.signed_in(Some(&value)).is_some());
             return Some(if held { nobody::not_found() } else { nobody::says_no_session(nobody::not_found(), asked.path) });
         }
         let Some(value) = cookie() else {
-            return (!self.apps_node_answers()).then(|| self.for_nobody(route, asked));
+            return Some(self.for_nobody(route, asked));
         };
         // Tafac's own icons: nothing asked of the university.
         if route == Moved::AppIcons {
@@ -375,9 +383,6 @@ impl Gateway {
             return self.settled(route, asked, &value, cookie, &node).await;
         }
         if route == Moved::PortalProxy {
-            if self.apps_node_answers() {
-                return None;
-            }
             return match self.signed_in(Some(&value)) {
                 Some(held) => Some(self.portal_proxy(asked, Some(&held))),
                 None => self.unheld(route, asked, &value, &node).await,
@@ -427,15 +432,6 @@ impl Gateway {
         self.still_the_sessions(route, asked, &value, &held, cookie, response, &node).await
     }
 
-    // In the apps, whose bridge doesn't tell the gateway what is served and
-    // has their own Node behind: that Node still answers who holds no
-    // session of the gateway's, and what is no route, until the bridge goes
-    // without it. None from the routes then. A session of a university the
-    // gateway doesn't serve is answered here all the same (unheld).
-    pub(super) fn apps_node_answers(&self) -> bool {
-        self.served.is_none() && self.node_behind
-    }
-
     // An answer made for a session, once it is ready. Signed out while the
     // university was asked (or out and in again): the session this answer
     // is about is over, and the request is answered as one that holds no
@@ -459,8 +455,7 @@ impl Gateway {
     // universities without the CAS ticket, which nothing can be asked with
     // (ended here, as the mail ends it); else nobody's (nobody.rs): a
     // cookie past its lifetime or not read, a session signed out, the demo
-    // account's from before, a university the gateway doesn't serve. In
-    // the apps, their Node's (None) but for the last.
+    // account's from before, a university the gateway doesn't serve.
     async fn unheld<N, Fut>(&self, route: Moved, asked: &Asked<'_>, value: &str, node: &N) -> Option<http::Response<Vec<u8>>>
     where
         N: Fn(NodeRequest) -> Fut,
@@ -473,9 +468,6 @@ impl Gateway {
         }
         let session = self.codec.read(value, now_ms());
         let elsewhere = session.as_ref().is_some_and(|session| !self.universities.contains_key(&session.university));
-        if self.apps_node_answers() && !elsewhere {
-            return None;
-        }
         if let Some(session) = session {
             if !elsewhere && self.memory.ended(&session.id).is_none() {
                 let why = if route == Moved::Logout { Ended::SignedOut } else { Ended::Expired };
@@ -494,16 +486,36 @@ impl Gateway {
     }
 
     // GET /__ent_auth/universities and a university's logo
-    // (own/universities.rs), where the server said what it serves. None
-    // elsewhere: the apps' Node, whose list carries their remote settings.
-    // A session cookie that isn't read here is no session.
-    fn own_universities(&self, route: Moved, asked: &Asked<'_>, cookie: Option<&str>) -> Option<http::Response<Vec<u8>>> {
-        let served = self.served.as_ref()?;
+    // (own/universities.rs). In the apps, the list carries what their
+    // remote settings lay over the page's settings. A session cookie that
+    // isn't read here is no session.
+    async fn own_universities(&self, route: Moved, asked: &Asked<'_>, cookie: Option<&str>) -> http::Response<Vec<u8>> {
+        let served = &self.served;
         if route == Moved::UniversityLogo {
-            return Some(routes::under(route, asked.path).and_then(|id| served.logo(id, asked.headers)).unwrap_or_else(nobody::not_found));
+            return routes::under(route, asked.path).and_then(|id| served.logo(id, asked.headers)).unwrap_or_else(nobody::not_found);
         }
         let session = cookie.and_then(|cookie| self.codec.read(cookie, now_ms())).map(|session| session.university);
-        Some(served.list(asked.headers, session.as_deref()))
+        let settings = self.page_settings().await;
+        served.list(asked.headers, session.as_deref(), settings.as_ref())
+    }
+
+    // What the apps' remote settings lay over the page's settings, by
+    // university; None: nothing to lay. A patch may name the university's
+    // own domains only: the ones the gateway asks it at (launch/targets.rs).
+    #[cfg(feature = "app")]
+    async fn page_settings(&self) -> Option<serde_json::Map<String, serde_json::Value>> {
+        let remote = self.remote_settings.as_ref()?;
+        let trusted = |id: &str| -> Vec<String> {
+            let Some(university) = self.universities.get(id) else { return Vec::new() };
+            let targets = crate::launch::targets::Targets::of(&university.settings);
+            targets.hosts().chain(targets.domains()).map(str::to_lowercase).collect()
+        };
+        Some(remote.page_settings(&self.served.ids(), trusted).await).filter(|settings| !settings.is_empty())
+    }
+
+    #[cfg(not(feature = "app"))]
+    async fn page_settings(&self) -> Option<serde_json::Map<String, serde_json::Value>> {
+        None
     }
 
     // A moved route without an answer of its own: its error, worded here as

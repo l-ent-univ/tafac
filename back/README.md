@@ -2,15 +2,16 @@
 
 Tafac's backend in Rust. It signs the student in, holds the session and
 answers every route of the page's API, through
-[tonAPI](https://github.com/l-ent-univ/tonAPI). On tafac.fr it can run
-alone: the Node server (`server.js`, `server/`) is behind it only when it
-is told where Node is (`TAFAC_GATEWAY_NODE`). The apps' bridge still has
-its own Node behind.
+[tonAPI](https://github.com/l-ent-univ/tonAPI). The apps run it alone, in
+their own process, with no Node at all (« The apps »). On tafac.fr it can
+run alone too: the Node server (`server.js`, `server/`) is behind it only
+when it is told where Node is (`TAFAC_GATEWAY_NODE`).
 
 One Cargo workspace; each crate under `crates/`. Today there is one,
 `tafac-gateway`. The apps call it in-process from their bridge
-(`src-tauri/src/bridge.rs`); on tafac.fr it is the server itself, alone or
-in front of Node. How it fits with the rest: `docs/DESKTOP.md`, « tonAPI ».
+(`src-tauri/src/bridge.rs`, the crate's `app` feature); on tafac.fr it is
+the server itself (the `server` feature, the default), alone or in front
+of Node. How it fits with the rest: `docs/DESKTOP.md`, « tonAPI ».
 
 ```sh
 cd back
@@ -29,10 +30,9 @@ the page ──▶ the gateway (Rust) ──▶ tonAPI ──▶ the university
                    │                            (CAS, portal, Moodle, ScoDoc,
                    │                             school records, planning,
                    │                             the webmail)
-                   └┄┄▶ Node, when there is one behind:
-                        told when a session ends; on tafac.fr what is
-                        left outside the API, in the apps what their
-                        bridge leaves it
+                   └┄┄▶ Node, when tafac.fr's server has one behind:
+                        told when a session ends, and what is left
+                        outside the API. The apps have none
 ```
 
 - **The gateway** answers `POST /login`, `POST /logout`, `GET /session`,
@@ -62,12 +62,12 @@ the page ──▶ the gateway (Rust) ──▶ tonAPI ──▶ the university
   not yet on a real account.
   With Node's `DATA_DIR`, it answers the applications' icons too (`POST
   /app-icons`, `own/icons.rs`), from and into Node's own file; and with
-  the page's build (`TAFAC_GATEWAY_DIST`, tafac.fr's server only), the
-  page's files, `robots.txt` and Apple's file (`own/statics.rs`), and the
-  page itself with its sitemap (`own/page.rs`, `own/shell.rs`): the same
-  bytes and the same headers as Node's, its security policy included,
-  held to Node's own answers by fixtures and compared with `server.js`
-  running on a real build.
+  the page's build (`TAFAC_GATEWAY_DIST` on tafac.fr; the build the apps
+  carry, `own/site.rs`), the page's files, `robots.txt` and Apple's file
+  (`own/statics.rs`), and the page itself with its sitemap (`own/page.rs`,
+  `own/shell.rs`): the same bytes and the same headers as Node's, its
+  security policy included, held to Node's own answers by fixtures and
+  compared with `server.js` running on a real build.
   For a session it holds, it answers all of these whatever happens: a
   service down or slow, a parameter to refuse, are said here in the status
   and the words Node's own route has for them (`translate/failed.rs`;
@@ -78,19 +78,21 @@ the page ──▶ the gateway (Rust) ──▶ tonAPI ──▶ the university
   `universities/directory.json`, written from the settings Node reads
   (`scripts/universities-directory.mjs`; a test holds the file to them).
   The server tells the gateway what it serves from the same environment
-  Node reads (`UNIVERSITY`, `UNIVERSITIES`, `MULTI_UNIVERSITY`); the
-  session check of a request without a cookie is then answered here too,
-  at the university the request is for. In the apps these stay Node's.
-  On tafac.fr it also answers Tafac's own statistics (`POST /analytics`,
-  `own/analytics.rs`), signed in or not, and sends them to PostHog itself;
-  in the apps that route is still Node's.
+  Node reads (`UNIVERSITY`, `UNIVERSITIES`, `MULTI_UNIVERSITY`); the apps
+  serve every university (`Served::every`, as their Node was started). The
+  session check of a request without a cookie is answered here, at the
+  university the request is for. In the apps the list also carries what
+  their remote settings lay over the page's settings (`settings`,
+  `own/settings/remote.rs`). It also answers Tafac's own statistics
+  (`POST /analytics`, `own/analytics.rs`), signed in or not, and sends them
+  to PostHog itself, from tafac.fr or from the student's device.
 - **tafac.fr's own routes** are its server's, whoever asks and whatever
   the session (`own/`): the apps' remote settings (`GET /app/settings.json`
   and its `.sig`, sent as they are) and the desktop app's update (`GET
   /desktop/latest.json`, `/desktop/download/<platform>`, and the newest
-  release's manifest followed). The apps ask tafac.fr for them, never their
-  bridge: none of it is in the library they embed. Their settings are
-  Node's (`APP_SETTINGS_FILE`, `DESKTOP_LATEST_*`), read by `main.rs`.
+  release's manifest followed). The apps ask tafac.fr for them over the
+  network, never their bridge. Their settings are Node's
+  (`APP_SETTINGS_FILE`, `DESKTOP_LATEST_*`), read by `main.rs`.
 - **Nobody signed in** is answered here too, on every route
   (`gateway/nobody.rs`): no cookie, a cookie that isn't read (past its
   lifetime, the demo account's from before, sealed with a secret no longer
@@ -118,11 +120,8 @@ the page ──▶ the gateway (Rust) ──▶ tonAPI ──▶ the university
 - **Node**, where it is still behind: on tafac.fr, with
   `TAFAC_GATEWAY_NODE`, it gets what is left outside the page's API (a
   POST to `/`, an address where the server has no build); without it, that
-  is Express's own 404 page, and nothing is ever passed on. In the apps,
-  their Node still answers who holds no session of the gateway's (but for
-  another university's), what is no route, `/__ent_proxy/*`, the list of
-  universities (it carries their remote settings), the statistics and the
-  icons: their bridge goes without it in a step of its own.
+  is Express's own 404 page, and nothing is ever passed on. The apps have
+  no Node (« The apps »).
   Rennes 2 and the Sorbonne Nouvelle are answered here like Rennes: see
   « Rennes 2 and the Sorbonne Nouvelle ».
 - **The demo account is nobody's here.** The page serves it by itself,
@@ -152,7 +151,7 @@ crates/tafac-gateway/
    ├─ lib.rs              what the crate is, and its public names
    ├─ routes.rs           THE TABLE: each route of the page, moved or Node's, and why
    │
-   ├─ gateway/            a request in, its answer out (None: the apps' own Node, for what their bridge leaves it)
+   ├─ gateway/            a request in, its answer out (None: outside the page's API, or what tafac.fr's server leaves its Node)
    │  ├─ mod.rs           the Gateway: which route, whose session, a route that fails, and a session the university no longer knows
    │  ├─ signin.rs        POST /login and /logout: the session made (tonAPI signs in, one-time code included), and ended
    │  ├─ attempts.rs      the sign-in's limits, the codes sent, and the address a request came from
@@ -171,9 +170,12 @@ crates/tafac-gateway/
    │  ├─ analytics.rs     POST /analytics: the statistics, the allowlist (analytics/schema.rs), sent on to PostHog (analytics/posthog.rs)
    │  ├─ icons.rs         POST /app-icons: Node's file, the picking of src/appIconPicks.js from icons.json (scripts/gateway-data.mjs writes it)
    │  ├─ js.rs            what JavaScript does to text where Rust does otherwise
+   │  │                   with the `app` feature (the apps, and tafac.fr's server):
+   │  ├─ site.rs          the apps' page and its files: statics.rs then page.rs, from the build they carry
+   │  ├─ settings/        the apps' remote settings: remote.rs asks tafac.fr, keeps the file, lays it over the page's settings; minisign.rs, document.rs, guard.rs check it
    │  │                   tafac.fr's server's alone, answered before the gateway and Node:
    │  ├─ express.rs       what Express does around a route of Node's: the path matched, HEAD, the headers, a redirect
-   │  ├─ settings.rs      GET /app/settings.json and its .sig; settings/: the apps' checks of the file (minisign, what it says, what a patch may not do), not called yet
+   │  ├─ settings.rs      GET /app/settings.json and its .sig, sent as they are
    │  ├─ desktop_update.rs   GET /desktop/latest.json, /desktop/download/*; desktop_update/: the manifest, the releases followed
    │  ├─ statics.rs       the page's built files, robots.txt, Apple's file
    │  ├─ conditional.rs   what Express puts in a file's answer: ETags, dates, a copy still good, a range
@@ -222,7 +224,7 @@ crates/tafac-gateway/
    │  ├─ student_pic.rs   GET /__ent_auth/student-pic
    │  └─ school_certificate.rs   GET /__ent_auth/documents/school-certificate and its /status
    │
-   ├─ node.rs             Node, where it is behind: what it is told, and what the two share (the User-Agent, whether the statistics are on)
+   ├─ node.rs             Node, where tafac.fr's server has it behind: what it is told, and what the two share (the User-Agent, whether the statistics are on)
    ├─ universities.rs     tonAPI's settings, and where each university's services are
    ├─ portals.rs          what differs from one portal software to another (uPortal, Drupal, iSorbonne)
    │
@@ -419,6 +421,38 @@ tried on a real account on 27/11/2026). The Sorbonne Nouvelle's ADE 6.12
 has no provider in tonAPI (tonAPI's `docs/recherche/sorbonne-nouvelle.md`).
 Node's `/__ent_auth/planning` and `/__ent_auth/ade/*` are no longer asked
 by the page: the gateway answers them 404.
+
+## The apps
+
+The desktop app and the iOS app run the gateway in their own process, with
+no Node at all since 27 November 2026 (`src-tauri/src/bridge.rs`): every
+request of their window goes to the gateway (the page's API) or to its
+`Site` (the page and its files). They ran Node before, beside the app on
+the desktop (`desktop/sidecar.mjs`), inside it on iOS (nodejs-mobile). What
+that Node did, and where it is now:
+
+| What the apps' Node did | Now |
+|---|---|
+| the routes the gateway left it: nobody signed in, no route, `/__ent_proxy/*` | the gateway, as on tafac.fr alone (`gateway/nobody.rs`, `gateway/portal_proxy.rs`) |
+| the list of universities and their logos, every one served (`MULTI_UNIVERSITY=1`) | `own/universities.rs`, `Served::every` |
+| the remote settings: asked of tafac.fr, kept in the app's data folder, laid over each university's settings as it started (`REMOTE_SETTINGS_*`, `TAFAC_APP*`) | `own/settings/remote.rs`, started by the app (`src-tauri/src/remote_settings.rs`); the page's part only (below) |
+| the statistics, with the key CI builds in (`POSTHOG_PROJECT_KEY`) | `own/analytics.rs`, the same key (`bridge.rs`: `statistics_key`) |
+| the applications' icons, in `DATA_DIR` (the app's data folder's `server/`) | `own/icons.rs`, in the same folder: the icons kept stay |
+| the page and its files (`dist/` in its copy of the server), and Express's 404 | `own/site.rs`, from `dist/` among the app's resources |
+| told when a session ended | nothing: nobody to tell |
+| iOS: the phone's time zone (`TAFAC_TIME_ZONE`), for its `Intl` | nothing: Rust needs none |
+
+The session's cookie and its secret are the ones the apps' Node read
+(`PRODUCTION_COOKIE`, the secret of `src-tauri/src/secret.rs`): a student
+signed in stays signed in across the update.
+
+**Remote settings**: a patch's `client` and `features` are laid over the
+page's settings, as before. Its `server`, laid over Node's own settings of
+a university, has nothing left to change: the university is asked through
+tonAPI, whose settings are in the app. It is still checked, against the
+university's domains the gateway asks at (`launch/targets.rs`), so a
+patch that names another domain is refused whole, as before
+(`docs/REMOTE_SETTINGS.md`).
 
 ## Alone
 

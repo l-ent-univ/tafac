@@ -163,14 +163,11 @@ fn session_user<'a>(university: &University, named_by_the_portal: &'a str, who: 
 }
 
 impl Gateway {
-    // A university's id, from a name the page gave: through what the server
-    // serves where it says (an id, an id without its dashes, a slug), else
-    // an id of the gateway's.
+    // A university's id, from a name the page gave: through what the
+    // server serves (an id, an id without its dashes, a slug), when the
+    // gateway answers for it.
     fn university_named(&self, name: &str) -> Option<String> {
-        let id = match &self.served {
-            Some(served) => served.named(name)?.to_string(),
-            None => name.trim().to_lowercase(),
-        };
+        let id = self.served.named(name)?.to_string();
         self.universities.contains_key(&id).then_some(id)
     }
 
@@ -192,9 +189,8 @@ impl Gateway {
     // POST /__ent_auth/login. The demo account's login never comes: the
     // page signs in to the demo by itself (src/demoSession.js), and here it
     // would be a login like any other.
-    // None: a body the apps' own Node reads its own way (apps_node_answers).
     pub(super) async fn sign_in(&self, asked: &Asked<'_>) -> Option<http::Response<Vec<u8>>> {
-        let Some(login) = read_login(asked) else { return (!self.apps_node_answers()).then(no_login) };
+        let Some(login) = read_login(asked) else { return Some(no_login()) };
         let university = match self.chosen(&login, asked) {
             Ok(university) => university,
             Err(named) => return Some(unknown_university(&named)),

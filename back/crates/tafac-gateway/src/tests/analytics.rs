@@ -214,7 +214,8 @@ fn the_statistics_route_is_answered_here() {
 
 #[test]
 fn without_being_told_where_posthog_is_the_route_stays_nodes() {
-    // As in the apps: the statistics on, nothing said of where they go.
+    // The statistics on, nothing said of where they go (no server or app
+    // sets the gateway up so): Node's, where there is one.
     let gateway = Gateway::for_tests(Vec::new(), SECRET, COOKIE_NAME).with_statistics(Some(KEY));
     assert!(post(&gateway, &events(&[login_failed()]), None).is_none());
     assert!(post(&gateway, &events(&[dashboard()]), Some(&session("session-1", UNIVERSITY, "jdoe"))).is_none());

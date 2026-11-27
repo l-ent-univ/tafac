@@ -16,14 +16,12 @@
 //   without APP_SETTINGS_FILE: Node's. It has no such route then, and
 //       answers its page (a 404)
 //
-// What the apps check the file with is here too, as Node's
-// (server/remoteSettings/): its signature (minisign.rs), what it says
-// (document.rs) and what a patch may not do (guard.rs). Nothing calls them
-// yet: the apps still read the file in their own Node server
-// (server/remoteSettings/index.ts: asking tafac.fr, keeping the file,
-// laying the patches over its universities' settings), which isn't
-// ported. They are for the day the apps' gateway reads it instead, and
-// their tests hold them to Node's, on Node's own signed fixtures.
+// What the apps do with the file is here too: they ask tafac.fr for it,
+// keep it, and lay its patches over the page's settings (remote.rs, as
+// Node's createRemoteSettings did in their own Node), after checking its
+// signature (minisign.rs), what it says (document.rs) and what a patch may
+// not do (guard.rs), as Node's (server/remoteSettings/). Their tests hold
+// them to Node's, on Node's own signed fixtures.
 
 use std::path::PathBuf;
 
@@ -33,12 +31,12 @@ use super::express::{self, Asked};
 use super::Service;
 use crate::routes::Servers;
 
-#[cfg_attr(not(test), allow(dead_code))]
 mod document;
-#[cfg_attr(not(test), allow(dead_code))]
 mod guard;
-#[cfg_attr(not(test), allow(dead_code))]
 mod minisign;
+mod remote;
+
+pub use self::remote::{RemoteSettings, Source};
 
 // Never kept by anyone between the server and the app: each request reads
 // the file as it is now.

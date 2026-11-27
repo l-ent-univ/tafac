@@ -22,7 +22,7 @@
 // which is Node's list as it was.
 //
 // 404 { ok: false } for nobody signed in, another university: answered
-// here too (gateway/nobody.rs; their Node in the apps).
+// here too (gateway/nobody.rs).
 
 use std::collections::BTreeSet;
 

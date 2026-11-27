@@ -435,7 +435,7 @@ impl Gateway {
     fn mail_university(&self, cookie: Option<&str>, asked: &Asked<'_>) -> Option<String> {
         match cookie.and_then(|cookie| self.codec.read(cookie, now_ms())).filter(|session| self.universities.contains_key(&session.university)) {
             Some(session) => Some(session.university),
-            None => self.served.as_ref().map(|served| served.for_nobody(asked.headers).to_string()),
+            None => Some(self.served.for_nobody(asked.headers).to_string()),
         }
     }
 

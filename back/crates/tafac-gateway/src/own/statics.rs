@@ -1,8 +1,8 @@
 // The page's own files on tafac.fr, answered by this server when it is
 // given the build (TAFAC_GATEWAY_DIST: Node's dist/), and the two
 // addresses beside them that server.js answers by itself. Off without it:
-// every such request is Node's, as before. The apps carry their own files
-// (src-tauri/src/assets.rs): nothing of this is theirs.
+// every such request is Node's, as before. The apps answer the build they
+// carry with it too (site.rs).
 //
 // Node's answers (server.js; server/staticFiles/: express.static), given
 // here:
@@ -264,7 +264,7 @@ impl Statics {
         let chunks = futures_util::stream::unfold((file.take(length), vec![0_u8; CHUNK_BYTES]), |(mut reader, mut buffer)| async move {
             match reader.read(&mut buffer).await {
                 Ok(0) => None,
-                Ok(read) => Some((Ok(hyper::body::Frame::data(Bytes::copy_from_slice(&buffer[..read]))), (reader, buffer))),
+                Ok(read) => Some((Ok(http_body::Frame::data(Bytes::copy_from_slice(&buffer[..read]))), (reader, buffer))),
                 Err(error) => Some((Err(Box::new(error) as Box<dyn std::error::Error + Send + Sync>), (reader, buffer))),
             }
         });

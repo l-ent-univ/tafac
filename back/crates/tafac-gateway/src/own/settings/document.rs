@@ -27,7 +27,9 @@
 
 use serde_json::{Map, Value};
 
-use super::guard::{refusal, trusted_domains};
+use super::guard::refusal;
+#[cfg(test)]
+use super::guard::trusted_domains;
 use crate::own::desktop_update::manifest::{compare_versions, is_version};
 
 pub(super) struct SettingsDocument {
@@ -206,11 +208,17 @@ fn apply_patch(settings: ResolvedSettings, patch: &Patch, trusted: &[String], re
 // version laid over (RemoteSettings.resolve). Its own domains are read from
 // its settings as shipped: a patch can't widen what the next is checked
 // against.
+#[cfg(test)]
 pub(super) fn resolve(document: Option<&SettingsDocument>, id: &str, server_config: &Value, app: &str, version: &str, report: &dyn Fn(&str)) -> ResolvedSettings {
+    resolve_with(document, id, server_config, &trusted_domains(server_config), app, version, report)
+}
+
+// The same, with the university's own domains given (remote.rs: the ones
+// the app asks the university at, where Node read them from its settings).
+pub(super) fn resolve_with(document: Option<&SettingsDocument>, id: &str, server_config: &Value, trusted: &[String], app: &str, version: &str, report: &dyn Fn(&str)) -> ResolvedSettings {
     let settings = ResolvedSettings { server: server_config.clone(), client: None, applied: Vec::new() };
     let Some(document) = document else { return settings };
-    let trusted = trusted_domains(server_config);
-    let resolved = document.patches.iter().filter(|patch| patch.university == id && is_for(patch, app, version)).fold(settings, |current, patch| apply_patch(current, patch, &trusted, report));
+    let resolved = document.patches.iter().filter(|patch| patch.university == id && is_for(patch, app, version)).fold(settings, |current, patch| apply_patch(current, patch, trusted, report));
     if !resolved.applied.is_empty() {
         report(&format!("Remote settings: {id}: {} (serial {})", resolved.applied.join(", "), document.serial));
     }

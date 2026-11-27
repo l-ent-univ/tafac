@@ -73,7 +73,8 @@ fn who_isnt_held_gets_nodes_refusal_here_and_the_apps_keep_theirs() {
     // Not said to be JSON: no services, in Node's words.
     let response = block_on(gateway.answer(&asked(&POST, ICONS, &NO_HEADERS, BODY), || Some(campus.alive()), never)).unwrap();
     assert_eq!((response.status().as_u16(), body_of(&response)), (400, serde_json::json!({ "ok": false, "error": "Expected { services: [...] }." })));
-    // A gateway without Node's data directory (the apps): their Node's.
+    // A gateway without Node's data directory (tafac.fr's server in front
+    // of Node, without DATA_DIR): Node's.
     assert!(block_on(campus.server_gateway().answer(&asked(&POST, ICONS, &headers, BODY), || Some(campus.alive()), never)).is_none());
     assert!(!data.0.exists());
 }

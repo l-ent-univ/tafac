@@ -119,7 +119,7 @@ fn behind_a_moodle_that_is_down_the_old_answer_stays() {
 #[test]
 fn behind_a_session_the_cas_no_longer_knows_the_old_answer_goes_and_the_next_request_ends_it() {
     let campus = campus();
-    let gateway = campus.gateway();
+    let gateway = campus.server_gateway();
     let cookie = campus.alive();
     assert!(ask(&gateway, DEADLINES, &cookie).is_some());
     later(&gateway, &cookie);

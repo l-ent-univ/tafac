@@ -1,7 +1,8 @@
 // Tafac's own routes about the universities (own/universities.rs), through
-// the gateway: answered where the server said what it serves, the apps'
-// Node's elsewhere; and the routes nobody is signed in for, at the
-// university the request is for.
+// the gateway: on tafac.fr, what the server says it serves; in the apps,
+// every university, with what their remote settings lay over the page's
+// settings; and the routes nobody is signed in for, at the university the
+// request is for.
 
 use http::HeaderMap;
 
@@ -50,7 +51,7 @@ fn the_list_and_the_logos_are_answered_where_the_server_says_what_it_serves() {
 }
 
 #[test]
-fn a_cookie_not_read_here_is_no_session_and_the_apps_keep_their_list() {
+fn a_cookie_not_read_here_is_no_session_and_the_apps_have_every_university() {
     let campus = campus();
     // A cookie that isn't read here (another secret, or from before
     // sessions named their university): no session.
@@ -61,18 +62,17 @@ fn a_cookie_not_read_here_is_no_session_and_the_apps_keep_their_list() {
     // A path under the folder that is no logo's: no route.
     let other = get(&gateway, "/__ent_auth/universities/univ-rennes/settings", &NO_HEADERS, None).unwrap();
     assert_eq!((other.status().as_u16(), body_of(&other)), (404, serde_json::json!({ "error": "Not found." })));
-    // Where the gateway isn't told what is served (the apps): the list and
-    // the logos, which carry their remote settings, are their Node's, and
-    // so is the session check of nobody, for now.
+    // Where the gateway isn't told what is served (the apps): every
+    // university, as their Node served them, without remote settings here.
     let apps = campus.gateway();
-    for target in [UNIVERSITIES, LOGO, SESSION] {
-        assert!(get(&apps, target, &NO_HEADERS, None).is_none(), "{target}");
-    }
-    // Without a Node behind, the session check of nobody is answered, at
-    // the university the page chose.
+    let list = body_of(&get(&apps, UNIVERSITIES, &NO_HEADERS, None).unwrap());
+    assert_eq!((&list["mode"], list["universities"].as_array().unwrap().len()), (&"multi".into(), 3));
+    assert!(list.get("settings").is_none());
+    assert_eq!(get(&apps, LOGO, &NO_HEADERS, None).unwrap().status(), 200);
+    // The session check of nobody, at the university the page chose.
     let mut chosen = HeaderMap::new();
-    chosen.insert("x-tafac-university", UNIVERSITY.parse().unwrap());
-    assert_eq!(body_of(&get(&apps.without_node(), SESSION, &chosen, None).unwrap())["university"], UNIVERSITY);
+    chosen.insert("x-tafac-university", "univ-rennes-2".parse().unwrap());
+    assert_eq!(body_of(&get(&apps, SESSION, &chosen, None).unwrap())["university"], "univ-rennes-2");
 }
 
 #[test]

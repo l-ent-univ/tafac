@@ -1,8 +1,8 @@
 // Node, behind the gateway where there still is one: what it is told, and
 // what the two share.
 //
-// Where it is behind (the apps' bridge; tafac.fr's server given
-// TAFAC_GATEWAY_NODE), Node gets what the gateway leaves (routes.rs), with
+// Where it is behind (tafac.fr's server given TAFAC_GATEWAY_NODE; the apps
+// have none), Node gets what the gateway leaves (routes.rs), with
 // the session's cookie, which it reads as the gateway does. The gateway
 // goes to it for one thing, a request to one of Node's own routes, and
 // asks nothing without a Node (Gateway::without_node):

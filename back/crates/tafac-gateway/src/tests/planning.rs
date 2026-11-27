@@ -137,7 +137,7 @@ fn a_university_without_a_planning_service_says_so_as_tonapi_does() {
 #[test]
 fn a_session_the_cas_no_longer_knows_is_over_here_too() {
     let campus = campus();
-    let gateway = campus.gateway();
+    let gateway = campus.server_gateway();
     let node = Node::default();
     let cookie = campus.alive();
     data_of(&get(&gateway, WEEK, &cookie));

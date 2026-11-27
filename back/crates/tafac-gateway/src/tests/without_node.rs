@@ -1,6 +1,7 @@
-// The gateway with no Node at all: every route of the page's API answered
-// here, whoever asks, and Node never asked or told anything (`never`
-// panics). And /__ent_proxy/*, what is left of Node's portal proxy.
+// The gateway with no Node at all, as the apps have it, and tafac.fr's
+// server alone: every route of the page's API answered here, whoever asks,
+// and Node never asked or told anything (`never` panics). And
+// /__ent_proxy/*, what is left of Node's portal proxy.
 
 use http::header::LOCATION;
 use http::{HeaderMap, Method};
@@ -32,7 +33,7 @@ fn each_route() -> Vec<(Method, String)> {
 #[test]
 fn every_route_is_answered_for_nobody_and_node_is_never_asked() {
     let campus = campus();
-    let gateway = campus.gateway().without_node();
+    let gateway = campus.gateway();
     let demo = campus.cookie(serde_json::json!({ "mode": "demo" }), &[]);
     let elsewhere = campus.cookie(serde_json::json!({ "uni": "univ-rennes-2" }), &[("JSESSIONID", "alive")]);
     let mut json = HeaderMap::new();
@@ -40,10 +41,9 @@ fn every_route_is_answered_for_nobody_and_node_is_never_asked() {
     for cookie in [None, Some(demo), Some(elsewhere), Some("v1.not.one".to_string())] {
         for (method, path) in each_route() {
             let response = block_on(gateway.answer(&asked(&method, &path, &json, b"{}"), || cookie.clone(), never));
-            // Only the list of universities and the statistics wait for a
-            // server to say what is served and where they go (the apps'
-            // Node keeps those).
-            if path.starts_with("/__ent_auth/universities") || path == "/__ent_auth/analytics" {
+            // Only the statistics wait to be told where they go
+            // (Gateway::sending_statistics: the apps and the server say).
+            if path == "/__ent_auth/analytics" {
                 assert!(response.is_none(), "{method} {path}");
                 continue;
             }
@@ -57,7 +57,7 @@ fn every_route_is_answered_for_nobody_and_node_is_never_asked() {
 #[test]
 fn a_session_ends_without_node_being_told() {
     let campus = campus();
-    let gateway = campus.gateway().without_node();
+    let gateway = campus.gateway();
     // Signed out: the CAS is told, Node isn't (`never`).
     let cookie = campus.alive();
     let response = block_on(gateway.answer(&asked(&POST, LOGOUT, &NO_HEADERS, &[]), || Some(cookie.clone()), never)).unwrap();
@@ -65,7 +65,7 @@ fn a_session_ends_without_node_being_told() {
     assert!(!campus.cas_knows_the_ticket());
     // Found expired: the page is told, Node isn't.
     let campus = crate::testing::campus();
-    let gateway = campus.gateway().without_node();
+    let gateway = campus.gateway();
     let cookie = campus.alive();
     campus.cas_forgets();
     let response = block_on(gateway.answer(&asked(&GET, "/__ent_auth/grades", &NO_HEADERS, &[]), || Some(cookie.clone()), never)).unwrap();
@@ -90,7 +90,7 @@ fn proxied(gateway: &Gateway, method: &Method, target: &str, headers: &[(&'stati
 #[test]
 fn an_old_link_to_a_portals_page_goes_to_the_launch_relay() {
     let campus = campus();
-    let gateway = campus.gateway().without_node();
+    let gateway = campus.gateway();
     let page = [("sec-fetch-mode", "navigate"), ("sec-fetch-dest", "document")];
     for cookie in [None, Some(campus.alive())] {
         let response = proxied(&gateway, &GET, "/__ent_proxy/f/welcome?tab=2", &page, cookie);
@@ -107,7 +107,7 @@ fn an_old_link_to_a_portals_page_goes_to_the_launch_relay() {
 #[test]
 fn anything_else_of_the_portal_proxy_is_refused_in_nodes_words() {
     let campus = campus();
-    let gateway = campus.gateway().without_node();
+    let gateway = campus.gateway();
     let refused = |method: &Method, target: &str, headers: &[(&'static str, &'static str)], cookie: Option<String>| {
         let response = proxied(&gateway, method, target, headers, cookie);
         (response.status().as_u16(), body_of(&response)["error"].as_str().unwrap_or_default().to_string())

@@ -16,7 +16,7 @@
 //       CAS no longer knows the ticket. Answered here (translate/expired.rs),
 //       and Node is told.
 //   200 { authenticated: false, … }: nobody signed in, at the university
-//       the request is for. Answered here (gateway/nobody.rs; their Node in the apps).
+//       the request is for. Answered here (gateway/nobody.rs).
 //   200 { degraded: true } without a CAS ticket: Node's. Here such a
 //       session is over (gateway/mod.rs: unheld).
 //   500 { error }: the portal down, slow, or answering something else

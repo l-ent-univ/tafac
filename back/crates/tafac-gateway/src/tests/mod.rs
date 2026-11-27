@@ -1,6 +1,7 @@
 // The gateway on a made-up campus (testing/): what it answers, its errors
 // too, for a session it holds and for nobody, and what it tells Node when
-// there is one.
+// there is one (tafac.fr's server in front of Node: Campus::server_gateway;
+// the apps have none: Campus::gateway).
 //
 //   signin.rs             the session made and ended: a sign-in, its
 //                         refusals and limits, what is Node's, a sign-out
@@ -34,7 +35,8 @@
 //   icons.rs              the applications' icons, Tafac's own: Node's file
 //   own.rs                tafac.fr's server on the wire: the page's files,
 //                         the icons' body read on its way
-//   without_node.rs       no Node at all: every route answered for anyone,
+//   without_node.rs       no Node at all (the apps; tafac.fr's server
+//                         alone): every route answered for anyone,
 //                         Node never asked or told; the portal proxy's
 //                         old links and refusals
 

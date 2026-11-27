@@ -35,9 +35,9 @@
 // the length it said, one that isn't JSON serde reads (JavaScript's
 // JSON.parse takes a few more). A session cookie the gateway doesn't read
 // (one of SESSION_SECRET_PREVIOUS, one from before sessions named their
-// university) is a visitor's. Still the apps' own Node's (None): every
-// request where the gateway isn't told where PostHog is
-// (Gateway::sending_statistics).
+// university) is a visitor's. Still Node's (None), where there is one:
+// every request where the gateway isn't told where PostHog is
+// (Gateway::sending_statistics; tafac.fr's server and the apps always say).
 
 mod posthog;
 pub(crate) mod schema;
@@ -90,7 +90,7 @@ impl Statistics {
         let excluded = setting("ANALYTICS_EXCLUDED_USERS").unwrap_or_default().split(|character: char| character == ',' || character.is_whitespace()).map(user).filter(|user| !user.is_empty()).collect();
         // An unknown university: Node doesn't start, and neither does the
         // server (main.rs). Here, what is served without any setting.
-        let universities = Served::from_environment(&setting, false).unwrap_or_else(|_| Served::from_environment(|_| None, false).expect("the default university is one of the directory's"));
+        let universities = Served::from_environment(&setting, false).unwrap_or_else(|_| Served::every());
         Self { posthog: key.map(|key| PostHog::new(key, &host)), excluded, universities, salt: DailySalt::default() }
     }
 

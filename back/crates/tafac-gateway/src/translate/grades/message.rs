@@ -8,7 +8,7 @@
 //       wrote nothing. The page shows it as plain text. tonAPI reads the
 //       same and gives the text, a line per paragraph: answered here.
 //   200 { authenticated: false, message: null }: nobody signed in.
-//       Answered here (gateway/nobody.rs; their Node in the apps).
+//       Answered here (gateway/nobody.rs).
 //   400 { error }: a `dep` that isn't a department's name. Answered here,
 //       in Node's words (translate/failed.rs).
 //   500 { error }: ScoDoc down or answering something else. Answered here

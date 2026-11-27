@@ -17,7 +17,7 @@
 //       cookie cleared: the CAS no longer knows the ticket. Answered here
 //       (translate/expired.rs), and Node is told.
 //   200 { authenticated: false, account: null }: nobody signed in.
-//       Answered here (gateway/nobody.rs; their Node in the apps).
+//       Answered here (gateway/nobody.rs).
 //   500 { error }: the portal down, slow, or answering something else, or
 //       for another name than the session's. Answered here
 //       (translate/failed.rs).

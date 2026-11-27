@@ -71,8 +71,8 @@ use tonapi_core::{ErrorCode, Problem};
 
 use super::{planning, Asked, Gateway};
 use crate::mail::request::query_value;
-use crate::node::{SESSION_EXPIRED, SESSION_HEADER, UNIVERSITY_HEADER};
-use crate::own::universities::{self, Feature, DEFAULT_UNIVERSITY};
+use crate::node::{SESSION_EXPIRED, SESSION_HEADER};
+use crate::own::universities::{self, Feature};
 use crate::routes::Moved;
 use crate::translate::{self, json_response};
 
@@ -120,11 +120,7 @@ pub(crate) fn says_no_session(mut response: http::Response<Vec<u8>>, path: &str)
 impl Gateway {
     // The university a request without a session is for.
     pub(crate) fn university_for_nobody(&self, headers: &http::HeaderMap) -> String {
-        if let Some(served) = &self.served {
-            return served.for_nobody(headers).to_string();
-        }
-        let chosen = headers.get(UNIVERSITY_HEADER).and_then(|value| value.to_str().ok()).map(|name| name.trim().to_lowercase());
-        chosen.filter(|id| self.universities.contains_key(id)).unwrap_or_else(|| DEFAULT_UNIVERSITY.to_string())
+        self.served.for_nobody(headers).to_string()
     }
 
     // A moved route's answer for nobody signed in (the list at the top).

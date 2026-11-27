@@ -1,27 +1,34 @@
 [package]
 name = "tafac-gateway"
 version = "0.0.0"
-description = "Tafac's backend in Rust: it signs in, holds the session and answers what moved to tonAPI, in front of the Node server, on tafac.fr and in the apps"
+description = "Tafac's backend in Rust: it signs in, holds the session and answers the page's API through tonAPI, on tafac.fr and in the apps"
 license = "AGPL-3.0-only"
 edition = "2021"
 publish = false
 
 # One code for the three places Tafac runs: the apps call the library from
-# their bridge (src-tauri/src/bridge.rs); tafac.fr runs the binary in front
-# of Node. No Tauri here.
+# their bridge (src-tauri/src/bridge.rs), with the `app` feature; tafac.fr
+# runs the binary. No Tauri here.
 [features]
 default = ["server"]
-# The HTTP server in front of Node, and the binary that runs it.
+# The HTTP server, alone or in front of Node, and the binary that runs it.
 server = [
+    "app",
     "dep:hyper",
     "dep:hyper-util",
-    "dep:http-body-util",
-    "dep:minisign-verify",
     "tokio/rt-multi-thread",
     "tokio/net",
-    "tokio/io-util",
     "tokio/signal",
-    # The page's files, read as they go out (own/statics.rs).
+]
+# What the apps' bridge needs beyond the routes, and tafac.fr's server too:
+# the page and its built files, read as they go out (own/statics.rs,
+# own/page.rs, own/site.rs), and the apps' remote settings, read and checked
+# (own/settings/).
+app = [
+    "dep:http-body",
+    "dep:http-body-util",
+    "dep:minisign-verify",
+    "tokio/io-util",
     "tokio/fs",
 ]
 # A made-up campus for the tests of what uses this crate (the apps' bridge).
@@ -70,12 +77,13 @@ futures-util = { version = "0.3", default-features = false, features = ["std"] }
 reqwest = { version = "0.13", default-features = false, features = ["stream"] }
 hyper = { version = "1", features = ["client", "server", "http1"], optional = true }
 hyper-util = { version = "0.1", features = ["tokio", "client-legacy", "http1"], optional = true }
+http-body = { version = "1", optional = true }
 http-body-util = { version = "0.1", optional = true }
 # The mail's bodies as they stream (an upload, a part), in the apps too.
 bytes = "1"
 # The apps' remote settings' signature (own/settings/minisign.rs): Ed25519
 # over BLAKE2b, as `tauri signer` signs, verification only, no dependency of
-# its own. The apps have the same one, through Tauri's updater.
+# its own. The desktop app has the same one, through Tauri's updater.
 minisign-verify = { version = "0.3", optional = true }
 
 # Where tonAPI's settings files are on this computer (build.rs).

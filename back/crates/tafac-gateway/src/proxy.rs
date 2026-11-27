@@ -139,7 +139,7 @@ impl Proxy {
     // the page is filled with. Without the build's index.html, the page
     // itself stays Node's.
     pub fn with_page_files(mut self, dist: std::path::PathBuf, apple_app_ids: &str, served: crate::own::universities::Served) -> Self {
-        self.page = crate::own::page::Page::read(&dist, served);
+        self.page = crate::own::page::Page::read(&dist, served, true);
         if self.page.is_none() {
             eprintln!("Tafac gateway: no index.html in {}: the page itself is Node's, or a 404 without Node", dist.display());
         }
@@ -711,7 +711,7 @@ mod tests {
         let (campus, node) = (campus(), node());
         let listener = block_on(TcpListener::bind("127.0.0.1:0")).unwrap();
         let address = listener.local_addr().unwrap().to_string();
-        let proxy = Arc::new(Proxy::new(Some(campus.gateway().without_node()), None));
+        let proxy = Arc::new(Proxy::new(Some(campus.gateway()), None));
         spawn(async move {
             let _ = serve(listener, proxy).await;
         });

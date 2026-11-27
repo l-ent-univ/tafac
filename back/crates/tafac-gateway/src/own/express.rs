@@ -26,7 +26,9 @@
 use http::header::{ACCEPT, CACHE_CONTROL, CONTENT_LENGTH, CONTENT_TYPE, LOCATION, VARY};
 use http::{HeaderMap, Method, Response};
 
-use crate::routes::{Backend, Servers, ROUTES};
+use crate::routes::Servers;
+#[cfg(feature = "server")]
+use crate::routes::{Backend, ROUTES};
 use crate::translate::{ANSWERED_BY, BASELINE_HEADERS};
 
 // What an answer made by the server's own routes says it is.
@@ -44,6 +46,7 @@ pub struct Asked<'a> {
 
 // The request, when it is one of the table's Backend::Server lines as
 // Express matches it.
+#[cfg(feature = "server")]
 pub(crate) fn asked<'a>(method: &Method, path: &str, headers: &'a HeaderMap) -> Option<Asked<'a>> {
     let head = method == Method::HEAD;
     if method != Method::GET && !head {
@@ -65,6 +68,7 @@ pub(crate) fn asked<'a>(method: &Method, path: &str, headers: &'a HeaderMap) -> 
     None
 }
 
+#[cfg(feature = "server")]
 enum Matched {
     No,
     Path,
@@ -74,6 +78,7 @@ enum Matched {
 
 // path-to-regexp's match, as Express 5 asks it (not case-sensitive, not
 // strict): « ^<path>(?:/$)?$ », a folder's segment « [^/]+ ».
+#[cfg(feature = "server")]
 fn matched(route: &str, path: &str) -> Matched {
     let path = path.strip_suffix('/').unwrap_or(path);
     match route.strip_suffix("/*") {
@@ -92,6 +97,7 @@ fn matched(route: &str, path: &str) -> Matched {
 
 // decodeURIComponent: every « %XX » decoded, the whole read as UTF-8, and
 // nothing for a « % » without two hex digits or bytes that aren't UTF-8.
+#[cfg(feature = "server")]
 fn decode_component(text: &str) -> Option<String> {
     let bytes = text.as_bytes();
     let mut decoded = Vec::with_capacity(bytes.len());

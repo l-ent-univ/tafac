@@ -3,8 +3,8 @@
 // is a route of Node's moved as it is (server/), with Node's answers listed
 // at its top.
 //
-// In the library, so in the apps too where their bridge sets them up
-// (routes.rs, Backend::TonApi; answered by Gateway::answer):
+// In the library, so in the apps too (routes.rs, Backend::TonApi; answered
+// by Gateway::answer):
 //
 //   universities.rs    which universities this server serves, the one a
 //                      request is for, GET /__ent_auth/universities and
@@ -16,15 +16,17 @@
 //                      sent on to PostHog
 //   icons.rs           POST /__ent_auth/app-icons: the applications' tiles,
 //                      picked once for the whole university and kept in
-//                      Node's own file (the apps leave it to their Node)
+//                      Node's own file
 //   js.rs              what JavaScript does to text where Rust does
 //                      otherwise (white space, UTF-16, JSON.stringify)
 //
-// tafac.fr's alone, answered by its server before the gateway and before
-// Node (proxy.rs; routes.rs, Backend::Server). The apps ask tafac.fr for
-// these over the network and carry their own files; their bridge never
-// sees them, so they are built with the server only, files and outgoing
-// requests included:
+// tafac.fr's, answered by its server before the gateway and before Node
+// (proxy.rs; routes.rs, Backend::Server). The apps ask tafac.fr for the
+// settings and the update over the network; their bridge never asks the
+// gateway for them. Built with the `app` feature, which the server's
+// includes: the apps answer the build they carry with the same files'
+// code (site.rs), and read the remote settings with the same checks
+// (settings/remote.rs):
 //
 //   express.rs         what Express does around a route of Node's: the
 //                      path matched as its router matches it, HEAD, the
@@ -40,6 +42,7 @@
 //   page_headers.rs    the page's security headers, its policy included
 //   page.rs            the page and the sitemap on the wire, as Express
 //                      sends them (shell.rs says what is sent)
+//   site.rs            the apps' page and files: statics.rs, then page.rs
 //
 // The settings and the update are each a Service with its settings, read in
 // main.rs from Node's own names; the server asks them in turn
@@ -47,39 +50,45 @@
 // itself after (Proxy::with_page_files).
 
 pub(crate) mod analytics;
-#[cfg(feature = "server")]
+#[cfg(feature = "app")]
 pub(crate) mod conditional;
-#[cfg(feature = "server")]
+#[cfg(feature = "app")]
 pub(crate) mod desktop_update;
-#[cfg(feature = "server")]
+#[cfg(feature = "app")]
 pub(crate) mod express;
 pub(crate) mod icons;
 pub(crate) mod js;
-#[cfg(feature = "server")]
+#[cfg(feature = "app")]
 pub(crate) mod page;
-#[cfg(feature = "server")]
+#[cfg(feature = "app")]
 pub(crate) mod page_headers;
-#[cfg(feature = "server")]
+#[cfg(feature = "app")]
 pub(crate) mod settings;
 pub(crate) mod shell;
-#[cfg(feature = "server")]
+#[cfg(feature = "app")]
+pub(crate) mod site;
+#[cfg(feature = "app")]
 pub(crate) mod statics;
 pub mod universities;
 
+#[cfg(feature = "app")]
+use http::Response;
 #[cfg(feature = "server")]
-use http::{HeaderMap, Method, Response};
+use http::{HeaderMap, Method};
 
-#[cfg(feature = "server")]
+#[cfg(feature = "app")]
 pub use self::desktop_update::{follow_releases, DesktopUpdate, Following};
-#[cfg(feature = "server")]
+#[cfg(feature = "app")]
 pub use self::express::Asked;
-#[cfg(feature = "server")]
-pub use self::settings::AppSettings;
+#[cfg(feature = "app")]
+pub use self::settings::{AppSettings, RemoteSettings, Source as RemoteSource};
+#[cfg(feature = "app")]
+pub use self::site::Site;
 
 // One of the server's own services: its answer to a request for one of its
 // lines of the table, or None when the line isn't its own, or when Node
 // answers it after all (express.rs says when).
-#[cfg(feature = "server")]
+#[cfg(feature = "app")]
 pub trait Service: Send + Sync {
     fn answer(&self, asked: &Asked<'_>) -> Option<Response<Vec<u8>>>;
 }
@@ -97,10 +106,10 @@ pub(crate) fn answer(services: &[Box<dyn Service>], method: &Method, path: &str,
 
 // Where a service says what it did, or refused: the server's log, and a
 // list in the tests.
-#[cfg(feature = "server")]
+#[cfg(feature = "app")]
 pub(crate) type Report = std::sync::Arc<dyn Fn(&str) + Send + Sync>;
 
-#[cfg(feature = "server")]
+#[cfg(feature = "app")]
 pub(crate) fn to_log() -> Report {
     std::sync::Arc::new(|message: &str| eprintln!("{message}"))
 }

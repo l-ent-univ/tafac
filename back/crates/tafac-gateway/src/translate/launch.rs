@@ -33,7 +33,7 @@
 // holds the service tickets): never given here.
 //
 // Nobody signed in, another university: answered here too, as Node
-// answered nobody (gateway/nobody.rs; their Node in the apps); a session without its CAS ticket is over.
+// answered nobody (gateway/nobody.rs); a session without its CAS ticket is over.
 
 use http::header::{CACHE_CONTROL, CONTENT_TYPE, LOCATION, SET_COOKIE};
 use http::HeaderValue;

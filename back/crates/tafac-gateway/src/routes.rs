@@ -14,9 +14,8 @@
 // What is left of Node: an address outside the page's API that no line
 // takes (a POST to /, a GET where the server has no build), passed on when
 // a Node is behind (TAFAC_GATEWAY_NODE), Express's 404 without one
-// (proxy.rs); and in the apps, whose bridge still has their own Node
-// behind: the list of universities (it carries their remote settings), the
-// statistics and the icons, which the bridge doesn't set the gateway up for.
+// (proxy.rs). The apps have no Node: their bridge answers those itself,
+// from the build they carry (own/site.rs).
 //
 // A moved route is written once more in translate/ (tonAPI's answer as the
 // page reads it today, its errors too). The planning's are the exception:
@@ -102,7 +101,7 @@ pub enum Backend {
     TonApi(Moved),
     // tafac.fr's server: always for the apps' settings and updates, and
     // given the build (TAFAC_GATEWAY_DIST) for the page's files; Node
-    // otherwise, and in the apps.
+    // otherwise. The apps' page files: their bridge's (own/site.rs).
     Server(Servers),
     // An address outside the page's API that no line takes: Node's, when
     // there is one behind (proxy.rs).
@@ -140,8 +139,8 @@ pub const ROUTES: &[Route] = &[
     moved("GET", "/__ent_auth/grades/evaluation-distribution", Moved::GradesDistribution),
     moved("GET", "/__ent_auth/grades/report.pdf", Moved::GradesTranscript),
     // Tafac's own: the universities this server serves, and their logos
-    // (own/universities.rs). Node's still where the gateway isn't told what
-    // is served: the apps.
+    // (own/universities.rs); in the apps, every one, with what their remote
+    // settings lay over the page's settings.
     moved("GET", "/__ent_auth/universities", Moved::Universities),
     moved("GET", "/__ent_auth/universities/*", Moved::UniversityLogo),
     moved("POST", "/__ent_auth/analytics", Moved::Analytics),
