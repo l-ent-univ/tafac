@@ -1,6 +1,0 @@
-# tonAPI's repository (a git dependency of back/crates/tafac-gateway) is private.
-# Cargo fetches it with the git program, which signs in as git does on that
-# computer: its credential helper, an SSH key, a token in CI. Cargo's own git
-# client doesn't always manage to.
-[net]
-git-fetch-with-cli = true

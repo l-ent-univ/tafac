@@ -76,9 +76,8 @@ university, in the app's own process.
   there when the page asks.
 - **Nothing to ship**: tonAPI's settings for each university are in the
   crate (taken from tonAPI's own repository as it builds). tonAPI is a git
-  dependency at one commit; its repository is private, so Cargo fetches it
-  with git (`.cargo/config.toml`) and a build needs read access
-  to it.
+  dependency at one commit, fetched from its public repository with no
+  account or token.
 
 Measured on a real Rennes account, iPhone 17 simulator, debug build, when
 the gateway answered the session check and the account only and Node the

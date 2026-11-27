@@ -19,9 +19,9 @@ cargo test                                   # every crate
 cargo build --release -p tafac-gateway       # tafac.fr's server
 ```
 
-tonAPI's repository is private for now: Cargo fetches it with git
-(`.cargo/config.toml`, at the repository's root), so a build needs read
-access to it.
+tonAPI's repository is public (github.com/l-ent-univ/tonAPI): Cargo fetches
+it at the commit `crates/tafac-gateway/Cargo.toml` pins, with no account or
+token, here, in CI and in the Docker image alike.
 
 ## Who does what
 
