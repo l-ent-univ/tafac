@@ -2,7 +2,7 @@
 
 > Tafac s'appelait auparavant l'ent : certains identifiants techniques (`%LENT_*%`, `l-ent:*`) gardent l'ancien nom.
 
-Tafac est conçu pour être forké : toute la configuration propre à une université vit dans un seul dossier, `universities/<id>/`. Le reste du code (frontend React, backend Express) est générique.
+Tafac est conçu pour être forké : la configuration propre à une université vit dans `universities/<id>/` pour la page, et dans les réglages de [tonAPI](https://github.com/l-ent-univ/tonAPI) (`universities/<id>/university.toml`) pour le serveur. Le reste du code (la page React, la passerelle Rust de `back/`) est générique.
 
 Trois universités servent de modèle :
 
@@ -16,11 +16,12 @@ Le compte démo (`demo@tafac.fr` / `tafac-demo`) marche pour toute université q
 
 ```bash
 cp -r universities/univ-rennes-2 universities/univ-mon-campus
-# éditez universities/univ-mon-campus/{shared,client,server}.js (id, origins, branding) et assets/
+# éditez universities/univ-mon-campus/{shared,client}.js (id, origins, branding) et assets/
+# côté serveur : ses réglages dans tonAPI et son id dans la passerelle (« Côté serveur » plus bas)
 npm run dev                                 # toutes les universités : choisissez la vôtre, ou /<slug>
 UNIVERSITY=univ-mon-campus npm run dev      # la vôtre seule, sans liste
 npm run build                               # un seul build pour toutes les universités
-UNIVERSITY=univ-mon-campus npm start        # production, votre université seule
+# production : la passerelle (back/), votre université seule avec UNIVERSITY (SELF_HOSTING.md)
 ```
 
 Le build est le même pour toutes les universités : `UNIVERSITY` ne compte qu'à l'exécution. La page charge au démarrage le `client.js` de son université (un fichier par université, téléchargé à la demande).
@@ -46,13 +47,14 @@ Les anciennes adresses par université restent routées vers elle : le sous-doma
 export const hostnames = ['rennes.tafac.example', 'ent-rennes.example.fr']
 ```
 
-## Les trois fichiers d'une université
+## Les fichiers d'une université
 
 | Fichier | Chargé par | Contenu |
 | --- | --- | --- |
-| `shared.js` | Node **et** navigateur | Données pures partagées : id, origins publics, flags de features, textes de branding. **Aucun import d'asset** (le serveur Node doit pouvoir l'importer). |
+| `shared.js` | la page, le build et les scripts | Données pures partagées : id, origins publics, flags de features, textes de branding, style des icônes. **Aucun import d'asset** (Node doit pouvoir l'importer au build). |
 | `client.js` | Navigateur uniquement (chargé au démarrage de la page, lu via `@university`) | Config complète côté client : branding + logo, liens d'aide, catégories/icônes de services, établissements. Peut importer des images. |
-| `server.js` | Node uniquement | Origins internes (CAS, ADE, Moodle, Planning), paramètres du flux d'auth, clés ADE rétro-ingéniérées. **Jamais envoyé au navigateur.** |
+
+Côté serveur, il n'y a plus de fichier dans `universities/` : voir « Côté serveur » plus bas.
 
 ## Champs de configuration
 
@@ -63,10 +65,10 @@ export const hostnames = ['rennes.tafac.example', 'ent-rennes.example.fr']
 - `origins.cas` (serveur + client) — origine du SSO CAS. Le flux de connexion implémenté est **CAS 2.0 avec formulaire** (scraping des champs `execution`/`_eventId`), le standard Jasig/Apereo utilisé par la plupart des universités françaises.
 - `origins.moodle` (optionnel, `client.js`) — origine Moodle, pour le lien « Moodle » de la sidebar et de la barre d'onglets mobile (`/my/`, via `/__ent_auth/launch`). Requiert `features.moodle`. Le lien « Messagerie » n'a besoin que de `features.mail`.
 - `auth.portalEntryPath` — page d'atterrissage uPortal (souvent `/f/services/normal/render.uP`). Sert de point d'entrée de connexion, de `Referer` par défaut et de preuve d'authentification. Le serveur rejoue cette entrée avec le seul cookie CAS `TGC` (conservé chiffré dans le cookie de session) pour rétablir la session ENT en silence quand elle a expiré.
-- `auth.portal` (optionnel, `server.js`, défaut `'uportal'`) — logiciel du portail. Avec `'drupal'`, la session est vérifiée sur `portalEntryPath` (classe `user-logged-in` du `<body>`, `server/portalSession.js`). Drupal n'a ni API layout ni userinfo : la grille d'applications reste vide et le compte n'a pas de prénom. Exemple : `universities/univ-rennes-2/`. Avec `'isorbonne'` (portail JSF maison de la Sorbonne Nouvelle), la session est vérifiée sur `portalEntryPath` (lien `/ENT/logout.xhtml` et formulaire `portalForm`), le nom vient de ce lien et la grille des tuiles de la page (`catalog.path`). Exemple : `universities/univ-sorbonne-nouvelle/`.
-- La grille d'applications lit `GET /__ent_auth/apps` : une seule liste, `{ id, title, description, url, iconUrl, category, favorite }`, quel que soit le portail (`src/portalApps.js`). Pour uPortal, la passerelle Rust la donne (`back/`, par tonAPI) ; sans elle, ce serveur répond 502 pour un portail uPortal. Pour `'drupal'` et `'isorbonne'`, ce serveur la construit depuis `catalog.path` (`server/portalSession.js` : `buildPortalApps`). Les favoris restent dans le navigateur ; ils partent une fois de ceux que le portail marque `favorite`.
+- Le logiciel du portail (uPortal, Drupal, iSorbonne) est un fournisseur de tonAPI, choisi dans son `university.toml` ; la passerelle le reconnaît (`back/crates/tafac-gateway/src/portals.rs`). Avant, c'était `auth.portal` : Avec Drupal, la session est vérifiée sur `portalEntryPath` (classe `user-logged-in` du `<body>`). Drupal n'a ni API layout ni userinfo : la grille d'applications reste vide et le compte n'a pas de prénom. Exemple : `universities/univ-rennes-2/`. Avec `'isorbonne'` (portail JSF maison de la Sorbonne Nouvelle), la session est vérifiée sur `portalEntryPath` (lien `/ENT/logout.xhtml` et formulaire `portalForm`), le nom vient de ce lien et la grille des tuiles de la page (`catalog.path`). Exemple : `universities/univ-sorbonne-nouvelle/`.
+- La grille d'applications lit `GET /__ent_auth/apps` : une seule liste, `{ id, title, description, url, iconUrl, category, favorite }`, quel que soit le portail (`src/portalApps.js`). La passerelle la donne par tonAPI, quel que soit le portail. Les favoris restent dans le navigateur ; ils partent une fois de ceux que le portail marque `favorite`.
 - `auth.casLogoutPath` (optionnel, défaut `/logout`) — chemin de déconnexion du CAS Apereo, appelé à la déconnexion pour clore la session SSO côté université.
-- `auth.mfa` (optionnel, `server.js`, absent par défaut) — second facteur du CAS. Avec `'esup-otp'` (Esup OTP), un CAS qui répond à un mot de passe juste par sa page de code fait passer le formulaire de connexion à l'étape du code (`401` avec `code: 'mfa_required'`, puis `'mfa_invalid'` si le code est refusé). Le serveur lit sur cette page l'adresse de l'API Esup OTP, l'uid et le hash de l'étudiant, demande à l'API ses méthodes et l'envoi d'un code (`server/esupOtp.js`) : à la demande de l'étudiant (`sendCode: 'sms' | 'mail'`), ou d'office quand c'est sa seule méthode (pas d'application, un seul de SMS et mail), comme le fait la page de l'université. L'API doit être sur un hôte autorisé (`origins`, `launch.allowedDomains`), sinon seul le code d'une application d'authentification est proposé. Notification push, WebAuthn et carte NFC ne sont pas pris en charge. Sans cette clé, un CAS qui demande un code reste un échec de connexion. Exemple : `universities/univ-rennes/`.
+- Le second facteur du CAS est réglé dans tonAPI (`university.toml`). Avec `'esup-otp'` (Esup OTP), un CAS qui répond à un mot de passe juste par sa page de code fait passer le formulaire de connexion à l'étape du code (`401` avec `code: 'mfa_required'`, puis `'mfa_invalid'` si le code est refusé). Le serveur lit sur cette page l'adresse de l'API Esup OTP, l'uid et le hash de l'étudiant, demande à l'API ses méthodes et l'envoi d'un code (tonAPI) : à la demande de l'étudiant (`sendCode: 'sms' | 'mail'`), ou d'office quand c'est sa seule méthode (pas d'application, un seul de SMS et mail), comme le fait la page de l'université. L'API doit être sur un hôte autorisé (`origins`, `launch.allowedDomains`), sinon seul le code d'une application d'authentification est proposé. Notification push, WebAuthn et carte NFC ne sont pas pris en charge. Sans cette clé, un CAS qui demande un code reste un échec de connexion. Exemple : `universities/univ-rennes/`.
 - `branding` — `appName`, `defaultTitle`, `seoTitle`, `seoDescription`, `logo` (+ `logoAlt`, `loginFooterLine`, `loginPasswordNote` (ligne sous le formulaire de connexion sur le mot de passe), `alternateNames` (anciens noms, pour les moteurs de recherche), `about.*` (dont `about.team` et `about.contactEmail`, l'équipe et l'adresse de la section « Aide » d'À propos : les mêmes pour toutes les universités, à importer de `universities/tafac.js`), `papillon` (`{ url }` : les mentions « Fait partie de Papillon » de la landing, de la connexion et d'À propos ; à omettre si l'instance n'est pas faite par l'équipe de Papillon)). `nameInText` : le nom de l'université au milieu d'une phrase (« l’Université de Rennes »), repris par la landing de `tafac.fr/<slug>` (`{university}` dans `src/landingCopy.json`) ; sans lui, « votre université ». Les textes de `branding` s'adressent à l'étudiant en le vouvoyant (ou de façon impersonnelle pour ceux qu'un étudiant tutoyé voit aussi, comme `about.disclaimer`) : ils ne suivent pas `register`. La description doit dire que le client n'est pas officiel. Sur un serveur qui sert toutes les universités, `/<slug>` est la landing de l'université (déconnecté), avec son `seoTitle` et sa `seoDescription`, et figure dans le sitemap : c'est elle qui ressort quand on cherche l'ENT de cette université. Utilisé par la page de connexion, la sidebar, le SEO, le manifest PWA et `index.html` (placeholders `%LENT_*%`).
   - `lockup` / `lockupDark` (optionnels, `client.js` uniquement) — visuel combiné « Tafac × université » affiché dans la sidebar et le header (comme Rennes). Sans eux, le logo Tafac et votre `logo` sont composés côte à côte automatiquement.
   - `heroImages` (optionnel, `client.js` uniquement) — photos affichées en fond du haut du tableau de bord, en fondu vers le fond uni : `[{ src, credit: { author, license, url }, position? }]`. Plusieurs photos tournent chaque jour. Chaque établissement peut définir ses propres `heroImages` dans `establishments.byId`. Sans photo, ce sont celles de Tafac (`src/assets/wallpapers/tafac/`), et Réglages › Apparence ne propose que ce dossier. Un établissement peut partir sur les photos de Tafac (une par jour) plutôt que les siennes tant que l'étudiant n'a rien choisi : `establishments.byId.<id>.defaultWallpaperFolder: 'tafac'` (l'IUT de Lannion). Le crédit apparaît dans le footer : utilisez des images libres de droits (ex. Wikimedia Commons) et renseignez auteur + licence.
@@ -90,7 +92,7 @@ export const features = {
 }
 ```
 
-Un feature à `false` : le serveur répond `{ disabled: true }` sur les endpoints concernés et le frontend masque les widgets/liens. Mettez aussi l'origin correspondant à `null` dans `server.js`.
+Un feature à `false` : le serveur répond `{ disabled: true }` sur les endpoints concernés et le frontend masque les widgets/liens.
 
 ### Optionnels
 
@@ -136,55 +138,31 @@ Un feature à `false` : le serveur répond `{ disabled: true }` sur les endpoint
 - `mail.ownDomains` (optionnel, `client.js`) — domaines mail de l'université, sous-domaines compris (Rennes : `['univ-rennes.fr', 'univ-rennes1.fr']`). Dans la page Messagerie, le lecteur affiche toujours le domaine de l'expéditeur à côté de son nom ; la liste ne l'affiche que pour un domaine hors de cette liste, pour repérer un nom d'affichage qui imite l'université (`src/mailDomain.js`). Sans lui, les domaines des `origins` (deux derniers labels) en tiennent lieu.
 - `grades` (copy) — `unavailableTitle`, `unavailableDetail`, `disabledPillLabel` quand `features.grades === 'disabled'` ; `unavailableTitle`/`unavailableDetail` servent aussi de message d'erreur serveur quand ScoDoc ne répond pas.
 
-### Serveur uniquement (`server.js`)
+### Côté serveur : tonAPI et la passerelle
 
-- `origins.ade` / `origins.moodle` / `origins.planning` — `null` si absent.
-- `moodle.shibbolethLoginPath` + `moodle.wayfEntityId` — l'entityID Shibboleth de votre université sur la page WAYF de la fédération (visible dans l'URL `user_idp=` lors d'une connexion Moodle manuelle).
-- `moodle.signInDomains` — requis quand `features.moodleDeadlines === true` (endpoint `GET /__ent_auth/moodle/deadlines`, contrat dans `src/entApi.js#getMoodleDeadlines`) : domaines que la connexion SSO Moodle côté serveur peut visiter (HTTPS uniquement) en plus de `origins.moodle` et du CAS, typiquement le WAYF et l'IdP Shibboleth (Rennes : `['wayf.univ-rennes.fr', 'ident-shib.univ-rennes1.fr']`). Le serveur rejoue la chaîne du relais Moodle (Shibboleth → WAYF → IdP → CAS → POST SAML) avec une copie du cookie jar de session, récupère le `sesskey` sur `/my/`, puis appelle `lib/ajax/service.php` : `core_calendar_get_action_events_by_timesort` (à faire, retards ≤ 7 jours inclus) et `core_calendar_get_calendar_upcoming_view` (devoirs/tests déjà rendus, et liste de repli). 6 échéances max sur 30 jours, cache 5 min par session ; les liens passent par `/__ent_auth/launch`. Requiert aussi `features.moodle` (relais) pour les liens. Le compte démo renvoie des échéances fictives.
-- `ade.etab`, `ade.passwordKey`, `ade.passwordIv`, `ade.appHeaders` — identité de l'app mobile « Campus » de votre université. **Ces valeurs se rétro-ingénient par campus** (interception du trafic de l'app mobile officielle) ; voir `API_GUIDE.md` et `src/knownEndpoints.js` pour la méthodologie utilisée à Rennes.
-- `planning.gwtClientId` — identifiant client GWT du Planning adesoft (visible dans les requêtes RPC de `myplanning.jsp`).
-- `planning.projectId` (défaut `1`) et `planning.displayConfigurationName` (défaut `web-default`) : le projet de `method6loadProject` et le nom passé à `method28getDisplayConfigurationByName` dans ces mêmes requêtes. Un ADE 6.12 (`method10getTimetable` dans le `.cache.html`) est détecté tout seul.
-- `planning.personal` (optionnel, Planning GWT, `server.js` et `client.js`) — l'emploi du temps est celui des ressources ADE de l'étudiant trouvées à la connexion (Sorbonne Nouvelle : une par groupe d'inscription), réunies en un groupe « Mon emploi du temps » adopté sans onboarding ; dans `client.js`, masque aussi « Mon groupe » dans Mon compte. Si aucune ressource n'est trouvée, l'arbre reste à parcourir pour choisir un groupe. Exemple : `universities/univ-sorbonne-nouvelle/`.
-- `planning.api` (optionnel) — client du planning à la place du Planning GWT : `'portal-rest'` (portail REST d'ADE, `planningPortalApi.js`) ou `'tempo'` (TEMPO de Rennes 2, `tempoApi.js` : `GET <origins.planning>/api/events?start=&end=` derrière le CAS, heures lues sur `planning.timeZone`, défaut `Europe/Paris`). TEMPO donne l'emploi du temps de l'étudiant : un seul groupe « Mon emploi du temps », adopté sans onboarding. Avec lui, `planning.personal: true` dans `client.js` masque « Mon groupe » dans Mon compte. Requiert `features.ade` et `features.planning`.
-- `grades.origin` — origine du ScoDoc (ex. `https://notes9.iutlan.univ-rennes1.fr`). Le serveur y rejoue la session CAS (`/services/doAuth.php`) puis lit `data.php?q=dataPremièreConnexion` et la photo étudiante. Requis quand `features.grades === true`.
-  Pour l'histogramme d'une évaluation, `GET /__ent_auth/grades/evaluation-distribution?semestre=<id|current>&eval=<id>` relaie `data.php?q=listeNotes&eval=<id>` (notes de la promo ramenées sur 20, anonymes) uniquement pour une évaluation du relevé de l'étudiant, et répond `{ status: 'ok', counts: [21 effectifs, barre i = notes dans [i, i+1[, 20/20 dans la barre 20], total, bins: 'integer' }` ou `{ status: 'unavailable', reason: 'disabled' | 'too-few' | 'hidden' }` (`disabled` : option `histogramme` de la passerelle désactivée ; `too-few` : moins de 6 notes, la passerelle répond `['too low']` ; `hidden` : relevé non publié ou notes masquées par le département). Cache 10 min par session ; contrat client dans `src/entApi.js#getEvaluationDistribution`, binning dans `src/evaluationDistribution.js`.
-- `mail` — requis quand `features.mail === true` (endpoint `GET /__ent_auth/mail/recent`, contrat dans `src/entApi.js#getRecentMail`) :
-  ```js
-  mail: {
-    provider: 'zimbra',                         // seul fournisseur implémenté (Zimbra / RENATER Partage)
-    origin: 'https://partage.univ-rennes.fr',   // origine du webmail
-    webmailUrl: mailWebmailUrl,                 // page d'entrée du webmail (défaut : origin)
-    maxMessages: 5,                             // 1–20
-    signInDomains: ['partage.renater.fr'],        // domaines autorisés pendant la connexion SSO (HTTPS uniquement), en plus du webmail et du CAS
-  }
-  ```
-  Le serveur parcourt la chaîne SSO du webmail (Shibboleth → CAS) avec une copie du cookie jar de session, puis lit la boîte via l'API Zimbra (SOAP `SearchRequest`/`GetFolderRequest`, repli REST `/service/home/~/inbox?fmt=json`). Résultat mis en cache 2 min par session. Le compte démo renvoie des mails fictifs. Pour un autre webmail (SOGo, Roundcube, Exchange…), ajoutez une fonction dans `MAIL_PROVIDERS` (`server/entAuthApp.js`) qui renvoie `{ unreadCount, webmailHref, messages }` ; un `provider` inconnu répond `500 { error: 'Mail provider not configured' }`.
-- `mail.signature` (optionnel, `server.js`) — la signature automatique des mails envoyés depuis le composeur (`POST /__ent_auth/mail/send`, `server/mailSend.js`). Le serveur la construit lui-même : le nom de l'identité Zimbra, le groupe choisi (texte court, échappé), l'établissement (son id, vérifié dans `establishments`), le nom de l'université et les logos, joints au mail en images inline (CID). Les logos sont des PNG (Gmail et Outlook n'affichent pas le SVG), versions claires sur une plaque blanche arrondie, rendus à 2× par `scripts/render-mail-logos.mjs` (ajoutez-y les vôtres) ; leur taille affichée est lue dans le fichier (moitié des pixels).
-  ```js
-  signature: {
-    university: university.name,
-    logo: { file: fileURLToPath(new URL('./assets/mail/logo.png', import.meta.url)), alt: university.name },
-    establishments: {
-      iutlan: { label: establishmentNames.iutlan, logo: { file: …, alt: … } },   // ids de client.js › establishments.byId
-    },
-  }
-  ```
-  Sans ce bloc, la signature n'a que le nom et le groupe. Les noms des établissements sont dans `shared.js` (`establishmentNames`), lus par `client.js` et `server.js`.
-- `mail.signature.showLogin` (optionnel, `server.js` **et** `client.js`, `false` par défaut) — ajoute à la signature automatique une ligne « Identifiant : <login CAS> » sous le nom (Rennes 2). Le serveur la prend dans la session (`session.user`), jamais dans la requête du composeur ; le composeur et Réglages l'affichent depuis `sessionState.user`. Un login qui n'est pas fait de lettres, chiffres, `.`, `-`, `_` (32 au plus), une adresse mail par exemple, ne donne aucune ligne (`signatureLogin`, `src/mailSignatureChoice.js`). Déclarez la valeur une fois dans `shared.js` et lisez-la des deux côtés, comme Rennes 2 (`mailSignatureShowsLogin`).
-- Signatures de l'étudiant (aucune clé) — Réglages › Messagerie (avec la page Messagerie) choisit la signature : automatique, celle de Partage (`GetSignaturesRequest` et la signature par défaut de l'identité), ou une personnalisée, enregistrée dans Partage sous le nom « Tafac » (`POST /__ent_auth/mail/signature`, `server/mailSignature.js`). Le serveur relit la signature dans Partage à chaque envoi et nettoie son HTML (liste blanche, sans images) : le composeur n'envoie que le type choisi. Réservé à `mail.provider: 'zimbra'`.
-- `launch.allowedDomains` (optionnel) — domaines que le relais `/__ent_auth/launch` peut ouvrir avec la session, sous-domaines compris (Rennes : `['univ-rennes.fr', 'univ-rennes1.fr', 'iut-lannion.loxya.app']`). Les hôtes des origines et URLs de service de la config (ENT, CAS, ADE, Moodle, planning, notes, webmail, certificat) et les `signInDomains` sont déjà autorisés. Toute autre cible est renvoyée vers `/` par le relais et ouverte directement par le navigateur (`launch-preview` répond `useServerLaunch: false`, `reason: 'target-not-allowed'`). Ajoutez ici les domaines des applications de l'ENT protégées par le CAS de l'université, et ceux de vos `extraServices` (`client.js`).
+Le serveur de Tafac est la passerelle Rust de `back/` (`back/README.md`), qui demande à l'université par [tonAPI](https://github.com/l-ent-univ/tonAPI). Pour une nouvelle université :
+
+1. **Dans tonAPI** : `universities/<id>/university.toml` (le portail, le CAS et son second facteur, ADE ou TEMPO, ScoDoc, Moodle, le webmail…), validé par `cargo run -p tonapi-cli -- validate universities`. Un logiciel que tonAPI ne connaît pas encore y devient un fournisseur. Les réglages ADE rétro-ingéniérés (`ade.etab`, clés de l'app « Campus ») et ceux du Planning GWT y vivent aussi.
+2. **Dans la passerelle** (`back/crates/tafac-gateway/src/`) :
+   - son id dans `routes::UNIVERSITIES` (les universités servies) ;
+   - ses domaines dans `launch/targets.rs` (ce que le relais `/__ent_auth/launch` peut ouvrir avec la session, et les chaînes de connexion de Moodle et du webmail) ;
+   - sa signature de mail, s'il y en a une, dans `mail/signature_block.rs` (université, logo, établissements, `show_login`), le PNG rendu par `scripts/render-mail-logos.mjs` ;
+   - puis épingler le commit de tonAPI qui a ses réglages (`back/crates/tafac-gateway/Cargo.toml`, `cargo update -p tonapi-*` dans `back/` et `src-tauri/`).
+3. **Dans Tafac** : `node scripts/universities-directory.mjs` (la liste et les `features` que la passerelle lit, `universities/directory.json`).
+
+Ce que la page lit (les `features`, les liens, les textes) reste dans `shared.js` et `client.js`.
 
 ## Icônes des applications
 
 Chaque tuile d'application (grille « Toutes les applications », favoris, favoris de la sidebar) reçoit une icône et une couleur **automatiquement**, sans rien configurer :
 
 1. **Icône faite main** si `services.getAppIcon(title)` en renvoie une (Rennes : `universities/univ-rennes/app-icons/`). Elle a toujours la priorité.
-2. Sinon, **icône automatique** choisie par le serveur (`server/appIcons.js`) : un *concept* (`mail`, `calendar`, `course`, `library`, `wifi`, `printing`, `visio`, `office`, `help`, `restaurant`, `sport`, `jobs`, `card`, `payment`…, 59 au total) d'après des mots-clés français et anglais du titre (puis de la description, puis de la catégorie), et une *teinte*, tirée du hash de l'id du service en évitant les teintes déjà les plus utilisées. Sans mot-clé reconnu : concept `generic`.
+2. Sinon, **icône automatique** choisie par la passerelle (`back/crates/tafac-gateway/src/own/icons.rs`) : un *concept* (`mail`, `calendar`, `course`, `library`, `wifi`, `printing`, `visio`, `office`, `help`, `restaurant`, `sport`, `jobs`, `card`, `payment`…, 59 au total) d'après des mots-clés français et anglais du titre (puis de la description, puis de la catégorie), et une *teinte*, tirée du hash de l'id du service en évitant les teintes déjà les plus utilisées. Sans mot-clé reconnu : concept `generic`.
 3. Pendant le chargement ou en cas d'échec : la lettre sur fond coloré, à la même taille.
 
 Le premier choix pour un service est **mémorisé pour toute l'université** dans `<DATA_DIR>/app-icons/<id>.json` (voir [SELF_HOSTING.md](SELF_HOSTING.md#icônes-automatiques-des-applications)) : tous les étudiants voient la même tuile, et modifier la liste de mots-clés ne change pas les tuiles existantes, seulement celles des services jamais vus. Un service ajouté au portail a donc tout de suite une tuile correcte.
 
-### Style des icônes et couleurs (`server.js` → `appIcons`)
+### Style des icônes et couleurs (`shared.js` → `appIcons`)
 
 Le concept et la teinte sont dessinés selon le style de chaque université :
 
@@ -196,18 +174,18 @@ appIcons: {
 }
 ```
 
-Chaque mode de couleur a sa variante sombre. Le fichier ne garde que le concept et la teinte : changer de style ou de mode redessine toutes les tuiles sans rien remélanger. Une valeur inconnue empêche le serveur de démarrer (comme un id d'université inconnu). Exemples : Rennes en `phosphor-duotone` + `soft`, la Sorbonne Nouvelle en `carbon` + `pastel`.
+Chaque mode de couleur a sa variante sombre. Le fichier ne garde que le concept et la teinte : changer de style ou de mode redessine toutes les tuiles sans rien remélanger. Une valeur inconnue fait échouer `node scripts/gateway-data.mjs` et les tests. Exemples : Rennes en `phosphor-duotone` + `soft`, la Sorbonne Nouvelle en `carbon` + `pastel`.
 
-Pour améliorer les choix, ajoutez des mots-clés dans `APP_ICON_RULES` (`src/appIconPicks.js`, que le serveur et la page partagent ; test dans `tests/appIcons.test.js`) ; un nouveau concept doit avoir une icône dans chaque style (`ICONS_BY_CONCEPT`). La passerelle Rust choisit avec une copie de ces listes et du style de chaque université : après une modification, lancez `node scripts/gateway-data.mjs` (les tests échouent tant que ce n'est pas fait). Pour corriger une tuile déjà attribuée, éditez le fichier JSON (voir SELF_HOSTING) ou ajoutez une icône faite main.
+Pour améliorer les choix, ajoutez des mots-clés dans `APP_ICON_RULES` (`src/appIconPicks.js`, que la page et la passerelle partagent ; test dans `tests/appIcons.test.js`) ; un nouveau concept doit avoir une icône dans chaque style (`ICONS_BY_CONCEPT`). La passerelle Rust choisit avec une copie de ces listes et du style de chaque université : après une modification, lancez `node scripts/gateway-data.mjs` (les tests échouent tant que ce n'est pas fait). Pour corriger une tuile déjà attribuée, éditez le fichier JSON (voir SELF_HOSTING) ou ajoutez une icône faite main.
 
 ## Checklist de validation
 
-1. `npm run lint && npm run typecheck && npm test && npm run build` — tout doit passer.
+1. `npm run lint && npm run typecheck && npm test && npm run build`, et `cargo test` dans `back/` — tout doit passer.
 2. `npm run dev`, puis `/<slug>` et son bouton « Se connecter à mon ENT » — page de connexion : logo, textes, liens d'aide corrects ; votre université figure dans la liste de `/universites`.
 3. Connexion démo (`demo@tafac.fr` / `tafac-demo`) si `features.demo` — dashboard, grille d'applications. La page sert la démo elle-même (`src/demoServer.js`), selon les `features` de `shared.js` : rien à écrire côté serveur pour elle.
 4. **Connexion réelle** avec un compte étudiant — c'est le seul test qui exerce CAS, le proxy ENT et les services activés.
-5. `grep -ri '<votre-univ>' src/ server/` ne doit rien retourner : tout doit vivre dans `universities/<id>/`.
+5. `grep -ri '<votre-univ>' src/` ne doit rien retourner : tout ce qui est propre à l'université vit dans `universities/<id>/`, dans tonAPI et dans les listes de la passerelle ci-dessus.
 
 ## Ce qui n'est pas couvert
 
-Le backend suppose un ENT **uPortal** derrière un **CAS Apereo**. Si votre université utilise un autre portail (ex : Esup-Pod seul, ENT non-uPortal) ou un autre SSO (OIDC, SAML direct), il faudra adapter `server/entAuthApp.js` (fonction `performEntLogin` et endpoints `/__ent_auth/*`). Les contributions généralisant ces points sont bienvenues.
+Un portail, un SSO (OIDC, SAML direct) ou un service que tonAPI ne connaît pas demande un nouveau fournisseur dans tonAPI (`crates/tonapi-providers`), puis sa route dans la passerelle si la page en a besoin d'une nouvelle. Les contributions sont bienvenues.

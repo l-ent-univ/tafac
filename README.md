@@ -99,16 +99,15 @@ Les liens `/rennes`, `/rennes2` et `/sorbonne-nouvelle` ouvrent la page d’accu
 | --- | --- |
 | `npm run dev` | Vite avec rechargement à chaud, et la passerelle de `back/` lancée derrière lui. |
 | `npm run lint` | Vérification ESLint. |
-| `npm run typecheck` | Vérification des types des modules TypeScript du serveur (`server/**/*.ts`), sans compilation. |
+| `npm run typecheck` | Vérification des types des modules TypeScript des scripts et des tests, sans compilation. |
 | `npm test` | Tests avec le runner natif de Node.js. Certains ouvrent des serveurs HTTP locaux temporaires. |
 | `npm run build` | Compilation de l’interface et génération du service worker dans `dist/`. |
 | `npm run build:all` | Même compilation que `npm run build`. |
 | `npm run preview` | Prévisualisation locale du build avec le backend ; cookies en mode développement. |
-| `npm start` | Serveur de production Express ; nécessite un build et `SESSION_SECRET`. |
 
 ## Architecture
 
-L’interface utilise **React 19**, **Vite 7**, **Tailwind CSS 4** et **Iconify**. Le backend repose sur **Express 5**, les API natives de Node.js et des adaptateurs pour les services universitaires. Le code applicatif est écrit en JavaScript avec des modules ES ; les nouveaux modules du serveur sont en TypeScript, que Node.js exécute tel quel (les types sont retirés au chargement, rien n’est compilé).
+L’interface utilise **React 19**, **Vite 7**, **Tailwind CSS 4** et **Iconify**, en JavaScript avec des modules ES. Le serveur est la passerelle Rust de `back/` (`back/README.md`), qui demande aux services de l’université par [tonAPI](https://github.com/l-ent-univ/tonAPI) ; la même passerelle tourne dans les applis de bureau et iOS.
 
 ```text
 Navigateur : React / PWA
@@ -116,14 +115,14 @@ Navigateur : React / PWA
     ├── /__ent_auth/*    Connexion, session et services intégrés
     └── /__ent_proxy/*   Photo du compte et anciens liens vers le portail ENT (liste fermée)
               │
-       Serveur Express
+       Passerelle Rust (back/)
               │
-       Sélection de l’université
+       tonAPI, selon l’université
               │
        CAS · uPortal · ADE · ScoDoc · Moodle · Zimbra · MonDossierWeb
 ```
 
-Au démarrage, le navigateur consulte `/__ent_auth/universities`, puis charge le `client.js` adapté avant d’importer l’application. Côté serveur, chaque université dispose de son propre backend configuré. Une requête authentifiée est routée vers l’université inscrite dans sa session ; le formulaire de connexion peut en sélectionner une nouvelle.
+Au démarrage, le navigateur consulte `/__ent_auth/universities`, puis charge le `client.js` adapté avant d’importer l’application. Côté serveur, chaque université a ses réglages dans tonAPI. Une requête authentifiée est servie pour l’université inscrite dans sa session ; le formulaire de connexion peut en sélectionner une nouvelle.
 
 | Fichier ou dossier | Responsabilité |
 | --- | --- |
@@ -134,18 +133,8 @@ Au démarrage, le navigateur consulte `/__ent_auth/universities`, puis charge le
 | `src/gradesReport.js`, `src/gradeSimulation.js` | Lecture des relevés, calculs et projections de notes. |
 | `src/planning*.js`, `src/usePlanning*.js` | Dates, vues, chargement et export du planning. |
 | `src/profileStorage.js`, `src/universityStorage.js` | Préférences locales et séparation des réglages entre universités. |
-| `server.js` | Entrée de production : API, fichiers compilés et page HTML avec métadonnées. |
-| `server/universitiesApp.js` | Registre public et routage des requêtes entre universités. |
-| `server/entProxy/` | Relais vers le portail ENT : session exigée, requêtes connues de la page seulement, réponses rendues inertes. |
-| `server/cookieJar/` | Cookies d’une session auprès des services universitaires, rangés et renvoyés comme le ferait un navigateur. |
-| `server/casLogin/`, `server/loginRateLimit/` | Contrôle de la destination du mot de passe (le CAS uniquement) et limites des tentatives de connexion. |
-| `server/securityHeaders/` | En-têtes de sécurité du serveur de production et politique de contenu (CSP) de la page. |
-| `server/launchRelay/`, `server/routeErrors/` | Relais de lancement (requêtes venues d’un autre site, tickets CAS) et réponses d’erreur sans détail interne en production. |
-| `server/entAuthApp.js` | Connexion CAS, sessions, proxy ENT et intégrations des services. |
-| `server/sessionCookie.js` | Chiffrement, durée de vie et rotation des cookies de session. |
-| `planningPortalApi.js` | Adaptateur du portail planning REST, utilisé pour Rennes. |
-| `planningRpc.js`, `adeApi.js`, `adeUpcomingResolver.js` | Adaptateurs planning GWT et ADE mobile, résolution des cours à venir. |
-| `server/appIcons.js`, `src/appIconPicks.js` | Attribution et persistance des icônes des applications ; les règles du choix, partagées avec la page pour la démonstration. |
+| `back/crates/tafac-gateway/` | Le serveur : connexion CAS, sessions, toutes les routes de l’API de la page (`routes.rs`), relais de lancement, messagerie, fichiers compilés et page HTML avec métadonnées. |
+| `src/appIconPicks.js` | Règles du choix des icônes des applications, partagées avec la passerelle (`scripts/gateway-data.mjs`). |
 | `universities/` | Configuration, identité et ressources de chaque université. |
 | `tests/` | Tests des calculs, adaptateurs, sessions, routage, exports et comportements de l’interface. |
 | `deploy/`, `Dockerfile` | Image de production et déploiement avec Caddy. |
@@ -161,14 +150,14 @@ Au démarrage, le navigateur consulte `/__ent_auth/universities`, puis charge le
 | `SESSION_SECRET` | Secret servant à dériver la clé de chiffrement des sessions. Obligatoire en production, au moins 32 octets. |
 | `SESSION_SECRET_PREVIOUS` | Anciens secrets, séparés par des virgules, acceptés pendant une rotation. |
 | `DATA_DIR` | Dossier des icônes persistantes : `./data` par défaut, `/app/data` dans Docker. |
-| `TRUST_PROXY` | Proxys autorisés à transmettre l’adresse du client à Express, notamment pour limiter les tentatives de connexion. Par défaut : réseaux locaux et privés. |
+| `TRUST_PROXY` | Proxys autorisés à transmettre l’adresse du client au serveur, notamment pour limiter les tentatives de connexion. Par défaut : réseaux locaux et privés. |
 | `POSTHOG_PROJECT_KEY` | Active les événements PostHog côté serveur. Absent : PostHog désactivé. |
 | `POSTHOG_HOST` | Destination PostHog, `https://eu.i.posthog.com` par défaut. |
 | `POSTHOG_IN_DEV` | `1` pour autoriser PostHog dans le serveur Vite, avec une clé configurée. |
 | `ANALYTICS_EXCLUDED_USERS` | Identifiants ENT dont les événements PostHog sont ignorés, séparés par des virgules. |
 | `BUILD_HASH` | Référence de commit affichée dans « À propos », fournie au moment du build si Git n’est pas disponible. |
 
-Passer `UNIVERSITY`, `MULTI_UNIVERSITY` et `UNIVERSITIES` dans l’environnement du processus. Le serveur Vite lit aussi les variables de session, de statistiques et `DATA_DIR` dans `.env` / `.env.local`. En production, `npm start` ne charge pas automatiquement de fichier `.env` ; Docker Compose le transmet au conteneur, ou Node peut le charger explicitement avec `node --env-file=.env server.js`.
+Passer `UNIVERSITY`, `MULTI_UNIVERSITY` et `UNIVERSITIES` dans l’environnement du processus. Le serveur Vite lit aussi les variables de session, de statistiques et `DATA_DIR` dans `.env` / `.env.local`. En production, le serveur ne lit aucun fichier `.env` ; Docker Compose le transmet au conteneur.
 
 Les anciens noms `MULTI_TENANT` et `TENANTS` restent acceptés. Le fichier `.env.example` à la racine contient encore des commentaires sur l’ancien fonctionnement par builds et sous-domaines : pour le déploiement actuel, utiliser [`deploy/example.env`](deploy/example.env) et les variables ci-dessus.
 
@@ -240,13 +229,12 @@ Créer un nouveau dossier à partir d’une université existante, par exemple R
 cp -R universities/univ-rennes-2 universities/univ-mon-campus
 ```
 
-Adapter les trois fichiers de configuration :
+Adapter ses deux fichiers de configuration, puis ses réglages côté serveur (tonAPI et la passerelle : [`docs/ADDING_A_UNIVERSITY.md`](docs/ADDING_A_UNIVERSITY.md)) :
 
 | Fichier | Contenu |
 | --- | --- |
-| `shared.js` | Identifiant, noms, slug, textes publics et fonctionnalités. Données pures, lisibles par Node et le navigateur. |
+| `shared.js` | Identifiant, noms, slug, textes publics et fonctionnalités. Données pures, lisibles par la page et les scripts. |
 | `client.js` | Identité visuelle, images, liens, établissements et configuration de l’interface. Tout son contenu peut être envoyé au navigateur. |
-| `server.js` | Origines des services, paramètres de connexion et adaptateurs côté serveur. |
 
 Ajouter un logo dans `assets/`, renseigner les origines CAS/uPortal et n’activer que les intégrations configurées, puis lancer :
 
