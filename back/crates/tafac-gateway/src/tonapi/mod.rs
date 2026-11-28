@@ -38,9 +38,9 @@ use std::time::Duration;
 
 use futures_util::FutureExt;
 use tonapi_config::{ServiceAvailability, ServiceKind};
-use tonapi_core::{ErrorCode, Problem};
+use tonapi_core::{ErrorCode, EstablishmentSource, Problem};
 use tonapi_providers::{Context, Fetched, NetSettings};
-use tonapi_session::SessionData;
+use tonapi_session::{EstablishmentPick, SessionData};
 
 use crate::session::cookie::Session;
 use crate::session::memory::Turn;
@@ -173,6 +173,9 @@ impl Service<'_> {
         if memory.snapshot().look_due && university.differs_by_component(kind) {
             self.detect(kind, &ticket).await?;
         }
+        if kind == ServiceKind::Grades && memory.snapshot().probe_due {
+            self.probe(&ticket).await?;
+        }
         let before = memory.snapshot();
         let mut data = session_data(university, session, ticket.iter().chain(&before.cookies).cloned().collect())?;
         data.tokens = before.tokens.clone();
@@ -255,16 +258,73 @@ impl Service<'_> {
         }
         Ok(())
     }
+
+    // The look failed (ADE down, or too slow): the grades are one
+    // component's alone (Rennes's IUT), and its ScoDoc knows its students.
+    // Asked for the student's report there, as of that component: a report
+    // says the student is of it, kept as if the look had found it. Anything
+    // else (ScoDoc's error to a student it doesn't know, no answer) says
+    // nothing: the question goes with the default component, and the probe
+    // waits LOOK_AGAIN_AFTER. Not the photo: a gateway may give an image to
+    // anyone; a report is the student's own.
+    async fn probe(&self, ticket: &[tonapi_session::StoredCookie]) -> Result<(), Unanswered> {
+        let Held { session, university, memory } = self.held;
+        let Some(component) = university.only_component_with(ServiceKind::Grades) else {
+            return Ok(());
+        };
+        let _looking = memory.turn(Turn::Component).await;
+        let before = memory.snapshot();
+        if !before.probe_due {
+            return Ok(());
+        }
+        let pick = EstablishmentPick { id: component, source: EstablishmentSource::Detected, confidence: 0.5 };
+        let mut data = session_data(university, session, ticket.iter().chain(&before.cookies).cloned().collect())?;
+        data.tokens = before.tokens.clone();
+        data.establishment = Some(pick.clone());
+        let mut context = Context { university: &university.settings, session: &mut data, now: chrono::Utc::now(), net: self.net };
+        let asked = bounded(SERVICE_PATIENCE, tonapi_providers::grades_and_absences_of(&mut context, None)).await;
+        let report = match asked {
+            Ok((report, _)) => report,
+            Err(_) => {
+                eprintln!("[tafac] tonapi: the student's component wasn't found by their report either (no answer in time)");
+                memory.probe_failed();
+                return Ok(());
+            }
+        };
+        memory.keep(&before, &data, ticket);
+        match report {
+            Ok(_) => memory.detected(Some(pick)),
+            Err(problem) if problem.code == ErrorCode::SessionExpired => return Err(Unanswered::Problem(problem.code)),
+            Err(problem) => {
+                eprintln!("[tafac] tonapi: the student's component wasn't found by their report either ({})", problem.code);
+                memory.probe_failed();
+            }
+        }
+        Ok(())
+    }
 }
 
 impl University {
+    fn availability(&self, component: Option<&str>, kind: ServiceKind) -> Option<ServiceAvailability> {
+        self.settings.services_for(component).availability().into_iter().find_map(|(found, how)| (found == kind).then_some(how))
+    }
+
     // Whether a service isn't the same for every component of the
     // university: only then is the student's worth looking for.
     pub(crate) fn differs_by_component(&self, kind: ServiceKind) -> bool {
-        let of = |component: Option<&str>| -> Option<ServiceAvailability> {
-            self.settings.services_for(component).availability().into_iter().find_map(|(found, how)| (found == kind).then_some(how))
-        };
-        let everyone = of(None);
-        self.settings.establishments.keys().any(|component| of(Some(component.as_str())) != everyone)
+        let everyone = self.availability(None, kind);
+        self.settings.establishments.keys().any(|component| self.availability(Some(component.as_str()), kind) != everyone)
+    }
+
+    // The one component whose students have this service from tonAPI,
+    // when the others haven't (Rennes's IUT and its ScoDoc).
+    pub(crate) fn only_component_with(&self, kind: ServiceKind) -> Option<String> {
+        let served = |component: Option<&str>| matches!(self.availability(component, kind), Some(ServiceAvailability::Api { .. }));
+        if served(None) {
+            return None;
+        }
+        let mut with = self.settings.establishments.keys().filter(|component| served(Some(component.as_str())));
+        let one = with.next()?;
+        with.next().is_none().then(|| one.clone())
     }
 }

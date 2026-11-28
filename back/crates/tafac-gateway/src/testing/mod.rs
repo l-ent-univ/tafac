@@ -120,6 +120,9 @@ struct State {
     ade_down: AtomicBool,
     // ADE takes the request and never answers.
     ade_hangs: AtomicBool,
+    // ScoDoc's gateway answers its error to every question, as to a
+    // student who isn't the IUT's.
+    scodoc_knows_nobody: AtomicBool,
 }
 
 // Moodle's state: the session it knows (a number: it forgets the one before
@@ -402,7 +405,7 @@ pub const SCODOC_PHOTO: &str = "PNG a photo of the campus";
 
 // The IUT's ScoDoc gateway: a PHP session opened through the CAS, then
 // data.php's actions and the PDF.
-fn scodoc_answer(path: &str, cookies: &str, port: &str, has_photo: bool) -> Answer {
+fn scodoc_answer(path: &str, cookies: &str, port: &str, has_photo: bool, knows: bool) -> Answer {
     const SESSION: &str = "PHPSESSID=notes-open";
     let signed_in = cookies.contains(SESSION);
     let root = format!("http://127.0.0.1:{port}/scodoc/");
@@ -420,6 +423,7 @@ fn scodoc_answer(path: &str, cookies: &str, port: &str, has_photo: bool) -> Answ
             }
         }
         "/scodoc/services/data.php" if !signed_in => lost(),
+        "/scodoc/services/data.php" if !knows => Answer::of("200 OK", "application/json", r#"{"erreur":"Vous n'êtes pas étudiant."}"#.to_string()),
         "/scodoc/services/data.php" => {
             let json = |value: serde_json::Value| Answer::of("200 OK", "application/json", value.to_string());
             match query_of(path, "q").as_deref() {
@@ -714,7 +718,7 @@ fn campus_answer(received: &Received<'_>, port: &str, state: &State) -> Answer {
         return moodle_answer(path, cookies, port, &state.moodle);
     }
     if path.starts_with("/scodoc/") {
-        return scodoc_answer(path, cookies, port, !state.no_photo.load(Ordering::SeqCst));
+        return scodoc_answer(path, cookies, port, !state.no_photo.load(Ordering::SeqCst), !state.scodoc_knows_nobody.load(Ordering::SeqCst));
     }
     if path.starts_with("/mdw/") {
         return records_answer(received, port, state);
@@ -1032,6 +1036,11 @@ impl Campus {
     // ADE takes every request and answers none.
     pub fn ade_hangs(&self, hangs: bool) {
         self.state.ade_hangs.store(hangs, Ordering::SeqCst);
+    }
+
+    // ScoDoc's gateway doesn't know the student (one of another component).
+    pub fn scodoc_knows_nobody(&self, nobody: bool) {
+        self.state.scodoc_knows_nobody.store(nobody, Ordering::SeqCst);
     }
 
     // As tafac.fr's server has it in front of Node: told what is served
