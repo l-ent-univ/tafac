@@ -16,6 +16,7 @@ const GRADES: &str = "/__ent_auth/grades";
 // What ADE is asked each time the component is looked for (its tree is
 // kept a while, for every student).
 const TREE: &str = "/ade/RestApi/portal/projects/1/user/properties/name/PortalResourcesAllSelection";
+const DATA: &str = "/scodoc/services/data.php";
 
 // The page's sign-in: the session's cookie.
 fn signed_in(gateway: &Gateway) -> String {
@@ -73,13 +74,72 @@ fn a_component_ade_couldnt_tell_is_looked_for_again() {
     let campus = campus();
     let cookie = campus.alive();
     let gateway = campus.component_gateway();
-    // ADE down as the grades are first asked: no component, the error of a
-    // service down rather than « no grades here », and nothing kept.
+    // ADE down as the grades are first asked, and ScoDoc not knowing the
+    // student: no component, the error of a service down rather than « no
+    // grades here », and nothing kept.
     campus.ade_is_down(true);
+    campus.scodoc_knows_nobody(true);
     assert_eq!(error_of(&gateway, GRADES, &cookie), unavailable());
-    // ADE back: the next question finds the IUT.
+    // Failed lately: the next questions ask neither ADE nor ScoDoc again.
+    let (tree, scodoc) = (campus.asked(TREE), campus.asked(DATA));
+    assert_eq!(error_of(&gateway, "/__ent_auth/grades?fresh=1", &cookie), unavailable());
+    assert_eq!((campus.asked(TREE), campus.asked(DATA)), (tree, scodoc));
+    // ADE back, a while later: the next question finds the IUT.
     campus.ade_is_down(false);
+    campus.scodoc_knows_nobody(false);
+    gateway.memory.age_looks();
+    assert!(has_grades(&ask(&gateway, "/__ent_auth/grades?fresh=1", &cookie).unwrap()));
+}
+
+#[test]
+fn ade_down_the_grades_come_from_scodoc_which_knows_the_student() {
+    let campus = campus();
+    let cookie = campus.alive();
+    let gateway = campus.component_gateway();
+    // ADE down after a restart: ScoDoc, the IUT's alone, gives the student
+    // their report: they are the IUT's, kept as if ADE had said so.
+    campus.ade_is_down(true);
     assert!(has_grades(&ask(&gateway, GRADES, &cookie).unwrap()));
+    let tree = campus.asked(TREE);
+    assert!(has_grades(&ask(&gateway, "/__ent_auth/grades?fresh=1", &cookie).unwrap()));
+    assert!(ask(&gateway, "/__ent_auth/student-pic?meta=1", &cookie).is_some());
+    // Found: ADE isn't asked again, even back and a while later.
+    campus.ade_is_down(false);
+    gateway.memory.age_looks();
+    assert!(has_grades(&ask(&gateway, "/__ent_auth/grades?fresh=1", &cookie).unwrap()));
+    assert_eq!(campus.asked(TREE), tree);
+}
+
+#[test]
+fn a_hung_ade_is_waited_for_once_not_at_every_question() {
+    let campus = campus();
+    let cookie = campus.alive();
+    let gateway = campus.component_gateway();
+    // ADE takes the request and never answers: the first question waits
+    // for the look's patience, not the service's, then ScoDoc tells.
+    campus.ade_hangs(true);
+    let started = std::time::Instant::now();
+    assert!(has_grades(&ask(&gateway, GRADES, &cookie).unwrap()));
+    assert!(started.elapsed() < std::time::Duration::from_secs(5), "{:?}", started.elapsed());
+    // The next ones don't wait for it at all.
+    let started = std::time::Instant::now();
+    assert!(has_grades(&ask(&gateway, "/__ent_auth/grades?fresh=1", &cookie).unwrap()));
+    assert!(started.elapsed() < std::time::Duration::from_secs(1), "{:?}", started.elapsed());
+}
+
+#[test]
+fn a_hung_ade_and_a_student_scodoc_doesnt_know_wait_once() {
+    let campus = campus();
+    let cookie = campus.alive();
+    let gateway = campus.component_gateway();
+    campus.ade_hangs(true);
+    campus.scodoc_knows_nobody(true);
+    let started = std::time::Instant::now();
+    assert_eq!(error_of(&gateway, GRADES, &cookie), unavailable());
+    assert!(started.elapsed() < std::time::Duration::from_secs(5), "{:?}", started.elapsed());
+    let started = std::time::Instant::now();
+    assert_eq!(error_of(&gateway, "/__ent_auth/grades?fresh=1", &cookie), unavailable());
+    assert!(started.elapsed() < std::time::Duration::from_secs(1), "{:?}", started.elapsed());
 }
 
 #[test]

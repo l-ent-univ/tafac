@@ -106,6 +106,9 @@ mod tests {
         // The grades are the IUT's own: the student's component decides.
         assert!(rennes.differs_by_component(tonapi_config::ServiceKind::Grades));
         assert!(!rennes.differs_by_component(tonapi_config::ServiceKind::Homework));
+        // ScoDoc is the IUT's alone: asked when ADE can't tell (tonapi/mod.rs's probe).
+        assert_eq!(rennes.only_component_with(tonapi_config::ServiceKind::Grades).as_deref(), Some("iut-lannion"));
+        assert_eq!(rennes.only_component_with(tonapi_config::ServiceKind::Homework), None);
         assert_eq!(served.len(), routes::UNIVERSITIES.len());
         assert!(TONAPI_COMMIT.len() >= 7);
     }

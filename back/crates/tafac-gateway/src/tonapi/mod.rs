@@ -38,9 +38,9 @@ use std::time::Duration;
 
 use futures_util::FutureExt;
 use tonapi_config::{ServiceAvailability, ServiceKind};
-use tonapi_core::{ErrorCode, Problem};
+use tonapi_core::{ErrorCode, EstablishmentSource, Problem};
 use tonapi_providers::{Context, Fetched, NetSettings};
-use tonapi_session::SessionData;
+use tonapi_session::{EstablishmentPick, SessionData};
 
 use crate::session::cookie::Session;
 use crate::session::memory::Turn;
@@ -54,6 +54,9 @@ pub(crate) const PORTAL_PATIENCE: Duration = Duration::from_secs(15);
 // How long a service is: signing in to Moodle through the federation takes
 // a few seconds by itself.
 const SERVICE_PATIENCE: Duration = Duration::from_secs(20);
+// How long a look for the student's component waits, for ADE's turn and
+// for ADE: ADE answers it in a second when it is up.
+const LOOK_PATIENCE: Duration = if cfg!(test) { Duration::from_secs(2) } else { Duration::from_secs(10) };
 // tonAPI's session wants an end; this one lives for one question.
 const SESSION_SECONDS: i64 = 5 * 60;
 
@@ -167,8 +170,11 @@ impl Service<'_> {
         if ticket.is_empty() {
             return Err(Unanswered::NoTicket);
         }
-        if !memory.snapshot().detected && university.differs_by_component(kind) {
+        if memory.snapshot().look_due && university.differs_by_component(kind) {
             self.detect(kind, &ticket).await?;
+        }
+        if kind == ServiceKind::Grades && memory.snapshot().probe_due {
+            self.probe(&ticket).await?;
         }
         let before = memory.snapshot();
         let mut data = session_data(university, session, ticket.iter().chain(&before.cookies).cloned().collect())?;
@@ -203,11 +209,14 @@ impl Service<'_> {
     //                       session is the planning's too: the planning
     //                       isn't asked at the same moment (two sessions of
     //                       ADE's opened at once, one undoing the other)
-    //   a look that failed  the portal or ADE didn't answer, or the CAS
-    //                       refused the ticket: nothing kept, the next
-    //                       question looks again. The CAS's refusal is the
-    //                       question's (the session is lost); otherwise it
-    //                       is asked with the default component this once
+    //   a look that failed  the portal or ADE didn't answer, or not in
+    //                       time, or the CAS refused the ticket: nothing
+    //                       kept. The CAS's refusal is the question's (the
+    //                       session is lost); otherwise the question, and
+    //                       the session's others for LOOK_AGAIN_AFTER, are
+    //                       asked with the default component, then one
+    //                       looks again: a service that doesn't answer is
+    //                       not waited for by every question
     //
     // Found, or the university answered without the student matching any
     // component: kept, never looked for again (as before).
@@ -215,25 +224,80 @@ impl Service<'_> {
         let Held { session, university, memory } = self.held;
         // ADE's turn first, then the component's: the planning, which holds
         // its own turn, may ask for the component too.
-        let _ade = if kind == ServiceKind::Timetable { None } else { Some(memory.turn(Turn::Service(ServiceKind::Timetable)).await) };
+        let failed = |why: &str| {
+            eprintln!("[tafac] tonapi: the student's component wasn't found ({why}), looked for again in a while");
+            memory.look_failed()
+        };
+        let _ade = if kind == ServiceKind::Timetable {
+            None
+        } else {
+            // A planning question that waits on a hung ADE holds its turn.
+            match tokio::time::timeout(LOOK_PATIENCE, memory.turn(Turn::Service(ServiceKind::Timetable))).await {
+                Ok(turn) => Some(turn),
+                Err(_) => return Ok(failed("ADE busy")),
+            }
+        };
         let _looking = memory.turn(Turn::Component).await;
-        // Another question found it while this one waited.
+        // Another question found it, or failed to, while this one waited.
         let before = memory.snapshot();
-        if before.detected {
+        if !before.look_due {
             return Ok(());
         }
         let mut data = session_data(university, session, ticket.iter().chain(&before.cookies).cloned().collect())?;
         data.tokens = before.tokens.clone();
         let looking = tonapi_providers::look_for_establishment(&university.settings, data, chrono::Utc::now(), self.net);
-        let (data, looked) = bounded(SERVICE_PATIENCE, looking).await?;
+        let (data, looked) = match bounded(LOOK_PATIENCE, looking).await {
+            Ok(done) => done,
+            Err(_) => return Ok(failed("no answer in time")),
+        };
         memory.keep(&before, &data, ticket);
         match looked {
             Ok(()) => memory.detected(data.establishment.clone()),
+            Err(problem) if problem.code == ErrorCode::SessionExpired => return Err(Unanswered::Problem(problem.code)),
+            Err(problem) => failed(&problem.code.to_string()),
+        }
+        Ok(())
+    }
+
+    // The look failed (ADE down, or too slow): the grades are one
+    // component's alone (Rennes's IUT), and its ScoDoc knows its students.
+    // Asked for the student's report there, as of that component: a report
+    // says the student is of it, kept as if the look had found it. Anything
+    // else (ScoDoc's error to a student it doesn't know, no answer) says
+    // nothing: the question goes with the default component, and the probe
+    // waits LOOK_AGAIN_AFTER. Not the photo: a gateway may give an image to
+    // anyone; a report is the student's own.
+    async fn probe(&self, ticket: &[tonapi_session::StoredCookie]) -> Result<(), Unanswered> {
+        let Held { session, university, memory } = self.held;
+        let Some(component) = university.only_component_with(ServiceKind::Grades) else {
+            return Ok(());
+        };
+        let _looking = memory.turn(Turn::Component).await;
+        let before = memory.snapshot();
+        if !before.probe_due {
+            return Ok(());
+        }
+        let pick = EstablishmentPick { id: component, source: EstablishmentSource::Detected, confidence: 0.5 };
+        let mut data = session_data(university, session, ticket.iter().chain(&before.cookies).cloned().collect())?;
+        data.tokens = before.tokens.clone();
+        data.establishment = Some(pick.clone());
+        let mut context = Context { university: &university.settings, session: &mut data, now: chrono::Utc::now(), net: self.net };
+        let asked = bounded(SERVICE_PATIENCE, tonapi_providers::grades_and_absences_of(&mut context, None)).await;
+        let report = match asked {
+            Ok((report, _)) => report,
+            Err(_) => {
+                eprintln!("[tafac] tonapi: the student's component wasn't found by their report either (no answer in time)");
+                memory.probe_failed();
+                return Ok(());
+            }
+        };
+        memory.keep(&before, &data, ticket);
+        match report {
+            Ok(_) => memory.detected(Some(pick)),
+            Err(problem) if problem.code == ErrorCode::SessionExpired => return Err(Unanswered::Problem(problem.code)),
             Err(problem) => {
-                eprintln!("[tafac] tonapi: the student's component wasn't found ({}), looked for again at the next question", problem.code);
-                if problem.code == ErrorCode::SessionExpired {
-                    return Err(Unanswered::Problem(problem.code));
-                }
+                eprintln!("[tafac] tonapi: the student's component wasn't found by their report either ({})", problem.code);
+                memory.probe_failed();
             }
         }
         Ok(())
@@ -241,13 +305,26 @@ impl Service<'_> {
 }
 
 impl University {
+    fn availability(&self, component: Option<&str>, kind: ServiceKind) -> Option<ServiceAvailability> {
+        self.settings.services_for(component).availability().into_iter().find_map(|(found, how)| (found == kind).then_some(how))
+    }
+
     // Whether a service isn't the same for every component of the
     // university: only then is the student's worth looking for.
     pub(crate) fn differs_by_component(&self, kind: ServiceKind) -> bool {
-        let of = |component: Option<&str>| -> Option<ServiceAvailability> {
-            self.settings.services_for(component).availability().into_iter().find_map(|(found, how)| (found == kind).then_some(how))
-        };
-        let everyone = of(None);
-        self.settings.establishments.keys().any(|component| of(Some(component.as_str())) != everyone)
+        let everyone = self.availability(None, kind);
+        self.settings.establishments.keys().any(|component| self.availability(Some(component.as_str()), kind) != everyone)
+    }
+
+    // The one component whose students have this service from tonAPI,
+    // when the others haven't (Rennes's IUT and its ScoDoc).
+    pub(crate) fn only_component_with(&self, kind: ServiceKind) -> Option<String> {
+        let served = |component: Option<&str>| matches!(self.availability(component, kind), Some(ServiceAvailability::Api { .. }));
+        if served(None) {
+            return None;
+        }
+        let mut with = self.settings.establishments.keys().filter(|component| served(Some(component.as_str())));
+        let one = with.next()?;
+        with.next().is_none().then(|| one.clone())
     }
 }
