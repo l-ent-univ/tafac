@@ -77,9 +77,35 @@ fn a_component_ade_couldnt_tell_is_looked_for_again() {
     // service down rather than « no grades here », and nothing kept.
     campus.ade_is_down(true);
     assert_eq!(error_of(&gateway, GRADES, &cookie), unavailable());
-    // ADE back: the next question finds the IUT.
+    // Failed lately: the next questions don't ask ADE again.
+    let tree = campus.asked(TREE);
+    assert_eq!(error_of(&gateway, "/__ent_auth/grades?fresh=1", &cookie), unavailable());
+    assert_eq!(campus.asked(TREE), tree);
+    // ADE back, a while later: the next question finds the IUT.
     campus.ade_is_down(false);
-    assert!(has_grades(&ask(&gateway, GRADES, &cookie).unwrap()));
+    gateway.memory.age_looks();
+    assert!(has_grades(&ask(&gateway, "/__ent_auth/grades?fresh=1", &cookie).unwrap()));
+}
+
+#[test]
+fn a_hung_ade_is_waited_for_once_not_at_every_question() {
+    let campus = campus();
+    let cookie = campus.alive();
+    let gateway = campus.component_gateway();
+    // ADE takes the request and never answers: the first question waits
+    // for the look's patience, not the service's, and is answered.
+    campus.ade_hangs(true);
+    let started = std::time::Instant::now();
+    assert_eq!(error_of(&gateway, GRADES, &cookie), unavailable());
+    assert!(started.elapsed() < std::time::Duration::from_secs(5), "{:?}", started.elapsed());
+    // The next ones don't wait for it at all.
+    let started = std::time::Instant::now();
+    assert_eq!(error_of(&gateway, "/__ent_auth/grades?fresh=1", &cookie), unavailable());
+    assert!(started.elapsed() < std::time::Duration::from_secs(1), "{:?}", started.elapsed());
+    // ADE back, a while later: found.
+    campus.ade_hangs(false);
+    gateway.memory.age_looks();
+    assert!(has_grades(&ask(&gateway, "/__ent_auth/grades?fresh=1", &cookie).unwrap()));
 }
 
 #[test]

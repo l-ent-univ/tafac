@@ -118,6 +118,8 @@ struct State {
     // nothing but an error.
     ade_other_group: AtomicBool,
     ade_down: AtomicBool,
+    // ADE takes the request and never answers.
+    ade_hangs: AtomicBool,
 }
 
 // Moodle's state: the session it knows (a number: it forgets the one before
@@ -879,6 +881,11 @@ fn listening(answer: fn(&Received<'_>, &str, &State) -> Answer) -> Campus {
                 }
                 let mut words = head.split_whitespace();
                 let (method, path) = (words.next().unwrap_or_default().to_string(), words.next().unwrap_or_default().to_string());
+                if path.starts_with("/ade") && state.ade_hangs.load(Ordering::SeqCst) {
+                    record.lock().unwrap().push((path, String::new()));
+                    tokio::time::sleep(std::time::Duration::from_secs(120)).await;
+                    return;
+                }
                 let cookies = header_of(&head, "cookie");
                 let received =
                     Received { method: &method, path: &path, cookies: &cookies, agent: &header_of(&head, "user-agent"), body: &String::from_utf8_lossy(&body) };
@@ -1020,6 +1027,11 @@ impl Campus {
     // ADE answers nothing but an error.
     pub fn ade_is_down(&self, down: bool) {
         self.state.ade_down.store(down, Ordering::SeqCst);
+    }
+
+    // ADE takes every request and answers none.
+    pub fn ade_hangs(&self, hangs: bool) {
+        self.state.ade_hangs.store(hangs, Ordering::SeqCst);
     }
 
     // As tafac.fr's server has it in front of Node: told what is served

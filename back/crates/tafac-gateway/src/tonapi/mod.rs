@@ -54,6 +54,9 @@ pub(crate) const PORTAL_PATIENCE: Duration = Duration::from_secs(15);
 // How long a service is: signing in to Moodle through the federation takes
 // a few seconds by itself.
 const SERVICE_PATIENCE: Duration = Duration::from_secs(20);
+// How long a look for the student's component waits, for ADE's turn and
+// for ADE: ADE answers it in a second when it is up.
+const LOOK_PATIENCE: Duration = if cfg!(test) { Duration::from_secs(2) } else { Duration::from_secs(10) };
 // tonAPI's session wants an end; this one lives for one question.
 const SESSION_SECONDS: i64 = 5 * 60;
 
@@ -167,7 +170,7 @@ impl Service<'_> {
         if ticket.is_empty() {
             return Err(Unanswered::NoTicket);
         }
-        if !memory.snapshot().detected && university.differs_by_component(kind) {
+        if memory.snapshot().look_due && university.differs_by_component(kind) {
             self.detect(kind, &ticket).await?;
         }
         let before = memory.snapshot();
@@ -203,11 +206,14 @@ impl Service<'_> {
     //                       session is the planning's too: the planning
     //                       isn't asked at the same moment (two sessions of
     //                       ADE's opened at once, one undoing the other)
-    //   a look that failed  the portal or ADE didn't answer, or the CAS
-    //                       refused the ticket: nothing kept, the next
-    //                       question looks again. The CAS's refusal is the
-    //                       question's (the session is lost); otherwise it
-    //                       is asked with the default component this once
+    //   a look that failed  the portal or ADE didn't answer, or not in
+    //                       time, or the CAS refused the ticket: nothing
+    //                       kept. The CAS's refusal is the question's (the
+    //                       session is lost); otherwise the question, and
+    //                       the session's others for LOOK_AGAIN_AFTER, are
+    //                       asked with the default component, then one
+    //                       looks again: a service that doesn't answer is
+    //                       not waited for by every question
     //
     // Found, or the university answered without the student matching any
     // component: kept, never looked for again (as before).
@@ -215,26 +221,37 @@ impl Service<'_> {
         let Held { session, university, memory } = self.held;
         // ADE's turn first, then the component's: the planning, which holds
         // its own turn, may ask for the component too.
-        let _ade = if kind == ServiceKind::Timetable { None } else { Some(memory.turn(Turn::Service(ServiceKind::Timetable)).await) };
+        let failed = |why: &str| {
+            eprintln!("[tafac] tonapi: the student's component wasn't found ({why}), looked for again in a while");
+            memory.look_failed()
+        };
+        let _ade = if kind == ServiceKind::Timetable {
+            None
+        } else {
+            // A planning question that waits on a hung ADE holds its turn.
+            match tokio::time::timeout(LOOK_PATIENCE, memory.turn(Turn::Service(ServiceKind::Timetable))).await {
+                Ok(turn) => Some(turn),
+                Err(_) => return Ok(failed("ADE busy")),
+            }
+        };
         let _looking = memory.turn(Turn::Component).await;
-        // Another question found it while this one waited.
+        // Another question found it, or failed to, while this one waited.
         let before = memory.snapshot();
-        if before.detected {
+        if !before.look_due {
             return Ok(());
         }
         let mut data = session_data(university, session, ticket.iter().chain(&before.cookies).cloned().collect())?;
         data.tokens = before.tokens.clone();
         let looking = tonapi_providers::look_for_establishment(&university.settings, data, chrono::Utc::now(), self.net);
-        let (data, looked) = bounded(SERVICE_PATIENCE, looking).await?;
+        let (data, looked) = match bounded(LOOK_PATIENCE, looking).await {
+            Ok(done) => done,
+            Err(_) => return Ok(failed("no answer in time")),
+        };
         memory.keep(&before, &data, ticket);
         match looked {
             Ok(()) => memory.detected(data.establishment.clone()),
-            Err(problem) => {
-                eprintln!("[tafac] tonapi: the student's component wasn't found ({}), looked for again at the next question", problem.code);
-                if problem.code == ErrorCode::SessionExpired {
-                    return Err(Unanswered::Problem(problem.code));
-                }
-            }
+            Err(problem) if problem.code == ErrorCode::SessionExpired => return Err(Unanswered::Problem(problem.code)),
+            Err(problem) => failed(&problem.code.to_string()),
         }
         Ok(())
     }

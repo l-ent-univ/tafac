@@ -67,6 +67,10 @@ const CAS_WORD_KEPT: Duration = Duration::from_secs(60);
 // How long a session that ended is remembered as ended (Node's
 // ENDED_KEPT_MS): past any request still on its way with its cookie.
 const ENDED_KEPT: Duration = Duration::from_secs(60 * 60);
+// A look for the component that failed (ADE down, or too slow): the
+// session's questions go with the default component this long before one
+// looks again, rather than each waiting on a service that doesn't answer.
+const LOOK_AGAIN_AFTER: Duration = Duration::from_secs(2 * 60);
 
 // Why a session ended.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -157,6 +161,8 @@ struct State {
     component: Option<EstablishmentPick>,
     // The component was looked for: found or not, not twice.
     detected: bool,
+    // When a look last failed (session/memory.rs's LOOK_AGAIN_AFTER).
+    look_failed: Option<Instant>,
     profile: Option<(Instant, Profile)>,
     // When the CAS last said it knew the ticket.
     cas_knew: Option<Instant>,
@@ -179,6 +185,8 @@ pub(crate) struct Snapshot {
     pub tokens: BTreeMap<String, String>,
     pub component: Option<EstablishmentPick>,
     pub detected: bool,
+    // Not found yet, and no look failed lately: the next question looks.
+    pub look_due: bool,
 }
 
 impl Memory {
@@ -203,6 +211,7 @@ impl Memory {
                 tokens: BTreeMap::new(),
                 component: None,
                 detected: false,
+                look_failed: None,
                 profile: None,
                 cas_knew: None,
                 portal_opened: false,
@@ -264,6 +273,14 @@ impl Memory {
     pub(crate) fn remembers(&self, session: &str) -> bool {
         self.sessions.lock().unwrap().contains_key(session)
     }
+
+    // Every session's failed look, as if it were long ago.
+    #[cfg(test)]
+    pub(crate) fn age_looks(&self) {
+        for remembered in self.sessions.lock().unwrap().values() {
+            remembered.age_look();
+        }
+    }
 }
 
 impl Answers {
@@ -302,7 +319,8 @@ impl Remembered {
     pub(crate) fn snapshot(&self) -> Snapshot {
         let mut state = self.state.lock().unwrap();
         state.used = Instant::now();
-        Snapshot { cookies: state.cookies.clone(), tokens: state.tokens.clone(), component: state.component.clone(), detected: state.detected }
+        let look_due = !state.detected && state.look_failed.is_none_or(|at| at.elapsed() >= LOOK_AGAIN_AFTER);
+        Snapshot { cookies: state.cookies.clone(), tokens: state.tokens.clone(), component: state.component.clone(), detected: state.detected, look_due }
     }
 
     // What a question left in tonAPI's session, kept for the next one: what
@@ -338,6 +356,11 @@ impl Remembered {
         let mut state = self.state.lock().unwrap();
         state.component = component;
         state.detected = true;
+    }
+
+    // The look failed: not again for a while.
+    pub(crate) fn look_failed(&self) {
+        self.state.lock().unwrap().look_failed = Some(Instant::now());
     }
 
     // An answer kept, while it is still fresh.
@@ -430,6 +453,12 @@ impl Remembered {
     #[cfg(test)]
     pub(crate) fn forget_answers(&self) {
         self.answers.state.lock().unwrap().kept.clear();
+    }
+
+    #[cfg(test)]
+    pub(crate) fn age_look(&self) {
+        let mut state = self.state.lock().unwrap();
+        state.look_failed = state.look_failed.and_then(|at| at.checked_sub(LOOK_AGAIN_AFTER));
     }
 
     #[cfg(test)]
