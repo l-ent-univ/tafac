@@ -225,20 +225,20 @@ const STORED = ['mail', 'library', 'moodle', 'generic', 'carbon:book', 'ph:book-
 // Node's route on a file of each university's, before Node went (27 November
 // 2026): its status, its body and the file after each request. Kept as they
 // were written, the gateway's (own/icons.rs) to answer alike; no longer
-// written again.
+// written again, nor the day they were written on.
 async function nodesRoutes() {
   const kept = JSON.parse(await readFile(outputPath('tests/fixtures/app-icon-picks.json'), 'utf8'))
-  return kept.routes
+  return { routes: kept.routes, today: kept.today }
 }
 
 export async function buildIconFixture() {
   const themes = {}
   for (const id of listUniversityIds()) themes[id] = resolveAppIconTheme((await loadSharedConfig(id)).appIcons)
-  const routes = await nodesRoutes()
+  const { routes, today } = await nodesRoutes()
   return {
     about: 'Written by scripts/gateway-data.mjs from what the JS picks: the gateway (own/icons.rs) and tests/appIcons.test.js hold to it.',
     // The day the stores wrote down (assignedAt), for the files below.
-    today: new Date().toISOString().slice(0, 10),
+    today,
     normalized: TEXTS.map((text) => [text, normalizeText(text)]),
     picks: PICKS.map((picked) => ({
       ...picked,
